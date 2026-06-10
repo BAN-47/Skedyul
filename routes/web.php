@@ -7,3 +7,13 @@ Route::get('/', function () {
 });
 
 
+use Illuminate\Support\Facades\DB;
+
+Route::get('/test-db', function () {
+    try {
+        DB::connection()->getPdo();
+        return "✅ Connected to Supabase Successfully!";
+    } catch (\Exception $e) {
+        return "❌ Connection Failed: " . $e->getMessage();
+    }
+});
