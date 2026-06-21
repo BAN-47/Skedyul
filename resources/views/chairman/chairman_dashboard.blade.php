@@ -18,7 +18,7 @@
 
     <!-- TOPBAR -->
     <div class="topbar">
-      <div class="topbar-title">Department Chair Dashboard</div>
+      <div class="topbar-title">Department Chairperson Dashboard</div>
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="badge badge-blue" style="font-size:11px;">BSIS · AY 2025–26 · 1st Sem</span>
         <div class="notif-btn" id="notif-btn" onclick="toggleNotifPanel()"

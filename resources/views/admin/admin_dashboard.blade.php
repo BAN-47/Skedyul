@@ -6,7 +6,7 @@
 <title>SKEDYUL — Admin Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/admin_dashboard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/admin/admin_dashboard.css') }}">
 <style>
 </style>
 </head>
@@ -20,7 +20,7 @@
 
     <!-- TOPBAR -->
     <div class="topbar">
-      <div class="topbar-title">Dashboard</div>
+      <div class="topbar-title">Technical Admin Dashboard</div>
       <div class="notif-wrap">
         <button class="btn-notif" onclick="toggleNotif()">
           Notifications <span class="notif-badge" id="notif-count">3</span>

@@ -1,4 +1,4 @@
- <!-- ══════════ SIDEBAR ══════════ -->
+<!-- ══════════ SIDEBAR ══════════ -->
   <div class="sidebar">
     <div class="sidebar-logo">
       <div class="sidebar-logo-text">SKED<span>YUL</span></div>
@@ -14,18 +14,33 @@
 
     <div class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <div class="nav-item active"><span class="nav-icon"></span> Dashboard</div>
-      <div class="nav-item"><span class="nav-icon"></span> User Accounts</div>
-      <div class="nav-item"><span class="nav-icon"></span> Subjects</div>
-      <div class="nav-item"><span class="nav-icon"></span> Rooms</div>
+      <a href="{{ route('admin.dashboard') }}" class="nav-item {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Dashboard
+      </a>
+      <a href="{{ route('admin.users') }}" class="nav-item {{ request()->routeIs('admin.users') ? 'active' : '' }}">
+        <span class="nav-icon"></span> User Accounts
+      </a>
+      <a href="{{ route('admin.subjects') }}" class="nav-item {{ request()->routeIs('admin.subjects') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Subjects
+      </a>
+      <a href="{{ route('admin.rooms') }}" class="nav-item {{ request()->routeIs('admin.rooms') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Rooms
+      </a>
 
       <div class="nav-section-label">System</div>
-      <div class="nav-item"><span class="nav-icon"></span> Reports</div>
-      <div class="nav-item"><span class="nav-icon"></span> Settings</div>
+      <a href="{{ route('admin.reports') }}" class="nav-item {{ request()->routeIs('admin.reports') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Reports
+      </a>
+      <a href="{{ route('admin.admin_settings') }}" class="nav-item {{ request()->routeIs('admin.admin_settings') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Settings
+      </a>
     </div>
 
     <div class="sidebar-bottom">
-      <button class="btn-logout">⬅ Sign Out</button>
+      <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit" class="btn-logout">⬅ Sign Out</button>
+      </form>
     </div>
   </div>
   <!-- ══ END SIDEBAR ══ -->
