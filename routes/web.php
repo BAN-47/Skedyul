@@ -50,6 +50,20 @@ Route::get('/admin/settings', function () {
     return view('admin.admin_settings');
 })->name('admin.admin_settings');
 
+
+/* CHAIRMAN ROUTES */
+Route::get('/chair/dashboard', function () {
+    return view('chair.chair_dashboard');
+})->name('chair.dashboard');
+
+Route::get('/chair/plotter', function () {
+    return view('chair.schedule_plotter');
+})->name('chair.schedule_plotter');
+
+Route::get('/chair/faculty_load', function () {
+    return view('chair.faculty_load');
+})->name('chair.faculty_load');
+
 /* FACULTY ROUTES */
 Route::get('/faculty/dashboard', function () {
     return view('faculty.faculty_dashboard');
