@@ -114,7 +114,7 @@
           <strong>2 Conflicts Detected</strong>
           Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM. Jerome Bautista: CC 313 & CC 401 room conflict Wed 10:00–11:30 AM. Resolve before submitting to the Dean.
         </div>
-        <button class="topbar-btn btn-danger" style="margin-left:auto;white-space:nowrap;padding:6px 12px;font-size:12px;" onclick="resolveConflicts()">Fix Now</button>
+        <a href="{{ route('chair.schedule_plotter') }}" class="topbar-btn btn-danger" style="margin-left:auto;white-space:nowrap;padding:6px 12px;font-size:12px; text-decoration:none;">Fix Now</a>
       </div>
 
       <!-- Success Alert (hidden by default) -->
