@@ -1,0 +1,8 @@
+/* ============================================================
+   Faculty Portal — Settings Page (Admin/System)
+   File: Faculty/Public/settings.css
+   Page: #page-settings
+   ============================================================ */
+.settings-nav-item { padding:10px 20px; font-size:13px; font-weight:500; color:var(--text2); cursor:pointer; transition:all .15s; border-left:3px solid transparent; }
+.settings-nav-item:hover { background:var(--grey2); color:var(--text); }
+.settings-nav-item.active { background:var(--blue-pale); color:var(--blue); border-left-color:var(--blue); font-weight:700; }
