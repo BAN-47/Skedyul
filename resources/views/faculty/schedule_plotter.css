@@ -1,0 +1,21 @@
+/* ============================================================
+   Faculty Portal — Schedule Plotter Page
+   File: Faculty/Public/schedule_plotter.css
+   Page: #page-schedule-plotter
+   ============================================================ */
+.schedule-grid-wrap { overflow:auto; }
+.schedule-grid { display:grid; grid-template-columns:80px repeat(6,1fr); gap:1px; background:var(--border); border-radius:10px; overflow:hidden; min-width:700px; }
+.sg-header { background:var(--navy); color:#fff; font-size:11px; font-weight:700; padding:10px 8px; text-align:center; text-transform:uppercase; letter-spacing:.5px; }
+.sg-time { background:var(--grey2); font-size:11px; font-weight:600; color:var(--text3); padding:8px; text-align:center; font-family:var(--mono); }
+.sg-cell { background:var(--white); min-height:52px; padding:4px; position:relative; }
+.sg-event { border-radius:6px; padding:6px 8px; font-size:11px; font-weight:600; line-height:1.3; height:100%; display:flex; flex-direction:column; justify-content:center; }
+.sg-event.blue   { background:#dbeafe; color:#1e40af; border-left:3px solid #2563eb; }
+.sg-event.green  { background:#dcfce7; color:#166534; border-left:3px solid #16a34a; }
+.sg-event.amber  { background:#fef3c7; color:#92400e; border-left:3px solid #d97706; }
+.sg-event.teal   { background:#cffafe; color:#164e63; border-left:3px solid #0891b2; }
+.sg-event.red    { background:#fee2e2; color:#991b1b; border-left:3px solid #dc2626; }
+.sg-event.purple { background:#ede9fe; color:#4c1d95; border-left:3px solid #7c3aed; }
+.conflict-alert { background:#fef2f2; border:1px solid #fecaca; border-left:4px solid var(--red); border-radius:10px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:flex-start; gap:10px; }
+.conflict-alert-icon { font-size:18px; margin-top:1px; }
+.conflict-alert-text { font-size:13px; color:#991b1b; line-height:1.5; }
+.conflict-alert-text strong { display:block; font-weight:700; margin-bottom:2px; }

@@ -1,0 +1,22 @@
+/* ============================================================
+   Dean Portal — Dashboard Page
+   File: Dean/Public/dashboard.css
+   Page: #page-dashboard
+   ============================================================ */
+.approval-item { display:flex; align-items:flex-start; gap:14px; padding:14px 0; border-bottom:1px solid var(--border); }
+.approval-item:last-child { border-bottom:none; }
+.approval-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#fff; flex-shrink:0; }
+.approval-content { flex:1; }
+.approval-name { font-size:13px; font-weight:700; color:var(--text); }
+.approval-detail { font-size:12px; color:var(--text3); margin-top:3px; line-height:1.5; }
+.approval-actions { display:flex; gap:8px; margin-top:10px; }
+.tab-bar { display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:20px; }
+.tab-btn { padding:10px 16px; font-family:var(--font); font-size:13px; font-weight:600; color:var(--text3); background:none; border:none; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; transition:all .2s; }
+.tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tab-btn:hover:not(.active) { color:var(--text2); }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+.quick-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+.quick-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:18px 12px; background:var(--white); border:1px solid var(--border); border-radius:12px; cursor:pointer; transition:all .2s; text-align:center; }
+.quick-btn:hover { border-color:var(--blue); background:var(--blue-pale); transform:translateY(-1px); }
+.quick-btn-label { font-size:13px; font-weight:700; color:var(--navy); }
