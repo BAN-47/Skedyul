@@ -23,16 +23,28 @@
     <a href="{{ route('chair.faculty_load') }}" class="nav-item {{ request()->routeIs('chair.faculty_load') ? 'active' : '' }}">
       <span class="nav-icon"></span> Faculty Load
     </a>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Subjects</div>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Rooms</div>
+    <a href="{{ route('chair.subjects') }}" class="nav-item {{ request()->routeIs('chair.subjects') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Subjects
+    </a>
+    <a href="{{ route('chair.rooms') }}" class="nav-item {{ request()->routeIs('chair.rooms') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Rooms
+    </a>
 
     <div class="nav-section-label">Submission</div>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Conflict Checker</div>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Submit to Dean</div>
+    <a href="{{ route('chair.conflict_checker') }}" class="nav-item {{ request()->routeIs('chair.conflict_checker') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Conflict Checker
+    </a>
+    <a href="{{ route('chair.submit_dean') }}" class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Submit to Dean
+    </a>
 
     <div class="nav-section-label">System</div>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Export Reports</div>
-    <div class="nav-item" style="opacity:0.4;cursor:not-allowed;"><span class="nav-icon"></span> Settings</div>
+    <a href="{{ route('chair.export_reports') }}" class="nav-item {{ request()->routeIs('chair.export_reports') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Export Reports
+    </a>
+    <a href="{{ route('chair.settings') }}" class="nav-item {{ request()->routeIs('chair.settings') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Settings
+    </a>
   </div>
 
   <div class="sidebar-bottom">

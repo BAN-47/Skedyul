@@ -64,6 +64,34 @@ Route::get('/chair/faculty_load', function () {
     return view('chair.faculty_load');
 })->name('chair.faculty_load');
 
+Route::get('/chair/faculty_load', function () {
+    return view('chair.faculty_load');
+})->name('chair.faculty_load');
+
+Route::get('/chair/subjects', function () {
+    return view('chair.subjects');
+})->name('chair.subjects');
+
+Route::get('/chair/rooms', function() {
+    return view('chair.rooms');
+})->name('chair.rooms');
+
+Route::get('/chair/conflict_checker', function() {
+    return view('chair.conflict_checker');
+})->name('chair.conflict_checker');
+
+Route::get('/chair/submit_dean', function() {
+    return view('chair.submit_dean');
+})->name('chair.submit_dean');
+
+Route::get('/chair/export_reports', function() {
+    return view('chair.export_reports');
+})->name('chair.export_reports');
+
+Route::get('/chair/settings', function() {
+    return view('chair.settings');
+})->name('chair.settings');
+
 /* FACULTY ROUTES */
 Route::get('/faculty/dashboard', function () {
     return view('faculty.faculty_dashboard');

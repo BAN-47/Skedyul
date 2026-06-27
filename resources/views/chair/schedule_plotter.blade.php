@@ -9,6 +9,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/chair/schedule_plotter.css') }}">
 </head>
+<style>
+  html, body { overflow: hidden; }
+
+  .sidebar-nav {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .page {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .page::-webkit-scrollbar { display: none; }
+
+  .schedule-grid-wrap {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .schedule-grid-wrap::-webkit-scrollbar { display: none; }
+</style>
 <body>
 
 <div class="screen active" style="display:flex;">
@@ -32,7 +53,7 @@
       </div>
     </div>
 
-    <div id="page-plotter" class="page active">
+    <div class="page-content" style="margin-left: 30px; margin-top: 30px; margin-right: 30px; display: block;animation: fadeIn .3s ease;">
       <!-- Page header row -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
         <div>
