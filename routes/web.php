@@ -3,97 +3,96 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\LoginController;
+
+
+/*
+|--------------------------------------------------------------------------
+| HOME
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/', function () {
+    return redirect()->route('login');
+});
+/*
+|--------------------------------------------------------------------------
+| DATABASE TEST
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/test-db', function () {
-    try {
-        DB::connection()->getPdo();
-        return "✅ Connected to Supabase Successfully!";
-    } catch (\Exception $e) {
-        return "❌ Connection Failed: " . $e->getMessage();
-    }
-});
 
-/* LOGIN ROUTE */
+    try {
+
+        DB::connection()->getPdo();
+
+        return "✅ Supabase Connected Successfully";
+
+    } catch (\Exception $e) {
+
+        return "❌ Database Error: " . $e->getMessage();
+
+    }
+
+});
+/*
+|--------------------------------------------------------------------------
+| LOGIN PAGE
+|--------------------------------------------------------------------------
+*/
+
 Route::get('/login', function () {
+
     return view('index');
+
 })->name('login');
 
-Route::post('/logout', function () {
-    Auth::logout();
-    request()->session()->invalidate();
-    request()->session()->regenerateToken();
-    return redirect()->route('login');
-})->name('logout');
 
-/* ADMIN ROUTES */
-Route::get('/admin/admin_dashboard', function () {
-    return view('admin.admin_dashboard');
-})->name('admin.dashboard');
+Route::post('/login',[LoginController::class,'login'])
+->name('login.authenticate');
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
+Route::post('/logout',
+    [LoginController::class,'logout']
+)->name('logout');
+/*
+|--------------------------------------------------------------------------
+| ADMIN DASHBOARD
+|--------------------------------------------------------------------------
+*/
+Route::prefix('admin')->group(function () {
 
-Route::get('/admin/userAccounts', function () {
-    return view('admin.user_accounts');
-})->name('admin.users');
-
-Route::get('/admin/subjects', function () {
-    return view('admin.subjects');
-})->name('admin.subjects');
-
-Route::get('/admin/rooms', function () {
-    return view('admin.rooms');
-})->name('admin.rooms');
-
-Route::get('/admin/reports', function () {
-    return view('admin.reports');
-})->name('admin.reports');
-
-Route::get('/admin/settings', function () {
-    return view('admin.admin_settings');
-})->name('admin.admin_settings');
+    Route::get('/dashboard', function () {
+        return view('admin.admin_dashboard');
+    })->name('admin.dashboard');
 
 
-/* CHAIRMAN ROUTES */
-Route::get('/chair/dashboard', function () {
-    return view('chair.chair_dashboard');
-})->name('chair.dashboard');
+    Route::get('/users', function () {
+        return view('admin.user_accounts');
+    })->name('admin.users');
 
-Route::get('/chair/plotter', function () {
-    return view('chair.schedule_plotter');
-})->name('chair.schedule_plotter');
 
-Route::get('/chair/faculty_load', function () {
-    return view('chair.faculty_load');
-})->name('chair.faculty_load');
+    Route::get('/subjects', function () {
+        return view('admin.subjects');
+    })->name('admin.subjects');
 
-Route::get('/chair/faculty_load', function () {
-    return view('chair.faculty_load');
-})->name('chair.faculty_load');
 
-Route::get('/chair/subjects', function () {
-    return view('chair.subjects');
-})->name('chair.subjects');
+    Route::get('/rooms', function () {
+        return view('admin.rooms');
+    })->name('admin.rooms');
 
-Route::get('/chair/rooms', function() {
-    return view('chair.rooms');
-})->name('chair.rooms');
 
-Route::get('/chair/conflict_checker', function() {
-    return view('chair.conflict_checker');
-})->name('chair.conflict_checker');
+    Route::get('/reports', function () {
+        return view('admin.reports');
+    })->name('admin.reports');
 
-Route::get('/chair/submit_dean', function() {
-    return view('chair.submit_dean');
-})->name('chair.submit_dean');
 
-Route::get('/chair/export_reports', function() {
-    return view('chair.export_reports');
-})->name('chair.export_reports');
+    Route::get('/settings', function () {
+        return view('admin.admin_settings');
+    })->name('admin.admin_settings');
 
-Route::get('/chair/settings', function() {
-    return view('chair.settings');
-})->name('chair.settings');
-
-/* FACULTY ROUTES */
-Route::get('/faculty/dashboard', function () {
-    return view('faculty.faculty_dashboard');
-})->name('faculty.dashboard');
-
+});
