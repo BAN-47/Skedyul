@@ -188,8 +188,10 @@
           <div class="dash-card">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <div>
-                <div class="card-title">Current Sections</ div>
-                <div class="card-sub">AY {{ $academicYear }} · {{ $semester }}</div>
+                <div class="card-title">Current Sections</div>
+                <div class="card-sub">
+                    AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
+                </div>
               </div>
               <span class="badge badge-blue">{{ $section->count() }} Total</span>
             </div>
@@ -201,26 +203,19 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @forelse($section as $sections)
-                  <tr>
-                    <td><b>{{ $sections->name }}</b></td>
-                    <td>{{ $sections->program }}</td>
-                    <td>{{ $sections->year_level }}</td>
-                    <td>{{ $sections->student_count }}</td>
-                    <td>{{ $sections->subject_count }}</td>
-                    <td>
-                      <span class="badge badge-{{ match($sections->status) {
-                          'Scheduled'   => 'green',
-                          'In Progress' => 'amber',
-                          'Unscheduled' => 'red',
-                          default       => 'grey',
-                      } }}">
-                          {{ $sections->status }}
-                      </span>
-                    </td>
-                  </tr>
+                  @forelse ($section as $sec)
+                    <tr>
+                      <td>{{ $sec->sec_name }}</td>
+                      <td>{{ $sec->program->prog_name ?? 'N/A' }}</td>
+                      <td>{{ $sec->sec_year_level }}</td>
+                      <td>{{ $sec->sec_no_of_students }}</td>
+                      <td>{{-- subjects column, depends on how subjects relate to a section --}}</td>
+                      <td>{{ $sec->sec_status }}</td>
+                    </tr>
                   @empty
-                  <tr><td colspan="6" style="text-align:center;">No sections found.</td></tr>
+                    <tr>
+                      <td colspan="6" class="text-center">No sections found.</td>
+                    </tr>
                   @endforelse
                 </tbody>
               </table>
