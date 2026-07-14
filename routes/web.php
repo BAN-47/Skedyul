@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\SubjectController;
+use App\Models\User;
 
 
 /*
@@ -58,32 +59,37 @@ Route::post('/logout',
 | ADMIN DASHBOARD
 |--------------------------------------------------------------------------
 */
+
+/*
+|--------------------------------------------------------------------------
+| User_accounts
+|--------------------------------------------------------------------------
+*/
+use App\Http\Controllers\Admin\UserController;
+
 Route::prefix('admin')->group(function () {
 
     Route::get('/dashboard', function () {
         return view('admin.admin_dashboard');
     })->name('admin.dashboard');
 
-
-    Route::get('/users', function () {
-        return view('admin.user_accounts');
-    })->name('admin.users');
-
+    Route::get('/users', [UserController::class,'index'])->name('admin.users');
+    Route::get('/users/{id}/edit', [UserController::class,'edit'])->name('admin.users.edit');
+    Route::post('/users', [UserController::class,'store'])->name('admin.users.store');
+    Route::put('/users/{id}', [UserController::class,'update'])->name('admin.users.update');
+    Route::delete('/users/{id}', [UserController::class,'destroy'])->name('admin.users.destroy');
 
     Route::get('/subjects', function () {
         return view('admin.subjects');
     })->name('admin.subjects');
 
-
     Route::get('/rooms', function () {
         return view('admin.rooms');
     })->name('admin.rooms');
 
-
     Route::get('/reports', function () {
         return view('admin.reports');
     })->name('admin.reports');
-
 
     Route::get('/settings', function () {
         return view('admin.admin_settings');
