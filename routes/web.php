@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\SubjectController;
 use App\Models\User;
@@ -83,9 +84,11 @@ Route::prefix('admin')->group(function () {
         return view('admin.subjects');
     })->name('admin.subjects');
 
-    Route::get('/rooms', function () {
-        return view('admin.rooms');
-    })->name('admin.rooms');
+    Route::get('/rooms', [RoomController::class, 'index'])->name('admin.rooms');
+    Route::post('/rooms', [RoomController::class, 'store'])->name('admin.rooms.store');
+    Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('admin.rooms.show');
+    Route::put('/rooms/{room}', [RoomController::class, 'update'])->name('admin.rooms.update');
+    Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])->name('admin.rooms.destroy');
 
     Route::get('/reports', function () {
         return view('admin.reports');

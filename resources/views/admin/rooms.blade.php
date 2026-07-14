@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>SKEDYUL — Room Management</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,19 +35,33 @@
 
     <div id="page-rooms" class="page active">
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Total Rooms</div><div class="stat-value">12</div><div class="stat-sub">Lecture + Lab</div></div>
-        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">Available</div><div class="stat-value">9</div><div class="stat-sub">Ready to assign</div></div>
-        <div class="stat-card" style="--accent:#dc2626"><div class="stat-label">In Use</div><div class="stat-value">3</div><div class="stat-sub">Currently occupied</div></div>
+        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Total Rooms</div><div class="stat-value" id="stat-total">{{ $rooms->count() }}</div><div class="stat-sub">Lecture + Lab</div></div>
+        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">Available</div><div class="stat-value" id="stat-available">{{ $rooms->where('room_is_available', true)->count() }}</div><div class="stat-sub">Ready to assign</div></div>
+        <div class="stat-card" style="--accent:#dc2626"><div class="stat-label">In Use</div><div class="stat-value" id="stat-inuse">{{ $rooms->where('room_is_available', false)->count() }}</div><div class="stat-sub">Currently occupied</div></div>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Room Management</div><button class="topbar-btn btn-primary" onclick="openModal('modal-add-room')">+ Add Room</button></div>
         <div class="table-wrap"><table id="rooms-table">
           <tr><th>Room</th><th>Type</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
-          <tr><td><b>Room 301</b></td><td>Lecture</td><td>40</td><td><span class="badge badge-amber">In Use</span></td><td style="display:flex;gap:6px;"><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('Room 301','Lecture','40','In Use','CC 313 — Web Systems · Mon/Wed 7:00–8:30 AM','Jerome Bautista','Ground Floor, ICT Building','Air-conditioned, projector, whiteboard, 40 movable chairs.')">View</button><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('Room 301','Lecture','40','In Use','Ground Floor, ICT Building','Air-conditioned, projector, whiteboard, 40 movable chairs.')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'Room 301')">Delete</button></td></tr>
-          <tr><td><b>Room 302</b></td><td>Lecture</td><td>40</td><td><span class="badge badge-green">Available</span></td><td style="display:flex;gap:6px;"><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('Room 302','Lecture','40','Available','—','—','Ground Floor, ICT Building','Air-conditioned, projector, whiteboard, 40 movable chairs.')">View</button><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('Room 302','Lecture','40','Available','Ground Floor, ICT Building','Air-conditioned, projector, whiteboard, 40 movable chairs.')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'Room 302')">Delete</button></td></tr>
-          <tr><td><b>Lab 1</b></td><td>Laboratory</td><td>35</td><td><span class="badge badge-amber">In Use</span></td><td style="display:flex;gap:6px;"><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('Lab 1','Laboratory','35','In Use','IT 401 — System Admin · Tue/Thu 8:30–10:00 AM','Ana Reyes','2nd Floor, ICT Building','35 desktop computers, air-conditioned, network switches, projector.')">View</button><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('Lab 1','Laboratory','35','In Use','2nd Floor, ICT Building','35 desktop computers, air-conditioned, network switches, projector.')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'Lab 1')">Delete</button></td></tr>
-          <tr><td><b>Lab 2</b></td><td>Laboratory</td><td>35</td><td><span class="badge badge-amber">In Use</span></td><td style="display:flex;gap:6px;"><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('Lab 2','Laboratory','35','In Use','IT 302 — Networking · Mon/Wed 1:00–2:30 PM','Carlo Mendoza','2nd Floor, ICT Building','35 desktop computers, network lab equipment, patch panels.')">View</button><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('Lab 2','Laboratory','35','In Use','2nd Floor, ICT Building','35 desktop computers, network lab equipment, patch panels.')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'Lab 2')">Delete</button></td></tr>
-          <tr><td><b>Room 201</b></td><td>Lecture</td><td>45</td><td><span class="badge badge-green">Available</span></td><td style="display:flex;gap:6px;"><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('Room 201','Lecture','45','Available','—','—','2nd Floor, Main Building','Air-conditioned, smart TV, whiteboard, 45 fixed chairs.')">View</button><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('Room 201','Lecture','45','Available','2nd Floor, Main Building','Air-conditioned, smart TV, whiteboard, 45 fixed chairs.')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'Room 201')">Delete</button></td></tr>
+          @foreach ($rooms as $room)
+          <tr data-room-id="{{ $room->room_id }}">
+            <td class="cell-name"><b>{{ $room->room_name }}</b></td>
+            <td class="cell-type">{{ $room->room_type }}</td>
+            <td class="cell-capacity">{{ $room->room_capacity }}</td>
+            <td class="cell-status">
+              @if ($room->room_is_available)
+                <span class="badge badge-green">Available</span>
+              @else
+                <span class="badge badge-amber">In Use</span>
+              @endif
+            </td>
+            <td style="display:flex;gap:6px;">
+              <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('{{ $room->room_id }}')">View</button>
+              <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('{{ $room->room_id }}')">Edit</button>
+              <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')">Delete</button>
+            </td>
+          </tr>
+          @endforeach
         </table></div>
       </div>
     </div>
@@ -71,9 +86,9 @@
     </div>
     <div class="form-row">
       <div class="field-group"><label class="field-label">Capacity</label><input class="field-input" id="add-room-capacity" type="number" min="1" placeholder="e.g. 40"></div>
-      <div class="field-group"><label class="field-label">Building / Location</label><input class="field-input" id="add-room-location" placeholder="e.g. 2nd Floor, ICT Building"></div>
+      <div class="field-group"><label class="field-label">Building</label><input class="field-input" id="add-room-building" placeholder="e.g. ICT Building"></div>
     </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Facilities / Equipment</label><textarea class="field-input" id="add-room-facilities" rows="2" placeholder="e.g. Air-conditioned, projector, whiteboard..." style="resize:vertical;"></textarea></div>
+    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Location / Floor</label><input class="field-input" id="add-room-location" placeholder="e.g. 2nd Floor"></div>
     <div class="modal-footer">
       <button class="topbar-btn btn-secondary" onclick="closeModal('modal-add-room')">Cancel</button>
       <button class="topbar-btn btn-primary" onclick="saveAddRoom()">Add Room</button>
@@ -104,23 +119,18 @@
         <div style="font-size:11px;color:var(--text3);">students</div>
       </div>
       <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Location</div>
-        <div id="vr-location" style="font-size:13px;font-weight:600;color:var(--text);"></div>
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Building</div>
+        <div id="vr-building" style="font-size:13px;font-weight:600;color:var(--text);">—</div>
       </div>
     </div>
-    <div style="background:var(--grey);border-radius:10px;padding:14px;margin-bottom:12px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Current Assignment</div>
-      <div id="vr-assignment" style="font-size:13px;font-weight:600;color:var(--text);"></div>
-      <div id="vr-faculty" style="font-size:12px;color:var(--text3);margin-top:3px;"></div>
-    </div>
     <div style="background:var(--grey);border-radius:10px;padding:14px;margin-bottom:20px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Facilities</div>
-      <div id="vr-facilities" style="font-size:13px;color:var(--text2);line-height:1.6;"></div>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Location / Floor</div>
+      <div id="vr-location" style="font-size:13px;font-weight:600;color:var(--text);">—</div>
     </div>
     <div class="modal-footer">
       <button class="topbar-btn btn-secondary" onclick="closeModal('modal-view-room')">Close</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteCurrentRoom('modal-view-room')">Delete</button>
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-view-room');showToast('Room details saved!')">Edit Room</button>
+      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteFromView()">Delete</button>
+      <button class="topbar-btn btn-primary" onclick="closeModal('modal-view-room'); openEditRoom(currentRoomId)">Edit Room</button>
     </div>
   </div>
 </div>
@@ -148,19 +158,35 @@
       <div class="field-group"><label class="field-label">Capacity</label><input class="field-input" id="edit-room-capacity" type="number" min="1"></div>
       <div class="field-group"><label class="field-label">Status</label>
         <select class="field-select" id="edit-room-status">
-          <option>Available</option><option>In Use</option><option>Under Maintenance</option>
+          <option value="1">Available</option><option value="0">In Use</option>
         </select>
       </div>
     </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Building / Location</label><input class="field-input" id="edit-room-location" placeholder="e.g. 2nd Floor, ICT Building"></div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Facilities / Equipment</label><textarea class="field-input" id="edit-room-facilities" rows="2" style="resize:vertical;" placeholder="e.g. Air-conditioned, projector..."></textarea></div>
+    <div class="form-row">
+      <div class="field-group"><label class="field-label">Building</label><input class="field-input" id="edit-room-building" placeholder="e.g. ICT Building"></div>
+      <div class="field-group"><label class="field-label">Location / Floor</label><input class="field-input" id="edit-room-location" placeholder="e.g. 2nd Floor"></div>
+    </div>
     <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:4px;">
       ⚠️ Changes will be reflected immediately in the room directory.
     </div>
     <div class="modal-footer">
       <button class="topbar-btn btn-secondary" onclick="closeModal('modal-edit-room')">Cancel</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteCurrentRoom('modal-edit-room')">Delete</button>
-      <button class="topbar-btn btn-primary" id="edit-room-save-btn">Save Changes</button>
+      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteFromEdit()">Delete</button>
+      <button class="topbar-btn btn-primary" onclick="saveEditRoom()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ERROR MODAL -->
+<div class="modal-overlay" id="modal-error">
+  <div class="modal" style="width:400px;">
+    <div style="display:flex;align-items:center;gap:14px;padding:8px 0 16px;">
+      <div style="width:44px;height:44px;border-radius:50%;background:var(--red-light);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">⚠️</div>
+      <div class="modal-title" style="margin:0;">Action Failed</div>
+    </div>
+    <div id="error-modal-message" style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:20px;"></div>
+    <div class="modal-footer">
+      <button class="topbar-btn btn-primary" onclick="closeModal('modal-error')">OK</button>
     </div>
   </div>
 </div>
@@ -169,6 +195,23 @@
 <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+let currentRoomId = null;
+
+// Room data passed from backend, keyed by room_id, for instant modal fill (no extra fetch)
+const ROOMS_DATA = {
+  @foreach ($rooms as $room)
+  "{{ $room->room_id }}": {
+    name: @json($room->room_name),
+    type: @json($room->room_type),
+    capacity: {{ $room->room_capacity }},
+    available: {{ $room->room_is_available ? 'true' : 'false' }},
+    building: @json($room->room_building),
+    location: @json($room->room_location)
+  },
+  @endforeach
+};
+
 // ── NOTIFICATION BELL ────────────────────────────────────────────────────────
 const ADMIN_NOTIFS = [
   { dot:'var(--red)', text:'<b>Conflict Detected</b> — GE002 Room 205 double-booked Wed 1PM.', time:'Today, 08:30 AM', unread:true },
@@ -233,6 +276,12 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+// ── ERROR MODAL (replaces browser alert()) ──────────────────────────────────
+function showErrorModal(message) {
+  document.getElementById('error-modal-message').textContent = message;
+  openModal('modal-error');
+}
+
 function setSelectValue(id, value) {
   const sel = document.getElementById(id);
   for (let i = 0; i < sel.options.length; i++) {
@@ -242,82 +291,242 @@ function setSelectValue(id, value) {
   }
 }
 
+// ── STATS ──────────────────────────────────────────────────────────────────
+function refreshStats() {
+  const rooms = Object.values(ROOMS_DATA);
+  document.getElementById('stat-total').textContent = rooms.length;
+  document.getElementById('stat-available').textContent = rooms.filter(r => r.available).length;
+  document.getElementById('stat-inuse').textContent = rooms.filter(r => !r.available).length;
+}
+
 // ── ROOMS: ADD ─────────────────────────────────────────────────────────────────
-function saveAddRoom() {
+async function saveAddRoom() {
   const name = document.getElementById('add-room-name').value.trim();
-  if (!name) { alert('Please enter a room name.'); return; }
+  if (!name) { showErrorModal('Please enter a room name.'); return; }
   const type       = document.getElementById('add-room-type').value;
-  const capacity   = document.getElementById('add-room-capacity').value || '—';
-  const location   = document.getElementById('add-room-location').value || '—';
-  const facilities = document.getElementById('add-room-facilities').value || '—';
-  const tbody = document.querySelector('#rooms-table');
-  const tr = document.createElement('tr');
-  tr.innerHTML = `<td><b>${name}</b></td><td>${type}</td><td>${capacity}</td>
-    <td><span class="badge badge-green">Available</span></td>
-    <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;"
-      onclick="openViewRoom('${name}','${type}','${capacity}','Available','—','—','${location}','${facilities}')">View</button></td>`;
-  tbody.appendChild(tr);
-  ['add-room-name','add-room-capacity','add-room-location','add-room-facilities'].forEach(id => document.getElementById(id).value = '');
-  closeModal('modal-add-room');
-  showToast('Room "' + name + '" added successfully!');
+  const capacity   = document.getElementById('add-room-capacity').value;
+  const building   = document.getElementById('add-room-building').value.trim();
+  const location   = document.getElementById('add-room-location').value.trim();
+
+  if (!capacity) { showErrorModal('Please enter a capacity.'); return; }
+
+  try {
+    const res = await fetch("{{ route('admin.rooms.store') }}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CSRF_TOKEN,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        room_name: name,
+        room_type: type,
+        room_capacity: capacity,
+        room_is_available: true,
+        room_building: building || null,
+        room_location: location || null
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showErrorModal(data.message || 'Failed to add room. Please try again.');
+      return;
+    }
+
+    const room = data.room;
+
+    // Add to local data store
+    ROOMS_DATA[room.room_id] = {
+      name: room.room_name,
+      type: room.room_type,
+      capacity: room.room_capacity,
+      available: room.room_is_available,
+      building: room.room_building,
+      location: room.room_location
+    };
+
+    // Insert new row into table
+    const tbody = document.getElementById('rooms-table');
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-room-id', room.room_id);
+    tr.style.opacity = '0';
+    tr.innerHTML = `
+      <td class="cell-name"><b>${room.room_name}</b></td>
+      <td class="cell-type">${room.room_type}</td>
+      <td class="cell-capacity">${room.room_capacity}</td>
+      <td class="cell-status"><span class="badge badge-green">Available</span></td>
+      <td style="display:flex;gap:6px;">
+        <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('${room.room_id}')">View</button>
+        <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('${room.room_id}')">Edit</button>
+        <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('${room.room_id}', '${room.room_name}')">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+    requestAnimationFrame(() => { tr.style.transition = 'opacity 0.3s'; tr.style.opacity = '1'; });
+
+    refreshStats();
+    closeModal('modal-add-room');
+    ['add-room-name','add-room-capacity','add-room-building','add-room-location'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    showToast(data.message || ('Room "' + name + '" added successfully!'));
+  } catch (err) {
+    showErrorModal('Failed to add room. Please try again.');
+    console.error(err);
+  }
 }
 
 // ── ROOMS: VIEW ────────────────────────────────────────────────────────────────
-function openViewRoom(name, type, capacity, status, assignment, faculty, location, facilities) {
-  document.getElementById('vr-name').textContent     = name;
-  document.getElementById('vr-type').textContent     = type;
-  document.getElementById('vr-capacity').textContent = capacity;
-  document.getElementById('vr-location').textContent = location;
-  document.getElementById('vr-assignment').textContent = assignment;
-  document.getElementById('vr-faculty').textContent  = faculty !== '—' ? 'Faculty: ' + faculty : '';
-  document.getElementById('vr-facilities').textContent = facilities;
-  const colors = { 'Available':'badge-green', 'In Use':'badge-amber', 'Under Maintenance':'badge-red' };
-  document.getElementById('vr-status-badge').innerHTML = `<span class="badge ${colors[status]||'badge-grey'}">${status}</span>`;
+function openViewRoom(roomId) {
+  currentRoomId = roomId;
+  const room = ROOMS_DATA[roomId];
+  if (!room) return;
+
+  document.getElementById('vr-name').textContent     = room.name;
+  document.getElementById('vr-type').textContent     = room.type;
+  document.getElementById('vr-capacity').textContent = room.capacity;
+  document.getElementById('vr-building').textContent = room.building || '—';
+  document.getElementById('vr-location').textContent = room.location || '—';
+  const status = room.available ? 'Available' : 'In Use';
+  const colors = { 'Available':'badge-green', 'In Use':'badge-amber' };
+  document.getElementById('vr-status-badge').innerHTML = `<span class="badge ${colors[status]}">${status}</span>`;
   openModal('modal-view-room');
 }
 
 // ── ROOMS: EDIT ────────────────────────────────────────────────────────────────
-function openEditRoom(name, type, capacity, status, location, facilities) {
-  document.getElementById('edit-room-header').textContent = name;
-  document.getElementById('edit-room-name').value       = name;
-  document.getElementById('edit-room-capacity').value   = capacity;
-  document.getElementById('edit-room-location').value   = location;
-  document.getElementById('edit-room-facilities').value = facilities;
-  setSelectValue('edit-room-type', type);
-  setSelectValue('edit-room-status', status);
-  document.getElementById('edit-room-save-btn').onclick = () => {
-    closeModal('modal-edit-room');
-    showToast('Room "' + document.getElementById('edit-room-name').value + '" updated successfully!');
-  };
+function openEditRoom(roomId) {
+  currentRoomId = roomId;
+  const room = ROOMS_DATA[roomId];
+  if (!room) return;
+
+  document.getElementById('edit-room-header').textContent = room.name;
+  document.getElementById('edit-room-name').value       = room.name;
+  document.getElementById('edit-room-capacity').value   = room.capacity;
+  document.getElementById('edit-room-building').value   = room.building || '';
+  document.getElementById('edit-room-location').value   = room.location || '';
+  setSelectValue('edit-room-type', room.type);
+  setSelectValue('edit-room-status', room.available ? '1' : '0');
   openModal('modal-edit-room');
 }
 
-// ── ROOMS: DELETE ──────────────────────────────────────────────────────────────
-function deleteCurrentRoom(modalId) {
-  const name = document.getElementById('vr-name') ? document.getElementById('vr-name').textContent
-    : (document.getElementById('edit-room-name') ? document.getElementById('edit-room-name').value : 'Room');
-  if (!confirm('Delete room: ' + name + '?\nThis action cannot be undone.')) return;
-  closeModal(modalId);
-  const rows = document.querySelectorAll('#rooms-table tr');
-  rows.forEach(row => {
-    if (row.textContent.includes(name)) {
-      row.style.transition = 'opacity 0.3s';
-      row.style.opacity = '0';
-      setTimeout(() => row.remove(), 300);
+async function saveEditRoom() {
+  const name     = document.getElementById('edit-room-name').value.trim();
+  const type     = document.getElementById('edit-room-type').value;
+  const capacity = document.getElementById('edit-room-capacity').value;
+  const available = document.getElementById('edit-room-status').value === '1';
+  const building = document.getElementById('edit-room-building').value.trim();
+  const location = document.getElementById('edit-room-location').value.trim();
+
+  if (!name || !capacity) { showErrorModal('Please fill in all required fields.'); return; }
+
+  try {
+    const res = await fetch(`/admin/rooms/${currentRoomId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': CSRF_TOKEN,
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        room_name: name,
+        room_type: type,
+        room_capacity: capacity,
+        room_is_available: available,
+        room_building: building || null,
+        room_location: location || null
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showErrorModal(data.message || 'Failed to update room. Please try again.');
+      return;
     }
-  });
-  showToast(name + ' deleted successfully.');
+
+    const room = data.room;
+
+    // Update local data store
+    ROOMS_DATA[room.room_id] = {
+      name: room.room_name,
+      type: room.room_type,
+      capacity: room.room_capacity,
+      available: room.room_is_available,
+      building: room.room_building,
+      location: room.room_location
+    };
+
+    // Update the table row in place
+    const row = document.querySelector(`tr[data-room-id="${room.room_id}"]`);
+    if (row) {
+      row.querySelector('.cell-name').innerHTML = `<b>${room.room_name}</b>`;
+      row.querySelector('.cell-type').textContent = room.room_type;
+      row.querySelector('.cell-capacity').textContent = room.room_capacity;
+      row.querySelector('.cell-status').innerHTML = room.room_is_available
+        ? `<span class="badge badge-green">Available</span>`
+        : `<span class="badge badge-amber">In Use</span>`;
+      // Update delete button's captured name argument
+      const deleteBtn = row.querySelector('button[onclick^="deleteRoom("]');
+      if (deleteBtn) deleteBtn.setAttribute('onclick', `deleteRoom('${room.room_id}', '${room.room_name}')`);
+    }
+
+    refreshStats();
+    closeModal('modal-edit-room');
+    showToast(data.message || ('Room "' + name + '" updated successfully!'));
+  } catch (err) {
+    showErrorModal('Failed to update room. Please try again.');
+    console.error(err);
+  }
 }
 
-function deleteTableRow(btn, name) {
-  if (!confirm('Delete: ' + name + '?\nThis action cannot be undone.')) return;
-  const row = btn.closest('tr');
-  if (row) {
-    row.style.transition = 'opacity 0.3s';
-    row.style.opacity = '0';
-    setTimeout(() => { row.remove(); }, 300);
+// ── ROOMS: DELETE ──────────────────────────────────────────────────────────────
+async function deleteRoom(roomId, name) {
+  if (!confirm('Delete room: ' + name + '?\nThis action cannot be undone.')) return;
+
+  try {
+    const res = await fetch(`/admin/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: {
+        'X-CSRF-TOKEN': CSRF_TOKEN,
+        'Accept': 'application/json'
+      }
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showErrorModal(data.message || 'Failed to delete room. Please try again.');
+      return;
+    }
+
+    showToast(data.message);
+    delete ROOMS_DATA[roomId];
+    const row = document.querySelector(`tr[data-room-id="${roomId}"]`);
+    if (row) {
+      row.style.transition = 'opacity 0.3s';
+      row.style.opacity = '0';
+      setTimeout(() => { row.remove(); refreshStats(); }, 300);
+    } else {
+      refreshStats();
+    }
+  } catch (err) {
+    showErrorModal('Failed to delete room. Please try again.');
+    console.error(err);
   }
-  showToast(name + ' deleted successfully.');
+}
+
+function deleteFromView() {
+  const room = ROOMS_DATA[currentRoomId];
+  closeModal('modal-view-room');
+  deleteRoom(currentRoomId, room ? room.name : 'Room');
+}
+
+function deleteFromEdit() {
+  const room = ROOMS_DATA[currentRoomId];
+  closeModal('modal-edit-room');
+  deleteRoom(currentRoomId, room ? room.name : 'Room');
 }
 </script>
 </body>
