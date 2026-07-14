@@ -90,7 +90,6 @@
             </div>
             <div class="table-wrap">
               <table>
-<<<<<<< HEAD
                 <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                   @php
@@ -126,51 +125,6 @@
                       </td>
                     </tr>
                   @endforelse
-=======
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Role</th>
-                        <th>Department</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($USER as $user)
-                    <tr>
-                        <td><b>{{ $user->name }}</b></td>
-                        <td>
-                            <span class="badge badge-{{ match($user->role) {
-                                'Admin' => 'blue',
-                                'Chair' => 'amber',
-                                'Faculty' => 'grey',
-                                default => 'grey',
-                            } }}">
-                                {{ $user->role }}
-                            </span>
-                        </td>
-                        <td>{{ $user->department }}</td>
-                        <td>
-                            <span class="badge badge-{{ $user->status === 'Active' ? 'green' : 'amber' }}">
-                                {{ $user->status }}
-                            </span>
-                        </td>
-                        <td>
-                            <button
-                                class="topbar-btn btn-secondary-custom"
-                                style="padding:4px 10px;font-size:11px;"
-                                onclick="showToast('{{ addslashes($user->name) }} - action performed')">
-                                View
-                            </button>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="5" style="text-align:center;">No records found.</td>
-                    </tr>
-                    @endforelse
->>>>>>> 076a4dfdb1b0cd3e11408edef631aa347edd9304
                 </tbody>
             </table>
             </div>
@@ -192,7 +146,6 @@
             </div>
           </div>
           <div class="dash-card flex-grow-1">
-<<<<<<< HEAD
             <div class="card-title mb-3">Role Distribution</div>
             @php
               $pct = fn($count) => $totalUsers > 0 ? round(($count / $totalUsers) * 100) : 0;
@@ -225,49 +178,6 @@
               </div>
               <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['system_admin']) }}%;background:var(--navy)"></div></div>
             </div>
-=======
-              <div class="card-title mb-3">Role Distribution</div>
-
-              <div class="workload-item">
-                  <div class="workload-header">
-                      <div class="workload-name">Faculty Members</div>
-                      <div class="workload-val" style="color:var(--blue)">{{ $facultyCount }}</div>
-                  </div>
-                  <div class="workload-bar">
-                      <div class="workload-fill" style="width:{{ $facultyPercent }}%;background:var(--blue)"></div>
-                  </div>
-              </div>
-
-              <div class="workload-item">
-                  <div class="workload-header">
-                      <div class="workload-name">Dept. Chairs</div>
-                      <div class="workload-val" style="color:var(--amber)">{{ $chairCount }}</div>
-                  </div>
-                  <div class="workload-bar">
-                      <div class="workload-fill" style="width:{{ $chairPercent }}%;background:var(--amber)"></div>
-                  </div>
-              </div>
-
-              <div class="workload-item">
-                  <div class="workload-header">
-                      <div class="workload-name">Dean</div>
-                      <div class="workload-val" style="color:var(--teal)">{{ $deanCount }}</div>
-                  </div>
-                  <div class="workload-bar">
-                      <div class="workload-fill" style="width:{{ $deanPercent }}%;background:var(--teal)"></div>
-                  </div>
-              </div>
-
-              <div class="workload-item">
-                  <div class="workload-header">
-                      <div class="workload-name">Tech Admin</div>
-                      <div class="workload-val" style="color:var(--navy)">{{ $adminCount }}</div>
-                  </div>
-                  <div class="workload-bar">
-                      <div class="workload-fill" style="width:{{ $adminPercent }}%;background:var(--navy)"></div>
-                  </div>
-              </div>
->>>>>>> 076a4dfdb1b0cd3e11408edef631aa347edd9304
           </div>
         </div>
       </div>
