@@ -80,7 +80,7 @@
         <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🚪</div><div class="stat-label">Rooms Available</div><div class="stat-value"></div><div class="stat-sub">9 currently occupied</div></div></div>
       </div>
 
-      <!-- USER ACCOUNTS + SYSTEM INFO -->
+<!-- USER ACCOUNTS + SYSTEM INFO -->
       <div class="row g-3 mb-4">
         <div class="col-lg-8">
           <div class="dash-card h-100">
@@ -90,6 +90,43 @@
             </div>
             <div class="table-wrap">
               <table>
+<<<<<<< HEAD
+                <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  @php
+                    $roleLabels  = [
+                      'faculty'          => ['Faculty', 'badge-grey'],
+                      'department_chair' => ['Dept. Chair', 'badge-amber'],
+                      'dean'             => ['Dean', 'badge-blue'],
+                      'system_admin'     => ['System Admin', 'badge-navy'],
+                    ];
+                  @endphp
+                  @forelse($users as $user)
+                    @php
+                      [$roleLabel, $roleBadge] = $roleLabels[$user->usr_role] ?? [ucfirst($user->usr_role), 'badge-grey'];
+                    @endphp
+                    <tr>
+                      <td><b>{{ $user->usr_name }}</b></td>
+                      <td><span class="badge {{ $roleBadge }}">{{ $roleLabel }}</span></td>
+                      <td>
+                        <span class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
+                          {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                      </td>
+                      <td>
+                        <a href="{{ route('admin.users') }}" class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;text-decoration:none;">
+                          Edit
+                        </a>
+                      </td>
+                    </tr>
+                  @empty
+                    <tr>
+                      <td colspan="4" style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">
+                        No user accounts found yet.
+                      </td>
+                    </tr>
+                  @endforelse
+=======
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -133,6 +170,7 @@
                         <td colspan="5" style="text-align:center;">No records found.</td>
                     </tr>
                     @endforelse
+>>>>>>> 076a4dfdb1b0cd3e11408edef631aa347edd9304
                 </tbody>
             </table>
             </div>
@@ -154,6 +192,40 @@
             </div>
           </div>
           <div class="dash-card flex-grow-1">
+<<<<<<< HEAD
+            <div class="card-title mb-3">Role Distribution</div>
+            @php
+              $pct = fn($count) => $totalUsers > 0 ? round(($count / $totalUsers) * 100) : 0;
+            @endphp
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Faculty Members</div>
+                <div class="workload-val" style="color:var(--blue)">{{ $roleCounts['faculty'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['faculty']) }}%;background:var(--blue)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Dept. Chairs</div>
+                <div class="workload-val" style="color:var(--amber)">{{ $roleCounts['department_chair'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['department_chair']) }}%;background:var(--amber)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Dean</div>
+                <div class="workload-val" style="color:var(--teal)">{{ $roleCounts['dean'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['dean']) }}%;background:var(--teal)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Tech Admin</div>
+                <div class="workload-val" style="color:var(--navy)">{{ $roleCounts['system_admin'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['system_admin']) }}%;background:var(--navy)"></div></div>
+            </div>
+=======
               <div class="card-title mb-3">Role Distribution</div>
 
               <div class="workload-item">
@@ -195,6 +267,7 @@
                       <div class="workload-fill" style="width:{{ $adminPercent }}%;background:var(--navy)"></div>
                   </div>
               </div>
+>>>>>>> 076a4dfdb1b0cd3e11408edef631aa347edd9304
           </div>
         </div>
       </div>

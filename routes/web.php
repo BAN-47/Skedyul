@@ -59,7 +59,24 @@ Route::post('/logout',
 | ADMIN DASHBOARD
 |--------------------------------------------------------------------------
 */
+Route::get('/dashboard', function () {
+    return view('admin.admin_dashboard');
+})->name('admin.dashboard');
 
+Route::get('/dashboard', function () {
+    $users = User::orderBy('usr_name')->take(5)->get();
+
+    $roleCounts = [
+        'faculty'          => User::where('usr_role', 'faculty')->count(),
+        'department_chair' => User::where('usr_role', 'department_chair')->count(),
+        'dean'             => User::where('usr_role', 'dean')->count(),
+        'system_admin'     => User::where('usr_role', 'system_admin')->count(),
+    ];
+
+    $totalUsers = array_sum($roleCounts);
+
+    return view('admin.admin_dashboard', compact('users', 'roleCounts', 'totalUsers'));
+})->name('admin.dashboard');
 /*
 |--------------------------------------------------------------------------
 | User_accounts
@@ -68,10 +85,6 @@ Route::post('/logout',
 use App\Http\Controllers\Admin\UserController;
 
 Route::prefix('admin')->group(function () {
-
-    Route::get('/dashboard', function () {
-        return view('admin.admin_dashboard');
-    })->name('admin.dashboard');
 
     Route::get('/users', [UserController::class,'index'])->name('admin.users');
     Route::get('/users/{id}/edit', [UserController::class,'edit'])->name('admin.users.edit');
