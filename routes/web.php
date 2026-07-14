@@ -91,10 +91,6 @@ Route::prefix('admin')->group(function () {
     Route::put('/users/{id}', [UserController::class,'update'])->name('admin.users.update');
     Route::delete('/users/{id}', [UserController::class,'destroy'])->name('admin.users.destroy');
 
-    Route::get('/rooms', function () {
-        return view('admin.rooms');
-    })->name('admin.rooms');
-
     Route::get('/reports', function () {
         return view('admin.reports');
     })->name('admin.reports');
