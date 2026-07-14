@@ -115,3 +115,4 @@ Route::prefix('admin')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::resource('subject', SubjectController::class);
+
