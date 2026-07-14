@@ -80,7 +80,7 @@
         <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🚪</div><div class="stat-label">Rooms Available</div><div class="stat-value">3 / 12</div><div class="stat-sub">9 currently occupied</div></div></div>
       </div>
 
-      <!-- USER ACCOUNTS + SYSTEM INFO -->
+<!-- USER ACCOUNTS + SYSTEM INFO -->
       <div class="row g-3 mb-4">
         <div class="col-lg-8">
           <div class="dash-card h-100">
@@ -90,13 +90,41 @@
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Name</th><th>Role</th><th>Department</th><th>Status</th><th>Action</th></tr></thead>
+                <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
-                  <tr><td><b>Ma. Emie Villaceran</b></td><td><span class="badge badge-blue">Dean</span></td><td>CCICT</td><td><span class="badge badge-green">Active</span></td><td><button class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;" onclick="showToast('Editing Ma. Emie Villaceran...')">Edit</button></td></tr>
-                  <tr><td><b>Rodrigo Tan</b></td><td><span class="badge badge-amber">Dept. Chair</span></td><td>BSIS</td><td><span class="badge badge-green">Active</span></td><td><button class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;" onclick="showToast('Editing Rodrigo Tan...')">Edit</button></td></tr>
-                  <tr><td><b>Lourdes Delos Santos</b></td><td><span class="badge badge-amber">Dept. Chair</span></td><td>BSIT</td><td><span class="badge badge-green">Active</span></td><td><button class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;" onclick="showToast('Editing Lourdes Delos Santos...')">Edit</button></td></tr>
-                  <tr><td><b>Jerome Bautista</b></td><td><span class="badge badge-grey">Faculty</span></td><td>BSIS</td><td><span class="badge badge-green">Active</span></td><td><button class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;" onclick="showToast('Editing Jerome Bautista...')">Edit</button></td></tr>
-                  <tr><td><b>Ana Reyes</b></td><td><span class="badge badge-grey">Faculty</span></td><td>BSIT</td><td><span class="badge badge-amber">Pending</span></td><td><button class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;" onclick="showToast('Editing Ana Reyes...')">Edit</button></td></tr>
+                  @php
+                    $roleLabels  = [
+                      'faculty'          => ['Faculty', 'badge-grey'],
+                      'department_chair' => ['Dept. Chair', 'badge-amber'],
+                      'dean'             => ['Dean', 'badge-blue'],
+                      'system_admin'     => ['System Admin', 'badge-navy'],
+                    ];
+                  @endphp
+                  @forelse($users as $user)
+                    @php
+                      [$roleLabel, $roleBadge] = $roleLabels[$user->usr_role] ?? [ucfirst($user->usr_role), 'badge-grey'];
+                    @endphp
+                    <tr>
+                      <td><b>{{ $user->usr_name }}</b></td>
+                      <td><span class="badge {{ $roleBadge }}">{{ $roleLabel }}</span></td>
+                      <td>
+                        <span class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
+                          {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                      </td>
+                      <td>
+                        <a href="{{ route('admin.users') }}" class="topbar-btn btn-secondary-custom" style="padding:4px 10px;font-size:11px;text-decoration:none;">
+                          Edit
+                        </a>
+                      </td>
+                    </tr>
+                  @empty
+                    <tr>
+                      <td colspan="4" style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">
+                        No user accounts found yet.
+                      </td>
+                    </tr>
+                  @endforelse
                 </tbody>
               </table>
             </div>
@@ -119,10 +147,37 @@
           </div>
           <div class="dash-card flex-grow-1">
             <div class="card-title mb-3">Role Distribution</div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">Faculty Members</div><div class="workload-val" style="color:var(--blue)">19</div></div><div class="workload-bar"><div class="workload-fill" style="width:70%;background:var(--blue)"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">Dept. Chairs</div><div class="workload-val" style="color:var(--amber)">3</div></div><div class="workload-bar"><div class="workload-fill" style="width:11%;background:var(--amber)"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">Dean</div><div class="workload-val" style="color:var(--teal)">1</div></div><div class="workload-bar"><div class="workload-fill" style="width:4%;background:var(--teal)"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">Tech Admin</div><div class="workload-val" style="color:var(--navy)">1</div></div><div class="workload-bar"><div class="workload-fill" style="width:4%;background:var(--navy)"></div></div></div>
+            @php
+              $pct = fn($count) => $totalUsers > 0 ? round(($count / $totalUsers) * 100) : 0;
+            @endphp
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Faculty Members</div>
+                <div class="workload-val" style="color:var(--blue)">{{ $roleCounts['faculty'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['faculty']) }}%;background:var(--blue)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Dept. Chairs</div>
+                <div class="workload-val" style="color:var(--amber)">{{ $roleCounts['department_chair'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['department_chair']) }}%;background:var(--amber)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Dean</div>
+                <div class="workload-val" style="color:var(--teal)">{{ $roleCounts['dean'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['dean']) }}%;background:var(--teal)"></div></div>
+            </div>
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">Tech Admin</div>
+                <div class="workload-val" style="color:var(--navy)">{{ $roleCounts['system_admin'] }}</div>
+              </div>
+              <div class="workload-bar"><div class="workload-fill" style="width:{{ $pct($roleCounts['system_admin']) }}%;background:var(--navy)"></div></div>
+            </div>
           </div>
         </div>
       </div>

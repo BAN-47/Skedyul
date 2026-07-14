@@ -8,6 +8,17 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/admin/user_accounts.css') }}">
+<style>
+  /* Modal fallback styles in case user_accounts.css doesn't define these */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:1000;align-items:center;justify-content:center;}
+  .modal-overlay.active{display:flex;}
+  .modal{background:#fff;border-radius:16px;width:640px;max-width:92vw;max-height:88vh;overflow-y:auto;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.25);}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .modal-title{font-size:17px;font-weight:800;color:var(--text,#0f172a);}
+  .modal-close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3,#94a3b8);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+</style>
 </head>
 <body>
 
@@ -19,14 +30,14 @@
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">User Accounts</div>
       <div id="topbar-notif-bell" style="position:relative;">
-        <button type="button" style="padding:8px 14px;border-radius:8px;background:var(--grey2);border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <button type="button" onclick="toggleNotifDropdown()" style="padding:8px 14px;border-radius:8px;background:var(--grey2);border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;">
           Notifications <span id="notif-count" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">3</span>
         </button>
         <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:100;overflow:hidden;">
           <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text);">Notifications</div>
           <div id="notif-list" style="max-height:320px;overflow-y:auto;"></div>
           <div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center;">
-            <button type="button" style="font-size:12px;color:var(--blue);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--font);">Mark all as read</button>
+            <button type="button" onclick="markAllRead()" style="font-size:12px;color:var(--blue);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--font);">Mark all as read</button>
           </div>
         </div>
       </div>
@@ -78,41 +89,9 @@
             <div class="card-sub">Click a name to view full profile</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input class="field-input" placeholder="Search users..." style="width:200px;padding:8px 12px;font-size:13px;">
-            <a class="topbar-btn btn-primary" href="#add-user-form" style="text-decoration:none;display:inline-flex;align-items:center;">+ Add User</a>
+            <input class="field-input" id="user-search" placeholder="Search users..." style="width:200px;padding:8px 12px;font-size:13px;" oninput="filterUsers(this.value)">
+            <button type="button" class="topbar-btn btn-primary" onclick="openModal('modal-add-user')">+ Add User</button>
           </div>
-        </div>
-
-        <div id="add-user-form" style="margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--grey);">
-          <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;">Quick Add User</div>
-          <form method="POST" action="{{ route('admin.users.store') }}" style="display:grid;grid-template-columns:repeat(4, minmax(0, 1fr));gap:12px;align-items:end;">
-            @csrf
-            <div class="field-group">
-              <label class="field-label">Full Name</label>
-              <input class="field-input" name="usr_name" placeholder="e.g. Juan Dela Cruz" required>
-            </div>
-            <div class="field-group">
-              <label class="field-label">Email</label>
-              <input class="field-input" name="usr_email" type="email" placeholder="user@ctu.edu.ph" required>
-            </div>
-            <div class="field-group">
-              <label class="field-label">Role</label>
-              <select class="field-select" name="usr_role" required>
-                <option value="">— Select role —</option>
-                <option value="faculty">Faculty Member</option>
-                <option value="department_chair">Department Chair</option>
-                <option value="dean">Dean</option>
-                <option value="system_admin">Technical Administrator</option>
-              </select>
-            </div>
-            <div class="field-group">
-              <label class="field-label">Password</label>
-              <input class="field-input" name="password" type="password" placeholder="Temporary password" required minlength="8">
-            </div>
-            <div class="field-group" style="grid-column:span 4;display:flex;justify-content:flex-end;">
-              <button class="topbar-btn btn-primary" type="submit">Create Account</button>
-            </div>
-          </form>
         </div>
 
         <div class="table-wrap">
@@ -169,11 +148,11 @@
 
                 <td>
                   <div style="display:flex;gap:6px;">
-                    <a class="topbar-btn btn-secondary"
-                      href="{{ route('admin.users') }}"
-                      style="padding:5px 12px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;">
+                    <button type="button" class="topbar-btn btn-secondary"
+                      onclick="openEditModal('{{ $user->usr_id }}')"
+                      style="padding:5px 12px;font-size:12px;">
                       Edit
-                    </a>
+                    </button>
                     <form method="POST" action="{{ route('admin.users.destroy', ['id' => $user->usr_id]) }}" onsubmit="return confirm('Delete this user?')" style="display:inline;">
                       @csrf
                       @method('DELETE')
@@ -201,9 +180,9 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
           <div id="page-info" style="font-size:13px;color:var(--text3);"></div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button class="topbar-btn btn-secondary" id="btn-prev" type="button" style="padding:6px 14px;font-size:13px;">← Prev</button>
+            <button class="topbar-btn btn-secondary" id="btn-prev" type="button" onclick="changePage(-1)" style="padding:6px 14px;font-size:13px;">← Prev</button>
             <div id="page-numbers" style="display:flex;gap:4px;"></div>
-            <button class="topbar-btn btn-secondary" id="btn-next" type="button" style="padding:6px 14px;font-size:13px;">Next →</button>
+            <button class="topbar-btn btn-secondary" id="btn-next" type="button" onclick="changePage(1)" style="padding:6px 14px;font-size:13px;">Next →</button>
           </div>
         </div>
       </div>
@@ -276,6 +255,7 @@
 
 {{-- ══════════════════════════════════════════════════════════════
      MODAL: EDIT USER  →  PUT to update()
+     Populated via fetch() from admin.users.edit (JSON)
      ══════════════════════════════════════════════════════════════ --}}
 <div class="modal-overlay" id="modal-edit-user">
   <div class="modal" style="width:520px;">
@@ -321,20 +301,6 @@
           </select>
         </div>
       </div>
-      <div class="form-row">
-        <div class="field-group">
-          <label class="field-label">Office Location</label>
-          <input class="field-input" id="edit-office" name="office" placeholder="e.g. Room 205, ICT Building">
-        </div>
-        <div class="field-group">
-          <label class="field-label">Contact Number</label>
-          <input class="field-input" id="edit-contact" name="contact" placeholder="e.g. (032) 401-0000">
-        </div>
-      </div>
-      <div class="field-group" style="margin-bottom:16px;">
-        <label class="field-label">About / Bio</label>
-        <textarea class="field-input" id="edit-about" name="about" rows="3" style="resize:vertical;"></textarea>
-      </div>
       <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:4px;">
         ⚠️ Changes will be reflected immediately across the system.
       </div>
@@ -347,15 +313,127 @@
   </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════════
-     HIDDEN DELETE FORM  →  DELETE to destroy()
-     ══════════════════════════════════════════════════════════════ --}}
-<form id="form-delete-user" method="POST" action="" style="display:none;">
-  @csrf
-  @method('DELETE')
-</form>
-
 <!-- TOAST -->
 <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+
+<script>
+const AVATAR_COLORS = ['#2563eb','#16a34a','#d97706','#0891b2','#7c3aed'];
+const ROLE_LABELS = {
+  faculty: 'Faculty',
+  department_chair: 'Dept. Chair',
+  dean: 'Dean',
+  system_admin: 'System Admin'
+};
+
+// Laravel route templates (id placeholder swapped at runtime)
+const EDIT_URL_TEMPLATE   = "{{ route('admin.users.edit', ['id' => '__ID__']) }}";
+const UPDATE_URL_TEMPLATE = "{{ route('admin.users.update', ['id' => '__ID__']) }}";
+
+function openModal(id) {
+  document.getElementById(id).classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+// Close modal if user clicks the dark overlay itself
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+});
+
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+async function openEditModal(userId) {
+  try {
+    const res = await fetch(EDIT_URL_TEMPLATE.replace('__ID__', userId), {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error('Failed to load user');
+    const user = await res.json();
+
+    document.getElementById('edit-name').value = user.usr_name ?? '';
+    document.getElementById('edit-email').value = user.usr_email ?? '';
+    document.getElementById('edit-role').value = user.usr_role ?? 'faculty';
+    document.getElementById('edit-status').value = user.usr_is_active ? '1' : '0';
+
+    const colorIndex = simpleHash(user.usr_name ?? '') % AVATAR_COLORS.length;
+    const avatarEl = document.getElementById('edit-avatar');
+    avatarEl.style.background = AVATAR_COLORS[colorIndex];
+    avatarEl.textContent = (user.usr_name ?? '?').charAt(0).toUpperCase();
+
+    document.getElementById('edit-avatar-name').textContent = user.usr_name ?? '';
+    document.getElementById('edit-avatar-role').textContent = ROLE_LABELS[user.usr_role] ?? user.usr_role ?? '';
+
+    const form = document.getElementById('form-edit-user');
+    form.action = UPDATE_URL_TEMPLATE.replace('__ID__', userId);
+    form.dataset.userId = userId;
+
+    openModal('modal-edit-user');
+  } catch (err) {
+    showToast('❌ Could not load user details');
+    console.error(err);
+  }
+}
+
+function confirmDeleteFromEdit() {
+  const form = document.getElementById('form-edit-user');
+  const userId = form.dataset.userId;
+  if (!userId) return;
+  if (!confirm('Delete this user? This cannot be undone.')) return;
+
+  const deleteForm = document.createElement('form');
+  deleteForm.method = 'POST';
+  deleteForm.action = "{{ url('admin/users') }}/" + userId;
+  deleteForm.innerHTML = `
+    @csrf
+    @method('DELETE')
+  `;
+  document.body.appendChild(deleteForm);
+  deleteForm.submit();
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  const toastMsg = document.getElementById('toast-msg');
+  if (!toast || !toastMsg) return;
+  toastMsg.textContent = msg.replace(/^✅\s?|^❌\s?/, '');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+function toggleNotifDropdown() {
+  const dd = document.getElementById('notif-dropdown');
+  dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+}
+
+function markAllRead() {
+  document.getElementById('notif-count').style.display = 'none';
+}
+
+function filterUsers(query) {
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll('#users-table tbody tr.user-row').forEach(row => {
+    const name = (row.dataset.name || '').toLowerCase();
+    const email = (row.dataset.email || '').toLowerCase();
+    const role = (row.dataset.role || '').toLowerCase();
+    const match = name.includes(q) || email.includes(q) || role.includes(q);
+    row.style.display = match ? '' : 'none';
+  });
+}
+
+function changePage(direction) {
+  // Placeholder — wire up if/when server-side pagination is added
+}
+</script>
+
 </body>
 </html>
