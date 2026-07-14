@@ -91,10 +91,6 @@ Route::prefix('admin')->group(function () {
     Route::put('/users/{id}', [UserController::class,'update'])->name('admin.users.update');
     Route::delete('/users/{id}', [UserController::class,'destroy'])->name('admin.users.destroy');
 
-    Route::get('/rooms', function () {
-        return view('admin.rooms');
-    })->name('admin.rooms');
-
     Route::get('/reports', function () {
         return view('admin.reports');
     })->name('admin.reports');
@@ -109,12 +105,18 @@ Route::prefix('admin')->group(function () {
 | SUBJECTS_ADMIN
 |--------------------------------------------------------------------------
 */
-Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index');
-Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
-Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
-Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
+    Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index');
+    Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
+    Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
+    Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
 /*
 |--------------------------------------------------------------------------
 | Room_ADMIN
 |--------------------------------------------------------------------------
 */
+    Route::get('/rooms', [RoomController::class, 'index'])->name('admin.rooms');
+    Route::post('/rooms', [RoomController::class, 'store'])->name('admin.rooms.store');
+    Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('admin.rooms.show');
+    Route::put('/rooms/{room}', [RoomController::class, 'update'])->name('admin.rooms.update');
+    Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])->name('admin.rooms.destroy');
+

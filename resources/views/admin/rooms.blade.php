@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -16,6 +17,7 @@
   @include('partials.admin_sidebar')
 
   <!-- MAIN -->
+
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Room Management</div>
@@ -33,43 +35,44 @@
       </div>
     </div>
 
-    <div id="page-rooms" class="page active">
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Total Rooms</div><div class="stat-value" id="stat-total">{{ $rooms->count() }}</div><div class="stat-sub">Lecture + Lab</div></div>
-        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">Available</div><div class="stat-value" id="stat-available">{{ $rooms->where('room_is_available', true)->count() }}</div><div class="stat-sub">Ready to assign</div></div>
-        <div class="stat-card" style="--accent:#dc2626"><div class="stat-label">In Use</div><div class="stat-value" id="stat-inuse">{{ $rooms->where('room_is_available', false)->count() }}</div><div class="stat-sub">Currently occupied</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">Room Management</div><button class="topbar-btn btn-primary" onclick="openModal('modal-add-room')">+ Add Room</button></div>
-        <div class="table-wrap"><table id="rooms-table">
-          <tr><th>Room</th><th>Type</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
-          @foreach ($rooms as $room)
-          <tr data-room-id="{{ $room->room_id }}">
-            <td class="cell-name"><b>{{ $room->room_name }}</b></td>
-            <td class="cell-type">{{ $room->room_type }}</td>
-            <td class="cell-capacity">{{ $room->room_capacity }}</td>
-            <td class="cell-status">
-              @if ($room->room_is_available)
-                <span class="badge badge-green">Available</span>
-              @else
-                <span class="badge badge-amber">In Use</span>
-              @endif
-            </td>
-            <td style="display:flex;gap:6px;">
-              <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('{{ $room->room_id }}')">View</button>
-              <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('{{ $room->room_id }}')">Edit</button>
-              <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')">Delete</button>
-            </td>
-          </tr>
-          @endforeach
-        </table></div>
-      </div>
-    </div>
+<div id="page-rooms" class="page active">
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Total Rooms</div><div class="stat-value" id="stat-total">{{ $rooms->count() }}</div><div class="stat-sub">Lecture + Lab</div></div>
+    <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">Available</div><div class="stat-value" id="stat-available">{{ $rooms->where('room_is_available', true)->count() }}</div><div class="stat-sub">Ready to assign</div></div>
+    <div class="stat-card" style="--accent:#dc2626"><div class="stat-label">In Use</div><div class="stat-value" id="stat-inuse">{{ $rooms->where('room_is_available', false)->count() }}</div><div class="stat-sub">Currently occupied</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Room Management</div><button class="topbar-btn btn-primary" onclick="openModal('modal-add-room')">+ Add Room</button></div>
+    <div class="table-wrap"><table id="rooms-table">
+      <tr><th>Room</th><th>Type</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
+      @foreach ($rooms as $room)
+      <tr data-room-id="{{ $room->room_id }}">
+        <td class="cell-name"><b>{{ $room->room_name }}</b></td>
+        <td class="cell-type">{{ $room->room_type }}</td>
+        <td class="cell-capacity">{{ $room->room_capacity }}</td>
+        <td class="cell-status">
+          @if ($room->room_is_available)
+            <span class="badge badge-green">Available</span>
+          @else
+            <span class="badge badge-amber">In Use</span>
+          @endif
+        </td>
+        <td style="display:flex;gap:6px;">
+          <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('{{ $room->room_id }}')">View</button>
+          <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('{{ $room->room_id }}')">Edit</button>
+          <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')">Delete</button>
+        </td>
+      </tr>
+      @endforeach
+    </table></div>
+  </div>
+</div>
 
   </div>
 </div>
 
 <!-- ADD ROOM MODAL -->
+
 <div class="modal-overlay" id="modal-add-room">
   <div class="modal" style="width:500px;">
     <div class="modal-header">
@@ -97,6 +100,7 @@
 </div>
 
 <!-- VIEW ROOM MODAL -->
+
 <div class="modal-overlay" id="modal-view-room">
   <div class="modal" style="width:480px;">
     <div class="modal-header">
@@ -136,6 +140,7 @@
 </div>
 
 <!-- EDIT ROOM MODAL -->
+
 <div class="modal-overlay" id="modal-edit-room">
   <div class="modal" style="width:500px;">
     <div class="modal-header">
@@ -178,6 +183,7 @@
 </div>
 
 <!-- ERROR MODAL -->
+
 <div class="modal-overlay" id="modal-error">
   <div class="modal" style="width:400px;">
     <div style="display:flex;align-items:center;gap:14px;padding:8px 0 16px;">
@@ -192,6 +198,7 @@
 </div>
 
 <!-- TOAST -->
+
 <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
@@ -422,7 +429,7 @@ async function saveEditRoom() {
   if (!name || !capacity) { showErrorModal('Please fill in all required fields.'); return; }
 
   try {
-    const res = await fetch(`/admin/rooms/${currentRoomId}`, {
+    const res = await fetch(`/rooms/${currentRoomId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -486,7 +493,7 @@ async function deleteRoom(roomId, name) {
   if (!confirm('Delete room: ' + name + '?\nThis action cannot be undone.')) return;
 
   try {
-    const res = await fetch(`/admin/rooms/${roomId}`, {
+    const res = await fetch(`/rooms/${roomId}`, {
       method: 'DELETE',
       headers: {
         'X-CSRF-TOKEN': CSRF_TOKEN,
@@ -529,5 +536,6 @@ function deleteFromEdit() {
   deleteRoom(currentRoomId, room ? room.name : 'Room');
 }
 </script>
+
 </body>
 </html>
