@@ -8,13 +8,11 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Models\User;
 
-
 /*
 |--------------------------------------------------------------------------
 | HOME
 |--------------------------------------------------------------------------
 */
-
 Route::get('/', function () {
     return redirect()->route('login');
 });
@@ -115,4 +113,8 @@ Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index
 Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
 Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
 Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
-
+/*
+|--------------------------------------------------------------------------
+| Room_ADMIN
+|--------------------------------------------------------------------------
+*/
