@@ -11,6 +11,12 @@
 </head>
 <body>
 
+@php
+    $subject = $subject ?? collect([]);
+    $departments = $departments ?? collect([]);
+    $programs = $programs ?? collect([]);
+@endphp
+
 <div class="screen active" style="display:flex;">
   @include('partials.admin_sidebar')
  
