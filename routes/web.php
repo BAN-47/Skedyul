@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\LoginController;
-use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\Admin\SubjectController;
 use App\Models\User;
 
 
@@ -92,10 +92,6 @@ Route::prefix('admin')->group(function () {
     Route::put('/users/{id}', [UserController::class,'update'])->name('admin.users.update');
     Route::delete('/users/{id}', [UserController::class,'destroy'])->name('admin.users.destroy');
 
-    Route::get('/subjects', function () {
-        return view('admin.subjects');
-    })->name('admin.subjects');
-
     Route::get('/rooms', function () {
         return view('admin.rooms');
     })->name('admin.rooms');
@@ -114,5 +110,8 @@ Route::prefix('admin')->group(function () {
 | SUBJECTS_ADMIN
 |--------------------------------------------------------------------------
 */
-Route::resource('subject', SubjectController::class);
+Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index');
+Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
+Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
+Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
 
