@@ -182,6 +182,227 @@
         </div>
       </div>
 
+<!-- SECTIONS + SCHEDULE COMPLETION -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+          <div class="dash-card">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <div class="card-title">Current Sections</ div>
+                <div class="card-sub">AY {{ $academicYear }} · {{ $semester }}</div>
+              </div>
+              <span class="badge badge-blue">{{ $section->count() }} Total</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Section</th><th>Program</th><th>Year</th><th>Students</th><th>Subjects</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @forelse($section as $sections)
+                  <tr>
+                    <td><b>{{ $sections->name }}</b></td>
+                    <td>{{ $sections->program }}</td>
+                    <td>{{ $sections->year_level }}</td>
+                    <td>{{ $sections->student_count }}</td>
+                    <td>{{ $sections->subject_count }}</td>
+                    <td>
+                      <span class="badge badge-{{ match($sections->status) {
+                          'Scheduled'   => 'green',
+                          'In Progress' => 'amber',
+                          'Unscheduled' => 'red',
+                          default       => 'grey',
+                      } }}">
+                          {{ $sections->status }}
+                      </span>
+                    </td>
+                  </tr>
+                  @empty
+                  <tr><td colspan="6" style="text-align:center;">No sections found.</td></tr>
+                  @endforelse
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="dash-card h-100">
+            <div class="card-title mb-1">Schedule Completion</div>
+            <div class="card-sub mb-3">By program</div>
+
+            @foreach($program as $programs)
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">{{ $programs['name'] }}</div>
+                <div class="workload-val" style="color:var(--{{ $programs['color'] }})">{{ $programs['percent'] }}%</div>
+              </div>
+              <div class="workload-bar">
+                <div class="workload-fill" style="width:{{ $programs['percent'] }}%;background:var(--{{ $programs['color'] }})"></div>
+              </div>
+            </div>
+            @endforeach
+
+            <div class="mt-3 pt-3" style="border-top:1px solid var(--border);">
+              <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">Sections Summary</div>
+              <div class="d-flex gap-2">
+                <div class="flex-fill text-center p-2 rounded-3" style="background:var(--green-light);">
+                  <div style="font-size:20px;font-weight:800;color:var(--green);">{{ $scheduledCount }}</div>
+                  <div style="font-size:10px;color:var(--green);font-weight:600;">Fully Scheduled</div>
+                </div>
+                <div class="flex-fill text-center p-2 rounded-3" style="background:var(--amber-light);">
+                  <div style="font-size:20px;font-weight:800;color:var(--amber);">{{ $inProgressCount }}</div>
+                  <div style="font-size:10px;color:var(--amber);font-weight:600;">In Progress</div>
+                </div>
+                <div class="flex-fill text-center p-2 rounded-3" style="background:var(--red-light);">
+                  <div style="font-size:20px;font-weight:800;color:var(--red);">{{ $unscheduledCount }}</div>
+                  <div style="font-size:10px;color:var(--red);font-weight:600;">Unscheduled</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBJECTS + ROOM UTILIZATION -->
+      <div class="row g-3 mb-4">
+        <div class="col-lg-8">
+          <div class="dash-card">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <div class="card-title">Subjects Offered</div>
+                <div class="card-sub">Current semester — all programs</div>
+              </div>
+              <span class="badge badge-blue">{{ $subject->count() }} Subjects</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Code</th><th>Subject</th><th>Units</th><th>Program</th><th>Assigned Faculty</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @forelse($subject as $subjects)
+                  <tr>
+                    <td><span style="font-family:var(--mono);font-size:12px;">{{ $subjects->code }}</span></td>
+                    <td><b>{{ $subjects->title }}</b></td>
+                    <td>{{ $subjects->units }}</td>
+                    <td>{{ $subjects->program }}</td>
+                    <td>
+                      @if($subjects->faculty_name)
+                          {{ $subjects->faculty_name }}
+                      @else
+                          <span style="color:var(--red);">Unassigned</span>
+                      @endif
+                    </td>
+                    <td>
+                      <span class="badge badge-{{ match($subjects->status) {
+                          'Active'     => 'green',
+                          'Conflict'   => 'amber',
+                          'No Faculty' => 'red',
+                          default      => 'grey',
+                      } }}">
+                          {{ $subjects->status }}
+                      </span>
+                    </td>
+                  </tr>
+                  @empty
+                  <tr><td colspan="6" style="text-align:center;">No subjects found.</td></tr>
+                  @endforelse
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="dash-card h-100">
+            <div class="card-title mb-1">Room Utilization</div>
+            <div class="card-sub mb-3">This week</div>
+
+            @foreach($room as $rooms)
+            <div class="workload-item">
+              <div class="workload-header">
+                <div class="workload-name">{{ $rooms['name'] }}</div>
+                <div class="workload-val" style="color:var(--{{ $rooms['color'] }})">{{ $rooms['percent'] }}%</div>
+              </div>
+              <div class="workload-bar">
+                <div class="workload-fill" style="width:{{ $rooms['percent'] }}%;background:var(--{{ $rooms['color'] }})"></div>
+              </div>
+            </div>
+            @endforeach
+
+            <div class="d-flex justify-content-between mt-3 pt-3" style="border-top:1px solid var(--border);font-size:12px;">
+              <div>
+                <div style="color:var(--text3);">Total Rooms</div>
+                <div style="font-weight:800;font-size:18px;color:var(--text);">{{ $totalRooms }}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);">In Use</div>
+                <div style="font-weight:800;font-size:18px;color:var(--blue);">{{ $roomsInUse }}</div>
+              </div>
+              <div>
+                <div style="color:var(--text3);">Available</div>
+                <div style="font-weight:800;font-size:18px;color:var(--green);">{{ $roomsAvailable }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECENT ACTIVITY -->
+      <div class="dash-card mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div>
+            <div class="card-title">Recent System Activity</div>
+            <div class="card-sub">Latest actions across all users</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              @forelse($audit_log as $log)
+              <tr>
+                <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">
+                    {{ $log->created_at->format('h:i A') }}
+                </td>
+                <td><b>{{ $log->user_name }}</b></td>
+                <td>{{ $log->action }}</td>
+                <td>{{ $log->details }}</td>
+                <td>
+                  <span class="badge badge-{{ match($log->status) {
+                      'Success' => 'green',
+                      'Info'    => 'blue',
+                      'Warning' => 'red',
+                      default   => 'grey',
+                  } }}">
+                      {{ $log->status }}
+                  </span>
+                </td>
+              </tr>
+              @empty
+              <tr><td colspan="5" style="text-align:center;">No recent activity.</td></tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- end page-content -->
+  </div><!-- end main -->
+</div><!-- end app-wrapper -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+      
     </div><!-- end page-content -->
   </div><!-- end main -->
 </div><!-- end app-wrapper -->

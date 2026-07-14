@@ -8,6 +8,7 @@ use App\Models\Admin\Program;
 use App\Models\Admin\Subjects;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Database\QueryException;
 
 class SubjectController extends Controller
 {
@@ -90,10 +91,20 @@ class SubjectController extends Controller
             ->with('success', 'Subject updated successfully.');
     }
 
-    public function destroy(string $id)
+   public function destroy(string $id)
     {
         $subject = Subjects::findOrFail($id);
-        $subject->delete();
+
+        try {
+            $subject->delete();
+        } catch (QueryException $e) {
+            if ($e->getCode() === '23503') {
+                return redirect()->route('subject.index')
+                    ->with('error', 'Cannot delete this subject — it is still assigned in one or more study loads.');
+            }
+
+            throw $e;
+        }
 
         return redirect()->route('subject.index')
             ->with('success', 'Subject deleted successfully.');
