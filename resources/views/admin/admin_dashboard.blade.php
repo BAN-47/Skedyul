@@ -34,7 +34,6 @@
       <!-- PAGE CONTENT -->
       <div class="page-content">
 
-<<<<<<< HEAD
         <!-- WELCOME BANNER -->
         <div class="quote-banner">
           <div class="quote-banner-grid"></div>
@@ -63,19 +62,6 @@
                 <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:4px;">Last backup</div>
                 <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
               </div>
-=======
-    <!-- WELCOME BANNER -->
-    <div class="quote-banner">
-      <div class="quote-banner-grid"></div>
-      <div class="position-relative" style="z-index:1;">
-        <div class="d-flex align-items-start justify-content-between gap-4">
-          <div class="flex-grow-1">
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
-              Welcome back, Tech Admin
-            </div>
-            <div id="quote-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
-              "Education is the most powerful weapon which you can use to change the world."
->>>>>>> 9db3920f305983c53ea2ddee8de6e4e23490479d
             </div>
             <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">— Nelson Mandela</div>
             <div class="d-flex align-items-center gap-2 mt-3">
@@ -91,7 +77,6 @@
             <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
           </div>
         </div>
-<<<<<<< HEAD
 
         <!-- STAT CARDS ROW 1 -->
         <div class="row g-3 mb-3">
@@ -101,34 +86,6 @@
               <div class="stat-label">Total Users</div>
               <div class="stat-value">{{ $totalUsers }}</div>
               <div class="stat-sub">4 roles registered</div>
-=======
-      </div>
-    </div>
-
-      <!-- STAT CARDS ROW 1 -->
-      <div class="row g-3 mb-3">
-        <div class="col-md-3"><div class="stat-card" style="--accent:#2563eb"><div class="stat-icon">👥</div><div class="stat-label">Total Users</div><div class="stat-value"></div><div class="stat-sub">4 roles registered</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">✅</div><div class="stat-label">System Status</div><div class="stat-value"></div><div class="stat-sub">Vercel · Supabase active</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#d97706"><div class="stat-icon">👨‍🏫</div><div class="stat-label">Total Faculty</div><div class="stat-value"></div><div class="stat-sub">BSIS · BSIT · BIT-CT</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🗄️</div><div class="stat-label">DB Records</div><div class="stat-value"></div><div class="stat-sub">Supabase PostgreSQL</div></div></div>
-      </div>
-
-      <!-- STAT CARDS ROW 2 -->
-      <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="stat-card" style="--accent:#7c3aed"><div class="stat-icon">🏫</div><div class="stat-label">Total Sections</div><div class="stat-value"></div><div class="stat-sub">Across 3 programs</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">📚</div><div class="stat-label">Subjects Offered</div><div class="stat-value"></div><div class="stat-sub">This semester</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#dc2626"><div class="stat-icon">⚡</div><div class="stat-label">Schedule Conflicts</div><div class="stat-value"></div><div class="stat-sub">Needs resolution</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🚪</div><div class="stat-label">Rooms Available</div><div class="stat-value"></div><div class="stat-sub">9 currently occupied</div></div></div>
-      </div>
-
-<!-- USER ACCOUNTS + SYSTEM INFO -->
-      <div class="row g-3 mb-4">
-        <div class="col-lg-8">
-          <div class="dash-card h-100">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <div><div class="card-title">User Accounts</div><div class="card-sub">All registered system users</div></div>
-              <a href="{{ route('admin.users') }}" class="topbar-btn btn-primary-custom" style="text-decoration:none;">+ Add User</a>
->>>>>>> 9db3920f305983c53ea2ddee8de6e4e23490479d
             </div>
           </div>
           <div class="col-md-3">
@@ -551,90 +508,4 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
-<<<<<<< HEAD
 </html>
-=======
-      
-    </div><!-- end page-content -->
-  </div><!-- end main -->
-</div><!-- end app-wrapper -->
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  (function () {
-    const quotes = [
-      { text: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
-      { text: "The more that you read, the more things you will know, the more that you learn, the more places you'll go.", author: "Dr. Seuss" },
-      { text: "Education is one thing no one can take away from you.", author: "Elin Nordegren" },
-      { text: "Give a man a fish and you feed him for a day; teach a man to fish and you feed him for a lifetime.", author: "Maimonides" },
-      { text: "The aim of education is the knowledge, not of facts, but of values.", author: "William S. Burroughs" },
-      { text: "Learning is not compulsory... Neither is survival.", author: "W. Edwards Demin" },
-      { text: "The purpose of education is to turn mirrors into windows.", author: "Sydney J. Harris" },
-      { text: "Intelligence plus character - that is the goal of true education.", author: "Martin Luther King Jr." },
-      { text: "The purpose of learning is growth, and our minds, unlike our bodies, can continue growing as we continue to live.", author: "Mortimer Adler" },
-      { text: "The content of a book holds the power of education and it is with this power that we can shape our future and change lives.", author: "Malala Yousafzai"}
-    ];
-
-    let current = 0;
-    let intervalid = null;
-
-    const textEl = document.getElementById('quote-text');
-    const authorEl = document.getElementById('quote-author');
-    const dotsEl = document.getElementById('quote-dots');
-    const prevBtn = document.getElementById('quote-prev');
-    const nextBtn = document.getElementById('quote-next');
-
-    function renderDots() {
-      dotsEl.innerHTML = '';
-      quotes.forEach((_, i) => {
-        const dot = document.createElement('span');
-        dot.style.width = '6px';
-        dot.style.height = '6px';
-        dot.style.borderRadius = '50%';
-        dot.style.background = i === current ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.25)';
-        dot.style.cursor = 'pointer';
-        dot.addEventListener('click', () => goTo(i));
-        dotsEl.appendChild(dot);
-      });
-    }
-
-    function showQuote(i) {
-      textEl.style.opacity = 0;
-      authorEl.style.opacity = 0;
-
-      setTimeout(() => {
-        textEl.textContent = `"${quotes[i].text}"`;
-        authorEl.textContent = `— ${quotes[i].author}`;
-        textEl.style.opacity = 1;
-        authorEl.style.opacity = 1;
-        renderDots();
-      }, 200);
-    }
-
-    function goTo(i) {
-      current = (i + quotes.length) % quotes.length;
-      showQuote(current);
-      resetInterval();
-    }
-
-    function next() { goTo(current + 1); }
-    function prev() { goTo(current - 1); }
-
-    function resetInterval() {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(next, 10000); // 10 seconds
-    }
-
-    textEl.style.transition = 'opacity 0.2s ease';
-    authorEl.style.transition = 'opacity 0.2s ease';
-
-    prevBtn.addEventListener('click', prev);
-    nextBtn.addEventListener('click', next);
-
-    renderDots();
-    resetInterval();
-  })();
-</script>
-</body>
-</html>
->>>>>>> 9db3920f305983c53ea2ddee8de6e4e23490479d
