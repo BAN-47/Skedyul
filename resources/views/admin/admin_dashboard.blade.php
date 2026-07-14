@@ -70,18 +70,18 @@
 
       <!-- STAT CARDS ROW 1 -->
       <div class="row g-3 mb-3">
-        <div class="col-md-3"><div class="stat-card" style="--accent:#2563eb"><div class="stat-icon">👥</div><div class="stat-label">Total Users</div><div class="stat-value">27</div><div class="stat-sub">4 roles registered</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">✅</div><div class="stat-label">System Status</div><div class="stat-value">Online</div><div class="stat-sub">Vercel · Supabase active</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#d97706"><div class="stat-icon">👨‍🏫</div><div class="stat-label">Total Faculty</div><div class="stat-value">19</div><div class="stat-sub">BSIS · BSIT · BIT-CT</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🗄️</div><div class="stat-label">DB Records</div><div class="stat-value">1,248</div><div class="stat-sub">Supabase PostgreSQL</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#2563eb"><div class="stat-icon">👥</div><div class="stat-label">Total Users</div><div class="stat-value"></div><div class="stat-sub">4 roles registered</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">✅</div><div class="stat-label">System Status</div><div class="stat-value"></div><div class="stat-sub">Vercel · Supabase active</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#d97706"><div class="stat-icon">👨‍🏫</div><div class="stat-label">Total Faculty</div><div class="stat-value"></div><div class="stat-sub">BSIS · BSIT · BIT-CT</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🗄️</div><div class="stat-label">DB Records</div><div class="stat-value"></div><div class="stat-sub">Supabase PostgreSQL</div></div></div>
       </div>
 
       <!-- STAT CARDS ROW 2 -->
       <div class="row g-3 mb-4">
-        <div class="col-md-3"><div class="stat-card" style="--accent:#7c3aed"><div class="stat-icon">🏫</div><div class="stat-label">Total Sections</div><div class="stat-value">28</div><div class="stat-sub">Across 3 programs</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">📚</div><div class="stat-label">Subjects Offered</div><div class="stat-value">42</div><div class="stat-sub">This semester</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#dc2626"><div class="stat-icon">⚡</div><div class="stat-label">Schedule Conflicts</div><div class="stat-value">2</div><div class="stat-sub">Needs resolution</div></div></div>
-        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🚪</div><div class="stat-label">Rooms Available</div><div class="stat-value">3 / 12</div><div class="stat-sub">9 currently occupied</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#7c3aed"><div class="stat-icon">🏫</div><div class="stat-label">Total Sections</div><div class="stat-value"></div><div class="stat-sub">Across 3 programs</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#16a34a"><div class="stat-icon">📚</div><div class="stat-label">Subjects Offered</div><div class="stat-value"></div><div class="stat-sub">This semester</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#dc2626"><div class="stat-icon">⚡</div><div class="stat-label">Schedule Conflicts</div><div class="stat-value"></div><div class="stat-sub">Needs resolution</div></div></div>
+        <div class="col-md-3"><div class="stat-card" style="--accent:#0891b2"><div class="stat-icon">🚪</div><div class="stat-label">Rooms Available</div><div class="stat-value"></div><div class="stat-sub">9 currently occupied</div></div></div>
       </div>
 
       <!-- USER ACCOUNTS + SYSTEM INFO -->
