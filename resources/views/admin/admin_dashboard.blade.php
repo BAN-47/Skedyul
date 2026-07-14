@@ -63,18 +63,6 @@
                 <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
               </div>
             </div>
-            <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">— Nelson Mandela</div>
-            <div class="d-flex align-items-center gap-2 mt-3">
-              <span id="quote-prev" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">‹</span>
-              <div class="d-flex gap-2" id="quote-dots"></div>
-              <span id="quote-next" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">›</span>
-            </div>
-          </div>
-          <div class="text-end flex-shrink-0">
-            <div style="font-size:44px;opacity:.12;line-height:1;margin-bottom:10px;">"</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.3);">AY 2025–2026 · 1st Sem</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:4px;">Last backup</div>
-            <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
           </div>
         </div>
 
