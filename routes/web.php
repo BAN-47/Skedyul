@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\LoginController;
-use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\Admin\SubjectController;
 use App\Models\User;
 
 
@@ -93,15 +93,9 @@ Route::prefix('admin')->group(function () {
     Route::put('/users/{id}', [UserController::class,'update'])->name('admin.users.update');
     Route::delete('/users/{id}', [UserController::class,'destroy'])->name('admin.users.destroy');
 
-    Route::get('/subjects', function () {
-        return view('admin.subjects');
-    })->name('admin.subjects');
-
-    Route::get('/rooms', [RoomController::class, 'index'])->name('admin.rooms');
-    Route::post('/rooms', [RoomController::class, 'store'])->name('admin.rooms.store');
-    Route::get('/rooms/{room}', [RoomController::class, 'show'])->name('admin.rooms.show');
-    Route::put('/rooms/{room}', [RoomController::class, 'update'])->name('admin.rooms.update');
-    Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])->name('admin.rooms.destroy');
+    Route::get('/rooms', function () {
+        return view('admin.rooms');
+    })->name('admin.rooms');
 
     Route::get('/reports', function () {
         return view('admin.reports');
@@ -117,5 +111,8 @@ Route::prefix('admin')->group(function () {
 | SUBJECTS_ADMIN
 |--------------------------------------------------------------------------
 */
-Route::resource('subject', SubjectController::class);
+Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index');
+Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
+Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
+Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
 

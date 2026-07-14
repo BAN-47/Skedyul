@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Admin;
 
-use App\Models\Department;
+use App\Http\Controllers\Controller;
+use App\Models\Admin\Department;
 use App\Models\Admin\Program;
-use App\Models\Subjects;
+use App\Models\Admin\Subjects;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -13,19 +14,19 @@ class SubjectController extends Controller
     public function index()
     {
         $subject = Subjects::with(['department', 'program'])->latest()->paginate(5);
-        $department = Department::orderBy('dept_name')->get();
-        $program = Program::orderBy('prog_name')->get();
+        $departments = Department::orderBy('dept_name')->get();
+        $programs = Program::orderBy('prog_name')->get();
 
-        return view('admin.subject', compact('subject', 'department', 'program'))
+        return view('admin.subjects', compact('subject', 'departments', 'programs'))
             ->with('i', (request()->input('page', 1) - 1) * 5);
     }
 
     public function create()
     {
-        $department = Department::orderBy('dept_name')->get();
-        $program = Program::orderBy('prog_name')->get();
+        $departments = Department::orderBy('dept_name')->get();
+        $programs = Program::orderBy('prog_name')->get();
 
-        return view('admin.create', compact('department', 'program'));
+        return view('admin.create', compact('departments', 'programs'));
     }
 
     public function store(Request $request)
@@ -54,21 +55,15 @@ class SubjectController extends Controller
         return view('admin.show', compact('subject'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(string $id)
     {
         $subject = Subjects::findOrFail($id);
-        $department = Department::orderBy('dept_name')->get();
-        $program = Program::orderBy('prog_name')->get();
+        $departments = Department::orderBy('dept_name')->get();
+        $programs = Program::orderBy('prog_name')->get();
 
-        return view('admin.edit', compact('subject', 'department', 'program'));
+        return view('admin.edit', compact('subject', 'departments', 'programs'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
         $subject = Subjects::findOrFail($id);
@@ -95,9 +90,6 @@ class SubjectController extends Controller
             ->with('success', 'Subject updated successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         $subject = Subjects::findOrFail($id);

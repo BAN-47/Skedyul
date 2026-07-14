@@ -9,6 +9,8 @@ class Section extends Model
 {
     protected $table = 'section';
     protected $primaryKey = 'sec_id';
+    public $incrementing = false;
+    protected $keyType = 'string';
 
     const CREATED_AT = 'sec_created_at';
     const UPDATED_AT = 'sec_updated_at';
