@@ -22,17 +22,11 @@ Route::get('/', function () {
 */
 
 Route::get('/test-db', function () {
-
     try {
-
         DB::connection()->getPdo();
-
         return "✅ Supabase Connected Successfully";
-
     } catch (\Exception $e) {
-
         return "❌ Database Error: " . $e->getMessage();
-
     }
 
 });
@@ -49,8 +43,7 @@ Route::get('/login', function () {
 })->name('login');
 
 
-Route::post('/login',[LoginController::class,'login'])
-->name('login.authenticate');
+Route::post('/login',[LoginController::class,'login'])->name('login.authenticate');
 /*
 |--------------------------------------------------------------------------
 | LOGOUT
