@@ -9,11 +9,18 @@ use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $users = User::orderBy('usr_name')->get();
+        $search = $request->input('search');
 
-        return view('admin.user_accounts', compact('users'));
+        $users = User::when($search, function ($query, $search) {
+                $query->where('usr_name', 'ilike', "%{$search}%")
+                      ->orWhere('usr_email', 'ilike', "%{$search}%");
+            })
+            ->orderBy('usr_name')
+            ->get();
+
+        return view('admin.user_accounts', compact('users', 'search'));
     }
 
     public function create()
@@ -42,7 +49,7 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        return view('admin.users.edit', compact('user'));
+        return response()->json($user);
     }
 
     public function update(Request $request, $id)

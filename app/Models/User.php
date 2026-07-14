@@ -6,10 +6,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class User extends Authenticatable
 {
-    protected $table = 'USER'; // keep as-is only if the table itself was created with quotes preserving uppercase
+    protected $table = 'USER'; // keep only if the table itself was created with quotes preserving uppercase
     protected $primaryKey = 'usr_id';
     public $incrementing = false;
     protected $keyType = 'string';
+    public $timestamps = false;
 
     protected $fillable = [
         'usr_id',
