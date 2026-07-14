@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Models\User;
@@ -110,8 +111,5 @@ Route::prefix('admin')->group(function () {
 | SUBJECTS_ADMIN
 |--------------------------------------------------------------------------
 */
-Route::get('/subject', [SubjectController::class, 'index'])->name('subject.index');
-Route::post('/subject', [SubjectController::class, 'store'])->name('subject.store');
-Route::put('/subject/{id}', [SubjectController::class, 'update'])->name('subject.update');
-Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])->name('subject.destroy');
+
 
