@@ -13,7 +13,7 @@
 
 <div class="screen active" style="display:flex;">
   @include('partials.admin_sidebar')
-
+ 
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
@@ -31,82 +31,189 @@
         </div>
       </div>
     </div>
-
+ 
     <div id="page-subjects" class="page active">
       <div class="card">
-        <div class="card-header"><div class="card-title">Subject Management</div><button class="topbar-btn btn-primary" onclick="openModal('modal-add-subject')">+ Add Subject</button></div>
-        <div class="table-wrap"><table id="subjects-table">
-          <tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Lec Hrs</th><th>Lab Hrs</th><th>Department</th><th>Action</th></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">CC 313</span></td><td>Web Systems and Technologies</td><td>3</td><td>2</td><td>3</td><td>BSIS</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('CC 313','Web Systems and Technologies','3','2','3','BSIS')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'CC 313')">Delete</button></td></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">CC 401</span></td><td>Capstone Project 1</td><td>3</td><td>3</td><td>0</td><td>BSIS</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('CC 401','Capstone Project 1','3','3','0','BSIS')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'CC 401')">Delete</button></td></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">IT 401</span></td><td>System Administration</td><td>3</td><td>2</td><td>3</td><td>BSIT</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('IT 401','System Administration','3','2','3','BSIT')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'IT 401')">Delete</button></td></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">IT 302</span></td><td>Data Communications &amp; Networking</td><td>3</td><td>2</td><td>3</td><td>BSIT</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('IT 302','Data Communications &amp; Networking','3','2','3','BSIT')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'IT 302')">Delete</button></td></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">GE 101</span></td><td>Ethics and Moral Philosophy</td><td>3</td><td>3</td><td>0</td><td>GE</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('GE 101','Ethics and Moral Philosophy','3','3','0','GE')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'GE 101')">Delete</button></td></tr>
-          <tr><td><span style="font-family:var(--mono);font-weight:700">CC 101</span></td><td>Introduction to Computing</td><td>3</td><td>2</td><td>3</td><td>BSIS</td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('CC 101','Introduction to Computing','3','2','3','BSIS')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'CC 101')">Delete</button></td></tr>
-        </table></div>
+        <div class="card-header">
+          <div class="card-title">Subject Management</div>
+          <button class="topbar-btn btn-primary" type="button" onclick="openModal('modal-add-subject')">+ Add Subject</button>
+        </div>
+ 
+        <div class="table-wrap">
+          <table id="subjects-table">
+            <tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Lec Hrs</th><th>Lab Hrs</th><th>Department</th><th>Action</th></tr>
+            @foreach ($subject as $s)
+              <tr>
+                <td><span style="font-family:var(--mono);font-weight:700">{{ $s->subj_code }}</span></td>
+                <td>{{ $s->subj_name }}</td>
+                <td>{{ $s->subj_lecture_hours + $s->subj_lab_hours }}</td>
+                <td>{{ $s->subj_lecture_hours }}</td>
+                <td>{{ $s->subj_lab_hours }}</td>
+                <td>{{ optional($s->department)->dept_name ?? '—' }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="topbar-btn btn-secondary"
+                    style="padding:4px 10px;font-size:11px;"
+                    onclick="openEditSubject(this)"
+                    data-id="{{ $s->subj_id }}"
+                    data-code="{{ $s->subj_code }}"
+                    data-name="{{ $s->subj_name }}"
+                    data-lec="{{ $s->subj_lecture_hours }}"
+                    data-lab="{{ $s->subj_lab_hours }}"
+                    data-dept="{{ $s->subj_dept_id }}"
+                    data-prog="{{ $s->subj_prog_id }}"
+                    data-action="{{ route('subject.update', $s->subj_id) }}"
+                  >Edit</button>
+ 
+                  <form action="{{ route('subject.destroy', $s->subj_id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Delete: {{ $s->subj_code }}?\nThis action cannot be undone.');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;">Delete</button>
+                  </form>
+                </td>
+              </tr>
+            @endforeach
+          </table>
+        </div>
       </div>
     </div>
-
+ 
   </div>
 </div>
 
-<!-- ADD SUBJECT MODAL -->
 <div class="modal-overlay" id="modal-add-subject">
   <div class="modal" style="width:500px;">
-    <div class="modal-header">
-      <div class="modal-title">Add New Subject</div>
-      <button class="modal-close" onclick="closeModal('modal-add-subject')">✕</button>
-    </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Subject Code</label><input class="field-input" id="add-subj-code" placeholder="e.g. CC 314"></div>
-      <div class="field-group"><label class="field-label">Department</label>
-        <select class="field-select" id="add-subj-dept">
-          <option>BSIS</option><option>BSIT</option><option>BIT-CT</option><option>GE</option>
-        </select>
+    <form action="{{ route('subject.store') }}" method="POST">
+      @csrf
+ 
+      <div class="modal-header">
+        <div class="modal-title">Add New Subject</div>
+        <button class="modal-close" type="button" onclick="closeModal('modal-add-subject')">✕</button>
       </div>
-    </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Subject Name</label><input class="field-input" id="add-subj-name" placeholder="e.g. Web Systems and Technologies"></div>
-    <div class="form-row three">
-      <div class="field-group"><label class="field-label">Units</label><input class="field-input" id="add-subj-units" type="number" min="1" max="6" placeholder="3"></div>
-      <div class="field-group"><label class="field-label">Lecture Hrs</label><input class="field-input" id="add-subj-lec" type="number" min="0" max="6" placeholder="2"></div>
-      <div class="field-group"><label class="field-label">Lab Hrs</label><input class="field-input" id="add-subj-lab" type="number" min="0" max="6" placeholder="3"></div>
-    </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Description (optional)</label><textarea class="field-input" id="add-subj-desc" rows="2" placeholder="Brief subject description..." style="resize:vertical;"></textarea></div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-add-subject')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="saveAddSubject()">Add Subject</button>
-    </div>
+ 
+      <div class="form-row">
+        <div class="field-group">
+          <label class="field-label">Subject Code</label>
+          <input class="field-input" name="subj_code" value="{{ old('subj_code') }}" placeholder="e.g. CC 314">
+          @error('subj_code') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+        </div>
+        <div class="field-group">
+          <label class="field-label">Department</label>
+          <select class="field-select" name="subj_dept_id">
+            <option value="">-- Select Department --</option>
+            @foreach ($departments as $dept)
+              <option value="{{ $dept->dept_id }}" @selected(old('subj_dept_id') == $dept->dept_id)>{{ $dept->dept_name }}</option>
+            @endforeach
+          </select>
+          @error('subj_dept_id') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+        </div>
+      </div>
+ 
+      <div class="field-group" style="margin-bottom:16px;">
+        <label class="field-label">Program</label>
+        <select class="field-select" name="subj_prog_id">
+          <option value="">-- Select Program --</option>
+          @foreach ($programs as $prog)
+            <option value="{{ $prog->prog_id }}" @selected(old('subj_prog_id') == $prog->prog_id)>{{ $prog->prog_name }}</option>
+          @endforeach
+        </select>
+        @error('subj_prog_id') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+      </div>
+ 
+      <div class="field-group" style="margin-bottom:16px;">
+        <label class="field-label">Subject Name</label>
+        <input class="field-input" name="subj_name" value="{{ old('subj_name') }}" placeholder="e.g. Web Systems and Technologies">
+        @error('subj_name') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+      </div>
+ 
+      <div class="form-row three">
+        <div class="field-group">
+          <label class="field-label">Lecture Hrs</label>
+          <input class="field-input" name="subj_lecture_hours" type="number" min="0" max="6" value="{{ old('subj_lecture_hours', 0) }}">
+          @error('subj_lecture_hours') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+        </div>
+        <div class="field-group">
+          <label class="field-label">Lab Hrs</label>
+          <input class="field-input" name="subj_lab_hours" type="number" min="0" max="6" value="{{ old('subj_lab_hours', 0) }}">
+          @error('subj_lab_hours') <div style="color:var(--red);font-size:12px;margin-top:4px;">{{ $message }}</div> @enderror
+        </div>
+      </div>
+      <div class="field-group" style="margin-bottom:16px;">
+        <label class="field-label">Description (optional)</label>
+        <textarea class="field-input" name="subj_description" rows="2" placeholder="Brief subject description..." style="resize:vertical;">{{ old('subj_description') }}</textarea>
+      </div>
+ 
+      <div class="modal-footer">
+        <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-add-subject')">Cancel</button>
+        <button class="topbar-btn btn-primary" type="submit">Add Subject</button>
+      </div>
+    </form>
   </div>
 </div>
-
-<!-- EDIT SUBJECT MODAL -->
+ 
 <div class="modal-overlay" id="modal-edit-subject">
   <div class="modal" style="width:500px;">
-    <div class="modal-header">
-      <div class="modal-title">Edit Subject</div>
-      <button class="modal-close" onclick="closeModal('modal-edit-subject')">✕</button>
-    </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Subject Code</label><input class="field-input" id="edit-subj-code" placeholder="e.g. CC 313"></div>
-      <div class="field-group"><label class="field-label">Department</label>
-        <select class="field-select" id="edit-subj-dept">
-          <option>BSIS</option><option>BSIT</option><option>BIT-CT</option><option>GE</option>
+    <form id="edit-subj-form" action="" method="POST">
+      @csrf
+      @method('PUT')
+ 
+      <div class="modal-header">
+        <div class="modal-title">Edit Subject</div>
+        <button class="modal-close" type="button" onclick="closeModal('modal-edit-subject')">✕</button>
+      </div>
+ 
+      <div class="form-row">
+        <div class="field-group">
+          <label class="field-label">Subject Code</label>
+          <input class="field-input" id="edit-subj-code" name="subj_code" placeholder="e.g. CC 313">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Department</label>
+          <select class="field-select" id="edit-subj-dept" name="subj_dept_id">
+            <option value="">-- Select Department --</option>
+            @foreach ($departments as $dept)
+              <option value="{{ $dept->dept_id }}">{{ $dept->dept_name }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+ 
+      <div class="field-group" style="margin-bottom:16px;">
+        <label class="field-label">Program</label>
+        <select class="field-select" id="edit-subj-prog" name="subj_prog_id">
+          <option value="">-- Select Program --</option>
+          @foreach ($programs as $prog)
+            <option value="{{ $prog->prog_id }}">{{ $prog->prog_name }}</option>
+          @endforeach
         </select>
       </div>
-    </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Subject Name</label><input class="field-input" id="edit-subj-name" placeholder="Subject name"></div>
-    <div class="form-row three">
-      <div class="field-group"><label class="field-label">Units</label><input class="field-input" id="edit-subj-units" type="number" min="1" max="6"></div>
-      <div class="field-group"><label class="field-label">Lecture Hrs</label><input class="field-input" id="edit-subj-lec" type="number" min="0" max="6"></div>
-      <div class="field-group"><label class="field-label">Lab Hrs</label><input class="field-input" id="edit-subj-lab" type="number" min="0" max="6"></div>
-    </div>
-    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:4px;">
-      ⚠️ Editing a subject may affect existing schedule assignments.
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-edit-subject')">Cancel</button>
-      <button class="topbar-btn btn-primary" id="edit-subj-save-btn">Save Changes</button>
-    </div>
+ 
+      <div class="field-group" style="margin-bottom:16px;">
+        <label class="field-label">Subject Name</label>
+        <input class="field-input" id="edit-subj-name" name="subj_name" placeholder="Subject name">
+      </div>
+ 
+      <div class="form-row three">
+        <div class="field-group">
+          <label class="field-label">Lecture Hrs</label>
+          <input class="field-input" id="edit-subj-lec" name="subj_lecture_hours" type="number" min="0" max="6">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Lab Hrs</label>
+          <input class="field-input" id="edit-subj-lab" name="subj_lab_hours" type="number" min="0" max="6">
+        </div>
+      </div>
+ 
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:4px;">
+        ⚠️ Editing a subject may affect existing schedule assignments.
+      </div>
+ 
+      <div class="modal-footer">
+        <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-edit-subject')">Cancel</button>
+        <button class="topbar-btn btn-primary" type="submit">Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -208,17 +315,17 @@ function saveAddSubject() {
 }
 
 // ── SUBJECTS: EDIT ─────────────────────────────────────────────────────────────
-function openEditSubject(code, name, units, lec, lab, dept) {
-  document.getElementById('edit-subj-code').value  = code;
-  document.getElementById('edit-subj-name').value  = name;
-  document.getElementById('edit-subj-units').value = units;
-  document.getElementById('edit-subj-lec').value   = lec;
-  document.getElementById('edit-subj-lab').value   = lab;
-  setSelectValue('edit-subj-dept', dept);
-  document.getElementById('edit-subj-save-btn').onclick = () => {
-    closeModal('modal-edit-subject');
-    showToast('Subject "' + document.getElementById('edit-subj-name').value + '" updated!');
-  };
+function openEditSubject(btn) {
+  const form = document.getElementById('edit-subj-form');
+  form.action = btn.dataset.action;
+ 
+  document.getElementById('edit-subj-code').value = btn.dataset.code;
+  document.getElementById('edit-subj-name').value = btn.dataset.name;
+  document.getElementById('edit-subj-lec').value  = btn.dataset.lec;
+  document.getElementById('edit-subj-lab').value  = btn.dataset.lab;
+  document.getElementById('edit-subj-dept').value = btn.dataset.dept;
+  document.getElementById('edit-subj-prog').value = btn.dataset.prog;
+ 
   openModal('modal-edit-subject');
 }
 

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\SubjectController;
 
 
 /*
@@ -89,3 +90,9 @@ Route::prefix('admin')->group(function () {
     })->name('admin.admin_settings');
 
 });
+/*
+|--------------------------------------------------------------------------
+| SUBJECTS_ADMIN
+|--------------------------------------------------------------------------
+*/
+Route::resource('subject', SubjectController::class);
