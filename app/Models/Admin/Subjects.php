@@ -21,14 +21,4 @@ class Subjects extends Model
         'subj_lab_hours',
         'subj_is_active'
     ];
-
-    public function department()
-    {
-        return $this->belongsTo(Department::class, 'subj_dept_id', 'dept_id');
-    }
-
-    public function program()
-    {
-        return $this->belongsTo(Program::class, 'subj_prog_id', 'prog_id');
-    }
 }
