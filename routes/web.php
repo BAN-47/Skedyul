@@ -62,6 +62,18 @@ Route::get('/dashboard', function () {
     return view('admin.admin_dashboard');
 })->name('admin.dashboard');
 
+/*
+|--------------------------------------------------------------------------
+| ADMIN DASHBOARD
+|--------------------------------------------------------------------------
+*/
+use App\Models\Chair\AcademicYear;
+use App\Models\Chair\Semester;
+use App\Models\Admin\Section;
+use App\Models\Admin\Program;
+use App\Models\Chair\Schedule;
+use App\Models\Admin\Subjects;
+
 Route::get('/dashboard', function () {
     $users = User::orderBy('usr_name')->take(5)->get();
 
@@ -74,7 +86,58 @@ Route::get('/dashboard', function () {
 
     $totalUsers = array_sum($roleCounts);
 
-    return view('admin.admin_dashboard', compact('users', 'roleCounts', 'totalUsers'));
+    $academicYear = AcademicYear::where('ay_is_active', true)->first();
+    $semester     = Semester::where('sem_is_active', true)->first();
+
+    $section = Section::with('program')
+        ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
+        ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
+        ->get();
+
+    $scheduledCount   = $section->where('sec_status', 'Scheduled')->count();
+    $inProgressCount  = $section->where('sec_status', 'In Progress')->count();
+    $unscheduledCount = $section->where('sec_status', 'Unscheduled')->count();
+
+    $program = $section
+        ->groupBy(fn ($s) => $s->program->prog_name ?? 'Unknown')
+        ->map(function ($group, $programName) {
+            $total = $group->count();
+            $scheduled = $group->where('sec_status', 'Scheduled')->count();
+            $percent = $total > 0 ? round(($scheduled / $total) * 100) : 0;
+
+            $color = match(true) {
+                $percent >= 90 => 'green',
+                $percent >= 50 => 'amber',
+                default        => 'red',
+            };
+
+            return ['name' => $programName, 'percent' => $percent, 'color' => $color];
+        })
+        ->values();
+
+    // ---------- SUBJECTS ----------
+    $subject = Subjects::with(['department', 'program'])->get();
+    $totalSubjectsOffered = $subject->count();
+    $scheduleConflicts = $subject->where('subj_is_active', false)->count(); // adjust once "conflict" logic exists
+
+    // ---------- ROOMS (placeholder until Room model exists) ----------
+    $room = collect();
+    $totalRooms     = 0;
+    $roomsInUse     = 0;
+    $roomsAvailable = 0;
+
+    // ---------- ACTIVITY LOG (placeholder until ActivityLog model exists) ----------
+    $audit_log = collect();
+
+    $dbRecordsCount = $totalUsers + $section->count() + $totalSubjectsOffered + $totalRooms;
+
+    return view('admin.admin_dashboard', compact(
+        'users', 'roleCounts', 'totalUsers', 'academicYear', 'semester',
+        'section', 'program', 'scheduledCount', 'inProgressCount', 'unscheduledCount',
+        'subject', 'totalSubjectsOffered', 'scheduleConflicts',
+        'room', 'totalRooms', 'roomsInUse', 'roomsAvailable',
+        'audit_log', 'dbRecordsCount'
+    ));
 })->name('admin.dashboard');
 /*
 |--------------------------------------------------------------------------
