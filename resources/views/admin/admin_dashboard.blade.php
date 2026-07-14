@@ -32,37 +32,34 @@
     <!-- PAGE CONTENT -->
     <div class="page-content">
 
-      <!-- WELCOME BANNER -->
-      <div class="quote-banner">
-        <div class="quote-banner-grid"></div>
-        <div class="position-relative" style="z-index:1;">
-          <div class="d-flex align-items-start justify-content-between gap-4">
-            <div class="flex-grow-1">
-              <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
-                Welcome back, Tech Admin
-              </div>
-              <div id="quote-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
-                "Education is the most powerful weapon which you can use to change the world."
-              </div>
-              <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">— Nelson Mandela</div>
-              <div class="d-flex align-items-center gap-2 mt-3">
-                <span style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;">‹</span>
-                <div class="d-flex gap-2">
-                  <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.9);"></span>
-                  <span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);"></span>
-                </div>
-                <span style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;">›</span>
-              </div>
+    <!-- WELCOME BANNER -->
+    <div class="quote-banner">
+      <div class="quote-banner-grid"></div>
+      <div class="position-relative" style="z-index:1;">
+        <div class="d-flex align-items-start justify-content-between gap-4">
+          <div class="flex-grow-1">
+            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
+              Welcome back, Tech Admin
             </div>
-            <div class="text-end flex-shrink-0">
-              <div style="font-size:44px;opacity:.12;line-height:1;margin-bottom:10px;">"</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.3);">AY 2025–2026 · 1st Sem</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:4px;">Last backup</div>
-              <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
+            <div id="quote-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
+              "Education is the most powerful weapon which you can use to change the world."
             </div>
+            <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">— Nelson Mandela</div>
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <span id="quote-prev" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">‹</span>
+              <div class="d-flex gap-2" id="quote-dots"></div>
+              <span id="quote-next" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">›</span>
+            </div>
+          </div>
+          <div class="text-end flex-shrink-0">
+            <div style="font-size:44px;opacity:.12;line-height:1;margin-bottom:10px;">"</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.3);">AY 2025–2026 · 1st Sem</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:4px;">Last backup</div>
+            <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
           </div>
         </div>
       </div>
+    </div>
 
       <!-- STAT CARDS ROW 1 -->
       <div class="row g-3 mb-3">
@@ -86,7 +83,7 @@
           <div class="dash-card h-100">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <div><div class="card-title">User Accounts</div><div class="card-sub">All registered system users</div></div>
-              <a href="{{ route('admin.users') }}" class="topbar-btn btn-primary-custom">+ Add User</a>
+              <a href="{{ route('admin.users') }}" class="topbar-btn btn-primary-custom" style="text-decoration:none;">+ Add User</a>
             </div>
             <div class="table-wrap">
               <table>
@@ -188,8 +185,10 @@
           <div class="dash-card">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <div>
-                <div class="card-title">Current Sections</ div>
-                <div class="card-sub">AY {{ $academicYear }} · {{ $semester }}</div>
+                <div class="card-title">Current Sections</div>
+                <div class="card-sub">
+                    AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
+                </div>
               </div>
               <span class="badge badge-blue">{{ $section->count() }} Total</span>
             </div>
@@ -201,26 +200,19 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @forelse($section as $sections)
-                  <tr>
-                    <td><b>{{ $sections->name }}</b></td>
-                    <td>{{ $sections->program }}</td>
-                    <td>{{ $sections->year_level }}</td>
-                    <td>{{ $sections->student_count }}</td>
-                    <td>{{ $sections->subject_count }}</td>
-                    <td>
-                      <span class="badge badge-{{ match($sections->status) {
-                          'Scheduled'   => 'green',
-                          'In Progress' => 'amber',
-                          'Unscheduled' => 'red',
-                          default       => 'grey',
-                      } }}">
-                          {{ $sections->status }}
-                      </span>
-                    </td>
-                  </tr>
+                  @forelse ($section as $sec)
+                    <tr>
+                      <td>{{ $sec->sec_name }}</td>
+                      <td>{{ $sec->program->prog_name ?? 'N/A' }}</td>
+                      <td>{{ $sec->sec_year_level }}</td>
+                      <td>{{ $sec->sec_no_of_students }}</td>
+                      <td>{{-- subjects column, depends on how subjects relate to a section --}}</td>
+                      <td>{{ $sec->sec_status }}</td>
+                    </tr>
                   @empty
-                  <tr><td colspan="6" style="text-align:center;">No sections found.</td></tr>
+                    <tr>
+                      <td colspan="6" class="text-center">No sections found.</td>
+                    </tr>
                   @endforelse
                 </tbody>
               </table>
@@ -285,27 +277,19 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @forelse($subject as $subjects)
+                  @forelse($subject as $s)
                   <tr>
-                    <td><span style="font-family:var(--mono);font-size:12px;">{{ $subjects->code }}</span></td>
-                    <td><b>{{ $subjects->title }}</b></td>
-                    <td>{{ $subjects->units }}</td>
-                    <td>{{ $subjects->program }}</td>
+                    <td><span style="font-family:var(--mono);font-size:12px;">{{ $s->subj_code }}</span></td>
+                    <td><b>{{ $s->subj_name }}</b></td>
+                    <td>{{ $s->subj_lecture_hours + $s->subj_lab_hours }}</td>
+                    <td>{{ optional($s->program)->prog_name ?? '—' }}</td>
                     <td>
-                      @if($subjects->faculty_name)
-                          {{ $subjects->faculty_name }}
-                      @else
-                          <span style="color:var(--red);">Unassigned</span>
-                      @endif
+                      {{-- No faculty assignment column exists yet on subject table --}}
+                      <span style="color:var(--red);">Unassigned</span>
                     </td>
                     <td>
-                      <span class="badge badge-{{ match($subjects->status) {
-                          'Active'     => 'green',
-                          'Conflict'   => 'amber',
-                          'No Faculty' => 'red',
-                          default      => 'grey',
-                      } }}">
-                          {{ $subjects->status }}
+                      <span class="badge badge-{{ $s->subj_is_active ? 'green' : 'grey' }}">
+                          {{ $s->subj_is_active ? 'Active' : 'Inactive' }}
                       </span>
                     </td>
                   </tr>
@@ -408,5 +392,80 @@
 </div><!-- end app-wrapper -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  (function () {
+    const quotes = [
+      { text: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
+      { text: "The more that you read, the more things you will know, the more that you learn, the more places you'll go.", author: "Dr. Seuss" },
+      { text: "Education is one thing no one can take away from you.", author: "Elin Nordegren" },
+      { text: "Give a man a fish and you feed him for a day; teach a man to fish and you feed him for a lifetime.", author: "Maimonides" },
+      { text: "The aim of education is the knowledge, not of facts, but of values.", author: "William S. Burroughs" },
+      { text: "Learning is not compulsory... Neither is survival.", author: "W. Edwards Demin" },
+      { text: "The purpose of education is to turn mirrors into windows.", author: "Sydney J. Harris" },
+      { text: "Intelligence plus character - that is the goal of true education.", author: "Martin Luther King Jr." },
+      { text: "The purpose of learning is growth, and our minds, unlike our bodies, can continue growing as we continue to live.", author: "Mortimer Adler" },
+      { text: "The content of a book holds the power of education and it is with this power that we can shape our future and change lives.", author: "Malala Yousafzai"}
+    ];
+
+    let current = 0;
+    let intervalid = null;
+
+    const textEl = document.getElementById('quote-text');
+    const authorEl = document.getElementById('quote-author');
+    const dotsEl = document.getElementById('quote-dots');
+    const prevBtn = document.getElementById('quote-prev');
+    const nextBtn = document.getElementById('quote-next');
+
+    function renderDots() {
+      dotsEl.innerHTML = '';
+      quotes.forEach((_, i) => {
+        const dot = document.createElement('span');
+        dot.style.width = '6px';
+        dot.style.height = '6px';
+        dot.style.borderRadius = '50%';
+        dot.style.background = i === current ? 'rgba(255,255,255,.9)' : 'rgba(255,255,255,.25)';
+        dot.style.cursor = 'pointer';
+        dot.addEventListener('click', () => goTo(i));
+        dotsEl.appendChild(dot);
+      });
+    }
+
+    function showQuote(i) {
+      textEl.style.opacity = 0;
+      authorEl.style.opacity = 0;
+
+      setTimeout(() => {
+        textEl.textContent = `"${quotes[i].text}"`;
+        authorEl.textContent = `— ${quotes[i].author}`;
+        textEl.style.opacity = 1;
+        authorEl.style.opacity = 1;
+        renderDots();
+      }, 200);
+    }
+
+    function goTo(i) {
+      current = (i + quotes.length) % quotes.length;
+      showQuote(current);
+      resetInterval();
+    }
+
+    function next() { goTo(current + 1); }
+    function prev() { goTo(current - 1); }
+
+    function resetInterval() {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(next, 10000); // 10 seconds
+    }
+
+    textEl.style.transition = 'opacity 0.2s ease';
+    authorEl.style.transition = 'opacity 0.2s ease';
+
+    prevBtn.addEventListener('click', prev);
+    nextBtn.addEventListener('click', next);
+
+    renderDots();
+    resetInterval();
+  })();
+</script>
 </body>
 </html>
