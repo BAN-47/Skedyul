@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
-use App\Models\Program;
+use App\Models\Admin\Program;
 use App\Models\Subjects;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
