@@ -4,13 +4,25 @@
         <div class="sidebar-logo-text">SKED<span>YUL</span></div>
     </div>
 
-    <div class="sidebar-user">
-        <div class="sidebar-avatar">TA</div>
-        <div class="overflow-hidden">
-            <div class="sidebar-user-name">Tech Admin</div>
-            <div class="sidebar-user-role">Technical Administrator</div>
-        </div>
+ <div class="sidebar-user">
+  <div class="sidebar-avatar">
+    {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
+  </div>
+  <div class="overflow-hidden">
+    <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
+    <div class="sidebar-user-role">
+      @php
+        $roleLabels = [
+          'system_admin'     => 'Technical Administrator',
+          'faculty'          => 'Faculty',
+          'department_chair' => 'Department Chair',
+          'dean'             => 'Dean',
+        ];
+      @endphp
+      {{ $roleLabels[Auth::user()->usr_role] ?? ucfirst(Auth::user()->usr_role) }}
     </div>
+  </div>
+</div>
 
     <div class="sidebar-nav">
         <div class="nav-section-label">Main</div>
