@@ -1,21 +1,20 @@
 <?php
 
-namespace App\Models\Admin;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
 class Schedule extends Model
 {
-    protected $table = 'SCHEDULE';
+    protected $table = 'schedule';
     protected $primaryKey = 'sch_id';
     public $incrementing = false;
     protected $keyType = 'string';
- 
+
     const CREATED_AT = 'sch_created_at';
     const UPDATED_AT = 'sch_updated_at';
- 
+
     protected $fillable = [
-        'sch_id',
         'sch_load_id',
         'sch_fac_id',
         'sch_subj_id',
@@ -26,6 +25,8 @@ class Schedule extends Model
         'sch_start_time',
         'sch_end_time',
         'sch_is_active',
-        'sch_created_by',
+        'sch_created_by'
     ];
 }
+
+?>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Chair;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,3 +21,5 @@ class Semester extends Model
         'sem_is_active'
     ];
 }
+
+?>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Chair;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -19,3 +19,5 @@ class AcademicYear extends Model
         'ay_is_active'
     ];
 }
+
+?>

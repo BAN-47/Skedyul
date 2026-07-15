@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Models\Admin;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Program;
 
 class Section extends Model
 {
@@ -29,3 +30,5 @@ class Section extends Model
         return $this->belongsTo(Program::class, 'sec_prog_id', 'prog_id');
     }
 }
+
+?>

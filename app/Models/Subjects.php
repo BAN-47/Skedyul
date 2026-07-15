@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Admin;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -34,3 +34,5 @@ class Subjects extends Model
         return $this->belongsTo(Program::class, 'subj_prog_id', 'prog_id');
     }
 }
+
+?>

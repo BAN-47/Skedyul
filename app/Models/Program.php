@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Admin;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,14 +23,6 @@ class Program extends Model
         'prog_name',
         'prog_code'
     ];
-
-
-    public function department()
-    {
-        return $this->belongsTo(
-            Department::class,
-            'prog_dept_id',
-            'dept_id'
-        );
-    }
 }
+
+?>

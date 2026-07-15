@@ -49,7 +49,12 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 | ADMIN DASHBOARD  (single source of truth — no duplicate route)
 |--------------------------------------------------------------------------
 */
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+use App\Models\AcademicYear;
+use App\Models\Semester;
+use App\Models\Section;
+use App\Models\Program;
+use App\Models\Schedule;
+use App\Models\Subjects;
 
 /*
 |--------------------------------------------------------------------------
