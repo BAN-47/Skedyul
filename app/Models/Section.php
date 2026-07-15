@@ -21,8 +21,8 @@ class Section extends Model
         'sec_sem_id',
         'sec_name',
         'sec_year_level',
-        'sec_no_of_students',
-        'sec_status'
+        'sec_no_of_student',
+        'sec_status',
     ];
 
     public function program()
