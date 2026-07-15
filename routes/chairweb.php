@@ -2,13 +2,16 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
+<<<<<<< HEAD
 use App\Http\Controllers\Chair\ChairRoomController;
+=======
+use App\Http\Controllers\Chair\ChairSubjectController;
+>>>>>>> 1dc2ae2ddc9f0fe9590528b21646d27531e280df
 
 Route::middleware('auth')->prefix('chair')->group(function () {
 
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
 
-    // Stubbed for now — swap each closure for a real controller method as you build it out
     Route::get('/schedule-plotter', function () {
         return view('chair.schedule_plotter');
     })->name('chair.schedule_plotter');
@@ -17,9 +20,10 @@ Route::middleware('auth')->prefix('chair')->group(function () {
         return view('chair.faculty_load');
     })->name('chair.faculty_load');
 
-    Route::get('/subjects', function () {
-        return view('chair.subjects');
-    })->name('chair.subjects');
+    Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
+    Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
+    Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('chair.subject.update');
+    Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('chair.subject.destroy');
 
 
     Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
@@ -44,3 +48,9 @@ Route::middleware('auth')->prefix('chair')->group(function () {
     })->name('chair.settings');
 
 });
+
+Route::post('/schedule', function () {
+    return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
+})->name('schedule.store');
+
+?>
