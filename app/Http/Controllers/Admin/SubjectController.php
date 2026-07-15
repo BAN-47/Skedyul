@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin\Department;
-use App\Models\Admin\Program;
-use App\Models\Admin\Subjects;
+use App\Models\Department;
+use App\Models\Program;
+use App\Models\Subjects;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Database\QueryException;

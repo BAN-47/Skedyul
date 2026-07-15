@@ -67,12 +67,12 @@ Route::get('/dashboard', function () {
 | ADMIN DASHBOARD
 |--------------------------------------------------------------------------
 */
-use App\Models\Chair\AcademicYear;
-use App\Models\Chair\Semester;
-use App\Models\Admin\Section;
-use App\Models\Admin\Program;
-use App\Models\Chair\Schedule;
-use App\Models\Admin\Subjects;
+use App\Models\AcademicYear;
+use App\Models\Semester;
+use App\Models\Section;
+use App\Models\Program;
+use App\Models\Schedule;
+use App\Models\Subjects;
 
 Route::get('/dashboard', function () {
     $users = User::orderBy('usr_name')->take(5)->get();

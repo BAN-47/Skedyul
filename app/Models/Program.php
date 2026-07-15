@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Admin;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -19,3 +19,5 @@ class Program extends Model
         'prog_code'
     ];
 }
+
+?>

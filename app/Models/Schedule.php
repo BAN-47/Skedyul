@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models\Chair;
+namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -28,3 +28,5 @@ class Schedule extends Model
         'sch_created_by'
     ];
 }
+
+?>
