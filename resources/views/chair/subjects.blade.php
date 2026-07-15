@@ -70,48 +70,46 @@
               <tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Lec</th><th>Lab</th><th>Assigned Faculty</th><th>Status</th><th>Action</th></tr>
             </thead>
             <tbody id="subjects-table">
+              @forelse($subjects as $s)
               <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">CC 313</span></td>
-                <td><b>Web Systems</b></td><td>3</td><td>2</td><td>1</td>
-                <td>J. Bautista</td>
-                <td><span class="badge badge-green">Assigned</span></td>
-                <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('CC 313','Web Systems','3','2','1','J. Bautista')">Edit</button></td>
+                <td><span style="font-family:var(--mono);font-weight:700">{{ $s->subj_code }}</span></td>
+                <td><b>{{ $s->subj_name }}</b></td>
+                <td>{{ $s->subj_lecture_hours + $s->subj_lab_hours }}</td>
+                <td>{{ $s->subj_lecture_hours }}</td>
+                <td>{{ $s->subj_lab_hours }}</td>
+                <td>
+                  @if($s->assignedFaculty)
+                    {{ $s->assignedFaculty }}
+                  @else
+                    <span style="color:var(--red);">Unassigned</span>
+                  @endif
+                </td>
+                <td>
+                  @if($s->assignedFaculty)
+                    <span class="badge badge-green">Assigned</span>
+                  @else
+                    <span class="badge badge-red">No Faculty</span>
+                  @endif
+                </td>
+                <td>
+                  @if($s->assignedFaculty)
+                    <button
+                      class="topbar-btn btn-secondary"
+                      style="padding:4px 10px;font-size:11px;"
+                      onclick="openEditSubject('{{ $s->subj_code }}','{{ addslashes($s->subj_name) }}','{{ $s->subj_lecture_hours }}','{{ $s->subj_lab_hours }}','{{ addslashes($s->assignedFaculty) }}')"
+                    >Edit</button>
+                  @else
+                    <button
+                      class="topbar-btn btn-primary"
+                      style="padding:4px 10px;font-size:11px;"
+                      onclick="openModal('modal-assign', '{{ $s->subj_id }}')"
+                    >Assign</button>
+                  @endif
+                </td>
               </tr>
-              <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">CC 401</span></td>
-                <td><b>Capstone Project 1</b></td><td>3</td><td>3</td><td>0</td>
-                <td>J. Bautista</td>
-                <td><span class="badge badge-green">Assigned</span></td>
-                <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('CC 401','Capstone Project 1','3','3','0','J. Bautista')">Edit</button></td>
-              </tr>
-              <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">IT 302</span></td>
-                <td><b>Networking Fundamentals</b></td><td>3</td><td>2</td><td>1</td>
-                <td>F. Lagman</td>
-                <td><span class="badge badge-green">Assigned</span></td>
-                <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('IT 302','Networking Fundamentals','3','2','1','F. Lagman')">Edit</button></td>
-              </tr>
-              <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">IT 401</span></td>
-                <td><b>Information Assurance</b></td><td>3</td><td>2</td><td>1</td>
-                <td>A. Reyes</td>
-                <td><span class="badge badge-green">Assigned</span></td>
-                <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('IT 401','Information Assurance','3','2','1','A. Reyes')">Edit</button></td>
-              </tr>
-              <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">GE 101</span></td>
-                <td><b>Purposive Communication</b></td><td>3</td><td>3</td><td>0</td>
-                <td>A. Reyes</td>
-                <td><span class="badge badge-green">Assigned</span></td>
-                <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('GE 101','Purposive Communication','3','3','0','A. Reyes')">Edit</button></td>
-              </tr>
-              <tr>
-                <td><span style="font-family:var(--mono);font-weight:700">CC 501</span></td>
-                <td><b>System Integration</b></td><td>3</td><td>2</td><td>1</td>
-                <td style="color:var(--red);">Unassigned</td>
-                <td><span class="badge badge-red">No Faculty</span></td>
-                <td><button class="topbar-btn btn-primary" style="padding:4px 10px;font-size:11px;" onclick="openModal('modal-assign')">Assign</button></td>
-              </tr>
+              @empty
+              <tr><td colspan="8" style="text-align:center;">No subjects found.</td></tr>
+              @endforelse
             </tbody>
           </table>
         </div>
@@ -124,131 +122,184 @@
 <!-- ADD SUBJECT MODAL -->
 <div class="modal-overlay" id="modal-add-subject">
   <div class="modal" style="width:500px;">
-    <div class="modal-header">
-      <div class="modal-title">Add New Subject</div>
-      <button class="modal-close" onclick="closeModal('modal-add-subject')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="field-group"><label class="field-label">Subject Code</label><input class="field-input" id="add-subj-code" placeholder="e.g. CC 314"></div>
-        <div class="field-group"><label class="field-label">Department</label>
-          <select class="field-select" id="add-subj-dept">
-            <option>BSIS</option><option>BSIT</option><option>BIT-CT</option><option>GE</option>
+    <form action="{{ route('subject.store') }}" method="POST">
+      @csrf
+      <div class="modal-header">
+        <div class="modal-title">Add New Subject</div>
+        <button type="button" class="modal-close" onclick="closeModal('modal-add-subject')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">Subject Code</label>
+            <input class="field-input" name="subj_code" value="{{ old('subj_code') }}" placeholder="e.g. CC 314">
+            @error('subj_code') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+          </div>
+          <div class="field-group">
+            <label class="field-label">Department</label>
+            <select class="field-select" name="subj_dept_id">
+              <option value="">-- Select --</option>
+              @foreach($departments as $dept)
+                <option value="{{ $dept->dept_id }}" @selected(old('subj_dept_id') == $dept->dept_id)>{{ $dept->dept_name }}</option>
+              @endforeach
+            </select>
+            @error('subj_dept_id') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+          </div>
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px;">
+          <label class="field-label">Program</label>
+          <select class="field-select" name="subj_prog_id">
+            <option value="">-- Select --</option>
+            @foreach($programs as $prog)
+              <option value="{{ $prog->prog_id }}" @selected(old('subj_prog_id') == $prog->prog_id)>{{ $prog->prog_name }}</option>
+            @endforeach
           </select>
+          @error('subj_prog_id') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px;">
+          <label class="field-label">Subject Name</label>
+          <input class="field-input" name="subj_name" value="{{ old('subj_name') }}" placeholder="e.g. Web Systems and Technologies">
+          @error('subj_name') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+        </div>
+
+        <div class="form-row three">
+          <div class="field-group">
+            <label class="field-label">Lecture Hrs</label>
+            <input class="field-input" name="subj_lecture_hours" type="number" min="0" max="6" value="{{ old('subj_lecture_hours', 0) }}">
+            @error('subj_lecture_hours') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+          </div>
+          <div class="field-group">
+            <label class="field-label">Lab Hrs</label>
+            <input class="field-input" name="subj_lab_hours" type="number" min="0" max="6" value="{{ old('subj_lab_hours', 0) }}">
+            @error('subj_lab_hours') <div style="color:var(--red);font-size:12px;">{{ $message }}</div> @enderror
+          </div>
         </div>
       </div>
-      <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Subject Name</label><input class="field-input" id="add-subj-name" placeholder="e.g. Web Systems and Technologies"></div>
-      <div class="form-row three">
-        <div class="field-group"><label class="field-label">Units</label><input class="field-input" id="add-subj-units" type="number" min="1" max="6" placeholder="3"></div>
-        <div class="field-group"><label class="field-label">Lecture Hrs</label><input class="field-input" id="add-subj-lec" type="number" min="0" max="6" placeholder="2"></div>
-        <div class="field-group"><label class="field-label">Lab Hrs</label><input class="field-input" id="add-subj-lab" type="number" min="0" max="6" placeholder="1"></div>
+      <div class="modal-footer">
+        <button type="button" class="topbar-btn btn-secondary" onclick="closeModal('modal-add-subject')">Cancel</button>
+        <button type="submit" class="topbar-btn btn-primary">Add Subject</button>
       </div>
-      <div class="field-group" style="margin-bottom:4px;"><label class="field-label">Assign Faculty</label>
-        <select class="field-select" id="add-subj-faculty">
-          <option value="">— Unassigned —</option>
-          <option>J. Bautista</option><option>F. Lagman</option><option>M. Santos</option><option>A. Reyes</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-add-subject')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="saveAddSubject()">Add Subject</button>
-    </div>
+    </form>
   </div>
 </div>
 
 <!-- EDIT SUBJECT MODAL -->
 <div class="modal-overlay" id="modal-edit-subject">
   <div class="modal" style="width:500px;">
-    <div class="modal-header">
-      <div class="modal-title">Edit Subject</div>
-      <button class="modal-close" onclick="closeModal('modal-edit-subject')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="field-group"><label class="field-label">Subject Code</label><input class="field-input" id="edit-subj-code"></div>
-        <div class="field-group"><label class="field-label">Department</label>
-          <select class="field-select" id="edit-subj-dept">
-            <option>BSIS</option><option>BSIT</option><option>BIT-CT</option><option>GE</option>
-          </select>
+    <form id="edit-subj-form" method="POST">
+      @csrf
+      @method('PUT')
+      <div class="modal-header">
+        <div class="modal-title">Edit Subject</div>
+        <button type="button" class="modal-close" onclick="closeModal('modal-edit-subject')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">Subject Code</label>
+            <input class="field-input" id="edit-subj-code" name="subj_code">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Department</label>
+            <select class="field-select" id="edit-subj-dept" name="subj_dept_id">
+              @foreach($departments as $dept)
+                <option value="{{ $dept->dept_id }}">{{ $dept->dept_name }}</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
+        <div class="field-group" style="margin-bottom:16px;">
+          <label class="field-label">Subject Name</label>
+          <input class="field-input" id="edit-subj-name" name="subj_name">
+        </div>
+        <div class="form-row three">
+          <div class="field-group">
+            <label class="field-label">Lecture Hrs</label>
+            <input class="field-input" id="edit-subj-lec" name="subj_lecture_hours" type="number" min="0" max="6">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Lab Hrs</label>
+            <input class="field-input" id="edit-subj-lab" name="subj_lab_hours" type="number" min="0" max="6">
+          </div>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">
+          ⚠️ Editing a subject may affect existing schedule assignments.
         </div>
       </div>
-      <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Subject Name</label><input class="field-input" id="edit-subj-name"></div>
-      <div class="form-row three">
-        <div class="field-group"><label class="field-label">Units</label><input class="field-input" id="edit-subj-units" type="number" min="1" max="6"></div>
-        <div class="field-group"><label class="field-label">Lecture Hrs</label><input class="field-input" id="edit-subj-lec" type="number" min="0" max="6"></div>
-        <div class="field-group"><label class="field-label">Lab Hrs</label><input class="field-input" id="edit-subj-lab" type="number" min="0" max="6"></div>
+      <div class="modal-footer">
+        <button type="button" class="topbar-btn btn-secondary" onclick="closeModal('modal-edit-subject')">Cancel</button>
+        <button type="submit" class="topbar-btn btn-primary">Save Changes</button>
       </div>
-      <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Assigned Faculty</label>
-        <select class="field-select" id="edit-subj-faculty">
-          <option value="">— Unassigned —</option>
-          <option>J. Bautista</option><option>F. Lagman</option><option>M. Santos</option><option>A. Reyes</option>
-        </select>
-      </div>
-      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">
-        ⚠️ Editing a subject may affect existing schedule assignments.
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-edit-subject')">Cancel</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteSubject()">Delete</button>
-      <button class="topbar-btn btn-primary" id="edit-subj-save-btn">Save Changes</button>
-    </div>
+    </form>
   </div>
 </div>
 
 <!-- QUICK ASSIGN MODAL (for unassigned subjects) -->
 <div class="modal-overlay" id="modal-assign">
   <div class="modal" style="width:480px;">
-    <div class="modal-header">
-      <div class="modal-title">Assign Faculty to Subject</div>
-      <button class="modal-close" onclick="closeModal('modal-assign')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:#fff;">CC 501 — System Integration</div>
-        <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px;">3 units · 2 Lec / 1 Lab · BSIS Dept</div>
+    <form action="{{ route('schedule.store') }}" method="POST">
+      @csrf
+      <input type="hidden" name="sch_subj_id" id="assign-subj-id" value="">
+
+      <div class="modal-header">
+        <div class="modal-title">Assign Faculty to Subject</div>
+        <button type="button" class="modal-close" onclick="closeModal('modal-assign')">×</button>
       </div>
-      <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Select Faculty</label>
-        <select class="field-select" id="quick-assign-faculty">
-          <option value="">— Choose Faculty —</option>
-          <option>Jerome Bautista (24u/30u · 6u left)</option>
-          <option>Felicitas Lagman (27u/30u · 3u left ⚠️)</option>
-          <option>Maria Santos (18u/30u · 12u left)</option>
-          <option>Ana Reyes — Part-time (18u/30u)</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="field-group"><label class="field-label">Day(s)</label>
-          <select class="field-select">
-            <option>Monday / Wednesday</option><option>Tuesday / Thursday</option>
-            <option>Monday / Wednesday / Friday</option><option>Friday</option>
+      <div class="modal-body">
+        <div id="assign-subject-info" style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:13px;font-weight:700;color:#fff;" id="assign-subj-title"></div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px;" id="assign-subj-meta"></div>
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px;">
+          <label class="field-label">Select Faculty</label>
+          <select class="field-select" name="sch_fac_id">
+            <option value="">— Choose Faculty —</option>
+            {{-- Needs a real $faculty collection with computed load --}}
           </select>
         </div>
-        <div class="field-group"><label class="field-label">Time Slot</label>
-          <select class="field-select">
-            <option>7:00 – 8:30 AM</option><option>8:30 – 10:00 AM</option>
-            <option>10:00 – 11:30 AM</option><option>1:00 – 2:30 PM</option><option>2:30 – 4:00 PM</option>
-          </select>
+
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">Day</label>
+            <select class="field-select" name="sch_day">
+              <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+              <option>Thursday</option><option>Friday</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Time Slot</label>
+            <div style="display:flex;gap:8px;">
+              <input class="field-input" type="time" name="sch_start_time">
+              <input class="field-input" type="time" name="sch_end_time">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field-group">
+            <label class="field-label">Room</label>
+            <select class="field-select" name="sch_room_id">
+              {{-- Needs a real $rooms collection --}}
+            </select>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Section</label>
+            <select class="field-select" name="sch_sec_id">
+              @foreach($section as $sec)
+                <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+              @endforeach
+            </select>
+          </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="field-group"><label class="field-label">Room</label>
-          <select class="field-select">
-            <option>Room 301</option><option>Room 302</option><option>Room 205</option><option>Lab 1</option><option>Lab 2</option>
-          </select>
-        </div>
-        <div class="field-group"><label class="field-label">Section</label>
-          <select class="field-select">
-            <option>BSIS 1-A</option><option>BSIS 2-A</option><option>BSIS 3-A</option><option>BSIS 4-A</option>
-          </select>
-        </div>
+      <div class="modal-footer">
+        <button type="button" class="topbar-btn btn-secondary" onclick="closeModal('modal-assign')">Cancel</button>
+        <button type="submit" class="topbar-btn btn-primary">Assign Faculty</button>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-assign')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="quickAssign()">Assign Faculty</button>
-    </div>
+    </form>
   </div>
 </div>
 
