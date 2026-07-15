@@ -13,24 +13,28 @@ use Illuminate\Validation\Rule;
 
 class ChairSubjectController extends Controller {
 
-    public function index() {
-        $subjects = Subjects::with(['department', 'program'])->get()->map(function ($s){
-            $schedule = Schedule::where('sch_subj_id', $s->subj_id)
-            ->where('sch_is_active', true)
-            ->first();
-            
-            $s->assignedFaculty = $schedule?->sch_fac_id
-                ? optional($schedule->faculty)->fac_name ?? 'Assigned'
-                : null;
-        
-        return $s;
-    });
+    public function index()
+    {
+        $subjects = Subjects::with(['department', 'program'])
+            ->where('subj_is_active', true)
+            ->get()
+            ->map(function ($s) {
+                $schedule = Schedule::where('sch_subj_id', $s->subj_id)
+                    ->where('sch_is_active', true)
+                    ->first();
 
-    $departments = Department::orderBy('dept_name')->get();
-    $programs = Program::orderBy('prog_name')->get();
-    $section = Section::orderBy('sec_name')->get();
+                $s->assignedFaculty = $schedule?->sch_fac_id
+                    ? optional($schedule->faculty)->fac_name ?? 'Assigned'
+                    : null;
 
-    return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section'));
+                return $s;
+            });
+
+        $departments = Department::orderBy('dept_name')->get();
+        $programs = Program::orderBy('prog_name')->get();
+        $section = Section::orderBy('sec_name')->get();
+
+        return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section'));
     }
 
     public function store(Request $request) {
@@ -71,12 +75,13 @@ class ChairSubjectController extends Controller {
 
     }
 
-    public function destroy(string $id) {
+    public function destroy(string $id)
+    {
         $subject = Subjects::findOrFail($id);
-        $subject->delete();
+        $subject->update(['subj_is_active' => false]);
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject deleted successfully.');
+            ->with('success', 'Subject deactivated successfully.');
     }
 
 }

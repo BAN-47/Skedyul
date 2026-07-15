@@ -8,7 +8,6 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
 
-    // Stubbed for now — swap each closure for a real controller method as you build it out
     Route::get('/schedule-plotter', function () {
         return view('chair.schedule_plotter');
     })->name('chair.schedule_plotter');
@@ -17,9 +16,10 @@ Route::middleware('auth')->prefix('chair')->group(function () {
         return view('chair.faculty_load');
     })->name('chair.faculty_load');
 
-    Route::get('/subjects', function () {
-        return view('chair.subjects');
-    })->name('chair.subjects');
+    Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
+    Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
+    Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('chair.subject.update');
+    Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('chair.subject.destroy');
 
     Route::get('/rooms', function () {
         return view('chair.rooms');
@@ -43,13 +43,8 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 
 });
 
-Route::prefix('chair')->group(function () {
-    Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
-    Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('subject.store');
-    Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('subject.update');
-    Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('subject.destroy');
-});
-
 Route::post('/schedule', function () {
     return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
 })->name('schedule.store');
+
+?>

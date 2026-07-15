@@ -96,15 +96,20 @@
                     <button
                       class="topbar-btn btn-secondary"
                       style="padding:4px 10px;font-size:11px;"
-                      onclick="openEditSubject('{{ $s->subj_code }}','{{ addslashes($s->subj_name) }}','{{ $s->subj_lecture_hours }}','{{ $s->subj_lab_hours }}','{{ addslashes($s->assignedFaculty) }}')"
+                      onclick="openEditSubject('{{ $s->subj_id }}','{{ $s->subj_code }}','{{ addslashes($s->subj_name) }}','{{ $s->subj_lecture_hours }}','{{ $s->subj_lab_hours }}','{{ addslashes($s->assignedFaculty) }}')"
                     >Edit</button>
                   @else
                     <button
                       class="topbar-btn btn-primary"
                       style="padding:4px 10px;font-size:11px;"
-                      onclick="openModal('modal-assign', '{{ $s->subj_id }}')"
+                      onclick="openAssignModal('{{ $s->subj_id }}','{{ $s->subj_code }}','{{ addslashes($s->subj_name) }}','{{ $s->subj_lecture_hours + $s->subj_lab_hours }}')"
                     >Assign</button>
                   @endif
+                  <form action="{{ route('chair.subject.destroy', $s->subj_id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Deactivate {{ $s->subj_code }}? It will be hidden from active lists but kept for historical records.');">
+                      @csrf
+                      @method('DELETE')
+                      <button type="submit" class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;">Delete</button>
+                  </form>
                 </td>
               </tr>
               @empty
@@ -122,7 +127,7 @@
 <!-- ADD SUBJECT MODAL -->
 <div class="modal-overlay" id="modal-add-subject">
   <div class="modal" style="width:500px;">
-    <form action="{{ route('subject.store') }}" method="POST">
+    <form action="{{ route('chair.subject.store') }}" method="POST">
       @csrf
       <div class="modal-header">
         <div class="modal-title">Add New Subject</div>
@@ -356,6 +361,13 @@ document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
+function openAssignModal(subjId, code, name, units) {
+  document.getElementById('assign-subj-id').value = subjId;
+  document.getElementById('assign-subj-title').textContent = `${code} — ${name}`;
+  document.getElementById('assign-subj-meta').textContent = `${units} units`;
+  openModal('modal-assign');
+}
+
 // ── TOAST ──────────────────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -402,17 +414,12 @@ function saveAddSubject() {
 }
 
 // ── EDIT SUBJECT ───────────────────────────────────────────────────────────────
-function openEditSubject(code, name, units, lec, lab, faculty) {
+function openEditSubject(id, code, name, units, lec, lab, faculty) {
+  document.getElementById('edit-subj-form').action = `/chair/subjects/${id}`;
   document.getElementById('edit-subj-code').value  = code;
   document.getElementById('edit-subj-name').value  = name;
-  document.getElementById('edit-subj-units').value = units;
   document.getElementById('edit-subj-lec').value   = lec;
   document.getElementById('edit-subj-lab').value   = lab;
-  setSelectValue('edit-subj-faculty', faculty);
-  document.getElementById('edit-subj-save-btn').onclick = () => {
-    closeModal('modal-edit-subject');
-    showToast(`Subject "${document.getElementById('edit-subj-name').value}" updated!`);
-  };
   openModal('modal-edit-subject');
 }
 
@@ -420,15 +427,7 @@ function openEditSubject(code, name, units, lec, lab, faculty) {
 function deleteSubject() {
   const name = document.getElementById('edit-subj-name').value;
   if (!confirm(`Delete subject: ${name}?\nThis cannot be undone.`)) return;
-  closeModal('modal-edit-subject');
-  document.querySelectorAll('#subjects-table tr').forEach(row => {
-    if (row.textContent.includes(name)) {
-      row.style.transition = 'opacity 0.3s';
-      row.style.opacity = '0';
-      setTimeout(() => row.remove(), 300);
-    }
-  });
-  showToast(`"${name}" deleted successfully.`);
+  document.getElementById('delete-subj-form').submit();
 }
 
 // ── QUICK ASSIGN ───────────────────────────────────────────────────────────────
