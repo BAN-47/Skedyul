@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Admin\Section;
-use App\Models\Admin\Subjects;
-use App\Models\Admin\Room;
-use App\Models\Admin\Notification;
-use App\Models\Chair\AcademicYear;
-use App\Models\Chair\Semester;
-use App\Models\Chair\Schedule;
+use App\Models\Section;
+use App\Models\Subjects;
+use App\Models\Room;
+use App\Models\Notification;
+use App\Models\AcademicYear;
+use App\Models\Semester;
+use App\Models\Schedule;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 

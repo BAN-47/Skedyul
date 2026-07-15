@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin\Program;
+use App\Models\Program;
 
 class ProgramController extends Controller
 {
