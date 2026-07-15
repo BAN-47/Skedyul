@@ -83,7 +83,12 @@ class DashboardController extends Controller
                 default        => 'green',
             };
 
-            return ['name' => $r->room_name, 'percent' => $percent, 'color' => $color];
+            return [
+                'name'    => $r->room_name,
+                'count'   => $bookings,
+                'percent' => $percent,
+                'color'   => $color,
+            ];
         });
 
         // ---------- NOTIFICATIONS ----------

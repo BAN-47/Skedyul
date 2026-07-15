@@ -1,11 +1,11 @@
-<?php 
+<?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Faculty extends Model {
-
+class Faculty extends Model
+{
     protected $table = 'faculty';
     protected $primaryKey = 'fac_id';
     public $incrementing = false;
@@ -21,6 +21,14 @@ class Faculty extends Model {
         'fac_rank',
         'fac_profile_image'
     ];
-};
 
-?>
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id');
+    }
+}

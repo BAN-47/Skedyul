@@ -56,6 +56,8 @@ use App\Models\Program;
 use App\Models\Schedule;
 use App\Models\Subjects;
 
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+
 /*
 |--------------------------------------------------------------------------
 | NOTIFICATIONS

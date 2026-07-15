@@ -17,7 +17,7 @@
     <a href="{{ route('chair.dashboard') }}" class="nav-item {{ request()->routeIs('chair.dashboard') ? 'active' : '' }}">
       <span class="nav-icon"></span> Dashboard
     </a>
-    <!-- <a href="{{ route('chair.schedule_plotter') }}" class="nav-item {{ request()->routeIs('chair.schedule_plotter') ? 'active' : '' }}">
+    <a href="{{ route('chair.schedule_plotter') }}" class="nav-item {{ request()->routeIs('chair.schedule_plotter') ? 'active' : '' }}">
       <span class="nav-icon"></span> Schedule Plotter
     </a>
     <a href="{{ route('chair.faculty_load') }}" class="nav-item {{ request()->routeIs('chair.faculty_load') ? 'active' : '' }}">
@@ -45,7 +45,7 @@
     <a href="{{ route('chair.settings') }}" class="nav-item {{ request()->routeIs('chair.settings') ? 'active' : '' }}">
       <span class="nav-icon"></span> Settings
     </a>
-  </div> -->
+  </div>
 
   <div class="sidebar-bottom">
     <form method="POST" action="{{ route('logout') }}">
