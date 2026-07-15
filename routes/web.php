@@ -121,3 +121,4 @@ Route::get('/programs',
 Route::get('/departments',
 [DepartmentController::class,'index'])
 ->name('admin.departments');
+
