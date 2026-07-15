@@ -2,11 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
-<<<<<<< HEAD
 use App\Http\Controllers\Chair\ChairRoomController;
-=======
 use App\Http\Controllers\Chair\ChairSubjectController;
->>>>>>> 1dc2ae2ddc9f0fe9590528b21646d27531e280df
 
 Route::middleware('auth')->prefix('chair')->group(function () {
 
