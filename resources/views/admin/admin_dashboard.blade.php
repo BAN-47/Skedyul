@@ -42,28 +42,21 @@
                     <div class="position-relative" style="z-index:1;">
                         <div class="d-flex align-items-start justify-content-between gap-4">
                             <div class="flex-grow-1">
-                                <div
-                                    style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
+                                <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
                                     Welcome back, Tech Admin
                                 </div>
-                                <div id="quote-text"
-                                    style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
+                                <div id="quote-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
                                     "Education is the most powerful weapon which you can use to change the world."
                                 </div>
-                                <div id="quote-author"
-                                    style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">— Nelson Mandela
+                                <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">
+                                    — Nelson Mandela
                                 </div>
                                 <div class="d-flex align-items-center gap-2 mt-3">
-                                    <span
-                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;">‹</span>
-                                    <div class="d-flex gap-2">
-                                        <span
-                                            style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.9);"></span>
-                                        <span
-                                            style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.25);"></span>
-                                    </div>
-                                    <span
-                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;">›</span>
+                                    <button type="button" id="quote-prev"
+                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">‹</button>
+                                    <div class="d-flex gap-2" id="quote-dots"></div>
+                                    <button type="button" id="quote-next"
+                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">›</button>
                                 </div>
                             </div>
                             <div class="text-end flex-shrink-0">
@@ -574,6 +567,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+
+        
         (function() {
             const perPage = 5;
             const list = document.getElementById('room-util-list');
@@ -616,6 +611,48 @@
             requestAnimationFrame(render);
             window.addEventListener('resize', render);
         })();
+
+        (function () {
+        const quotes = [
+            { text: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
+            { text: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
+            { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" }
+        ];
+
+        const textEl = document.getElementById('quote-text');
+        const authorEl = document.getElementById('quote-author');
+        const dotsEl = document.getElementById('quote-dots');
+        const prevBtn = document.getElementById('quote-prev');
+        const nextBtn = document.getElementById('quote-next');
+
+        if (!textEl || !dotsEl) return;
+
+        let current = 0;
+
+        function renderDots() {
+            dotsEl.innerHTML = quotes.map((_, i) =>
+                `<span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,${i === current ? '.9' : '.25'});"></span>`
+            ).join('');
+        }
+
+        function renderQuote() {
+            textEl.textContent = `"${quotes[current].text}"`;
+            authorEl.textContent = `— ${quotes[current].author}`;
+            renderDots();
+        }
+
+        prevBtn.addEventListener('click', function () {
+            current = (current - 1 + quotes.length) % quotes.length;
+            renderQuote();
+        });
+
+        nextBtn.addEventListener('click', function () {
+            current = (current + 1) % quotes.length;
+            renderQuote();
+        });
+
+        renderQuote();
+    })();
     </script>
 </body>
 
