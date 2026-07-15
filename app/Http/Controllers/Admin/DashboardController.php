@@ -74,26 +74,17 @@ class DashboardController extends Controller
         $roomsInUse     = $roomsOccupied;
 
         $room = Room::all()->map(function ($r) {
-    $bookings = Schedule::where('sch_room_id', $r->room_id)
-        ->where('sch_is_active', true)
-        ->count();
+            $bookings = Schedule::where('sch_room_id', $r->room_id)->count();
+            $percent  = min(100, round(($bookings / 40) * 100)); // assumes 40 weekly slots
 
-    // still calculate percent for the bar width visual, just not shown as the label
-    $percent = min(100, round(($bookings / 40) * 100));
+            $color = match (true) {
+                $percent >= 80 => 'red',
+                $percent >= 40 => 'amber',
+                default        => 'green',
+            };
 
-    $color = match (true) {
-        $bookings >= 32 => 'red',
-        $bookings >= 16 => 'amber',
-        default         => 'green',
-    };
-
-    return [
-        'name'    => $r->room_name,
-        'count'   => $bookings,
-        'percent' => $percent,
-        'color'   => $color,
-    ];
-});
+            return ['name' => $r->room_name, 'percent' => $percent, 'color' => $color];
+        });
 
         // ---------- NOTIFICATIONS ----------
         $notifCount = Notification::where('notif_usr_id', Auth::id())
