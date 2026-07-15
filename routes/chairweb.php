@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
+use App\Http\Controllers\Chair\ChairRoomController;
 
 Route::middleware('auth')->prefix('chair')->group(function () {
 
@@ -20,9 +21,11 @@ Route::middleware('auth')->prefix('chair')->group(function () {
         return view('chair.subjects');
     })->name('chair.subjects');
 
-    Route::get('/rooms', function () {
-        return view('chair.rooms');
-    })->name('chair.rooms');
+
+    Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
+    Route::post('/rooms', [ChairRoomController::class, 'store'])->name('chair.rooms.store');
+    Route::post('/schedules', [ChairRoomController::class, 'assignSchedule'])->name('chair.schedules.store');
+    Route::put('/schedules/{schedule}', [ChairRoomController::class, 'updateSchedule'])->name('chair.schedules.update');
 
     Route::get('/conflict-checker', function () {
         return view('chair.conflict_checker');
