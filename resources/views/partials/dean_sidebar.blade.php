@@ -25,12 +25,20 @@
       </a>
 
       <div class="nav-section-label">Approvals</div>
-      <div class="nav-item"><span class="nav-icon"></span> Pending Approvals</div>
+      <a href="{{ route('dean.pending_approvals') }}" class="nav-item {{ request()->routeIs('dean.pending_approvals') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Pending Approvals
+      </a>
 
       <div class="nav-section-label">System</div>
-      <div class="nav-item"><span class="nav-icon"></span> Schedule Reports</div>
-      <div class="nav-item"><span class="nav-icon"></span> Faculty Deployment</div>
-      <div class="nav-item"><span class="nav-icon"></span> Settings</div>
+      <a href="{{ route('dean.schedule_reports') }}" class="nav-item {{ request()->routeIs('dean.schedule_reports') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Schedule Reports
+      </a>
+      <a href="{{ route('dean.faculty_deployment') }}" class="nav-item {{ request()->routeIs('dean.faculty_deployment') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Faculty Deployment
+      </a>
+      <a href="{{ route('dean.settings') }}" class="nav-item {{ request()->routeIs('dean.settings') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Settings
+      </a>
     </div>
 
     <div class="sidebar-bottom">
