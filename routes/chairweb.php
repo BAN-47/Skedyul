@@ -2,15 +2,17 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
+use App\Http\Controllers\Chair\ScheduleController;
 
 Route::middleware('auth')->prefix('chair')->group(function () {
-
+// Chair dashboard index 
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
 
-    // Stubbed for now — swap each closure for a real controller method as you build it out
-    Route::get('/schedule-plotter', function () {
-        return view('chair.schedule_plotter');
-    })->name('chair.schedule_plotter');
+// schedule Plotter
+Route::get('/schedule-plotter', [ScheduleController::class, 'index'])->name('chair.schedule_plotter');
+Route::post('/schedule-plotter', [ScheduleController::class, 'store'])->name('chair.schedule_plotter.store');
+Route::delete('/schedule-plotter/{id}', [ScheduleController::class, 'destroy'])->name('chair.schedule_plotter.destroy');
+
 
     Route::get('/faculty-load', function () {
         return view('chair.faculty_load');

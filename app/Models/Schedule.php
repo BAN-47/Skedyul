@@ -27,6 +27,10 @@ class Schedule extends Model
         'sch_is_active',
         'sch_created_by'
     ];
+    public function faculty() { return $this->belongsTo(Faculty::class, 'sch_fac_id', 'fac_id'); }
+    public function subject() { return $this->belongsTo(Subjects::class, 'sch_subj_id', 'subj_id'); }
+    public function section() { return $this->belongsTo(Section::class, 'sch_sec_id', 'sec_id'); }
+    public function room()    { return $this->belongsTo(Room::class, 'sch_room_id', 'room_id'); }
 }
 
 ?>
