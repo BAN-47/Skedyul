@@ -29,4 +29,9 @@ class User extends Authenticatable
     {
         return $this->usr_password_hash;
     }
+
+    public function deptChairRecord()
+    {
+    return $this->hasOne(Dept_Chair::class, 'dc_usr_id', 'usr_id');
+    }
 }
