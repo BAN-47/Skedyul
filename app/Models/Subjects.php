@@ -33,6 +33,11 @@ class Subjects extends Model
     {
         return $this->belongsTo(Program::class, 'subj_prog_id', 'prog_id');
     }
+
+    public function studyLoads()
+    {
+        return $this->hasMany(Study_Load::class, 'sl_subj_id', 'subj_id');
+    }
 }
 
 ?>

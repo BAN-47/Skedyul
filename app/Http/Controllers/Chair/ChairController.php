@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
+use App\Models\room as Room;
+use App\Models\Schedule;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Section;
@@ -93,4 +95,6 @@ class ChairController extends Controller
             'subject', 'totalSubjects', 'subjectsPlotted'
         ));
     }
+    
+    
 }

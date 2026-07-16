@@ -14,9 +14,15 @@
 
     <div class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-      <div class="nav-item active"><span class="nav-icon"></span> Dashboard</div>
-      <div class="nav-item"><span class="nav-icon"></span> Faculty Workload</div>
-      <div class="nav-item"><span class="nav-icon"></span> Departments</div>
+      <a href="{{ route('dean.dashboard') }}" class="nav-item {{ request()->routeIs('dean.dashboard') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Dashboard
+      </a>
+      <a href="{{ route('dean.faculty_workload') }}" class="nav-item {{ request()->routeIs('dean.faculty_workload') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Faculty Workload
+      </a>
+      <a href="{{ route('dean.departments') }}" class="nav-item {{ request()->routeIs('dean.departments') ? 'active' : '' }}">
+        <span class="nav-icon"></span> Departments
+      </a>
 
       <div class="nav-section-label">Approvals</div>
       <div class="nav-item"><span class="nav-icon"></span> Pending Approvals</div>

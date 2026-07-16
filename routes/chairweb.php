@@ -18,13 +18,16 @@ Route::delete('/schedule-plotter/{id}', [ScheduleController::class, 'destroy'])-
         return view('chair.faculty_load');
     })->name('chair.faculty_load');
 
-    Route::get('/subjects', function () {
-        return view('chair.subjects');
-    })->name('chair.subjects');
+    Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
+    Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
+    Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('chair.subject.update');
+    Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('chair.subject.destroy');
 
-    Route::get('/rooms', function () {
-        return view('chair.rooms');
-    })->name('chair.rooms');
+
+    Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
+    Route::post('/rooms', [ChairRoomController::class, 'store'])->name('chair.rooms.store');
+    Route::post('/schedules', [ChairRoomController::class, 'assignSchedule'])->name('chair.schedules.store');
+    Route::put('/schedules/{schedule}', [ChairRoomController::class, 'updateSchedule'])->name('chair.schedules.update');
 
     Route::get('/conflict-checker', function () {
         return view('chair.conflict_checker');
@@ -43,3 +46,9 @@ Route::delete('/schedule-plotter/{id}', [ScheduleController::class, 'destroy'])-
     })->name('chair.settings');
 
 });
+
+Route::post('/schedule', function () {
+    return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
+})->name('schedule.store');
+
+?>

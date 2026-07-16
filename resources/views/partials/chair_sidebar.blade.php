@@ -33,9 +33,6 @@
     </a>
 
     <div class="nav-section-label">Submission</div>
-    <a href="{{ route('chair.conflict_checker') }}" class="nav-item {{ request()->routeIs('chair.conflict_checker') ? 'active' : '' }}">
-      <span class="nav-icon"></span> Conflict Checker
-    </a>
     <a href="{{ route('chair.submit_dean') }}" class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
       <span class="nav-icon"></span> Submit to Dean
     </a>
