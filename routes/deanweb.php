@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 | LOGIN / LOGOUT
 |--------------------------------------------------------------------------
 */
+
 Route::get('/login', function () {
     return view('index');
 })->name('login');
@@ -28,6 +29,22 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     Route::get('/departments', function () {
         return view('dean.departments');
     })->name('departments');
+
+    Route::get('/pending-approvals', function () {
+        return view('dean.pending_approvals');
+    })->name('pending_approvals');
+
+    Route::get('/schedule-reports', function () {
+        return view('dean.schedule_reports');
+    })->name('schedule_reports');
+
+    Route::get('/faculty-deployment', function () {
+        return view('dean.faculty_deployment');
+    })->name('faculty_deployment');
+
+    Route::get('/settings', function () {
+        return view('dean.settings');
+    })->name('settings');
 
     Route::post('/schedule/{id}/approve', [DeanDashboardController::class, 'approve'])
         ->name('schedule.approve');
