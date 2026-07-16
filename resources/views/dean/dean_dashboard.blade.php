@@ -251,34 +251,15 @@
         </div><!-- end main -->
     </div><!-- end app-wrapper -->
 
-<<<<<<< HEAD
     <!-- TOAST -->
     <div class="toast" id="toast"><span id="toast-msg"></span></div>
-=======
-        <div class="card">
-          <div class="card-header">
-            <div>
-              <div class="card-title">Quick Actions</div>
-            </div>
-          </div>
-          <div class="quick-actions">
-            <div class="quick-btn" onclick="openModal('modal-export')"><div class="quick-btn-label">Export Master Schedule</div></div>
-            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Faculty Overview</div></a>
-            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Approve Schedules</div></a>
-            <div class="quick-btn" onclick="openModal('modal-export')"><div class="quick-btn-label">Workload Report</div></div>
-            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Deployment Report</div></a>
-            <div class="quick-btn" onclick="openModal('modal-notify')"><div class="quick-btn-label">Notify All Chairs</div></div>
-          </div>
-        </div>
-      </div>
->>>>>>> 032a0c584cd149f0946220ad12021af66ba306ba
 
     <script>
         /* ── MODALS ──
-       modal-export, modal-notify, and modal-review are defined on their
-       respective pages (Reports / Notify Chairs / Approvals) and are not
-       part of this dashboard extract. Wire them up if you include those
-       modal partials on this page too. */
+                       modal-export, modal-notify, and modal-review are defined on their
+                       respective pages (Reports / Notify Chairs / Approvals) and are not
+                       part of this dashboard extract. Wire them up if you include those
+                       modal partials on this page too. */
         function openModal(id) {
             const m = document.getElementById(id);
             if (m) m.classList.add('open');
