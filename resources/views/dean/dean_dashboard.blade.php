@@ -185,10 +185,10 @@
           </div>
           <div class="quick-actions">
             <div class="quick-btn" onclick="openModal('modal-export')"><div class="quick-btn-label">Export Master Schedule</div></div>
-            <a href="" class="quick-btn"><div class="quick-btn-label">Faculty Overview</div></a>
-            <a href="" class="quick-btn"><div class="quick-btn-label">Approve Schedules</div></a>
+            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Faculty Overview</div></a>
+            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Approve Schedules</div></a>
             <div class="quick-btn" onclick="openModal('modal-export')"><div class="quick-btn-label">Workload Report</div></div>
-            <a href="" class="quick-btn"><div class="quick-btn-label">Deployment Report</div></a>
+            <a href="" class="quick-btn" style="text-decoration:none;"><div class="quick-btn-label">Deployment Report</div></a>
             <div class="quick-btn" onclick="openModal('modal-notify')"><div class="quick-btn-label">Notify All Chairs</div></div>
           </div>
         </div>
