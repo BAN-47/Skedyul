@@ -21,6 +21,8 @@ class Schedule_Submission extends Model {
         'schsub_status',
         'schsub_remarks'
     ];
+
+    public function department() { return $this->belongsTo(Department::class, 'schsub_dept_id', 'dept_id'); }
 }
 
 ?>
