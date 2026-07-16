@@ -1,8 +1,23 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Chair\ChairController;
 use App\Http\Controllers\Chair\ScheduleController;
+
+
+/*
+|--------------------------------------------------------------------------
+| LOGIN / LOGOUT
+|--------------------------------------------------------------------------
+*/
+Route::get('/login', function () {
+    return view('index');
+})->name('login');
+
+Route::post('/login', [LoginController::class, 'login'])->name('login.authenticate');
+Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
 
 Route::middleware('auth')->prefix('chair')->group(function () {
 // Chair dashboard index 
