@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Chair\ChairController;
 use App\Http\Controllers\Chair\ScheduleController;
+use App\Http\Controllers\Chair\ChairSubjectController;
+use App\Http\Controllers\Chair\ChairRoomController;
 
 /*
 |--------------------------------------------------------------------------

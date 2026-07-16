@@ -1,15 +1,16 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Dean\DeanFacultyWorkloadController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use Illuminate\Support\Facades\DB;
+
 /*
 |--------------------------------------------------------------------------
 | LOGIN / LOGOUT
 |--------------------------------------------------------------------------
 */
-
 Route::get('/login', function () {
     return view('index');
 })->name('login');
