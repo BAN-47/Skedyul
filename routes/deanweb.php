@@ -16,7 +16,6 @@ Route::get('/login', function () {
 Route::post('/login', [LoginController::class, 'login'])->name('login.authenticate');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-
 Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
 
     Route::get('/dashboard', [DeanDashboardController::class, 'index'])

@@ -5,7 +5,6 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Chair\ChairController;
 use App\Http\Controllers\Chair\ScheduleController;
 
-
 /*
 |--------------------------------------------------------------------------
 | LOGIN / LOGOUT
