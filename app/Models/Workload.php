@@ -1,11 +1,11 @@
-<?php 
+<?php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Workload extends Model {
-
+class Workload extends Model
+{
     protected $table = 'workload';
     protected $primaryKey = 'wl_id';
     public $incrementing = false;
@@ -19,8 +19,8 @@ class Workload extends Model {
         'wl_sem_id',
         'wl_ay_id',
         'wl_type',
-        'wl_total_hours'
+        'wl_total_hours',
     ];
-}
 
-?>
+    public function faculty() { return $this->belongsTo(Faculty::class, 'wl_fac_id', 'fac_id'); }
+}

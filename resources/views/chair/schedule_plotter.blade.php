@@ -4,381 +4,278 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SKEDYUL — Schedule Plotter</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/chair/schedule_plotter.css') }}">
-</head>
+<link rel="stylesheet" href="{{ asset('css/chair/chair_dashboard.css') }}">
 <style>
-  html, body { overflow: hidden; }
-
-  .sidebar-nav {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  :root {
+    --sp-blue:#4f5bff; --sp-blue-light:#eef0ff;
+    --sp-border:#e5e7eb; --sp-text:#1f2937; --sp-text2:#6b7280; --sp-text3:#9ca3af;
   }
-  .sidebar-nav::-webkit-scrollbar { display: none; }
 
-  .page {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  .page::-webkit-scrollbar { display: none; }
+  .sp-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .sp-toolbar-left { display:flex; gap:10px; flex-wrap:wrap; }
+  .sp-btn { display:inline-flex; align-items:center; gap:6px; padding:10px 16px; border-radius:10px; font-size:13px; font-weight:700; border:1px solid var(--sp-border); background:#fff; color:var(--sp-text); cursor:pointer; }
+  .sp-btn.primary { background:var(--sp-blue); color:#fff; border:none; }
+  .sp-hours { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--sp-text2); font-weight:600; }
+  .sp-hours select { padding:6px 10px; border-radius:8px; border:1px solid var(--sp-border); font-size:13px; font-family:inherit; }
 
-  .schedule-grid-wrap {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  .sp-card { background:#fff; border:1px solid var(--sp-border); border-radius:14px; padding:18px; margin-bottom:18px; }
+  .sp-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; cursor:pointer; }
+  .sp-card-title { font-size:14px; font-weight:800; color:var(--sp-text); }
+  .sp-collapse-icon { font-size:12px; color:var(--sp-text3); transition:transform .15s; }
+  .sp-collapsed .sp-collapse-icon { transform:rotate(-90deg); }
+  .sp-collapsible-body { display:block; }
+  .sp-collapsed .sp-collapsible-body { display:none; }
+
+  .sp-chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .sp-subj-chip { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700; color:#fff; }
+
+  .sp-class-row { display:flex; align-items:center; gap:8px; padding:12px; border-radius:10px; background:var(--grey,#f8f9fb); margin-bottom:8px; flex-wrap:wrap; }
+  .sp-class-row.editing { background:var(--sp-blue-light); border:1px solid var(--sp-blue); }
+  .sp-mini-select, .sp-mini-input { padding:7px 10px; border-radius:8px; border:1px solid var(--sp-border); font-size:12px; font-family:inherit; background:#fff; }
+  .sp-mini-select { min-width:110px; }
+  .sp-mini-input[type="time"] { min-width:110px; }
+  .sp-badge { display:inline-flex; align-items:center; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:700; color:#fff; min-width:70px; justify-content:center; }
+  .sp-class-meta { font-size:12px; color:var(--sp-text2); display:flex; gap:10px; flex-wrap:wrap; }
+  .sp-day-pills { display:flex; gap:4px; }
+  .sp-day-pill { width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; background:#e5e7eb; color:var(--sp-text3); border:none; cursor:default; }
+  .sp-day-pill.active { background:var(--sp-blue); color:#fff; }
+  .sp-day-pill.clickable { cursor:pointer; }
+  .sp-day-pill.clickable:hover { background:#d1d5db; }
+  .sp-day-pill.clickable.active:hover { background:var(--sp-blue); }
+  .sp-remove-btn, .sp-save-btn { background:none; border:none; cursor:pointer; font-size:15px; padding:4px 8px; }
+  .sp-remove-btn { color:var(--sp-text3); margin-left:auto; }
+  .sp-remove-btn:hover { color:#dc2626; }
+  .sp-save-btn { color:#16a34a; font-weight:700; font-size:13px; }
+
+  .sp-grid { width:100%; border-collapse:collapse; }
+  .sp-grid th, .sp-grid td { border:1px solid #eef0f4; padding:0; }
+  .sp-grid th { background:#f7f9fc; font-size:13px; font-weight:700; padding:12px 14px; text-align:center; color:#3b4a66; }
+  .sp-grid th:first-child { text-align:left; }
+  .sp-grid td.time-col { font-size:13px; font-weight:600; color:#5b6b8c; padding:10px 14px; white-space:nowrap; }
+  .sp-cell-inner { min-height:44px; padding:4px; display:flex; flex-direction:column; gap:4px; }
+  .sp-chip {
+    border-radius:6px; padding:8px 12px; font-size:12.5px; font-weight:700; color:#fff;
+    position:relative; line-height:1.2; display:flex; align-items:center; justify-content:space-between; gap:6px;
   }
-  .schedule-grid-wrap::-webkit-scrollbar { display: none; }
+  .sp-chip .sc-name { font-weight:700; }
+  .sp-chip .sc-meta { display:none; } /* meta hidden for a cleaner look, matching reference */
+  .sp-chip form { display:flex; align-items:center; opacity:0; transition:opacity .12s; }
+  .sp-chip:hover form { opacity:1; }
+  .sp-chip button.remove { background:rgba(255,255,255,.25); border:none; color:#fff; border-radius:5px; width:16px; height:16px; font-size:11px; line-height:1; cursor:pointer; flex-shrink:0; }
+
+  .alert-banner { padding:12px 16px; border-radius:10px; margin-bottom:16px; font-size:13px; }
+  .alert-banner.error { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+  .alert-banner.success { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
 </style>
+</head>
 <body>
 
-<div class="screen active" style="display:flex;">
-  @include('partials.chair_sidebar')
+<div class="app-wrapper">
+@include('partials.chair_sidebar')
 
-  <!-- MAIN -->
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Schedule Plotter</div>
-      <div id="topbar-notif-bell" style="position:relative;">
-        <button onclick="toggleNotifDropdown()" style="padding:8px 14px;border-radius:8px;background:var(--grey2);border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;">
-          Notifications <span id="notif-count" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">2</span>
-        </button>
-        <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:100;overflow:hidden;">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text);">Notifications</div>
-          <div id="notif-list" style="max-height:320px;overflow-y:auto;"></div>
-          <div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center;">
-            <button onclick="markAllRead()" style="font-size:12px;color:var(--blue);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--font);">Mark all as read</button>
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-title">Schedule Plotter</div>
+    <div style="font-size:12px;color:var(--text3);">
+      AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'No active semester' }}
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    @if (session('success'))
+      <div class="alert-banner success">{{ session('success') }}</div>
+    @endif
+
+    @error('conflict')
+      <div class="alert-banner error"><strong>Cannot save:</strong> {{ $message }}</div>
+    @enderror
+
+    <!-- TOOLBAR -->
+    <div class="sp-toolbar">
+      <div class="sp-toolbar-left">
+        <button class="sp-btn primary" type="button" onclick="addNewClassRow()">+ Add Class</button>
+        <button class="sp-btn" type="button" onclick="toggleCard('subjects-card')">Subjects</button>
+        <button class="sp-btn" type="button" onclick="window.print()">⬇ Download</button>
+        <button class="sp-btn" type="button" onclick="clearHourFilter()">↺ Clear</button>
+      </div>
+      <div class="sp-hours">
+        Hours:
+        <select id="hour-start" onchange="applyHourFilter()"></select>
+        to
+        <select id="hour-end" onchange="applyHourFilter()"></select>
+      </div>
+    </div>
+
+    @if (!$semester)
+      <div class="alert-banner error">No active semester is set — ask the admin to activate one before plotting a schedule.</div>
+    @else
+
+    <!-- MANAGE SUBJECTS — collapsible, no modal. Read-only reference; use your Subjects admin page to add/remove. -->
+    <div class="sp-card" id="subjects-card">
+      <div class="sp-card-header" onclick="toggleCard('subjects-card')">
+        <div class="sp-card-title">Department Subjects</div>
+        <span class="sp-collapse-icon">▾</span>
+      </div>
+      <div class="sp-collapsible-body">
+        <div class="sp-chip-row">
+          @forelse ($subjects as $s)
+            @php
+              $palette = ['#4f5bff','#16a34a','#d97706','#dc2626','#0d9488','#7c3aed','#0891b2','#be185d'];
+              $color = $palette[crc32($s->subj_code) % count($palette)];
+            @endphp
+            <span class="sp-subj-chip" style="background:{{ $color }};">{{ $s->subj_code }}</span>
+          @empty
+            <span style="font-size:13px;color:var(--sp-text3);">No subjects found for your department.</span>
+          @endforelse
+        </div>
+      </div>
+    </div>
+
+    <!-- SCHEDULED CLASSES — new rows inserted here inline, no modal -->
+    <div class="sp-card">
+      <div class="sp-card-title">Scheduled Classes</div>
+
+      <div id="new-class-row-container"></div>
+
+      @forelse ($schedules as $sch)
+        @php
+          $palette = ['#4f5bff','#16a34a','#d97706','#dc2626','#0d9488','#7c3aed','#0891b2','#be185d'];
+          $color = $palette[crc32($sch->subject->subj_code ?? 'x') % count($palette)];
+        @endphp
+        <div class="sp-class-row">
+          <span class="sp-badge" style="background:{{ $color }};">{{ $sch->subject->subj_code ?? '—' }}</span>
+
+          <div class="sp-class-meta">
+            <span>🕒 {{ \Carbon\Carbon::parse($sch->sch_start_time)->format('g:i A') }} – {{ \Carbon\Carbon::parse($sch->sch_end_time)->format('g:i A') }}</span>
+            <span>👤 {{ $sch->faculty->user->usr_name ?? '—' }}</span>
+            <span>🚪 {{ $sch->room->room_name ?? '—' }}</span>
+            <span>🏫 {{ $sch->section->sec_name ?? '—' }}</span>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="page-content" style="margin-left: 30px; margin-top: 30px; margin-right: 30px; display: block;animation: fadeIn .3s ease;">
-      <!-- Page header row -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div>
-          <div style="font-size:20px;font-weight:800;color:var(--text);">Schedule Plotter</div>
-          <div style="font-size:13px;color:var(--text3);">BSIS Department · Click any event to view details</div>
-        </div>
-        <div style="display:flex;gap:10px;">
-          <select class="field-select" style="width:170px;" onchange="filterPlotter(this.value)">
-            <option value="all">All Faculty</option>
-            <option value="bautista">Jerome Bautista</option>
-            <option value="santos">Maria Santos</option>
-            <option value="reyes">Ana Reyes</option>
-            <option value="lagman">Felicitas Lagman</option>
-          </select>
-          <button class="topbar-btn btn-primary" onclick="openModal('modal-assign')">+ Assign Subject</button>
-        </div>
-      </div>
-
-      <!-- Conflict banner -->
-      <div id="plotter-conflict-banner" class="conflict-alert">
-        <div class="conflict-alert-text"><strong>2 Conflicts</strong> — Maria Santos: GE 102 &amp; IT 101 overlap Tue 7:00–8:30 AM · Jerome Bautista: Room conflict Wed 10:00–11:30 AM.</div>
-        <button class="topbar-btn btn-danger" style="margin-left:auto;padding:5px 10px;font-size:11px;" onclick="openModal('modal-resolve')">Fix</button>
-      </div>
-
-      <!-- Clean banner (hidden until conflict resolved) -->
-      <div id="plotter-clean-banner" class="success-alert" style="display:none;">
-        <div class="success-alert-text"><strong>Schedule is conflict-free!</strong> Ready to submit to Dean.</div>
-      </div>
-
-      <!-- Schedule grid -->
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div class="schedule-grid-wrap" style="padding:16px;">
-          <div class="schedule-grid">
-            <!-- Headers -->
-            <div class="sg-header">Time</div>
-            <div class="sg-header">Monday</div>
-            <div class="sg-header">Tuesday</div>
-            <div class="sg-header">Wednesday</div>
-            <div class="sg-header">Thursday</div>
-            <div class="sg-header">Friday</div>
-            <div class="sg-header">Saturday</div>
-
-            <!-- 7:00–8:30 -->
-            <div class="sg-time">7:00–8:30</div>
-            <div class="sg-cell"><div class="sg-event blue" onclick="openEventDetail('e1')">CC 313<br><span style="font-size:10px;opacity:.8">Bautista·R301</span></div></div>
-            <div class="sg-cell" id="conflict-cell"><div class="sg-event red" onclick="openModal('modal-resolve')">GE 102/IT 101<br><span style="font-size:10px">Santos—CONFLICT</span></div></div>
-            <div class="sg-cell"><div class="sg-event blue" onclick="openEventDetail('e1')">CC 313<br><span style="font-size:10px;opacity:.8">Bautista·R301</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event teal" onclick="openEventDetail('e5')">IT 302<br><span style="font-size:10px;opacity:.8">Lagman·Lab2</span></div></div>
-            <div class="sg-cell"></div>
-
-            <!-- 8:30–10:00 -->
-            <div class="sg-time">8:30–10:00</div>
-            <div class="sg-cell"><div class="sg-event green" onclick="openEventDetail('e2')">IT 101<br><span style="font-size:10px;opacity:.8">Santos·R205</span></div></div>
-            <div class="sg-cell"><div class="sg-event amber" onclick="openEventDetail('e3')">CC 401<br><span style="font-size:10px;opacity:.8">Bautista·R302</span></div></div>
-            <div class="sg-cell"><div class="sg-event green" onclick="openEventDetail('e2')">IT 101<br><span style="font-size:10px;opacity:.8">Santos·R205</span></div></div>
-            <div class="sg-cell"><div class="sg-event amber" onclick="openEventDetail('e3')">CC 401<br><span style="font-size:10px;opacity:.8">Bautista·R302</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"></div>
-
-            <!-- 10:00–11:30 -->
-            <div class="sg-time">10:00–11:30</div>
-            <div class="sg-cell"><div class="sg-event purple" onclick="openEventDetail('e4')">CC 202<br><span style="font-size:10px;opacity:.8">Lagman·R206</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event purple" onclick="openEventDetail('e4')">CC 202<br><span style="font-size:10px;opacity:.8">Lagman·R206</span></div></div>
-            <div class="sg-cell"><div class="sg-event teal" onclick="openEventDetail('e5')">IT 302<br><span style="font-size:10px;opacity:.8">Lagman·Lab2</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"></div>
-
-            <!-- 1:00–2:30 -->
-            <div class="sg-time">1:00–2:30</div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event blue" onclick="openEventDetail('e6')">IT 401<br><span style="font-size:10px;opacity:.8">Reyes·R207</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event blue" onclick="openEventDetail('e6')">IT 401<br><span style="font-size:10px;opacity:.8">Reyes·R207</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"></div>
-
-            <!-- 2:30–4:00 -->
-            <div class="sg-time">2:30–4:00</div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event green" onclick="openEventDetail('e7')">GE 101<br><span style="font-size:10px;opacity:.8">Reyes·R101</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"><div class="sg-event green" onclick="openEventDetail('e7')">GE 101<br><span style="font-size:10px;opacity:.8">Reyes·R101</span></div></div>
-            <div class="sg-cell"></div>
-            <div class="sg-cell"></div>
+          <div class="sp-day-pills">
+            @foreach (['M' => 'Monday','T' => 'Tuesday','W' => 'Wednesday','Th' => 'Thursday','F' => 'Friday','S' => 'Saturday'] as $short => $full)
+              <span class="sp-day-pill {{ $sch->sch_day === $full ? 'active' : '' }}">{{ $short }}</span>
+            @endforeach
           </div>
+
+          <form method="POST" action="{{ route('chair.schedule_plotter.destroy', $sch->sch_id) }}"
+                onsubmit="return confirm('Remove this class from the schedule?');" style="margin-left:auto;">
+            @csrf @method('DELETE')
+            <button type="submit" class="sp-remove-btn" title="Remove">🗑</button>
+          </form>
         </div>
-      </div>
+      @empty
+        <div id="empty-classes-msg" style="font-size:13px;color:var(--sp-text3);">No classes scheduled yet. Click <strong>+ Add Class</strong> to get started.</div>
+      @endforelse
     </div>
 
+    <!-- CALENDAR GRID — hourly rows, class lands in the hour bucket its start time falls under -->
+    <div class="sp-card" style="padding:0;overflow-x:auto;">
+      <table class="sp-grid" id="plotter-grid">
+        <thead>
+          <tr>
+            <th style="width:90px;">Time</th>
+            @foreach ($days as $d)
+              <th>{{ $d }}</th>
+            @endforeach
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($slots as $slot)
+            @php $slotHour = \Carbon\Carbon::parse($slot['start'])->format('H'); @endphp
+            <tr data-start="{{ $slot['start'] }}">
+              <td class="time-col">{{ \Carbon\Carbon::parse($slot['start'])->format('g:i A') }}</td>
+              @foreach ($days as $d)
+                <td>
+                  <div class="sp-cell-inner">
+                    @foreach ($schedules->where('sch_day', $d)->filter(fn ($s) => \Carbon\Carbon::parse($s->sch_start_time)->format('H') === $slotHour) as $sch)
+                      @php
+                        $palette = ['#4f5bff','#16a34a','#d97706','#dc2626','#0d9488','#7c3aed','#0891b2','#be185d'];
+                        $color = $palette[crc32($sch->subject->subj_code ?? 'x') % count($palette)];
+                      @endphp
+                      <div class="sp-chip" style="background:{{ $color }};" title="{{ $sch->faculty->user->usr_name ?? '—' }} · {{ $sch->room->room_name ?? '—' }} · {{ $sch->section->sec_name ?? '—' }}">
+                        <span class="sc-name">{{ $sch->subject->subj_name ?? $sch->subject->subj_code ?? '—' }}</span>
+                        <form method="POST" action="{{ route('chair.schedule_plotter.destroy', $sch->sch_id) }}"
+                              onsubmit="return confirm('Remove this class from the schedule?');">
+                          @csrf @method('DELETE')
+                          <button type="submit" class="remove" title="Remove">×</button>
+                        </form>
+                      </div>
+                    @endforeach
+                  </div>
+                </td>
+              @endforeach
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+
+    @endif
   </div>
+</div>
 </div>
 
-<!-- MODAL: ASSIGN SUBJECT -->
-<div class="modal-overlay" id="modal-assign">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Assign Subject to Faculty</div>
-      <button class="modal-close" onclick="closeModal('modal-assign')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="field-group">
-          <label class="field-label">Subject</label>
-          <select class="field-select" id="assign-subject" onchange="updateUnitAlert()">
-            <option value="3">CC 313 — Web Systems (3u)</option>
-            <option value="3">CC 401 — Capstone 1 (3u)</option>
-            <option value="3">IT 302 — Networking (3u)</option>
-            <option value="3">CC 501 — System Integration (3u)</option>
-            <option value="3">GE 102 — Mathematics (3u)</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Faculty Member</label>
-          <select class="field-select" id="assign-faculty" onchange="updateUnitAlert()">
-            <option value="bautista">Jerome Bautista</option>
-            <option value="lagman">Felicitas Lagman</option>
-            <option value="santos">Maria Santos</option>
-            <option value="reyes">Ana Reyes (Part-time)</option>
-          </select>
-        </div>
-      </div>
-      <!-- Live unit alert -->
-      <div id="unit-alert-box" class="unit-alert-box ua-ok">
-        <span id="unit-alert-icon" style="flex-shrink:0;font-size:13px;font-weight:700;">OK</span>
-        <span id="unit-alert-text">Jerome Bautista — currently 24u/30u. Adding 3u → 27u (3u remaining).</span>
-      </div>
-      <div class="form-row">
-        <div class="field-group">
-          <label class="field-label">Day(s)</label>
-          <select class="field-select" id="assign-days" onchange="checkTimeConflict()">
-            <option>Monday / Wednesday</option>
-            <option>Tuesday / Thursday</option>
-            <option>Monday / Wednesday / Friday</option>
-            <option>Tuesday / Thursday / Saturday</option>
-            <option>Friday</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Time Slot</label>
-          <select class="field-select" id="assign-time" onchange="checkTimeConflict()">
-            <option>7:00 – 8:30 AM</option>
-            <option>8:30 – 10:00 AM</option>
-            <option>10:00 – 11:30 AM</option>
-            <option>1:00 – 2:30 PM</option>
-            <option>2:30 – 4:00 PM</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="field-group">
-          <label class="field-label">Room</label>
-          <select class="field-select">
-            <option>Room 301</option><option>Room 302</option><option>Room 205</option><option>Lab 1</option><option>Lab 2</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">Section</label>
-          <select class="field-select">
-            <option>BSIS 1-A</option><option>BSIS 2-A</option><option>BSIS 3-A</option><option>BSIS 4-A</option>
-          </select>
-        </div>
-      </div>
-      <div id="time-conflict-warning" class="conflict-alert" style="display:none;margin-top:0;">
-        <div class="conflict-alert-text"><strong>Schedule Conflict!</strong> This faculty is already assigned at this time slot. Choose a different day or time.</div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-assign')">Cancel</button>
-      <button class="topbar-btn btn-primary" id="assign-save-btn" onclick="saveAssignment()">Save Assignment</button>
-    </div>
-  </div>
-</div>
+<!-- HIDDEN TEMPLATE — cloned into #new-class-row-container each time "+ Add Class" is clicked -->
+<template id="new-class-template">
+  <form method="POST" action="{{ route('chair.schedule_plotter.store') }}" class="sp-class-row editing">
+    @csrf
+    <select class="sp-mini-select" name="subj_id" required>
+      <option value="">Subject</option>
+      @foreach ($subjects as $s)
+        <option value="{{ $s->subj_id }}">{{ $s->subj_code }}</option>
+      @endforeach
+    </select>
 
-<!-- MODAL: RESOLVE CONFLICT -->
-<div class="modal-overlay" id="modal-resolve">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Resolve Conflict — Maria Santos</div>
-      <button class="modal-close" onclick="closeModal('modal-resolve')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="conflict-alert" style="margin-bottom:16px;">
-        <div class="conflict-alert-text"><strong>Conflict:</strong> GE 102 and IT 101 are both on Tuesday 7:00–8:30 AM. Move one subject to a free slot to resolve.</div>
-      </div>
-      <div class="field-group" style="margin-bottom:16px;">
-        <label class="field-label">Subject to Move</label>
-        <select class="field-select">
-          <option>GE 102 — BSIS 1-A (currently Tue 7:00 AM)</option>
-          <option>IT 101 — BSIS 1-B (currently Tue 7:00 AM)</option>
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="field-group">
-          <label class="field-label">New Day</label>
-          <select class="field-select">
-            <option>Monday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
-          </select>
-        </div>
-        <div class="field-group">
-          <label class="field-label">New Time Slot</label>
-          <select class="field-select">
-            <option>8:30 – 10:00 AM — Free</option>
-            <option>10:00 – 11:30 AM — Free</option>
-            <option>1:00 – 2:30 PM — Free</option>
-            <option>2:30 – 4:00 PM — Free</option>
-          </select>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-resolve')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="resolveConflict()">Apply Fix &amp; Clear Conflict</button>
-    </div>
-  </div>
-</div>
+    <select class="sp-mini-select" name="fac_id" required>
+      <option value="">Faculty</option>
+      @foreach ($faculty as $f)
+        <option value="{{ $f->fac_id }}">{{ $f->user->usr_name ?? 'Unknown' }}</option>
+      @endforeach
+    </select>
 
-<!-- MODAL: EVENT DETAIL -->
-<div class="modal-overlay" id="modal-event-detail">
-  <div class="modal" style="width:420px;">
-    <div class="modal-header">
-      <div class="modal-title">Schedule Entry</div>
-      <button class="modal-close" onclick="closeModal('modal-event-detail')">×</button>
+    <select class="sp-mini-select" name="room_id" required>
+      <option value="">Room</option>
+      @foreach ($rooms as $r)
+        <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
+      @endforeach
+    </select>
+
+    <select class="sp-mini-select" name="sec_id" required>
+      <option value="">Section</option>
+      @foreach ($sections as $s)
+        <option value="{{ $s->sec_id }}">{{ $s->sec_name }}</option>
+      @endforeach
+    </select>
+
+    <input class="sp-mini-input" type="time" name="start_time" required>
+    <span style="font-size:12px;color:var(--sp-text2);">to</span>
+    <input class="sp-mini-input" type="time" name="end_time" required>
+
+    <input type="hidden" name="day" class="new-row-day-input" required>
+    <div class="sp-day-pills new-row-day-pills">
+      @foreach (['M' => 'Monday','T' => 'Tuesday','W' => 'Wednesday','Th' => 'Thursday','F' => 'Friday','S' => 'Saturday'] as $short => $full)
+        <button type="button" class="sp-day-pill clickable" data-day="{{ $full }}" onclick="selectDay(this)">{{ $short }}</button>
+      @endforeach
     </div>
-    <div class="modal-body">
-      <div style="background:linear-gradient(135deg,var(--navy),#1e3a8a);border-radius:12px;padding:16px;margin-bottom:16px;">
-        <div style="font-size:18px;font-weight:800;color:#fff;" id="ed-subject">—</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:4px;" id="ed-section">—</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div style="background:var(--grey);border-radius:8px;padding:12px;"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">Faculty</div><div style="font-size:13px;font-weight:700;" id="ed-faculty">—</div></div>
-        <div style="background:var(--grey);border-radius:8px;padding:12px;"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">Room</div><div style="font-size:13px;font-weight:700;" id="ed-room">—</div></div>
-        <div style="background:var(--grey);border-radius:8px;padding:12px;"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">Day</div><div style="font-size:13px;font-weight:700;" id="ed-day">—</div></div>
-        <div style="background:var(--grey);border-radius:8px;padding:12px;"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:3px;">Time</div><div style="font-size:13px;font-weight:700;" id="ed-time">—</div></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-event-detail')">Close</button>
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-event-detail');openModal('modal-assign')">Edit Assignment</button>
-    </div>
-  </div>
-</div>
+
+    <button type="submit" class="sp-save-btn" title="Save">✓ Save</button>
+    <button type="button" class="sp-remove-btn" title="Cancel" onclick="this.closest('form').remove()">×</button>
+  </form>
+</template>
 
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-// ── FACULTY DATA ──────────────────────────────────────────────────────────────
-const FACULTY = {
-  bautista:{ name:'Jerome Bautista',  load:24, max:30, parttime:false,
-    conflicts:[{days:'Monday / Wednesday',time:'7:00 – 8:30 AM'},{days:'Tuesday / Thursday',time:'8:30 – 10:00 AM'}] },
-  lagman:  { name:'Felicitas Lagman', load:27, max:30, parttime:false,
-    conflicts:[{days:'Monday / Wednesday',time:'10:00 – 11:30 AM'},{days:'Friday',time:'7:00 – 8:30 AM'}] },
-  santos:  { name:'Maria Santos',     load:18, max:30, parttime:false,
-    conflicts:[{days:'Tuesday / Thursday',time:'7:00 – 8:30 AM'},{days:'Monday / Wednesday',time:'8:30 – 10:00 AM'}] },
-  reyes:   { name:'Ana Reyes',        load:18, max:30, parttime:true,
-    conflicts:[{days:'Tuesday / Thursday',time:'1:00 – 2:30 PM'},{days:'Tuesday / Thursday',time:'2:30 – 4:00 PM'}] },
-};
-
-const EVENTS = {
-  e1:{ subject:'CC 313 — Web Systems',     section:'BSIS 3-A · 3 units', faculty:'Jerome Bautista', room:'Room 301', day:'Mon/Wed', time:'7:00–8:30 AM' },
-  e2:{ subject:'IT 101 — Intro to IT',     section:'BSIS 1-A · 3 units', faculty:'Maria Santos',    room:'Room 205', day:'Mon/Wed', time:'8:30–10:00 AM' },
-  e3:{ subject:'CC 401 — Capstone 1',      section:'BSIS 4-A · 3 units', faculty:'Jerome Bautista', room:'Room 302', day:'Tue/Thu', time:'8:30–10:00 AM' },
-  e4:{ subject:'CC 202 — Data Structures', section:'BSIS 2-A · 3 units', faculty:'F. Lagman',       room:'Room 206', day:'Mon/Wed', time:'10:00–11:30 AM' },
-  e5:{ subject:'IT 302 — Networking',      section:'BSIS 3-B · 3 units', faculty:'F. Lagman',       room:'Lab 2',    day:'Fri/Thu', time:'7:00–8:30 AM' },
-  e6:{ subject:'IT 401 — Info Assurance',  section:'BSIS 4-A · 3 units', faculty:'Ana Reyes',       room:'Room 207', day:'Tue/Thu', time:'1:00–2:30 PM' },
-  e7:{ subject:'GE 101 — Purpose. Comm',   section:'BSIS 1-A · 3 units', faculty:'Ana Reyes',       room:'Room 101', day:'Tue/Thu', time:'2:30–4:00 PM' },
-};
-
-// ── NOTIFICATION BELL ────────────────────────────────────────────────────────
-const CHAIR_NOTIFS = [
-  { dot:'var(--red)', text:'<b>Conflict Detected</b> — Maria Santos: GE 102 &amp; IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time:'Today, 08:00 AM', unread:true },
-  { dot:'var(--blue)', text:'<b>Reminder</b> — Schedule submission deadline is Friday.', time:'Yesterday, 4:00 PM', unread:false },
-];
-
-function renderNotifList() {
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = CHAIR_NOTIFS.map((n) => `
-    <div class="notif-drop-item ${n.unread?'unread':''}" onclick="markRead(this)">
-      <div class="notif-drop-dot" style="background:${n.dot};"></div>
-      <div><div class="notif-drop-text">${n.text}</div><div class="notif-drop-time">${n.time}</div></div>
-    </div>`).join('');
-  updateNotifCount();
+// ── COLLAPSIBLE PANELS (Subjects) ────────────────────────────────────────────
+function toggleCard(id) {
+  document.getElementById(id).classList.toggle('sp-collapsed');
 }
 
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  const dd = document.getElementById('notif-dropdown');
-  if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
-});
-function markRead(el) { el.classList.remove('unread'); updateNotifCount(); }
-function markAllRead() {
-  document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
-  updateNotifCount();
-}
-function updateNotifCount() {
-  const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-  const badge = document.getElementById('notif-count');
-  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline' : 'none'; }
-}
-renderNotifList();
-
-// ── MODALS ─────────────────────────────────────────────────────────────────────
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-  if (id === 'modal-assign') { setTimeout(updateUnitAlert, 10); }
-}
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
-});
-
-// ── TOAST ──────────────────────────────────────────────────────────────────────
+// ── TOAST ──────────────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
@@ -386,101 +283,76 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3200);
 }
 
-// ── LIVE UNIT ALERT ────────────────────────────────────────────────────────────
-function updateUnitAlert() {
-  const key = document.getElementById('assign-faculty').value;
-  const subjectSel = document.getElementById('assign-subject');
-  const addUnits = parseInt(subjectSel.options[subjectSel.selectedIndex].value) || 3;
-  const f = FACULTY[key];
-  if (!f) return;
-  const newLoad = f.load + addUnits;
-  const remaining = f.max - newLoad;
-  const box  = document.getElementById('unit-alert-box');
-  const icon = document.getElementById('unit-alert-icon');
-  const text = document.getElementById('unit-alert-text');
-  const btn  = document.getElementById('assign-save-btn');
+// ── ADD CLASS — inline row, no modal ─────────────────────────────────────────
+function addNewClassRow() {
+  const container = document.getElementById('new-class-row-container');
+  const tpl = document.getElementById('new-class-template');
+  const clone = tpl.content.cloneNode(true);
+  container.prepend(clone);
 
-  if (f.parttime) {
-    box.className = 'unit-alert-box ua-warn'; icon.textContent = '!';
-    text.textContent = `${f.name} is Part-time — currently ${f.load}u/30u. Adding ${addUnits}u → ${newLoad}u. Verify with Dean before assigning additional load.`;
-    btn.disabled = false; btn.className = 'topbar-btn btn-primary';
-  } else if (newLoad > f.max) {
-    box.className = 'unit-alert-box ua-over'; icon.textContent = 'X';
-    text.textContent = `OVERLOAD: ${f.name} is at ${f.load}u/30u. Adding ${addUnits}u → ${newLoad}u — exceeds maximum by ${newLoad - f.max} unit(s). Cannot assign!`;
-    btn.disabled = true; btn.className = 'topbar-btn btn-secondary';
-  } else if (remaining <= 3) {
-    box.className = 'unit-alert-box ua-warn'; icon.textContent = '!';
-    text.textContent = `${f.name} — currently ${f.load}u/30u. Adding ${addUnits}u → ${newLoad}u. Only ${remaining} unit(s) left — near maximum!`;
-    btn.disabled = false; btn.className = 'topbar-btn btn-primary';
-  } else {
-    box.className = 'unit-alert-box ua-ok'; icon.textContent = 'OK';
-    text.textContent = `${f.name} — currently ${f.load}u/30u. Adding ${addUnits}u → ${newLoad}u. ${remaining} units remaining after this assignment.`;
-    btn.disabled = false; btn.className = 'topbar-btn btn-primary';
-  }
-  checkTimeConflict();
+  const emptyMsg = document.getElementById('empty-classes-msg');
+  if (emptyMsg) emptyMsg.style.display = 'none';
+
+  const firstSelect = container.querySelector('form select');
+  if (firstSelect) firstSelect.focus();
 }
 
-// ── TIME CONFLICT CHECK ────────────────────────────────────────────────────────
-function checkTimeConflict() {
-  const key  = document.getElementById('assign-faculty').value;
-  const days = document.getElementById('assign-days').value;
-  const time = document.getElementById('assign-time').value;
-  const f = FACULTY[key];
-  if (!f) return;
-  const clash = f.conflicts.some(c => c.days === days && c.time === time);
-  document.getElementById('time-conflict-warning').style.display = clash ? 'flex' : 'none';
+// Single-select day toggle within a "new class" row
+function selectDay(btn) {
+  const row = btn.closest('.new-row-day-pills');
+  row.querySelectorAll('.sp-day-pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  const form = btn.closest('form');
+  form.querySelector('.new-row-day-input').value = btn.dataset.day;
 }
 
-// ── SAVE ASSIGNMENT ────────────────────────────────────────────────────────────
-function saveAssignment() {
-  const key = document.getElementById('assign-faculty').value;
-  const f = FACULTY[key];
-  const subjectSel = document.getElementById('assign-subject');
-  const addUnits = parseInt(subjectSel.options[subjectSel.selectedIndex].value) || 3;
-  if (f.load + addUnits > f.max) { showToast('Cannot assign — would exceed 30-unit maximum!'); return; }
-  const days = document.getElementById('assign-days').value;
-  const time = document.getElementById('assign-time').value;
-  const clash = f.conflicts.some(c => c.days === days && c.time === time);
-  if (clash) { showToast('Cannot assign — schedule conflict at this time slot!'); return; }
-  FACULTY[key].load += addUnits;
-  FACULTY[key].conflicts.push({ days, time });
-  closeModal('modal-assign');
-  showToast(`Subject assigned to ${f.name}! New load: ${FACULTY[key].load}u/30u (${30 - FACULTY[key].load}u remaining).`);
+// ── HOURS RANGE FILTER (client-side only — shows/hides grid rows) ───────────
+const GRID_HOURS = [
+  @foreach ($slots as $slot)
+    { start: "{{ $slot['start'] }}", label: "{{ \Carbon\Carbon::parse($slot['start'])->format('g:i A') }}" },
+  @endforeach
+];
+
+function populateHourSelectors() {
+  const startSel = document.getElementById('hour-start');
+  const endSel = document.getElementById('hour-end');
+  if (!startSel || !endSel) return;
+
+  GRID_HOURS.forEach((h) => {
+    const o1 = document.createElement('option');
+    o1.value = h.start; o1.textContent = h.label;
+    startSel.appendChild(o1);
+
+    const o2 = document.createElement('option');
+    o2.value = h.start; o2.textContent = h.label;
+    endSel.appendChild(o2);
+  });
+
+  startSel.value = GRID_HOURS[0]?.start ?? '';
+  endSel.value = GRID_HOURS[GRID_HOURS.length - 1]?.start ?? '';
 }
 
-// ── RESOLVE CONFLICT ───────────────────────────────────────────────────────────
-function resolveConflict() {
-  closeModal('modal-resolve');
-  document.getElementById('plotter-conflict-banner').style.display = 'none';
-  document.getElementById('plotter-clean-banner').style.display = 'flex';
-  const cell = document.getElementById('conflict-cell');
-  if (cell) {
-    cell.innerHTML = '<div class="sg-event green" onclick="openEventDetail(\'e2\')">GE 102<br><span style="font-size:10px;opacity:.8">Santos·R205</span></div>';
-  }
-  showToast('Conflict resolved! Schedule is now clean and ready to submit.');
-}
-
-// ── PLOTTER FILTER ─────────────────────────────────────────────────────────────
-function filterPlotter(val) {
-  document.querySelectorAll('.sg-event').forEach(ev => {
-    if (val === 'all') { ev.style.opacity = '1'; return; }
-    const txt = ev.textContent.toLowerCase();
-    const frags = { bautista:'bautista', santos:'santos', reyes:'reyes', lagman:'lagman' };
-    ev.style.opacity = txt.includes(frags[val] || val) ? '1' : '0.15';
+function applyHourFilter() {
+  const start = document.getElementById('hour-start').value;
+  const end = document.getElementById('hour-end').value;
+  document.querySelectorAll('#plotter-grid tbody tr').forEach(row => {
+    const rowStart = row.dataset.start;
+    const visible = rowStart >= start && rowStart <= end;
+    row.style.display = visible ? '' : 'none';
   });
 }
 
-// ── EVENT DETAIL ───────────────────────────────────────────────────────────────
-function openEventDetail(id) {
-  const ev = EVENTS[id]; if (!ev) return;
-  document.getElementById('ed-subject').textContent = ev.subject;
-  document.getElementById('ed-section').textContent = ev.section;
-  document.getElementById('ed-faculty').textContent = ev.faculty;
-  document.getElementById('ed-room').textContent    = ev.room;
-  document.getElementById('ed-day').textContent     = ev.day;
-  document.getElementById('ed-time').textContent    = ev.time;
-  openModal('modal-event-detail');
+function clearHourFilter() {
+  const startSel = document.getElementById('hour-start');
+  const endSel = document.getElementById('hour-end');
+  if (!startSel || !endSel || GRID_HOURS.length === 0) return;
+  startSel.value = GRID_HOURS[0].start;
+  endSel.value = GRID_HOURS[GRID_HOURS.length - 1].start;
+  applyHourFilter();
 }
+
+populateHourSelectors();
+applyHourFilter();
 </script>
 </body>
 </html>
