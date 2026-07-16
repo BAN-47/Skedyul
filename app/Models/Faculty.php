@@ -22,13 +22,6 @@ class Faculty extends Model
         'fac_profile_image'
     ];
 
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id');
-    }
-
-    public function department()
-    {
-        return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id');
-    }
+    public function user() { return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id'); }
+    public function department() { return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id'); }
 }
