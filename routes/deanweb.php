@@ -22,11 +22,18 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
 
     Route::get('/dashboard', [DeanDashboardController::class, 'index'])
         ->name('dashboard');
-
-    Route::get('/faculty-workload', function () {
-        return view('dean.faculty_workload');
-    })->name('faculty_workload');
-
+/*
+|--------------------------------------------------------------------------
+| FACULTY WORKLOAD
+|--------------------------------------------------------------------------
+*/
+    Route::get('/faculty-workload', [DeanFacultyWorkloadController::class, 'index'])
+    ->name('faculty_workload');
+/*
+|--------------------------------------------------------------------------
+| DEPARTMENTS
+|--------------------------------------------------------------------------
+*/
     Route::get('/departments', function () {
         return view('dean.departments');
     })->name('departments');
