@@ -49,7 +49,7 @@
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
                                     <div
                                         style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;">
-                                        <div style="font-size:20px;font-weight:800;">{{ count($d['faculty']) }}</div>
+                                        <div style="font-size:20px;font-weight:800;">{{ $d['facultyCount'] }}</div>
                                         <div style="font-size:11px;color:var(--text3)">Faculty</div>
                                     </div>
                                     <div
@@ -476,22 +476,46 @@
             function openDept(key) {
                 const d = deptData[key];
                 if (!d) return;
-                const facultyRows = d.faculty.map(f => `
-    <tr>
-      <td><b>${f.name}</b></td>
-      <td>${f.rank}</td>
-      <td>${f.employment}</td>
-      <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
-      <td><span class="badge ${f.badge}">${f.status}</span></td>
-    </tr>`).join('');
 
-                document.getElementById('dept-detail-content').innerHTML = `
+                // One card per Program (e.g. BSIS, BSIT, BIT-CT), each listing only the
+                // faculty currently teaching that program's subjects this semester.
+                const programKeys = Object.keys(d.programs);
+                const programCards = programKeys.map(pKey => {
+                    const p = d.programs[pKey];
+                    const rows = p.faculty.map(f => `
+      <tr>
+        <td><b>${f.name}</b></td>
+        <td>${f.rank}</td>
+        <td>${f.employment}</td>
+        <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
+        <td><span class="badge ${f.badge}">${f.status}</span></td>
+      </tr>`).join('');
+
+                    return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-header">
+        <div>
+          <div class="card-title">${p.code} — ${p.name}</div>
+          <div class="card-sub">${p.faculty.length} faculty · ${p.sections} sections</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">No faculty assigned to this program yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+                }).join('');
+
+                document.getElementById('dept-detail-content').innerHTML =
+                    `
     <div style="margin-bottom:20px;">
       <div style="font-size:22px;font-weight:800;color:${d.color}">${d.code}</div>
       <div style="font-size:14px;color:var(--text3);margin-top:2px;">${d.name}</div>
     </div>
     <div class="dept-info-grid">
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.faculty.length}</div><div class="dept-info-cell-label">Faculty</div></div>
+      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.facultyCount}</div><div class="dept-info-cell-label">Faculty</div></div>
       <div class="dept-info-cell"><div class="dept-info-cell-val">${d.sections}</div><div class="dept-info-cell-label">Sections</div></div>
       <div class="dept-info-cell"><div class="dept-info-cell-val">${d.avgLoad}</div><div class="dept-info-cell-label">Avg Load</div></div>
       <div class="dept-info-cell"><div class="dept-info-cell-val">${d.maxLoad}</div><div class="dept-info-cell-label">Max Load</div></div>
@@ -503,15 +527,7 @@
       </div>
       <div class="workload-bar" style="height:10px;"><div class="workload-fill" style="width:${d.loadPct}%;background:${d.loadColor}"></div></div>
     </div>
-    <div class="card">
-      <div class="card-header"><div><div class="card-title">Faculty Members</div><div class="card-sub">${d.faculty.length} faculty in this department</div></div></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
-          <tbody>${facultyRows}</tbody>
-        </table>
-      </div>
-    </div>`;
+    ${programCards || `<div class="card"><div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No programs found for this department.</div></div>`}`;
 
                 document.getElementById('dept-list-view').style.display = 'none';
                 document.getElementById('dept-detail-view').style.display = 'block';

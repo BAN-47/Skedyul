@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use App\Http\Controllers\Dean\DeanFacultyWorkloadController;
+use App\Http\Controllers\Dean\DeanDepartmentController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
 
 /*
@@ -34,9 +35,8 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
         ->name('faculty_workload');
 
     // Departments
-    Route::get('/departments', function () {
-        return view('dean.departments');
-    })->name('departments');
+    Route::get('/departments', [DeanDepartmentController::class, 'index'])
+        ->name('departments');
 
     // ── PENDING APPROVALS ─────────────────────────────────────────────
     // index    → GET  /dean/pending-approvals              → shows table of all submissions
