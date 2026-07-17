@@ -5,73 +5,161 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SKEDYUL — Dean Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/faculty/faculty_dashboard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/faculty/faculty_settings.css') }}">
 </head>
 <body>
 
 <div id="screen-app" class="screen active" style="flex-direction:row;">
 
-  @include('partials.facultyMember_sidebar')
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">SKED<span>YUL</span></div>
+    </div>
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sb-avatar">A</div>
+      <div class="sidebar-user-info">
+        <div class="sidebar-user-name" id="sb-name">Tech Admin</div>
+        <div class="sidebar-user-role" id="sb-role">Technical Administrator</div>
+      </div>
+    </div>
+
+    <div class="sidebar-nav" id="sidebar-nav"></div>
+
+    <div class="sidebar-bottom">
+      <button class="btn-logout" onclick="logout()">⬅ Sign Out</button>
+    </div>
+  </div>
 
   <!-- Main -->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="topbar-title">My Dashboard</div>
+      <div class="topbar-title" id="topbar-title">Settings</div>
     </div>
 
-    <!-- FACULTY DASHBOARD PAGE -->
-    <div id="page-faculty-dashboard" class="page active">
-      <!-- Welcome Banner with rotating quote -->
-      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1a2d5a 100%);border-radius:16px;padding:24px 28px;margin-bottom:24px;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
-        <div style="position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;">
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Welcome back, Jerome Bautista</div>
-            <div style="font-size:20px;line-height:1.35;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.4);font-weight:600;" id="fac-quote-author">— Mark Van Doren</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
-              <button onclick="prevFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8249;</button>
-              <div id="fac-quote-dots" style="display:flex;gap:5px;"></div>
-              <button onclick="nextFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8250;</button>
+    <!-- FACULTY SETTINGS PAGE -->
+    <div id="page-faculty-settings" class="page active">
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start;">
+        <div class="card" style="padding:12px 0;">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:8px 20px 4px;">Settings</div>
+          <div class="settings-nav-item active" onclick="showFacSettingsSection('profile',this)">Personal Info</div>
+          <div class="settings-nav-item" onclick="showFacSettingsSection('security',this)">Security</div>
+          <div class="settings-nav-item" onclick="showFacSettingsSection('notifications',this)">Notifications</div>
+        </div>
+        <div id="fac-settings-content">
+
+          <!-- PERSONAL INFO -->
+          <div id="fac-settings-profile">
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-header"><div><div class="card-title">Profile Picture</div><div class="card-sub">Upload a new profile photo</div></div></div>
+              <div style="display:flex;align-items:center;gap:24px;padding:8px 0;">
+                <div style="position:relative;flex-shrink:0;">
+                  <div id="fac-pic-preview" style="width:96px;height:96px;border-radius:50%;background:var(--grey2);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#16a34a;border:3px solid var(--border);overflow:hidden;">JB</div>
+                  <div onclick="document.getElementById('fac-pic-upload').click()" style="position:absolute;bottom:0;right:0;width:30px;height:30px;background:var(--blue);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid white;font-size:13px;">+</div>
+                  <input type="file" id="fac-pic-upload" accept="image/*" style="display:none;" onchange="facPreviewPic(this)">
+                </div>
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:var(--text);">Jerome Bautista</div>
+                  <div style="font-size:12px;color:var(--text3);margin-top:2px;">Faculty · BSIS Department</div>
+                  <div style="display:flex;gap:8px;margin-top:12px;">
+                    <button class="topbar-btn btn-primary" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('fac-pic-upload').click()">Upload Photo</button>
+                    <button class="topbar-btn btn-secondary" style="font-size:12px;padding:7px 14px;" onclick="facResetPic()">Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-header"><div><div class="card-title">Personal Information</div><div class="card-sub">Update your personal details</div></div></div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">First Name</label><input class="field-input" value="Jerome"></div>
+                <div class="field-group"><label class="field-label">Last Name</label><input class="field-input" value="Bautista"></div>
+              </div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Middle Name</label><input class="field-input" placeholder="Optional"></div>
+                <div class="field-group"><label class="field-label">Employee ID</label><input class="field-input" value="CTU-2022-045"></div>
+              </div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Gender</label><select class="field-select"><option selected>Male</option><option>Female</option><option>Prefer not to say</option></select></div>
+                <div class="field-group"><label class="field-label">Civil Status</label><select class="field-select"><option selected>Single</option><option>Married</option><option>Widowed</option></select></div>
+              </div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Date of Birth</label><input class="field-input" type="date" value="1990-05-15"></div>
+                <div class="field-group"><label class="field-label">Nationality</label><input class="field-input" value="Filipino"></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+                <button class="topbar-btn btn-primary" onclick="showToast('Personal info saved successfully!')">Save Changes</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Contact & Office</div><div class="card-sub">How others can reach you</div></div></div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Email Address</label><input class="field-input" type="email" value="j.bautista@ctu.edu.ph"></div>
+                <div class="field-group"><label class="field-label">Phone Number</label><input class="field-input" value="(032) 401-2222"></div>
+              </div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Office Location</label><input class="field-input" value="Room 205, ICT Building"></div>
+                <div class="field-group"><label class="field-label">Department</label><input class="field-input" value="BSIS" readonly style="background:var(--grey2);cursor:not-allowed;"></div>
+              </div>
+              <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Bio / About</label><textarea class="field-input" rows="3" style="resize:vertical;">Faculty member handling Programming and Systems subjects. Bachelor of Science in Computer Science, CTU.</textarea></div>
+              <div style="display:flex;justify-content:flex-end;">
+                <button class="topbar-btn btn-primary" onclick="showToast('Contact details saved!')">Save Changes</button>
+              </div>
             </div>
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:44px;opacity:0.12;line-height:1;margin-bottom:10px;">"</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);">Faculty · BSIS Dept</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:2px;">AY 2025–2026 · 1st Sem</div>
-          </div>
-        </div>
-      </div>
 
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
-        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Teaching Load</div><div class="stat-value">24h</div><div class="stat-sub">of 30h max</div></div>
-        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">My Subjects</div><div class="stat-value">3</div><div class="stat-sub">This semester</div></div>
-        <div class="stat-card" style="--accent:#d97706"><div class="stat-label">My Sections</div><div class="stat-value">4</div><div class="stat-sub">BSIS 1-A, 3-A, 3-B, 4-A</div></div>
-      </div>
-
-      <div class="row">
-        <div style="flex:1;">
-          <div class="card">
-            <div class="card-header"><div><div class="card-title">Today's Schedule — Monday</div><div class="card-sub">AY 2025–2026 · 1st Semester</div></div></div>
-            <div class="table-wrap"><table>
-              <tr><th>Time</th><th>Subject</th><th>Room</th><th>Section</th><th>Type</th></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">7:00–8:30</td><td><b>CC 313 — Web Systems</b></td><td>Room 301</td><td>BSIS 3-A</td><td><span class="badge badge-blue">Lecture</span></td></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">10:00–11:30</td><td><b>CC 401 — Capstone 1</b></td><td>Room 302</td><td>BSIS 4-A</td><td><span class="badge badge-amber">Lecture</span></td></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">1:00–2:30</td><td><b>IT 302 — Networking</b></td><td>Lab 2</td><td>BSIS 3-B</td><td><span class="badge badge-green">Lab</span></td></tr>
-            </table></div>
-          </div>
-        </div>
-        <div style="width:280px;flex-shrink:0;">
-          <div class="card">
-            <div class="card-header"><div class="card-title">My Subjects</div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">CC 313 — Web Systems</div><div class="workload-val" style="color:var(--blue);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--blue);"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">CC 401 — Capstone 1</div><div class="workload-val" style="color:var(--amber);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--amber);"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">IT 302 — Networking</div><div class="workload-val" style="color:var(--green);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--green);"></div></div></div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">
-              <div><div style="color:var(--text3);">Total Load</div><div style="font-weight:800;font-size:18px;color:var(--text);">24h</div></div>
-              <div style="text-align:right;"><div style="color:var(--text3);">Max Load</div><div style="font-weight:800;font-size:18px;color:var(--green);">30h</div></div>
+          <!-- SECURITY -->
+          <div id="fac-settings-security" style="display:none;">
+            <div class="card" style="margin-bottom:16px;">
+              <div class="card-header"><div><div class="card-title">Change Password</div><div class="card-sub">Update your account password</div></div></div>
+              <div class="field-group" style="margin-bottom:14px;"><label class="field-label">Current Password</label><input class="field-input" type="password" placeholder="••••••••"></div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">New Password</label><input class="field-input" type="password" placeholder="Min. 8 characters"></div>
+                <div class="field-group"><label class="field-label">Confirm New Password</label><input class="field-input" type="password" placeholder="Re-enter new password"></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+                <button class="topbar-btn btn-primary" onclick="showToast('Password updated successfully!')">Update Password</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Session Settings</div><div class="card-sub">Manage your login preferences</div></div></div>
+              <div class="form-row">
+                <div class="field-group"><label class="field-label">Session Timeout</label><select class="field-select"><option>15 minutes</option><option selected>30 minutes</option><option>1 hour</option><option>Never</option></select></div>
+                <div class="field-group"><label class="field-label">Max Login Attempts</label><select class="field-select"><option>3</option><option selected>5</option><option>10</option></select></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
+                <button class="topbar-btn btn-primary" onclick="showToast('Security settings saved!')">Save Changes</button>
+              </div>
             </div>
           </div>
+
+          <!-- NOTIFICATIONS SETTINGS -->
+          <div id="fac-settings-notifications" style="display:none;">
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Notification Preferences</div><div class="card-sub">Choose what alerts you receive</div></div></div>
+              <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grey);border-radius:10px;">
+                  <div><div style="font-size:13px;font-weight:600;color:var(--text);">Schedule Updates</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">When your schedule is modified</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grey);border-radius:10px;">
+                  <div><div style="font-size:13px;font-weight:600;color:var(--text);">New Assignments</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">When a new subject is assigned to you</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grey);border-radius:10px;">
+                  <div><div style="font-size:13px;font-weight:600;color:var(--text);">Reminders</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">Deadlines and important announcements</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--grey);border-radius:10px;">
+                  <div><div style="font-size:13px;font-weight:600;color:var(--text);">System Announcements</div><div style="font-size:12px;color:var(--text3);margin-top:2px;">General system updates and messages</div></div>
+                  <label class="toggle-switch"><input type="checkbox" onchange="toggleSwitch(this)"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+                <button class="topbar-btn btn-primary" onclick="showToast('Notification preferences saved!')">Save Preferences</button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

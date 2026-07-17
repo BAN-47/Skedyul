@@ -14,10 +14,18 @@
 
     <div class="sidebar-nav">
       <div class="nav-section-label">Main</div>
-        <div class="nav-item active"><span class="nav-icon"></span> Dashboard</div>
-        <div class="nav-item"><span class="nav-icon"></span> My Subjects</div>
-        <div class="nav-item"><span class="nav-icon"></span> My Schedule</div>
-        <div class="nav-item"><span class="nav-icon"></span> Settings</div>
+        <a href="{{ route('faculty.faculty_dashboard') }}" class="nav-item {{ request()->routeIs('faculty.faculty_dashboard') ? 'active' : '' }}">
+          <span class="nav-icon"></span> My Dashboard
+        </a>
+        <a href="{{ route('faculty.subjects') }}" class="nav-item {{ request()->routeIs('faculty.subjects') ? 'active' : '' }}">
+          <span class="nav-icon"></span> My Subjects
+        </a>
+        <a href="{{ route('faculty.schedule') }}" class="nav-item {{ request()->routeIs('faculty.schedule') ? 'active' : '' }}">
+          <span class="nav-icon"></span> My Schedule
+        </a>
+        <a href="{{ route('faculty.faculty_settings') }}" class="nav-item {{ request()->routeIs('faculty.faculty_settings') ? 'active' : '' }}">
+          <span class="nav-icon"></span> Settings
+        </a>
     </div>
 
     <div class="sidebar-bottom">

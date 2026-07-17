@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SKEDYUL — Dean Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/faculty/faculty_dashboard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/faculty/subjects.css') }}">
 </head>
 <body>
 
@@ -16,63 +16,34 @@
   <!-- Main -->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="topbar-title">My Dashboard</div>
+      <div class="topbar-title" id="topbar-title">My Subjects</div>
     </div>
 
-    <!-- FACULTY DASHBOARD PAGE -->
-    <div id="page-faculty-dashboard" class="page active">
-      <!-- Welcome Banner with rotating quote -->
-      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1a2d5a 100%);border-radius:16px;padding:24px 28px;margin-bottom:24px;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
-        <div style="position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;">
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Welcome back, Jerome Bautista</div>
-            <div style="font-size:20px;line-height:1.35;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.4);font-weight:600;" id="fac-quote-author">— Mark Van Doren</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
-              <button onclick="prevFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8249;</button>
-              <div id="fac-quote-dots" style="display:flex;gap:5px;"></div>
-              <button onclick="nextFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8250;</button>
-            </div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:44px;opacity:0.12;line-height:1;margin-bottom:10px;">"</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);">Faculty · BSIS Dept</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:2px;">AY 2025–2026 · 1st Sem</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
-        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Teaching Load</div><div class="stat-value">24h</div><div class="stat-sub">of 30h max</div></div>
-        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">My Subjects</div><div class="stat-value">3</div><div class="stat-sub">This semester</div></div>
-        <div class="stat-card" style="--accent:#d97706"><div class="stat-label">My Sections</div><div class="stat-value">4</div><div class="stat-sub">BSIS 1-A, 3-A, 3-B, 4-A</div></div>
-      </div>
-
-      <div class="row">
-        <div style="flex:1;">
-          <div class="card">
-            <div class="card-header"><div><div class="card-title">Today's Schedule — Monday</div><div class="card-sub">AY 2025–2026 · 1st Semester</div></div></div>
-            <div class="table-wrap"><table>
-              <tr><th>Time</th><th>Subject</th><th>Room</th><th>Section</th><th>Type</th></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">7:00–8:30</td><td><b>CC 313 — Web Systems</b></td><td>Room 301</td><td>BSIS 3-A</td><td><span class="badge badge-blue">Lecture</span></td></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">10:00–11:30</td><td><b>CC 401 — Capstone 1</b></td><td>Room 302</td><td>BSIS 4-A</td><td><span class="badge badge-amber">Lecture</span></td></tr>
-              <tr><td style="font-family:var(--mono);font-size:12px;color:var(--text3);">1:00–2:30</td><td><b>IT 302 — Networking</b></td><td>Lab 2</td><td>BSIS 3-B</td><td><span class="badge badge-green">Lab</span></td></tr>
-            </table></div>
-          </div>
-        </div>
-        <div style="width:280px;flex-shrink:0;">
-          <div class="card">
-            <div class="card-header"><div class="card-title">My Subjects</div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">CC 313 — Web Systems</div><div class="workload-val" style="color:var(--blue);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--blue);"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">CC 401 — Capstone 1</div><div class="workload-val" style="color:var(--amber);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--amber);"></div></div></div>
-            <div class="workload-item"><div class="workload-header"><div class="workload-name">IT 302 — Networking</div><div class="workload-val" style="color:var(--green);">3u</div></div><div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--green);"></div></div></div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">
-              <div><div style="color:var(--text3);">Total Load</div><div style="font-weight:800;font-size:18px;color:var(--text);">24h</div></div>
-              <div style="text-align:right;"><div style="color:var(--text3);">Max Load</div><div style="font-weight:800;font-size:18px;color:var(--green);">30h</div></div>
-            </div>
-          </div>
-        </div>
+    <!-- FACULTY SUBJECTS PAGE -->
+    <div id="page-faculty-subjects" class="page active">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">My Subjects</div><div class="card-sub">Assigned subjects for AY 2025–2026 · 1st Semester</div></div></div>
+        <div class="table-wrap"><table>
+          <tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Lec Hrs</th><th>Lab Hrs</th><th>Sections</th><th>Room</th><th>Schedule</th></tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-weight:700;color:var(--blue);">CC 313</span></td>
+            <td><b>Web Systems and Technologies</b></td><td>3</td><td>2</td><td>3</td>
+            <td>BSIS 3-A, 3-B</td><td>Room 301</td>
+            <td style="font-size:12px;color:var(--text3);">Mon/Wed 7:00–8:30<br>Tue/Thu 7:00–8:30</td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-weight:700;color:var(--amber);">CC 401</span></td>
+            <td><b>Capstone Project 1</b></td><td>3</td><td>3</td><td>0</td>
+            <td>BSIS 4-A</td><td>Room 302</td>
+            <td style="font-size:12px;color:var(--text3);">Mon/Wed 10:00–11:30</td>
+          </tr>
+          <tr>
+            <td><span style="font-family:var(--mono);font-weight:700;color:var(--green);">IT 302</span></td>
+            <td><b>Data Communications &amp; Networking</b></td><td>3</td><td>2</td><td>1</td>
+            <td>BSIS 3-B</td><td>Lab 2</td>
+            <td style="font-size:12px;color:var(--text3);">Mon/Wed 1:00–2:30</td>
+          </tr>
+        </table></div>
       </div>
     </div>
 
