@@ -5,6 +5,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use App\Http\Controllers\Dean\DeanFacultyWorkloadController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
+use App\Http\Controllers\Dean\FacultyDeploymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -64,10 +65,11 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
         return view('dean.schedule_reports');
     })->name('schedule_reports');
 
-    // Faculty Deployment
-    Route::get('/faculty-deployment', function () {
-        return view('dean.faculty_deployment');
-    })->name('faculty_deployment');
+    Route::get('/faculty-deployment', [FacultyDeploymentController::class, 'index'])
+        ->name('faculty_deployment');
+
+    Route::post('/faculty-deployment/notify', [FacultyDeploymentController::class, 'sendNotification'])
+        ->name('faculty_deployment.notify');
 
     // Settings
     Route::get('/settings', function () {
