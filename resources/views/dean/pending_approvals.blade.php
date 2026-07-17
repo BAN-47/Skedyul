@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKEDYUL — Faculty Workload</title>
+<title>SKEDYUL — Pending Approvals</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -13,89 +13,249 @@
 
 <div id="screen-app" class="screen active" style="flex-direction:row;">
 
- @include('partials.dean_sidebar')
+  @include('partials.dean_sidebar')
 
-  <!-- Main -->
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Pending Approvals</div>
       <div class="topbar-actions">
         <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="topbar-btn btn-secondary" onclick="showToast('3 pending approvals')">Notifications</button>
+        <button class="topbar-btn btn-secondary" onclick="openModal('modal-notify')">Notify Chairs</button>
       </div>
     </div>
 
-    <!-- PENDING APPROVALS PAGE -->
+    {{-- ── FLASH ── --}}
+    @if(session("success"))
+      <script>document.addEventListener("DOMContentLoaded", () => showToast("✅ {{ session("success") }}"));</script>
+    @endif
+    @if(session("error"))
+      <script>document.addEventListener("DOMContentLoaded", () => showToast("❌ {{ session("error") }}"));</script>
+    @endif
+
     <div id="page-approvals" class="page active">
-      <div style="margin-bottom:20px;"><div style="font-size:20px;font-weight:800;">Schedule Approvals</div></div>
-      <div class="card"><div class="card-header"><div><div class="card-title">Submitted Schedules</div><div class="card-sub">3 pending approval</div></div></div>
-        <table><thead><tr><th>Department</th><th>Chair</th><th>Submitted</th><th>Faculty</th><th>Conflicts</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          <tr><td><b>BSIS</b></td><td>Rodrigo Tan</td><td>Mar 19, 2026</td><td>8</td><td><span style="color:var(--green);font-weight:700">0</span></td><td><span class="badge badge-amber">Pending</span></td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openModal('modal-review')">Review</button></td></tr>
-          <tr><td><b>BSIT</b></td><td>Maria Cruz</td><td>Mar 18, 2026</td><td>7</td><td><span style="color:var(--red);font-weight:700">1</span></td><td><span class="badge badge-red">Has Conflict</span></td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openModal('modal-review')">Review</button></td></tr>
-          <tr><td><b>BIT-CT</b></td><td>Jose Lim</td><td>Mar 20, 2026</td><td>4</td><td><span style="color:var(--green);font-weight:700">0</span></td><td><span class="badge badge-amber">Pending</span></td><td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openModal('modal-review')">Review</button></td></tr>
-        </tbody></table>
+
+      {{-- ── STAT CARDS ── --}}
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
+        <div class="stat-card" style="--accent:#d97706;">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-label">Pending</div>
+          <div class="stat-value">{{ $pendingCount }}</div>
+          <div class="stat-sub">Awaiting your review</div>
+        </div>
+        <div class="stat-card" style="--accent:#16a34a;">
+          <div class="stat-icon">✅</div>
+          <div class="stat-label">Approved</div>
+          <div class="stat-value">{{ $approvedCount }}</div>
+          <div class="stat-sub">This semester</div>
+        </div>
+        <div class="stat-card" style="--accent:#dc2626;">
+          <div class="stat-icon">↩️</div>
+          <div class="stat-label">Returned</div>
+          <div class="stat-value">{{ $returnedCount }}</div>
+          <div class="stat-sub">Sent back to chair</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:20px;font-weight:800;">Schedule Approvals</div>
+        @if($semester)
+          <div style="font-size:13px;color:var(--text3);margin-top:2px;">
+            {{ $semester->sem_name }} · AY {{ $semester->academicYear->ay_academic_year ?? '' }}
+          </div>
+        @endif
+      </div>
+
+      {{-- ── SUBMISSIONS TABLE ── --}}
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Submitted Schedules</div>
+            <div class="card-sub">{{ $pendingCount }} pending approval</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Chair</th>
+                <th>Submitted</th>
+                <th>Faculty</th>
+                <th>Conflicts</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse($submissions as $sub)
+              <tr>
+                <td><b>{{ $sub->department->dept_code ?? '—' }}</b></td>
+                <td>
+                  @if($sub->submittedBy)
+                    {{ $sub->submittedBy->usr_fname }} {{ $sub->submittedBy->usr_lname }}
+                  @else
+                    <span style="color:var(--text3);">Unknown</span>
+                  @endif
+                </td>
+                <td style="font-size:12px;color:var(--text2);">
+                  {{ \Carbon\Carbon::parse($sub->schsub_submitted_at)->format('M d, Y') }}
+                </td>
+                <td>{{ $sub->faculty_count }}</td>
+                <td>
+                  @if($sub->conflict_count > 0)
+                    <span style="color:var(--red);font-weight:700;">{{ $sub->conflict_count }}</span>
+                  @else
+                    <span style="color:var(--green);font-weight:700;">0</span>
+                  @endif
+                </td>
+                <td>
+                  @php
+                    $statusBadge = match($sub->schsub_status) {
+                      'approved' => 'badge-green',
+                      'returned' => 'badge-red',
+                      default    => 'badge-amber',
+                    };
+                    $statusLabel = match($sub->schsub_status) {
+                      'approved' => 'Approved',
+                      'returned' => 'Returned',
+                      default    => $sub->conflict_count > 0 ? 'Has Conflict' : 'Pending',
+                    };
+                  @endphp
+                  <span class="badge {{ $statusBadge }}">{{ $statusLabel }}</span>
+                </td>
+                <td>
+                  @if($sub->schsub_status === 'pending' || $sub->schsub_status === 'returned')
+                    <button class="topbar-btn btn-secondary"
+                      style="padding:4px 10px;font-size:11px;"
+                      onclick="openReview(
+                        '{{ $sub->schsub_id }}',
+                        '{{ $sub->department->dept_code ?? "" }}',
+                        {{ $sub->conflict_count }}
+                      )">
+                      Review
+                    </button>
+                  @else
+                    <span style="font-size:12px;color:var(--text3);">Approved</span>
+                  @endif
+                </td>
+              </tr>
+              @empty
+              <tr>
+                <td colspan="7" style="text-align:center;padding:40px;color:var(--text3);">
+                  No schedule submissions found for this semester.
+                </td>
+              </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-
-  </div><!-- end .main -->
-</div><!-- end #screen-app -->
-
-<!-- MODAL: EXPORT -->
-<div class="modal-overlay" id="modal-export">
-  <div class="modal" style="width:440px;">
-    <div class="modal-header"><div class="modal-title">Export Report</div><button class="modal-close" onclick="closeModal('modal-export')">✕</button></div>
-    <div class="modal-body">
-      <div class="field-group" style="margin-bottom:14px;"><label class="field-label">Report Type</label><select class="field-select"><option>Master Schedule</option><option>Faculty Workload Report</option><option>Faculty Deployment Report</option><option>Department Summary</option></select></div>
-      <div class="field-group" style="margin-bottom:14px;"><label class="field-label">Department</label><select class="field-select"><option>All Departments</option><option>BSIS</option><option>BSIT</option><option>BIT-CT</option></select></div>
-      <div class="field-group"><label class="field-label">Format</label><select class="field-select"><option>PDF</option><option>Excel (.xlsx)</option><option>Word (.docx)</option></select></div>
-    </div>
-    <div class="modal-footer"><button class="topbar-btn btn-secondary" onclick="closeModal('modal-export')">Cancel</button><button class="topbar-btn btn-primary" onclick="closeModal('modal-export');showToast('Report exported!')">Download</button></div>
   </div>
 </div>
-<!-- MODAL: NOTIFY CHAIRS -->
+
+{{-- ══════════════════════════════════════════════════════════════
+     MODAL: REVIEW — approve or return
+     ══════════════════════════════════════════════════════════════ --}}
+<div class="modal-overlay" id="modal-review">
+  <div class="modal" style="width:620px;">
+    <div class="modal-header">
+      <div class="modal-title" id="review-modal-title">Schedule Review</div>
+      <button class="modal-close" type="button" onclick="closeModal('modal-review')">✕</button>
+    </div>
+    <div class="modal-body" id="review-modal-body">
+      <div style="text-align:center;padding:40px;color:var(--text3);">Loading schedules…</div>
+    </div>
+
+    {{-- APPROVE FORM --}}
+    <form id="form-approve" method="POST" action="" style="display:none;">
+      @csrf
+      @method('POST')
+      <input type="hidden" name="_action" value="approve">
+      <textarea name="remarks" style="display:none;"></textarea>
+    </form>
+
+    {{-- RETURN FORM --}}
+    <form id="form-return" method="POST" action="">
+      @csrf
+      @method('POST')
+      <div class="modal-body" style="padding-top:0;">
+        <div class="field-group" style="margin-top:12px;">
+          <label class="field-label">Return Note <span style="color:var(--red)">*</span></label>
+          <textarea class="field-input" name="remarks" id="return-note" rows="3"
+            placeholder="Explain what the Chair needs to fix before resubmitting…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-review')">Close</button>
+        <button class="topbar-btn"
+          type="button"
+          id="btn-return"
+          style="background:var(--red-light);color:var(--red);">
+          ↩ Return to Chair
+        </button>
+        <button class="topbar-btn btn-primary"
+          type="button"
+          id="btn-approve">
+          ✓ Approve Schedule
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════════
+     MODAL: EXPORT
+     ══════════════════════════════════════════════════════════════ --}}
+<div class="modal-overlay" id="modal-export">
+  <div class="modal" style="width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">Export Report</div>
+      <button class="modal-close" type="button" onclick="closeModal('modal-export')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group" style="margin-bottom:14px;">
+        <label class="field-label">Report Type</label>
+        <select class="field-select">
+          <option>Master Schedule</option>
+          <option>Faculty Workload Report</option>
+          <option>Faculty Deployment Report</option>
+          <option>Department Summary</option>
+        </select>
+      </div>
+      <div class="field-group" style="margin-bottom:14px;">
+        <label class="field-label">Department</label>
+        <select class="field-select">
+          <option>All Departments</option>
+          <option>BSIS</option><option>BSIT</option><option>BIT-CT</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Format</label>
+        <select class="field-select">
+          <option>PDF</option><option>Excel (.xlsx)</option><option>Word (.docx)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-export')">Cancel</button>
+      <button class="topbar-btn btn-primary" type="button"
+        onclick="closeModal('modal-export');showToast('Report exported!')">Download</button>
+    </div>
+  </div>
+</div>
+
+{{-- ══════════════════════════════════════════════════════════════
+     MODAL: NOTIFY CHAIRS
+     ══════════════════════════════════════════════════════════════ --}}
 <div class="modal-overlay" id="modal-notify">
   <div class="modal" style="width:520px;">
     <div class="modal-header">
       <div class="modal-title">Send Notification to Chairs</div>
-      <button class="modal-close" onclick="closeModal('modal-notify')">✕</button>
+      <button class="modal-close" type="button" onclick="closeModal('modal-notify')">✕</button>
     </div>
     <div class="modal-body">
-
-      <!-- Recipients -->
-      <div style="margin-bottom:16px;">
-        <div class="field-label" style="margin-bottom:8px;">Recipients</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-            <input type="checkbox" id="notif-all" checked onchange="toggleAllChairs(this)" style="width:15px;height:15px;accent-color:var(--blue);">
-            <span style="font-size:13px;font-weight:700;color:var(--text);">All Department Chairs</span>
-          </label>
-          <div style="display:flex;flex-direction:column;gap:6px;padding-left:12px;">
-            <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-              <input type="checkbox" class="chair-check" checked onchange="syncAllChairs()" style="width:14px;height:14px;accent-color:var(--blue);">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <div style="width:28px;height:28px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">RT</div>
-                <div><div style="font-size:13px;font-weight:600;color:var(--text);">Rodrigo Tan</div><div style="font-size:11px;color:var(--text3);">Chair · BSIS</div></div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-              <input type="checkbox" class="chair-check" checked onchange="syncAllChairs()" style="width:14px;height:14px;accent-color:var(--blue);">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <div style="width:28px;height:28px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">MC</div>
-                <div><div style="font-size:13px;font-weight:600;color:var(--text);">Maria Cruz</div><div style="font-size:11px;color:var(--text3);">Chair · BSIT</div></div>
-              </div>
-            </label>
-            <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-              <input type="checkbox" class="chair-check" checked onchange="syncAllChairs()" style="width:14px;height:14px;accent-color:var(--blue);">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <div style="width:28px;height:28px;border-radius:50%;background:#0891b2;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">JL</div>
-                <div><div style="font-size:13px;font-weight:600;color:var(--text);">Jose Lim</div><div style="font-size:11px;color:var(--text3);">Chair · BIT-CT</div></div>
-              </div>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Type -->
       <div class="field-group" style="margin-bottom:14px;">
         <label class="field-label">Notification Type</label>
         <select class="field-select" id="notif-type">
@@ -105,131 +265,117 @@
           <option value="deadline">Deadline Notice</option>
         </select>
       </div>
-
-      <!-- Title -->
       <div class="field-group" style="margin-bottom:14px;">
         <label class="field-label">Title</label>
         <input class="field-input" id="notif-title" placeholder="e.g. Schedule Submission Reminder">
       </div>
-
-      <!-- Message -->
       <div class="field-group" style="margin-bottom:14px;">
         <label class="field-label">Message</label>
-        <textarea class="field-input" id="notif-message" rows="4" style="resize:vertical;" placeholder="Write your message to the chairs..."></textarea>
+        <textarea class="field-input" id="notif-message" rows="4" style="resize:vertical;"
+          placeholder="Write your message to the chairs..."></textarea>
       </div>
-
-      <!-- Sent History -->
       <div>
         <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Recently Sent</div>
-        <div id="notif-history" style="display:flex;flex-direction:column;gap:6px;">
+        <div id="notif-history">
           <div style="font-size:12px;color:var(--text3);padding:8px;text-align:center;">No notifications sent yet this session.</div>
         </div>
       </div>
-
     </div>
     <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-notify')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="sendNotifToChairs()">Send Notification</button>
+      <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-notify')">Cancel</button>
+      <button class="topbar-btn btn-primary" type="button" onclick="sendNotif()">Send Notification</button>
     </div>
-  </div>
-</div>
-<div class="modal-overlay" id="modal-review">
-  <div class="modal" style="width:560px;">
-    <div class="modal-header"><div class="modal-title">Schedule Review — BSIT</div><button class="modal-close" onclick="closeModal('modal-review')">✕</button></div>
-    <div class="modal-body">
-      <div style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;"><strong>1 Conflict Detected:</strong> Carlo Mendoza is scheduled for CC 311 and IT 201 at the same time on Monday 8:30–10:00 AM.</div>
-      <table><thead><tr><th>Faculty</th><th>Subject</th><th>Day & Time</th><th>Room</th><th>Issue</th></tr></thead><tbody>
-        <tr><td><b>Carlo Mendoza</b></td><td>IT 201</td><td>Mon 8:30–10:00</td><td>Lab 1</td><td><span class="badge badge-red">Conflict</span></td></tr>
-        <tr><td><b>Carlo Mendoza</b></td><td>CC 311</td><td>Mon 8:30–10:00</td><td>Room 205</td><td><span class="badge badge-red">Conflict</span></td></tr>
-        <tr><td><b>Ana Reyes</b></td><td>IT 401</td><td>Tue 7:00–8:30</td><td>Room 206</td><td><span class="badge badge-green">OK</span></td></tr>
-      </tbody></table>
-      <div class="field-group" style="margin-top:16px;"><label class="field-label">Return Note</label><textarea class="field-input" rows="3">Please resolve the scheduling conflict for Carlo Mendoza before resubmitting.</textarea></div>
-    </div>
-    <div class="modal-footer"><button class="topbar-btn btn-secondary" onclick="closeModal('modal-review')">Close</button><button class="topbar-btn" style="background:var(--red-light);color:var(--red);" onclick="closeModal('modal-review');showToast('Schedule returned to Chair Cruz.')">Return to Chair</button></div>
   </div>
 </div>
 
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-
-function doLogin() {
-  document.getElementById('screen-login').classList.remove('active');
-  const app = document.getElementById('screen-app');
-  app.classList.add('active'); app.style.display='flex';
-}
-function logout() {
-  document.getElementById('screen-app').classList.remove('active');
-  document.getElementById('screen-app').style.display='none';
-  document.getElementById('screen-login').classList.add('active');
-}
-function goToPage(id) {
-  document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display='none'; });
-  const page = document.getElementById(id);
-  if (!page) return;
-  page.style.display='block'; page.classList.add('active');
-  const titles = {'page-dashboard':'Dean Dashboard','page-faculty':'Faculty Workload Overview','page-departments':'Department Overview','page-approvals':'Schedule Approvals','page-overload':'Overload Alerts','page-reports':'Schedule Reports','page-deployment':'Faculty Deployment Report','page-settings':'Settings'};
-  document.getElementById('topbar-title').textContent = titles[id] || 'SKEDYUL';
-}
-function setActiveNav(el) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-}
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+// ── MODALS ────────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); }); });
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
 });
 
-function showSettingsTab(tab, el) {
-  ['general','academic','notifications','security','system'].forEach(s => {
-    const p = document.getElementById('stab-'+s); if (p) p.style.display='none';
+// ── TOAST ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── REVIEW MODAL ──────────────────────────────────────────────────────────
+// Fetches schedule detail from the server then opens the modal
+let currentSubId = null;
+
+function openReview(subId, deptCode, conflictCount) {
+  currentSubId = subId;
+
+  // Update modal title
+  document.getElementById('review-modal-title').textContent = 'Schedule Review — ' + deptCode;
+
+  // Show loading state
+  document.getElementById('review-modal-body').innerHTML =
+    '<div style="text-align:center;padding:40px;color:var(--text3);">Loading schedules…</div>';
+
+  // Set form actions
+  document.getElementById('form-approve').action = '/dean/pending-approvals/' + subId + '/approve';
+  document.getElementById('form-return').action  = '/dean/pending-approvals/' + subId + '/return';
+
+  // Wire approve button — block if there are conflicts
+  document.getElementById('btn-approve').onclick = () => {
+    if (conflictCount > 0) {
+      showToast('❌ Cannot approve — resolve ' + conflictCount + ' conflict(s) first.');
+      return;
+    }
+    if (!confirm('Approve the schedule for ' + deptCode + '?')) return;
+    document.getElementById('form-approve').submit();
+  };
+
+  // Wire return button
+  document.getElementById('btn-return').onclick = () => {
+    const note = document.getElementById('return-note').value.trim();
+    if (!note) { showToast('Please enter a return note before sending.'); return; }
+    if (!confirm('Return schedule to Chair with your note?')) return;
+    document.getElementById('form-return').submit();
+  };
+
+  // Fetch schedule rows via AJAX
+  fetch('/dean/pending-approvals/' + subId + '/review', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.text())
+  .then(html => {
+    document.getElementById('review-modal-body').innerHTML = html;
+  })
+  .catch(() => {
+    document.getElementById('review-modal-body').innerHTML =
+      '<div style="color:var(--red);padding:20px;">Failed to load schedules. Please try again.</div>';
   });
-  const t = document.getElementById('stab-'+tab); if (t) t.style.display='block';
-  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
+
+  openModal('modal-review');
 }
-function showDeanSettingsSection(section, el) {
-  ['profile','general','academic','notifications','security','system'].forEach(s => {
-    const p = document.getElementById('dsec-'+s); if (p) p.style.display='none';
-  });
-  const t = document.getElementById('dsec-'+section); if (t) t.style.display='block';
-  document.querySelectorAll('#page-settings .settings-nav-item').forEach(i => i.classList.remove('active'));
-  el.classList.add('active');
-}
-function toggleAllChairs(master) {
-  document.querySelectorAll('.chair-check').forEach(c => c.checked = master.checked);
-}
-function syncAllChairs() {
-  const checks = document.querySelectorAll('.chair-check');
-  const allChecked = Array.from(checks).every(c => c.checked);
-  document.getElementById('notif-all').checked = allChecked;
-}
-function sendNotifToChairs() {
-  const title = document.getElementById('notif-title').value.trim();
+
+// ── NOTIFY CHAIRS (JS-only session history) ────────────────────────────────
+function sendNotif() {
+  const title   = document.getElementById('notif-title').value.trim();
   const message = document.getElementById('notif-message').value.trim();
-  const type = document.getElementById('notif-type').value;
-  const checks = document.querySelectorAll('.chair-check');
-  const selected = [];
-  const names = ['Rodrigo Tan (BSIS)', 'Maria Cruz (BSIT)', 'Jose Lim (BIT-CT)'];
-  checks.forEach((c, i) => { if (c.checked) selected.push(names[i]); });
-
-  if (!title) { showToast('Please enter a notification title.'); return; }
+  const type    = document.getElementById('notif-type').value;
+  if (!title)   { showToast('Please enter a title.'); return; }
   if (!message) { showToast('Please enter a message.'); return; }
-  if (selected.length === 0) { showToast('Please select at least one recipient.'); return; }
 
-  const typeColors = { info:'badge-blue', reminder:'badge-amber', urgent:'badge-red', deadline:'badge-purple' };
-  const typeLabels = { info:'Info', reminder:'Reminder', urgent:'Urgent', deadline:'Deadline' };
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
-
-  const historyEl = document.getElementById('notif-history');
-  // Remove empty state message
-  const empty = historyEl.querySelector('div[style*="text-align:center"]');
+  const typeColors  = { info:'badge-blue', reminder:'badge-amber', urgent:'badge-red', deadline:'badge-grey' };
+  const typeLabels  = { info:'Info', reminder:'Reminder', urgent:'Urgent', deadline:'Deadline' };
+  const now         = new Date();
+  const timeStr     = now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true });
+  const historyEl   = document.getElementById('notif-history');
+  const empty       = historyEl.querySelector('[style*="text-align:center"]');
   if (empty) empty.remove();
 
   const item = document.createElement('div');
-  item.style.cssText = 'background:var(--grey);border-radius:8px;padding:10px 12px;border:1px solid var(--border);';
+  item.style.cssText = 'background:var(--grey);border-radius:8px;padding:10px 12px;border:1px solid var(--border);margin-bottom:6px;';
   item.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
       <div style="display:flex;align-items:center;gap:7px;">
@@ -238,153 +384,13 @@ function sendNotifToChairs() {
       </div>
       <span style="font-size:11px;color:var(--text3);">Sent ${timeStr}</span>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">${message}</div>
-    <div style="font-size:11px;color:var(--text3);">To: ${selected.join(', ')}</div>`;
-
+    <div style="font-size:12px;color:var(--text2);">${message}</div>`;
   historyEl.prepend(item);
 
-  // Clear fields
-  document.getElementById('notif-title').value = '';
+  document.getElementById('notif-title').value   = '';
   document.getElementById('notif-message').value = '';
-  document.getElementById('notif-type').value = 'info';
-
-  showToast('Notification sent to ' + selected.length + ' chair' + (selected.length > 1 ? 's' : '') + '!');
+  showToast('Notification sent to all Chairs!');
 }
-
-function toggleSwitch(input) {
-  const track = input.nextElementSibling;
-  input.checked ? track.classList.add('on') : track.classList.remove('on');
-  showToast('Preference updated!');
-}
-function applyTheme(theme) {
-  theme==='dark' ? document.body.classList.add('dark') : document.body.classList.remove('dark');
-  showToast('Theme switched to '+(theme==='dark'?'Dark':'Light')+' mode!');
-}
-function checkPwStrength(val) {
-  const bar = document.getElementById('pw-bar'); if (!bar) return;
-  let score=0;
-  if (val.length>=8) score++;
-  if (/[A-Z]/.test(val)) score++;
-  if (/[0-9]/.test(val)) score++;
-  if (/[^A-Za-z0-9]/.test(val)) score++;
-  const colors=['#dc2626','#d97706','#16a34a','#0891b2'];
-  const widths=['25%','50%','75%','100%'];
-  bar.style.width = val.length ? (widths[score-1]||'10%') : '0';
-  bar.style.background = val.length ? (colors[score-1]||'#dc2626') : 'transparent';
-}
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
-}
-function switchTab(barId, panelId, btn) {
-  const bar = document.getElementById(barId); if (!bar) return;
-  bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  ['tab-by-dept','tab-by-faculty','tab-by-section'].forEach(p => {
-    const el = document.getElementById(p); if (el) { el.classList.remove('active'); el.style.display='none'; }
-  });
-  const target = document.getElementById(panelId);
-  if (target) { target.style.display='block'; target.classList.add('active'); }
-}
-
-const deptData = {
-  bsis: {
-    code: 'BSIS', color: 'var(--blue)',
-    name: 'Bachelor of Science in Information Systems',
-    chair: 'Rodrigo Tan', sections: 23, avgLoad: '22h', maxLoad: '30h', loadPct: 73,
-    loadColor: 'var(--blue)', scheduleStatus: 'Submitted', statusBadge: 'badge-green',
-    faculty: [
-      { name: 'Rodrigo Tan',    rank: 'Associate Professor II',  employment: 'Full-time', load: '24h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Jerome Bautista',rank: 'Assistant Professor III', employment: 'Full-time', load: '24h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Maria Santos',   rank: 'Instructor I',            employment: 'Full-time', load: '18h', status: 'Available',badge: 'badge-blue'  },
-      { name: 'Patricia Reyes', rank: 'Assistant Professor I',   employment: 'Full-time', load: '21h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Ronald Diaz',    rank: 'Instructor II',           employment: 'Full-time', load: '22h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Cynthia Uy',     rank: 'Lecturer',                employment: 'Part-time', load: '12h', status: 'Part-time',badge: 'badge-teal'  },
-      { name: 'Ben Flores',     rank: 'Instructor I',            employment: 'Part-time', load: '9h',  status: 'Part-time',badge: 'badge-teal'  },
-      { name: 'Alma Ramos',     rank: 'Professor I',             employment: 'Full-time', load: '27h', status: 'Near Max', badge: 'badge-amber' },
-    ]
-  },
-  bsit: {
-    code: 'BSIT', color: 'var(--purple)',
-    name: 'Bachelor of Science in Information Technology',
-    chair: 'Maria Cruz', sections: 19, avgLoad: '24h', maxLoad: '30h', loadPct: 80,
-    loadColor: 'var(--amber)', scheduleStatus: 'Has Conflicts', statusBadge: 'badge-amber',
-    faculty: [
-      { name: 'Maria Cruz',     rank: 'Associate Professor III', employment: 'Full-time', load: '21h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Ana Reyes',      rank: 'Assistant Professor II',  employment: 'Part-time', load: '27h', status: 'Near Max', badge: 'badge-amber' },
-      { name: 'Carlo Mendoza',  rank: 'Instructor II',           employment: 'Full-time', load: '31h', status: 'Overload', badge: 'badge-red'   },
-      { name: 'Liza Cruz',      rank: 'Lecturer',                employment: 'Part-time', load: '9h',  status: 'Part-time',badge: 'badge-teal'  },
-      { name: 'Marco Villena',  rank: 'Instructor I',            employment: 'Full-time', load: '24h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Susan Dela Cruz',rank: 'Assistant Professor I',   employment: 'Full-time', load: '21h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Dennis Yap',     rank: 'Instructor III',          employment: 'Full-time', load: '22h', status: 'OK',       badge: 'badge-green' },
-    ]
-  },
-  bitct: {
-    code: 'BIT-CT', color: 'var(--teal)',
-    name: 'Bachelor of Industrial Technology — Computer Technology',
-    chair: 'Jose Lim', sections: 10, avgLoad: '18h', maxLoad: '30h', loadPct: 60,
-    loadColor: 'var(--teal)', scheduleStatus: 'Submitted', statusBadge: 'badge-green',
-    faculty: [
-      { name: 'Jose Lim',       rank: 'Associate Professor I',   employment: 'Full-time', load: '21h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Noel Garcia',    rank: 'Instructor III',          employment: 'Full-time', load: '21h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Teresa Abella',  rank: 'Assistant Professor II',  employment: 'Full-time', load: '18h', status: 'OK',       badge: 'badge-green' },
-      { name: 'Ryan Cobrado',   rank: 'Lecturer',                employment: 'Part-time', load: '12h', status: 'Part-time',badge: 'badge-teal'  },
-    ]
-  }
-};
-
-function openDept(key) {
-  const d = deptData[key];
-  if (!d) return;
-  const facultyRows = d.faculty.map(f => `
-    <tr>
-      <td><b>${f.name}</b></td>
-      <td>${f.rank}</td>
-      <td>${f.employment}</td>
-      <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
-      <td><span class="badge ${f.badge}">${f.status}</span></td>
-    </tr>`).join('');
-
-  document.getElementById('dept-detail-content').innerHTML = `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:22px;font-weight:800;color:${d.color}">${d.code}</div>
-      <div style="font-size:14px;color:var(--text3);margin-top:2px;">${d.name}</div>
-    </div>
-    <div class="dept-info-grid">
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.faculty.length}</div><div class="dept-info-cell-label">Faculty</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.sections}</div><div class="dept-info-cell-label">Sections</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.avgLoad}</div><div class="dept-info-cell-label">Avg Load</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.maxLoad}</div><div class="dept-info-cell-label">Max Load</div></div>
-    </div>
-    <div class="card" style="margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text2)">Department Load — ${d.avgLoad} / ${d.maxLoad}</div>
-        <div style="display:flex;gap:8px;"><span class="badge ${d.statusBadge}">${d.scheduleStatus}</span><span class="badge badge-grey">Chair: ${d.chair}</span></div>
-      </div>
-      <div class="workload-bar" style="height:10px;"><div class="workload-fill" style="width:${d.loadPct}%;background:${d.loadColor}"></div></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div><div class="card-title">Faculty Members</div><div class="card-sub">${d.faculty.length} faculty in this department</div></div></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
-          <tbody>${facultyRows}</tbody>
-        </table>
-      </div>
-    </div>`;
-
-  document.getElementById('dept-list-view').style.display = 'none';
-  document.getElementById('dept-detail-view').style.display = 'block';
-  document.getElementById('topbar-title').textContent = d.code + ' — Department Details';
-}
-
-function closeDept() {
-  document.getElementById('dept-list-view').style.display = 'block';
-  document.getElementById('dept-detail-view').style.display = 'none';
-  document.getElementById('topbar-title').textContent = 'Department Overview';
-}
-
 </script>
 </body>
 </html>
