@@ -30,8 +30,8 @@ class Faculty extends Model {
 
     public function user() { return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id'); }
     public function department() { return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id'); }
+    public function studyLoads() { return $this->hasMany(Study_Load::class, 'sl_fac_id', 'fac_id'); }
 
-    // Full name built from faculty's own name columns, not the linked User account
     public function getFullNameAttribute(): string
     {
         $parts = array_filter([

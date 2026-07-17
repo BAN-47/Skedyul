@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Dean\DeanFacultyWorkloadController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Dean\DeanDashboardController;
+use App\Http\Controllers\Dean\ScheduleReportsController;
 use Illuminate\Support\Facades\DB;
 
 /*
@@ -22,18 +23,20 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
 
     Route::get('/dashboard', [DeanDashboardController::class, 'index'])
         ->name('dashboard');
-/*
-|--------------------------------------------------------------------------
-| FACULTY WORKLOAD
-|--------------------------------------------------------------------------
-*/
+
+    /*
+    |--------------------------------------------------------------------------
+    | FACULTY WORKLOAD
+    |--------------------------------------------------------------------------
+    */
     Route::get('/faculty-workload', [DeanFacultyWorkloadController::class, 'index'])
-    ->name('faculty_workload');
-/*
-|--------------------------------------------------------------------------
-| DEPARTMENTS
-|--------------------------------------------------------------------------
-*/
+        ->name('faculty_workload');
+
+    /*
+    |--------------------------------------------------------------------------
+    | DEPARTMENTS
+    |--------------------------------------------------------------------------
+    */
     Route::get('/departments', function () {
         return view('dean.departments');
     })->name('departments');
@@ -42,9 +45,15 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
         return view('dean.pending_approvals');
     })->name('pending_approvals');
 
-    Route::get('/schedule-reports', function () {
-        return view('dean.schedule_reports');
-    })->name('schedule_reports');
+    /*
+    |--------------------------------------------------------------------------
+    | SCHEDULE REPORTS
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/reports', [ScheduleReportsController::class, 'index'])->name('schedule_reports');
+    Route::get('/reports/department/{deptId}', [ScheduleReportsController::class, 'departmentDetail'])->name('dept.detail');
+    Route::get('/reports/conflicts/{sectionId?}', [ScheduleReportsController::class, 'detectConflicts'])->name('conflicts');
+    Route::post('/notify', [ScheduleReportsController::class, 'sendNotification'])->name('notify');
 
     Route::get('/faculty-deployment', function () {
         return view('dean.faculty_deployment');

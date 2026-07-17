@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SKEDYUL — Faculty Portal</title>
+  <title>SKEDYUL</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -86,7 +86,7 @@
             </div>
           </div>
         </div>
-        <div class="dept-badge">
+        <div class="dept-badge" style="margin-top:15px;">
           <div class="dept-badge-name">
             College of Computing, Information and
             <br>
