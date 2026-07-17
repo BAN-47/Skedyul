@@ -14,13 +14,7 @@ class Workload extends Model
     const CREATED_AT = 'wl_created_at';
     const UPDATED_AT = 'wl_updated_at';
 
-    protected $fillable = [
-        'wl_fac_id',
-        'wl_sem_id',
-        'wl_ay_id',
-        'wl_type',
-        'wl_total_hours',
-    ];
+    protected $fillable = ['wl_fac_id', 'wl_sem_id', 'wl_ay_id', 'wl_type', 'wl_total_hours'];
 
     public function faculty() { return $this->belongsTo(Faculty::class, 'wl_fac_id', 'fac_id'); }
 }

@@ -30,8 +30,11 @@ class PendingApprovalsController extends Controller
             ->map(function ($sub) {
                 $sub->faculty_count = Faculty::where('fac_dept_id', $sub->schsub_dept_id)->count();
 
+                // Query Schedule's own direct sch_fac_id → faculty relation instead of
+                // tunneling through Study_Load — this stays correct even if sch_load_id
+                // linkage is inconsistent, since Schedule already carries sch_fac_id itself.
                 $sub->conflict_count = Schedule::where('sch_sem_id', $sub->schsub_sem_id)
-                    ->whereHas('studyLoad.faculty', fn($q) =>
+                    ->whereHas('faculty', fn($q) =>
                         $q->where('fac_dept_id', $sub->schsub_dept_id)
                     )
                     ->where('sch_is_active', true)
@@ -72,13 +75,13 @@ class PendingApprovalsController extends Controller
         ])->findOrFail($id);
 
         $schedules = Schedule::with([
-                'studyLoad.faculty.user',
-                'studyLoad.subject',
-                'studyLoad.section',
+                'faculty.user',
+                'subject',
+                'section',
                 'room',
             ])
             ->where('sch_sem_id', $submission->schsub_sem_id)
-            ->whereHas('studyLoad.faculty', fn($q) =>
+            ->whereHas('faculty', fn($q) =>
                 $q->where('fac_dept_id', $submission->schsub_dept_id)
             )
             ->where('sch_is_active', true)
@@ -93,10 +96,9 @@ class PendingApprovalsController extends Controller
                     ->where('sch_id', '!=', $sch->sch_id)
                     ->exists();
 
-                $sch->faculty_name = optional($sch->studyLoad->faculty->user)->usr_fname
-                    . ' ' . optional($sch->studyLoad->faculty->user)->usr_lname;
-                $sch->subject_code = optional($sch->studyLoad->subject)->subj_code;
-                $sch->section_name = optional($sch->studyLoad->section)->sec_name;
+                $sch->faculty_name = optional($sch->faculty->user)->usr_name ?? 'Unknown';
+                $sch->subject_code = optional($sch->subject)->subj_code;
+                $sch->section_name = optional($sch->section)->sec_name;
                 $sch->room_name    = optional($sch->room)->room_name;
 
                 return $sch;
@@ -117,7 +119,7 @@ class PendingApprovalsController extends Controller
         $submission = Schedule_Submission::findOrFail($id);
 
         $hasConflicts = Schedule::where('sch_sem_id', $submission->schsub_sem_id)
-            ->whereHas('studyLoad.faculty', fn($q) =>
+            ->whereHas('faculty', fn($q) =>
                 $q->where('fac_dept_id', $submission->schsub_dept_id)
             )
             ->where('sch_is_active', true)

@@ -21,7 +21,7 @@
   <div style="background:var(--grey);border-radius:10px;padding:12px;">
     <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:2px;">Submitted By</div>
     <div style="font-weight:600;font-size:13px;">
-      {{ $submission->submittedBy->usr_fname ?? '' }} {{ $submission->submittedBy->usr_lname ?? '' }}
+      {{ $submission->submittedBy->usr_name ?? 'Unknown' }}
     </div>
   </div>
   <div style="background:var(--grey);border-radius:10px;padding:12px;">
