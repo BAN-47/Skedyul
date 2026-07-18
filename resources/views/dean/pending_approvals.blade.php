@@ -93,7 +93,7 @@
                 <td><b>{{ $sub->department->dept_code ?? '—' }}</b></td>
                 <td>
                   @if($sub->submittedBy)
-                    {{ $sub->submittedBy->usr_fname }} {{ $sub->submittedBy->usr_lname }}
+                    {{ $sub->submittedBy->usr_name }}
                   @else
                     <span style="color:var(--text3);">Unknown</span>
                   @endif
@@ -307,24 +307,17 @@ function showToast(msg) {
 }
 
 // ── REVIEW MODAL ──────────────────────────────────────────────────────────
-// Fetches schedule detail from the server then opens the modal
 let currentSubId = null;
 
 function openReview(subId, deptCode, conflictCount) {
   currentSubId = subId;
-
-  // Update modal title
   document.getElementById('review-modal-title').textContent = 'Schedule Review — ' + deptCode;
-
-  // Show loading state
   document.getElementById('review-modal-body').innerHTML =
     '<div style="text-align:center;padding:40px;color:var(--text3);">Loading schedules…</div>';
 
-  // Set form actions
   document.getElementById('form-approve').action = '/dean/pending-approvals/' + subId + '/approve';
   document.getElementById('form-return').action  = '/dean/pending-approvals/' + subId + '/return';
 
-  // Wire approve button — block if there are conflicts
   document.getElementById('btn-approve').onclick = () => {
     if (conflictCount > 0) {
       showToast('❌ Cannot approve — resolve ' + conflictCount + ' conflict(s) first.');
@@ -334,7 +327,6 @@ function openReview(subId, deptCode, conflictCount) {
     document.getElementById('form-approve').submit();
   };
 
-  // Wire return button
   document.getElementById('btn-return').onclick = () => {
     const note = document.getElementById('return-note').value.trim();
     if (!note) { showToast('Please enter a return note before sending.'); return; }
@@ -342,7 +334,6 @@ function openReview(subId, deptCode, conflictCount) {
     document.getElementById('form-return').submit();
   };
 
-  // Fetch schedule rows via AJAX
   fetch('/dean/pending-approvals/' + subId + '/review', {
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
   })
@@ -358,7 +349,7 @@ function openReview(subId, deptCode, conflictCount) {
   openModal('modal-review');
 }
 
-// ── NOTIFY CHAIRS (JS-only session history) ────────────────────────────────
+// ── NOTIFY CHAIRS ────────────────────────────────────────────────────────
 function sendNotif() {
   const title   = document.getElementById('notif-title').value.trim();
   const message = document.getElementById('notif-message').value.trim();

@@ -8,14 +8,53 @@ use App\Models\Schedule;
 use App\Models\Faculty;
 use App\Models\Semester;
 use App\Models\Department;
+use App\Models\Dean;
+use App\Models\DepartmentChair;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PendingApprovalsController extends Controller
 {
+    /**
+     * Helper: Get the logged-in user's Department ID.
+     * Returns null for System Admin (sees all), UUID for Dean/Chair, or false if unauthorized.
+     */
+    private function getUserDepartmentId()
+    {
+        $user = Auth::user();
+        if (!$user) return false;
+
+        // System Admins can see all departments
+        if ($user->usr_role === 'system_admin') {
+            return null; 
+        }
+
+        // Deans only see their assigned department
+        if ($user->usr_role === 'dean') {
+            $dean = Dean::where('dean_usr_id', $user->usr_id)->first();
+            return $dean?->dean_dept_id;
+        }
+
+        // Department Chairs only see their assigned department
+        if ($user->usr_role === 'department_chair') {
+            $chair = DepartmentChair::where('dc_usr_id', $user->usr_id)->first();
+            return $chair?->dc_dept_id;
+        }
+
+        // Faculty and other roles have no access here
+        return false;
+    }
+
     // ── GET /dean/pending-approvals ──────────────────────────────────────
     public function index()
     {
+        $userDeptId = $this->getUserDepartmentId();
+
+        // If they don't have a department assignment, block access
+        if ($userDeptId === false) {
+            abort(403, 'You do not have access to this page.');
+        }
+
         $semester = Semester::where('sem_is_active', true)->first();
 
         $submissions = Schedule_Submission::with([
@@ -24,15 +63,13 @@ class PendingApprovalsController extends Controller
                 'submittedBy',
                 'reviewedBy',
             ])
+            ->when($userDeptId, fn($q) => $q->where('schsub_dept_id', $userDeptId)) // Filter by Dept
             ->when($semester, fn($q) => $q->where('schsub_sem_id', $semester->sem_id))
             ->orderBy('schsub_submitted_at', 'desc')
             ->get()
             ->map(function ($sub) {
                 $sub->faculty_count = Faculty::where('fac_dept_id', $sub->schsub_dept_id)->count();
 
-                // Query Schedule's own direct sch_fac_id → faculty relation instead of
-                // tunneling through Study_Load — this stays correct even if sch_load_id
-                // linkage is inconsistent, since Schedule already carries sch_fac_id itself.
                 $sub->conflict_count = Schedule::where('sch_sem_id', $sub->schsub_sem_id)
                     ->whereHas('faculty', fn($q) =>
                         $q->where('fac_dept_id', $sub->schsub_dept_id)
@@ -68,11 +105,21 @@ class PendingApprovalsController extends Controller
     // ── GET /dean/pending-approvals/{id}/review (AJAX) ───────────────────
     public function review($id)
     {
+        $userDeptId = $this->getUserDepartmentId();
+        if ($userDeptId === false) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $submission = Schedule_Submission::with([
             'department',
             'semester',
             'submittedBy',
         ])->findOrFail($id);
+
+        // Security: Ensure Dean/Chair can only review their own department's schedules
+        if ($userDeptId !== null && $submission->schsub_dept_id !== $userDeptId) {
+            abort(403, 'You can only review schedules for your own department.');
+        }
 
         $schedules = Schedule::with([
                 'faculty.user',
@@ -116,7 +163,17 @@ class PendingApprovalsController extends Controller
     // ── POST /dean/pending-approvals/{id}/approve ────────────────────────
     public function approve(Request $request, $id)
     {
+        $userDeptId = $this->getUserDepartmentId();
+        if ($userDeptId === false) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $submission = Schedule_Submission::findOrFail($id);
+
+        // Security: Ensure Dean/Chair can only approve their own department's schedules
+        if ($userDeptId !== null && $submission->schsub_dept_id !== $userDeptId) {
+            abort(403, 'You cannot approve schedules for another department.');
+        }
 
         $hasConflicts = Schedule::where('sch_sem_id', $submission->schsub_sem_id)
             ->whereHas('faculty', fn($q) =>
@@ -153,11 +210,21 @@ class PendingApprovalsController extends Controller
     // ── POST /dean/pending-approvals/{id}/return ─────────────────────────
     public function returnToChair(Request $request, $id)
     {
+        $userDeptId = $this->getUserDepartmentId();
+        if ($userDeptId === false) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $request->validate([
             'remarks' => 'required|string|min:5|max:1000',
         ]);
 
         $submission = Schedule_Submission::findOrFail($id);
+
+        // Security: Ensure Dean/Chair can only return their own department's schedules
+        if ($userDeptId !== null && $submission->schsub_dept_id !== $userDeptId) {
+            abort(403, 'You cannot return schedules for another department.');
+        }
 
         $submission->update([
             'schsub_status'      => 'returned',
