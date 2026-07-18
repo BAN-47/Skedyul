@@ -65,7 +65,7 @@ class DeanDepartmentController extends Controller
 
             $programsData = [];
 
-            foreach ($programs as $prog) {
+            foreach ($programs as $progIndex => $prog) {
                 $facultyIds = Study_Load::whereHas('subject', fn ($q) => $q->where('subj_prog_id', $prog->prog_id))
                     ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
                     ->pluck('sl_fac_id')
@@ -87,16 +87,28 @@ class DeanDepartmentController extends Controller
                     ];
                 })->values();
 
+                $progFacultyCount = $progFaculty->count();
+                $progAvgLoad = $progFacultyCount > 0
+                    ? round($progFaculty->sum(fn ($f) => optional($workloads->get($f->fac_id))->wl_total_hours ?? 0) / $progFacultyCount)
+                    : 0;
+                $progLoadPct = min(100, round(($progAvgLoad / self::MAX_LOAD_HOURS) * 100));
+
                 $progSectionCount = Section::where('sec_prog_id', $prog->prog_id)
                     ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
                     ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                     ->count();
 
                 $programsData[$prog->prog_id] = [
-                    'code'     => $prog->prog_code,
-                    'name'     => $prog->prog_name,
-                    'sections' => $progSectionCount,
-                    'faculty'  => $progFacultyRows,
+                    'code'         => $prog->prog_code,
+                    'name'         => $prog->prog_name,
+                    'color'        => 'var(--' . self::DEPT_COLORS[$progIndex % count(self::DEPT_COLORS)] . ')',
+                    'facultyCount' => $progFacultyCount,
+                    'sections'     => $progSectionCount,
+                    'avgLoad'      => $progAvgLoad . 'h',
+                    'maxLoad'      => self::MAX_LOAD_HOURS . 'h',
+                    'loadPct'      => $progLoadPct,
+                    'loadColor'    => $this->resolveLoadColor($progAvgLoad),
+                    'faculty'      => $progFacultyRows,
                 ];
             }
 
