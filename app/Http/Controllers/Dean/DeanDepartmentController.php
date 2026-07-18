@@ -10,7 +10,7 @@ use App\Models\Workload;
 use App\Models\Section;
 use App\Models\Study_Load;
 use App\Models\Dept_Chair;
-use App\Models\Dept_Dean;
+use App\Models\Dean;
 use App\Models\Schedule_Submission;
 use App\Models\AcademicYear;
 use App\Models\Semester;
@@ -33,10 +33,10 @@ class DeanDepartmentController extends Controller
 
         // Each Dean is assigned to exactly one Department via department_dean.
         // Only show that department here — not the whole university.
-        $deanAssignment = Dept_Dean::where('dd_usr_id', auth()->id())->first();
+        $deanAssignment = Dean::where('dean_usr_id', auth()->id())->first();
 
         $departments = $deanAssignment
-            ? Department::where('dept_id', $deanAssignment->dd_dept_id)->get()
+            ? Department::where('dept_id', $deanAssignment->dean_dept_id)->get()
             : collect(); // Dean has no department assigned yet — show nothing rather than everything
 
         // Latest workload (total hours) per faculty for the active semester
@@ -102,6 +102,7 @@ class DeanDepartmentController extends Controller
                     'code'         => $prog->prog_code,
                     'name'         => $prog->prog_name,
                     'color'        => 'var(--' . self::DEPT_COLORS[$progIndex % count(self::DEPT_COLORS)] . ')',
+                    'chair'        => $this->resolveProgramChairName($prog->prog_id),
                     'facultyCount' => $progFacultyCount,
                     'sections'     => $progSectionCount,
                     'avgLoad'      => $progAvgLoad . 'h',
@@ -117,8 +118,6 @@ class DeanDepartmentController extends Controller
                 ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                 ->count();
 
-            $chairName = $this->resolveChairName($dept->dept_id);
-
             $submission = Schedule_Submission::where('schsub_dept_id', $dept->dept_id)
                 ->when($semester, fn ($q) => $q->where('schsub_sem_id', $semester->sem_id))
                 ->orderByDesc('schsub_submitted_at')
@@ -130,7 +129,6 @@ class DeanDepartmentController extends Controller
                 'code'           => $dept->dept_code,
                 'color'          => 'var(--' . self::DEPT_COLORS[$index % count(self::DEPT_COLORS)] . ')',
                 'name'           => $dept->dept_name,
-                'chair'          => $chairName,
                 'facultyCount'   => $facultyCount,
                 'sections'       => $sectionCount,
                 'avgLoad'        => $avgLoad . 'h',
@@ -147,11 +145,13 @@ class DeanDepartmentController extends Controller
     }
 
     /**
-     * Resolves the department chair's display name via department_chair -> users.
+     * Resolves a program's chair display name via department_chair -> users,
+     * matching on dc_prog_id since chairs are now assigned per-program
+     * (a department can have several programs, each with its own chair).
      */
-    private function resolveChairName(string $deptId): string
+    private function resolveProgramChairName(string $progId): string
     {
-        $chairRecord = Dept_Chair::where('dc_dept_id', $deptId)->first();
+        $chairRecord = Dept_Chair::where('dc_prog_id', $progId)->first();
         if (!$chairRecord) {
             return '—';
         }

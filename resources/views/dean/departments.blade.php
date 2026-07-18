@@ -65,8 +65,8 @@
                                         style="width:{{ $d['loadPct'] }}%;background:{{ $d['loadColor'] }}"></div>
                                 </div>
                                 <div style="margin-top:12px;display:flex;justify-content:space-between;"><span
-                                        class="badge badge-{{ $d['statusBadge'] }}">{{ $d['scheduleStatus'] }}</span><span
-                                        class="badge badge-grey">Chair: {{ $d['chair'] }}</span></div>
+                                        class="badge badge-{{ $d['statusBadge'] }}">{{ $d['scheduleStatus'] }}</span>
+                                </div>
                             </div>
                         @empty
                             <div style="color:var(--text3);font-size:13px;">No departments found.</div>
@@ -141,23 +141,29 @@
                                     Chairs</span>
                             </label>
                             <div style="display:flex;flex-direction:column;gap:6px;padding-left:12px;">
+                                {{-- Chairs are assigned per-program now (BSIS / BSIT / BIT-CT each have their
+                                     own chair), so this list loops over every program across all departments
+                                     the dean oversees, rather than one row per department. --}}
                                 @foreach ($deptData as $d)
-                                    <label
-                                        style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-                                        <input type="checkbox" class="chair-check" checked onchange="syncAllChairs()"
-                                            style="width:14px;height:14px;accent-color:var(--blue);">
-                                        <div style="display:flex;align-items:center;gap:8px;">
-                                            <div
-                                                style="width:28px;height:28px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
-                                                {{ strtoupper(substr($d['chair'], 0, 2)) }}</div>
-                                            <div>
-                                                <div style="font-size:13px;font-weight:600;color:var(--text);">
-                                                    {{ $d['chair'] }}</div>
-                                                <div style="font-size:11px;color:var(--text3);">Chair ·
-                                                    {{ $d['code'] }}</div>
+                                    @foreach ($d['programs'] as $p)
+                                        <label
+                                            style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
+                                            <input type="checkbox" class="chair-check" checked
+                                                onchange="syncAllChairs()"
+                                                style="width:14px;height:14px;accent-color:var(--blue);">
+                                            <div style="display:flex;align-items:center;gap:8px;">
+                                                <div
+                                                    style="width:28px;height:28px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
+                                                    {{ strtoupper(substr($p['chair'], 0, 2)) }}</div>
+                                                <div>
+                                                    <div style="font-size:13px;font-weight:600;color:var(--text);">
+                                                        {{ $p['chair'] }}</div>
+                                                    <div style="font-size:11px;color:var(--text3);">Chair ·
+                                                        {{ $p['code'] }}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </label>
+                                        </label>
+                                    @endforeach
                                 @endforeach
                             </div>
                         </div>
@@ -359,7 +365,10 @@
                 const type = document.getElementById('notif-type').value;
                 const checks = document.querySelectorAll('.chair-check');
                 const selected = [];
-                const names = @json(collect($deptData)->map(fn($d) => $d['chair'] . ' (' . $d['code'] . ')')->values());
+                // Chairs are per-program now, so flatten every department's
+                // programs into one list of "Chair Name (PROG_CODE)" strings —
+                // this must line up 1:1 with the recipient rows rendered above.
+                const names = @json(collect($deptData)->flatMap(fn($d) => collect($d['programs'])->map(fn($p) => $p['chair'] . ' (' . $p['code'] . ')'))->values());
                 checks.forEach((c, i) => {
                     if (c.checked) selected.push(names[i]);
                 });
@@ -508,6 +517,7 @@
       </div>
       <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2)">Avg Load: ${p.avgLoad} / ${p.maxLoad} max</div>
       <div class="workload-bar"><div class="workload-fill" style="width:${p.loadPct}%;background:${p.loadColor}"></div></div>
+      <div style="margin-top:12px;"><span class="badge badge-grey">Chair: ${p.chair}</span></div>
     </div>`;
                 }).join('');
 
@@ -525,7 +535,7 @@
     <div class="card" style="margin-bottom:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <div style="font-size:13px;font-weight:600;color:var(--text2)">Department Load — ${d.avgLoad} / ${d.maxLoad}</div>
-        <div style="display:flex;gap:8px;"><span class="badge badge-${d.statusBadge}">${d.scheduleStatus}</span><span class="badge badge-grey">Chair: ${d.chair}</span></div>
+        <div style="display:flex;gap:8px;"><span class="badge badge-${d.statusBadge}">${d.scheduleStatus}</span></div>
       </div>
       <div class="workload-bar" style="height:10px;"><div class="workload-fill" style="width:${d.loadPct}%;background:${d.loadColor}"></div></div>
     </div>
@@ -574,6 +584,7 @@
     <div style="margin-bottom:20px;">
       <div style="font-size:22px;font-weight:800;color:${p.color}">${p.code}</div>
       <div style="font-size:14px;color:var(--text3);margin-top:2px;">${p.name}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px;">Chair: <b style="color:var(--text2)">${p.chair}</b></div>
     </div>
     <div class="dept-info-grid">
       <div class="dept-info-cell"><div class="dept-info-cell-val">${p.facultyCount}</div><div class="dept-info-cell-label">Faculty</div></div>
