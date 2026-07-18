@@ -78,6 +78,11 @@
                         Departments</button>
                     <div id="dept-detail-content"></div>
                 </div>
+                <div id="program-detail-view" style="display:none;">
+                    <button class="topbar-btn btn-secondary" onclick="closeProgram()" style="margin-bottom:20px;">Back
+                        to Programs</button>
+                    <div id="program-detail-content"></div>
+                </div>
 
             </div><!-- end .main -->
         </div><!-- end #screen-app -->
@@ -210,7 +215,8 @@
                     <div
                         style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;">
                         <strong>1 Conflict Detected:</strong> Carlo Mendoza is scheduled for CC 311 and IT 201 at the
-                        same time on Monday 8:30–10:00 AM.</div>
+                        same time on Monday 8:30–10:00 AM.
+                    </div>
                     <table>
                         <thead>
                             <tr>
@@ -473,43 +479,39 @@
             // Real department + faculty data from the database (built in DeanDepartmentController)
             const deptData = @json($deptData);
 
+            let currentDeptKey = null;
+
+            // Auto-open the department directly — skip the list-click step
+            // when the dean only oversees a single department (e.g. CCICT).
+            // Once more departments exist, the list view returns automatically.
+            document.addEventListener('DOMContentLoaded', function() {
+                const keys = Object.keys(deptData);
+                if (keys.length === 1) {
+                    openDept(keys[0]);
+                }
+            });
+
             function openDept(key) {
                 const d = deptData[key];
                 if (!d) return;
+                currentDeptKey = key;
 
-                // One card per Program (e.g. BSIS, BSIT, BIT-CT), each listing only the
-                // faculty currently teaching that program's subjects this semester.
                 const programKeys = Object.keys(d.programs);
                 const programCards = programKeys.map(pKey => {
                     const p = d.programs[pKey];
-                    const rows = p.faculty.map(f => `
-      <tr>
-        <td><b>${f.name}</b></td>
-        <td>${f.rank}</td>
-        <td>${f.employment}</td>
-        <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
-        <td><span class="badge ${f.badge}">${f.status}</span></td>
-      </tr>`).join('');
-
                     return `
-    <div class="card" style="margin-bottom:16px;">
-      <div class="card-header">
-        <div>
-          <div class="card-title">${p.code} — ${p.name}</div>
-          <div class="card-sub">${p.faculty.length} faculty · ${p.sections} sections</div>
-        </div>
+    <div class="dept-card" onclick="openProgram('${key}','${pKey}')">
+      <div class="dept-card-header"><div><div class="dept-card-code" style="color:${p.color}">${p.code}</div><div class="dept-card-name">${p.name}</div></div><span class="dept-card-arrow">›</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+        <div style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:800;">${p.facultyCount}</div><div style="font-size:11px;color:var(--text3)">Faculty</div></div>
+        <div style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:800;">${p.sections}</div><div style="font-size:11px;color:var(--text3)">Sections</div></div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
-          <tbody>${rows || `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">No faculty assigned to this program yet.</td></tr>`}</tbody>
-        </table>
-      </div>
+      <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2)">Avg Load: ${p.avgLoad} / ${p.maxLoad} max</div>
+      <div class="workload-bar"><div class="workload-fill" style="width:${p.loadPct}%;background:${p.loadColor}"></div></div>
     </div>`;
                 }).join('');
 
-                document.getElementById('dept-detail-content').innerHTML =
-                    `
+                document.getElementById('dept-detail-content').innerHTML = `
     <div style="margin-bottom:20px;">
       <div style="font-size:22px;font-weight:800;color:${d.color}">${d.code}</div>
       <div style="font-size:14px;color:var(--text3);margin-top:2px;">${d.name}</div>
@@ -520,24 +522,87 @@
       <div class="dept-info-cell"><div class="dept-info-cell-val">${d.avgLoad}</div><div class="dept-info-cell-label">Avg Load</div></div>
       <div class="dept-info-cell"><div class="dept-info-cell-val">${d.maxLoad}</div><div class="dept-info-cell-label">Max Load</div></div>
     </div>
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card" style="margin-bottom:20px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <div style="font-size:13px;font-weight:600;color:var(--text2)">Department Load — ${d.avgLoad} / ${d.maxLoad}</div>
         <div style="display:flex;gap:8px;"><span class="badge badge-${d.statusBadge}">${d.scheduleStatus}</span><span class="badge badge-grey">Chair: ${d.chair}</span></div>
       </div>
       <div class="workload-bar" style="height:10px;"><div class="workload-fill" style="width:${d.loadPct}%;background:${d.loadColor}"></div></div>
     </div>
-    ${programCards || `<div class="card"><div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No programs found for this department.</div></div>`}`;
+    <div style="margin-bottom:12px;">
+      <div style="font-size:16px;font-weight:800;color:var(--text);">Programs</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:2px;">Select a program to view its faculty</div>
+    </div>
+    <div class="three-col">
+      ${programCards || `<div style="color:var(--text3);font-size:13px;">No programs found for this department.</div>`}
+    </div>`;
 
                 document.getElementById('dept-list-view').style.display = 'none';
                 document.getElementById('dept-detail-view').style.display = 'block';
                 document.getElementById('topbar-title').textContent = d.code + ' — Department Details';
+
+                // Hide "Back to Departments" when it's the only department —
+                // there's nothing meaningful to go back to.
+                const backBtn = document.querySelector('#dept-detail-view > .topbar-btn');
+                if (backBtn) {
+                    backBtn.style.display = Object.keys(deptData).length === 1 ? 'none' : 'inline-flex';
+                }
             }
 
             function closeDept() {
                 document.getElementById('dept-list-view').style.display = 'block';
                 document.getElementById('dept-detail-view').style.display = 'none';
                 document.getElementById('topbar-title').textContent = 'Department Overview';
+            }
+
+            function openProgram(deptKey, progKey) {
+                const d = deptData[deptKey];
+                if (!d) return;
+                const p = d.programs[progKey];
+                if (!p) return;
+
+                const rows = p.faculty.map(f => `
+    <tr>
+      <td><b>${f.name}</b></td>
+      <td>${f.rank}</td>
+      <td>${f.employment}</td>
+      <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
+      <td><span class="badge ${f.badge}">${f.status}</span></td>
+    </tr>`).join('');
+
+                document.getElementById('program-detail-content').innerHTML = `
+    <div style="margin-bottom:20px;">
+      <div style="font-size:22px;font-weight:800;color:${p.color}">${p.code}</div>
+      <div style="font-size:14px;color:var(--text3);margin-top:2px;">${p.name}</div>
+    </div>
+    <div class="dept-info-grid">
+      <div class="dept-info-cell"><div class="dept-info-cell-val">${p.facultyCount}</div><div class="dept-info-cell-label">Faculty</div></div>
+      <div class="dept-info-cell"><div class="dept-info-cell-val">${p.sections}</div><div class="dept-info-cell-label">Sections</div></div>
+      <div class="dept-info-cell"><div class="dept-info-cell-val">${p.avgLoad}</div><div class="dept-info-cell-label">Avg Load</div></div>
+      <div class="dept-info-cell"><div class="dept-info-cell-val">${p.maxLoad}</div><div class="dept-info-cell-label">Max Load</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Faculty Members</div><div class="card-sub">${p.faculty.length} faculty in this program</div></div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">No faculty assigned to this program yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+                document.getElementById('dept-detail-view').style.display = 'none';
+                document.getElementById('program-detail-view').style.display = 'block';
+                document.getElementById('topbar-title').textContent = p.code + ' — Faculty';
+            }
+
+            function closeProgram() {
+                document.getElementById('program-detail-view').style.display = 'none';
+                document.getElementById('dept-detail-view').style.display = 'block';
+                if (currentDeptKey) {
+                    document.getElementById('topbar-title').textContent = deptData[currentDeptKey].code +
+                        ' — Department Details';
+                }
             }
         </script>
 </body>
