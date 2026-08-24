@@ -31,10 +31,6 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     Route::get('/dashboard', [DeanDashboardController::class, 'index'])
         ->name('dashboard');
 
-    // Faculty Workload
-    Route::get('/faculty-workload', [DeanFacultyWorkloadController::class, 'index'])
-        ->name('faculty_workload');
-
     // Departments
     Route::get('/departments', [DeanDepartmentController::class, 'index'])
         ->name('departments');
