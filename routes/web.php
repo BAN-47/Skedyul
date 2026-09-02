@@ -8,6 +8,8 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\Admin\NotifController;
+use App\Http\Controllers\Admin\ReportsController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -82,9 +84,8 @@ Route::prefix('admin')->group(function () {
     Route::put('/users/{id}', [UserController::class, 'update'])->name('admin.users.update');
     Route::delete('/users/{id}', [UserController::class, 'destroy'])->name('admin.users.destroy');
 
-    Route::get('/reports', function () {
-        return view('admin.reports');
-    })->name('admin.reports');
+    // reports routes 
+Route::get('/reports', [ReportsController::class, 'index'])->name('admin.reports');
 
     Route::get('/settings', function () {
         return view('admin.admin_settings');
@@ -129,3 +130,5 @@ Route::get('/departments',
 [DepartmentController::class,'index'])
 ->name('admin.departments');
 
+// reports routes 
+Route::get('/reports', [ReportsController::class, 'index'])->name('admin.reports');

@@ -5,20 +5,404 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
-/* ── FONTS ────────────────────────────────────────────────────────────── */
+/* ── FONTS ──────────────────────────────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
-/* ── ICONS ────────────────────────────────────────────────────────────── */
+/* ── ICONS ──────────────────────────────────────────────────────────────── */
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
 
-/* ── THEME / DESIGN TOKENS ────────────────────────────────────────────── */
+/* ── THEME ──────────────────────────────────────────────────────────────── */
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'DM Mono', ui-monospace, monospace;
 }
 
-/* ── GLOBAL BASE ──────────────────────────────────────────────────────── */
-body {
-    font-family: var(--font-sans);
-}
+/* ══════════════════════════════════════════════════════════════════════════
+   SHARED COMPONENTS
+   Used across: admin_dashboard, user_accounts, rooms, settings,
+                pending_approvals, dean_dashboard, faculty pages
+   ══════════════════════════════════════════════════════════════════════════ */
+@layer components {
 
+    /* ── LAYOUT ──────────────────────────────────────────────────────────── */
+    /* The main app shell — sidebar + content side by side */
+    .app-shell {
+        @apply flex h-screen overflow-hidden;
+    }
+
+    /* The right side of the shell — topbar + scrollable content */
+    .app-main {
+        @apply flex flex-col flex-1 overflow-hidden;
+    }
+
+    /* ── TOPBAR ──────────────────────────────────────────────────────────── */
+    /* Top navigation bar — white bar at the top of every page */
+    .topbar {
+        @apply h-[60px] bg-white border-b border-slate-200
+               flex items-center px-7 gap-4 flex-shrink-0;
+    }
+
+    .topbar-title {
+        @apply flex-1 text-lg font-bold text-slate-900;
+    }
+
+    /* ── PAGE CONTENT ────────────────────────────────────────────────────── */
+    /* Scrollable area below the topbar */
+    .page-content {
+        @apply flex-1 overflow-y-auto p-7 scrollbar-none;
+    }
+
+    /* ── DASHBOARD GRID / LAYOUT HELPERS ────────────────────────────────── */
+    /* Used on dashboards for the row of stat cards at the top */
+    .stat-grid {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6;
+    }
+
+    /* Two-column layout — table + chart/list side by side */
+    .two-col {
+        @apply grid grid-cols-1 lg:grid-cols-2 gap-5;
+    }
+
+    /* ── STAT CARD ───────────────────────────────────────────────────────── */
+    /* The metric cards at the top of each dashboard */
+    .stat-card {
+        @apply relative bg-white rounded-2xl p-5
+               border border-slate-200 overflow-hidden;
+    }
+
+    /* Colored top accent bar — add color class: bg-blue-600, bg-green-600, etc. */
+    .stat-card-bar {
+        @apply absolute top-0 left-0 right-0 h-[3px];
+    }
+
+    .stat-icon {
+        @apply absolute right-4 top-4 text-[28px] opacity-[.15];
+    }
+
+    .stat-label {
+        @apply text-[11px] font-semibold uppercase tracking-[.6px] text-slate-400 mb-2;
+    }
+
+    .stat-value {
+        @apply text-[28px] font-extrabold text-slate-900 leading-none mb-1;
+    }
+
+    .stat-sub {
+        @apply text-[12px] text-slate-400;
+    }
+
+    /* ── CARD / DASH-CARD ────────────────────────────────────────────────── */
+    /* Generic white rounded card used for tables, charts, forms */
+    .card {
+        @apply bg-white rounded-2xl border border-slate-200 p-5;
+    }
+
+    .card-title {
+        @apply text-[15px] font-bold text-slate-900;
+    }
+
+    .card-sub {
+        @apply text-[12px] text-slate-400 mt-0.5;
+    }
+
+    .card-header {
+        @apply flex items-center justify-between mb-4;
+    }
+
+    /* ── TABLE ───────────────────────────────────────────────────────────── */
+    /* Standard data table used everywhere */
+    .data-table {
+        @apply w-full border-collapse;
+    }
+
+    .data-table th {
+        @apply text-[11px] font-bold uppercase tracking-[.6px] text-slate-400
+               px-3.5 py-2.5 text-left border-b-2 border-slate-200 whitespace-nowrap;
+    }
+
+    .data-table td {
+        @apply text-[13px] text-slate-900 px-3.5 py-3 border-b border-slate-100;
+    }
+
+    .data-table tr:hover td {
+        @apply bg-slate-50;
+    }
+
+    /* ── BADGES ──────────────────────────────────────────────────────────── */
+    /* Status pills / role labels */
+    .badge {
+        @apply inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold;
+    }
+
+    .badge-green  { @apply bg-green-100 text-green-700; }
+    .badge-red    { @apply bg-red-100 text-red-600; }
+    .badge-amber  { @apply bg-amber-100 text-amber-700; }
+    .badge-blue   { @apply bg-blue-50 text-blue-600; }
+    .badge-grey   { @apply bg-slate-100 text-slate-500; }
+    .badge-navy   { @apply bg-slate-800 text-white; }
+    .badge-teal   { @apply bg-cyan-100 text-cyan-700; }
+    .badge-purple { @apply bg-violet-100 text-violet-700; }
+
+    /* ── WORKLOAD BARS ───────────────────────────────────────────────────── */
+    /* Progress bar rows — role distribution, schedule completion, room util */
+    .workload-item {
+        @apply mb-3.5;
+    }
+
+    .workload-header {
+        @apply flex justify-between items-center mb-1;
+    }
+
+    .workload-name {
+        @apply text-[13px] font-semibold text-slate-700;
+    }
+
+    .workload-val {
+        @apply text-[12px] font-bold font-mono;
+    }
+
+    .workload-bar {
+        @apply h-2 bg-slate-100 rounded-full overflow-hidden;
+    }
+
+    .workload-fill {
+        @apply h-full rounded-full transition-all duration-700;
+    }
+
+    /* ── BUTTONS ─────────────────────────────────────────────────────────── */
+    .btn {
+        @apply px-4 py-2 rounded-lg text-[13px] font-semibold
+               cursor-pointer transition-all border-none;
+    }
+
+    .btn-primary {
+        @apply bg-blue-600 text-white hover:bg-blue-700;
+    }
+
+    .btn-secondary {
+        @apply bg-slate-100 text-slate-600 hover:bg-slate-200;
+    }
+
+    .btn-danger {
+        @apply bg-red-100 text-red-600 hover:bg-red-200;
+    }
+
+    /* ── FORM FIELDS ─────────────────────────────────────────────────────── */
+    /* Text inputs, selects, textareas */
+    .field-input {
+        @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-[13px]
+               focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100
+               transition;
+    }
+
+    .field-label {
+        @apply block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5;
+    }
+
+    /* ── MODAL ───────────────────────────────────────────────────────────── */
+    /* Overlay backdrop — JS toggles .open class */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, .55);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.open   { display: flex; }
+    .modal-overlay.active { display: flex; } /* alias used in user_accounts */
+
+    /* White modal box */
+    .modal-box {
+        @apply bg-white rounded-2xl max-w-[92vw] max-h-[88vh]
+               overflow-y-auto p-6 shadow-[0_20px_60px_rgba(0,0,0,.25)];
+    }
+
+    .modal-header {
+        @apply flex items-center justify-between mb-4;
+    }
+
+    .modal-title {
+        @apply text-[17px] font-extrabold text-slate-900;
+    }
+
+    .modal-close {
+        @apply text-slate-400 hover:text-slate-600 text-base
+               bg-transparent border-none cursor-pointer;
+    }
+
+    .modal-footer {
+        @apply flex justify-end gap-2 mt-4;
+    }
+
+    /* ── NOTIFICATION DROPDOWN ───────────────────────────────────────────── */
+    .notif-drop-item {
+        display: flex;
+        gap: 10px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: background .15s;
+    }
+
+    .notif-drop-item:last-child { border-bottom: none; }
+    .notif-drop-item:hover      { background: #f8fafc; }
+    .notif-drop-item.unread     { background: #eff6ff; }
+    .notif-drop-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .notif-drop-text { font-size: 13px; color: #475569; line-height: 1.4; }
+    .notif-drop-time { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+
+    /* ── TOAST ───────────────────────────────────────────────────────────── */
+    /* Bottom-right success/error message */
+    .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #0f172a;
+        color: #fff;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+        transition: all .25s ease;
+        z-index: 2000;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    /* ── SCROLLBAR HIDE ──────────────────────────────────────────────────── */
+    /* Used on .page-content and sidebar nav */
+    .scrollbar-none {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+
+    /* ── SIDEBAR ─────────────────────────────────────────────────────────── */
+    /* The left navigation panel — dark navy */
+    .sidebar {
+        @apply w-[240px] h-screen flex flex-col flex-shrink-0
+               bg-[#1a2d5a] z-10 shadow-[4px_0_24px_rgba(0,0,0,.15)];
+    }
+
+    .sidebar-logo {
+        @apply px-5 pt-6 pb-5 border-b border-white/[.08] text-center;
+    }
+
+    .sidebar-logo-text {
+        @apply text-[30px] font-extrabold text-white tracking-tight leading-none;
+    }
+
+    .sidebar-logo-text span { @apply text-blue-400; }
+
+    .sidebar-user {
+        @apply px-5 py-4 flex items-center gap-2.5
+               border-b border-white/[.08];
+    }
+
+    .sidebar-avatar {
+        @apply w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center
+               text-[13px] font-bold text-white flex-shrink-0;
+    }
+
+    .sidebar-user-name {
+        @apply text-[13px] font-semibold text-white truncate;
+    }
+
+    .sidebar-user-role {
+        @apply text-[11px] text-white/40;
+    }
+
+    .sidebar-nav {
+        @apply flex-1 py-3 overflow-y-auto scrollbar-none;
+    }
+
+    .nav-section-label {
+        @apply text-[10px] font-bold text-white/30 uppercase tracking-[1px]
+               px-5 pt-4 pb-1.5;
+    }
+
+    .nav-item {
+        @apply flex items-center gap-2.5 py-2.5 pl-8 pr-5
+               text-white/55 text-[13px] font-medium cursor-pointer
+               transition-all border-l-[3px] border-transparent
+               no-underline;
+    }
+
+    .nav-item:hover {
+        @apply text-white bg-white/[.06];
+    }
+
+    .nav-item.active {
+        @apply text-white bg-blue-600/20 border-l-blue-400 font-semibold;
+    }
+
+    .nav-icon {
+        @apply text-base w-5 text-center flex-shrink-0;
+    }
+
+    .nav-badge {
+        @apply ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full;
+    }
+
+    .sidebar-bottom {
+        @apply px-5 py-4 border-t border-white/[.08];
+    }
+
+    .btn-logout {
+        @apply w-full py-2.5 border border-white/[.12] rounded-lg bg-transparent
+               text-white/50 text-[12px] font-semibold cursor-pointer transition-all
+               hover:bg-red-600/15 hover:border-red-500/40 hover:text-red-300;
+    }
+
+    /* ── QUOTE BANNER ────────────────────────────────────────────────────── */
+    /* Dark gradient banner used on dashboard pages */
+    .quote-banner {
+        @apply relative rounded-2xl p-6 mb-6 overflow-hidden;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1a2d5a 100%);
+    }
+
+    .quote-banner-grid {
+        @apply absolute inset-0 pointer-events-none;
+        background-image:
+            linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+        background-size: 28px 28px;
+    }
+
+    /* ── SETTINGS NAV ────────────────────────────────────────────────────── */
+    .settings-nav-item {
+        @apply flex items-center px-5 py-2.5 text-[13px] font-medium
+               text-slate-600 cursor-pointer transition-all
+               hover:bg-slate-50 hover:text-slate-900;
+    }
+
+    .settings-nav-item.active {
+        @apply bg-blue-50 text-blue-600 font-semibold
+               border-l-[3px] border-blue-600;
+    }
+
+    /* ── TOGGLE SWITCH ───────────────────────────────────────────────────── */
+    /* Used on settings notifications page */
+    .toggle-switch { @apply relative inline-flex cursor-pointer; }
+
+    .toggle-track {
+        @apply w-10 h-6 rounded-full bg-slate-200 transition-colors relative;
+    }
+
+    .toggle-track.on { @apply bg-blue-600; }
+
+    .toggle-thumb {
+        @apply absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full
+               shadow transition-transform;
+    }
+
+    .toggle-track.on .toggle-thumb { @apply translate-x-4; }
+}

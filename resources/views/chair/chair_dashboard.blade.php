@@ -4,104 +4,112 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SKEDYUL — Department Chair Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/chair/chair_dashboard.css') }}">
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
-<div class="app-wrapper">
+<div class="app-shell">
 
 @include('partials.chair_sidebar')
 
   <!-- ══════════ MAIN ══════════ -->
-  <div class="main">
+<div class="app-main relative">
 
     <!-- TOPBAR -->
     <div class="topbar">
       <div class="topbar-title">Department Chairperson Dashboard</div>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="badge badge-blue" style="font-size:11px;">BSIS · AY 2025–26 · 1st Sem</span>
-        <div class="notif-btn" id="notif-btn" onclick="toggleNotifPanel()"
-             style="width:auto;padding:0 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text2);gap:7px;">
-          <div class="notif-dot" id="notif-dot"></div>
+      <div class="flex items-center gap-2.5">
+        <span class="badge badge-blue text-[11px]">BSIS · AY 2025–26 · 1st Sem</span>
+        <div class="relative flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-slate-100 text-slate-600 text-[13px] font-semibold cursor-pointer hover:bg-slate-200 transition"
+             id="notif-btn" onclick="toggleNotifPanel()">
+          <div class="w-2 h-2 rounded-full bg-red-500" id="notif-dot"></div>
           Notifications
         </div>
       </div>
     </div>
 
     <!-- NOTIFICATION PANEL -->
-    <div class="notif-panel" id="notif-panel">
-      <div class="notif-panel-header">
-        <span class="notif-panel-title">Notifications</span>
+    <div class="hidden absolute top-[60px] right-7 w-[340px] max-h-[420px] overflow-y-auto bg-white rounded-2xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,.15)] z-50"
+         id="notif-panel">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <span class="text-[14px] font-bold text-slate-900">Notifications</span>
         <span class="badge badge-red" id="notif-count-badge">2 new</span>
       </div>
-      <div class="notif-panel-item">
-        <div class="notif-dot-sm" style="background:var(--red);"></div>
+
+      <div class="flex gap-2.5 px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
+        <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-red-500"></div>
         <div>
-          <div class="notif-panel-text"><strong>Conflict — Maria Santos</strong><br>GE 102 & IT 101 overlap Tue 7:00–8:30 AM. Fix before submitting.</div>
-          <div class="notif-panel-time">Today, 08:30 AM</div>
+          <div class="text-[12.5px] text-slate-600 leading-relaxed"><strong>Conflict — Maria Santos</strong><br>GE 102 & IT 101 overlap Tue 7:00–8:30 AM. Fix before submitting.</div>
+          <div class="text-[11px] text-slate-400 mt-1">Today, 08:30 AM</div>
         </div>
       </div>
-      <div class="notif-panel-item">
-        <div class="notif-dot-sm" style="background:var(--red);"></div>
+
+      <div class="flex gap-2.5 px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
+        <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-red-500"></div>
         <div>
-          <div class="notif-panel-text"><strong>Conflict — Jerome Bautista</strong><br>CC 313 & CC 401 assigned same room Wed 10:00–11:30 AM.</div>
-          <div class="notif-panel-time">Today, 08:35 AM</div>
+          <div class="text-[12.5px] text-slate-600 leading-relaxed"><strong>Conflict — Jerome Bautista</strong><br>CC 313 & CC 401 assigned same room Wed 10:00–11:30 AM.</div>
+          <div class="text-[11px] text-slate-400 mt-1">Today, 08:35 AM</div>
         </div>
       </div>
-      <div class="notif-panel-item">
-        <div class="notif-dot-sm" style="background:var(--amber);"></div>
+
+      <div class="flex gap-2.5 px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
+        <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-amber-500"></div>
         <div>
-          <div class="notif-panel-text"><strong>Near-Max Load — Felicitas Lagman</strong><br>Currently at 27u / 30u max. Only 3 units remaining.</div>
-          <div class="notif-panel-time">Today, 08:00 AM</div>
+          <div class="text-[12.5px] text-slate-600 leading-relaxed"><strong>Near-Max Load — Felicitas Lagman</strong><br>Currently at 27u / 30u max. Only 3 units remaining.</div>
+          <div class="text-[11px] text-slate-400 mt-1">Today, 08:00 AM</div>
         </div>
       </div>
-      <div class="notif-panel-item">
-        <div class="notif-dot-sm" style="background:var(--blue);"></div>
+
+      <div class="flex gap-2.5 px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
+        <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-blue-500"></div>
         <div>
-          <div class="notif-panel-text"><strong>Submission Deadline Reminder</strong><br>Schedule due to Dean Villaceran by Friday, July 25.</div>
-          <div class="notif-panel-time">Yesterday, 9:00 AM</div>
+          <div class="text-[12.5px] text-slate-600 leading-relaxed"><strong>Submission Deadline Reminder</strong><br>Schedule due to Dean Villaceran by Friday, July 25.</div>
+          <div class="text-[11px] text-slate-400 mt-1">Yesterday, 9:00 AM</div>
         </div>
       </div>
-      <div class="notif-panel-item">
-        <div class="notif-dot-sm" style="background:var(--green);"></div>
+
+      <div class="flex gap-2.5 px-4 py-3 hover:bg-slate-50">
+        <div class="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-green-500"></div>
         <div>
-          <div class="notif-panel-text"><strong>System Backup Complete</strong><br>Automatic backup successful at 06:00 AM.</div>
-          <div class="notif-panel-time">Today, 06:00 AM</div>
+          <div class="text-[12.5px] text-slate-600 leading-relaxed"><strong>System Backup Complete</strong><br>Automatic backup successful at 06:00 AM.</div>
+          <div class="text-[11px] text-slate-400 mt-1">Today, 06:00 AM</div>
         </div>
       </div>
     </div>
 
     <!-- ══════════ DASHBOARD PAGE ══════════ -->
-    <div class="page-content" style="animation:fadeIn .3s ease;">
-
+<div class="page-content">
       <!-- Page heading -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-        <div style="flex:1;">
-          <div style="font-size:22px;font-weight:800;">Good morning, Chair Tan</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:3px;">BSIS Department · AY 2025–2026 · 1st Semester</div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex-1">
+          <div class="text-[22px] font-extrabold">Good morning, Chair Tan</div>
+          <div class="text-[13px] text-slate-400 mt-0.5">BSIS Department · AY 2025–2026 · 1st Semester</div>
         </div>
         <span id="dash-status-badge" class="badge badge-red">2 Conflicts</span>
       </div>
 
       <!-- Stat Cards -->
       <div class="stat-grid">
-        <div class="stat-card" style="--accent:#2563eb">
+        <div class="stat-card">
+          <div class="stat-card-bar bg-blue-600"></div>
           <div class="stat-label">Faculty (BSIS)</div>
           <div class="stat-value">4</div>
           <div class="stat-sub">Under your department</div>
         </div>
-        <div class="stat-card" style="--accent:#16a34a">
+        <div class="stat-card">
+          <div class="stat-card-bar bg-green-600"></div>
           <div class="stat-label">Subjects Plotted</div>
           <div class="stat-value">5</div>
           <div class="stat-sub">of 6 total</div>
         </div>
-        <div class="stat-card" style="--accent:#dc2626">
+        <div class="stat-card">
+          <div class="stat-card-bar bg-red-600"></div>
           <div class="stat-label">Conflicts</div>
           <div class="stat-value" id="stat-conflicts">2</div>
           <div class="stat-sub" id="stat-conflicts-sub">Requires resolution</div>
         </div>
-        <div class="stat-card" style="--accent:#0891b2">
+        <div class="stat-card">
+          <div class="stat-card-bar bg-cyan-600"></div>
           <div class="stat-label">Sections</div>
           <div class="stat-value">23</div>
           <div class="stat-sub">All year levels</div>
@@ -109,20 +117,21 @@
       </div>
 
       <!-- Conflict Alert -->
-      <div id="dash-conflict-alert" class="conflict-alert">
-        <div class="conflict-alert-text">
-          <strong>2 Conflicts Detected</strong>
+      <div id="dash-conflict-alert" class="flex items-center gap-4 bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+        <div class="text-[13px] text-red-700 leading-relaxed">
+          <strong class="block text-red-800 font-bold mb-0.5">2 Conflicts Detected</strong>
           Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM. Jerome Bautista: CC 313 & CC 401 room conflict Wed 10:00–11:30 AM. Resolve before submitting to the Dean.
         </div>
-        <a href="{{ route('chair.schedule_plotter') }}" class="topbar-btn btn-danger" style="margin-left:auto;white-space:nowrap;padding:6px 12px;font-size:12px; text-decoration:none;">Fix Now</a>
+        <a href="{{ route('chair.schedule_plotter') }}"
+           class="ml-auto whitespace-nowrap px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-red-100 text-red-600 hover:bg-red-200 no-underline">Fix Now</a>
       </div>
 
       <!-- Success Alert (hidden by default) -->
-      <div id="dash-ok-alert" class="success-alert" style="display:none;">
-        <div class="success-alert-text">
-          <strong>No Conflicts — Schedule is clean!</strong> All faculty schedules are conflict-free. Ready to submit to the Dean.
+      <div id="dash-ok-alert" class="hidden items-center gap-4 bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+        <div class="text-[13px] text-green-700">
+          <strong class="block text-green-800 font-bold mb-0.5">No Conflicts — Schedule is clean!</strong> All faculty schedules are conflict-free. Ready to submit to the Dean.
         </div>
-        <button class="topbar-btn btn-success" style="margin-left:auto;white-space:nowrap;padding:6px 12px;font-size:12px;">Submit</button>
+        <button class="ml-auto whitespace-nowrap px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-green-100 text-green-600 hover:bg-green-200">Submit</button>
       </div>
 
       <!-- Faculty Load + Workload Distribution -->
@@ -141,25 +150,25 @@
             <tbody>
               <tr>
                 <td><b>Jerome Bautista</b></td>
-                <td><span style="font-family:var(--mono);font-weight:700;color:var(--green)">24u</span></td>
+                <td><span class="font-mono font-bold text-green-600">24u</span></td>
                 <td><span class="badge badge-green">6u left</span></td>
                 <td><span class="badge badge-green">OK</span></td>
               </tr>
               <tr>
                 <td><b>Felicitas Lagman</b></td>
-                <td><span style="font-family:var(--mono);font-weight:700;color:var(--amber)">27u</span></td>
+                <td><span class="font-mono font-bold text-amber-600">27u</span></td>
                 <td><span class="badge badge-amber">3u left</span></td>
                 <td><span class="badge badge-amber">Near Max</span></td>
               </tr>
               <tr>
                 <td><b>Maria Santos</b></td>
-                <td><span style="font-family:var(--mono);font-weight:700;color:var(--blue)">18u</span></td>
+                <td><span class="font-mono font-bold text-blue-600">18u</span></td>
                 <td><span class="badge badge-blue">12u left</span></td>
                 <td><span class="badge badge-blue">Available</span></td>
               </tr>
               <tr>
                 <td><b>Ana Reyes</b></td>
-                <td><span style="font-family:var(--mono);font-weight:700;color:var(--teal)">18u</span></td>
+                <td><span class="font-mono font-bold text-cyan-600">18u</span></td>
                 <td><span class="badge badge-grey">Part-time</span></td>
                 <td><span class="badge badge-teal">Part-time</span></td>
               </tr>
@@ -177,34 +186,34 @@
           <div class="workload-item">
             <div class="workload-header">
               <div class="workload-name">Jerome Bautista</div>
-              <div class="workload-val" style="color:var(--green)">24/30u</div>
+              <div class="workload-val text-green-600">24/30u</div>
             </div>
-            <div class="workload-bar"><div class="workload-fill" style="width:80%;background:var(--green)"></div></div>
-            <div style="font-size:11px;color:var(--green);margin-top:3px;">6 units remaining</div>
+            <div class="workload-bar"><div class="workload-fill bg-green-600" style="width:80%"></div></div>
+            <div class="text-[11px] text-green-600 mt-1">6 units remaining</div>
           </div>
           <div class="workload-item">
             <div class="workload-header">
               <div class="workload-name">Felicitas Lagman</div>
-              <div class="workload-val" style="color:var(--amber)">27/30u</div>
+              <div class="workload-val text-amber-600">27/30u</div>
             </div>
-            <div class="workload-bar"><div class="workload-fill" style="width:90%;background:var(--amber)"></div></div>
-            <div style="font-size:11px;color:var(--amber);margin-top:3px;">3 units remaining — near maximum</div>
+            <div class="workload-bar"><div class="workload-fill bg-amber-600" style="width:90%"></div></div>
+            <div class="text-[11px] text-amber-600 mt-1">3 units remaining — near maximum</div>
           </div>
           <div class="workload-item">
             <div class="workload-header">
               <div class="workload-name">Maria Santos</div>
-              <div class="workload-val" style="color:var(--blue)">18/30u</div>
+              <div class="workload-val text-blue-600">18/30u</div>
             </div>
-            <div class="workload-bar"><div class="workload-fill" style="width:60%;background:var(--blue)"></div></div>
-            <div style="font-size:11px;color:var(--blue);margin-top:3px;">12 units remaining</div>
+            <div class="workload-bar"><div class="workload-fill bg-blue-600" style="width:60%"></div></div>
+            <div class="text-[11px] text-blue-600 mt-1">12 units remaining</div>
           </div>
           <div class="workload-item">
             <div class="workload-header">
               <div class="workload-name">Ana Reyes (Part-time)</div>
-              <div class="workload-val" style="color:var(--teal)">18/30u</div>
+              <div class="workload-val text-cyan-600">18/30u</div>
             </div>
-            <div class="workload-bar"><div class="workload-fill" style="width:60%;background:var(--teal)"></div></div>
-            <div style="font-size:11px;color:var(--text3);margin-top:3px;">Part-time — verify additional load with Dean</div>
+            <div class="workload-bar"><div class="workload-fill bg-cyan-600" style="width:60%"></div></div>
+            <div class="text-[11px] text-slate-400 mt-1">Part-time — verify additional load with Dean</div>
           </div>
         </div>
       </div>
@@ -212,8 +221,8 @@
     </div>
     <!-- ══ END DASHBOARD ══ -->
 
-  </div><!-- end main -->
-</div><!-- end app-wrapper -->
+  </div><!-- end app-main -->
+</div><!-- end app-shell -->
 
 <!-- TOAST -->
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
@@ -227,26 +236,25 @@ function setActiveNav(el) {
 
 /* ── NOTIFICATION PANEL ── */
 function toggleNotifPanel() {
-  document.getElementById('notif-panel').classList.toggle('open');
+  document.getElementById('notif-panel').classList.toggle('hidden');
 }
 document.addEventListener('click', function(e) {
   const panel = document.getElementById('notif-panel');
   const btn   = document.getElementById('notif-btn');
   if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
-    panel.classList.remove('open');
+    panel.classList.add('hidden');
   }
 });
 
 /* ── RESOLVE CONFLICTS (demo) ── */
 function resolveConflicts() {
-  document.getElementById('dash-conflict-alert').style.display = 'none';
-  document.getElementById('dash-ok-alert').style.display = 'flex';
+  document.getElementById('dash-conflict-alert').classList.add('hidden');
+  document.getElementById('dash-ok-alert').classList.remove('hidden');
+  document.getElementById('dash-ok-alert').classList.add('flex');
   document.getElementById('dash-status-badge').textContent = 'All Clear';
   document.getElementById('dash-status-badge').className = 'badge badge-green';
   document.getElementById('stat-conflicts').textContent = '0';
   document.getElementById('stat-conflicts-sub').textContent = 'All clear';
-  document.getElementById('conflict-badge').textContent = '0';
-  document.getElementById('conflict-badge').style.background = 'var(--green)';
   document.getElementById('notif-dot').style.display = 'none';
   document.getElementById('notif-count-badge').textContent = '0 new';
   document.getElementById('notif-count-badge').className = 'badge badge-grey';

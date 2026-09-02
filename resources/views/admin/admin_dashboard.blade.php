@@ -1,559 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL — Admin Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/admin/admin_dashboard.css') }}">
-    <style>
-    </style>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
-<body>
+<body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
-    <div class="app-wrapper">
+{{-- ══ APP WRAPPER ══ --}}
+<div class="app-shell">
 
-        @include('partials.admin_sidebar')
+    {{-- ══ SIDEBAR ══ --}}
+    @include('partials.admin_sidebar')
 
-        <div class="main">
+    {{-- ══ MAIN ══ --}}
+    <div class="app-main">
 
-            <!-- TOPBAR -->
-            <div class="topbar">
-                <div class="topbar-title">Technical Admin Dashboard</div>
-                <div class="notif-wrap">
-                    <button class="btn-notif" type="button">
-                        Notifications <span class="notif-badge" id="notif-count">{{ $notifCount }}</span>
-                    </button>
+        {{-- ══ TOPBAR ══ --}}
+        <div class="topbar">
+            <div class="topbar-title">Technical Admin Dashboard</div>
+            <div class="relative">
+                <button type="button"
+                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
+                    Notifications
+                    <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {{ $notifCount }}
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        {{-- ══ PAGE CONTENT ══ --}}
+        <div class="page-content">
+
+            {{-- ══ QUOTE BANNER ══ --}}
+            <div class="quote-banner">
+                <div class="quote-banner-grid"></div>
+                <div class="relative z-10 flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <div class="text-[11px] font-bold uppercase tracking-[1.5px] text-white/40 mb-1.5">
+                            Welcome back, Tech Admin
+                        </div>
+                        <div id="quote-text" class="text-[22px] leading-snug font-bold text-white mb-2.5 italic">
+                            "Education is the most powerful weapon which you can use to change the world."
+                        </div>
+                        <div id="quote-author" class="text-[12px] font-semibold text-white/40">
+                            — Nelson Mandela
+                        </div>
+                        <div class="flex items-center gap-2 mt-3">
+                            <button type="button" id="quote-prev"
+                                class="w-7 h-7 rounded-full bg-white/10 border-none text-white text-[13px] cursor-pointer flex items-center justify-center hover:bg-white/20 transition">‹</button>
+                            <div class="flex gap-2" id="quote-dots"></div>
+                            <button type="button" id="quote-next"
+                                class="w-7 h-7 rounded-full bg-white/10 border-none text-white text-[13px] cursor-pointer flex items-center justify-center hover:bg-white/20 transition">›</button>
+                        </div>
+                    </div>
+                    <div class="text-right flex-shrink-0">
+                        <div class="text-[44px] opacity-[.12] leading-none mb-2.5">"</div>
+                        <div class="text-[11px] text-white/30">AY 2025–2026 · 1st Sem</div>
+                        <div class="text-[11px] text-white/30 mt-1">Last backup</div>
+                        <div class="text-[12px] font-bold text-emerald-400">Today 06:00 AM ✓</div>
+                    </div>
                 </div>
             </div>
-            <!-- END TOPBAR -->
 
-            <!-- PAGE CONTENT -->
-            <div class="page-content">
-
-                <!-- WELCOME BANNER -->
-                <div class="quote-banner">
-                    <div class="quote-banner-grid"></div>
-                    <div class="position-relative" style="z-index:1;">
-                        <div class="d-flex align-items-start justify-content-between gap-4">
-                            <div class="flex-grow-1">
-                                <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">
-                                    Welcome back, Tech Admin
-                                </div>
-                                <div id="quote-text" style="font-size:22px;line-height:1.3;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;">
-                                    "Education is the most powerful weapon which you can use to change the world."
-                                </div>
-                                <div id="quote-author" style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;">
-                                    — Nelson Mandela
-                                </div>
-                                <div class="d-flex align-items-center gap-2 mt-3">
-                                    <button type="button" id="quote-prev"
-                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">‹</button>
-                                    <div class="d-flex gap-2" id="quote-dots"></div>
-                                    <button type="button" id="quote-next"
-                                        style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;cursor:pointer;">›</button>
-                                </div>
-                            </div>
-                            <div class="text-end flex-shrink-0">
-                                <div style="font-size:44px;opacity:.12;line-height:1;margin-bottom:10px;">"</div>
-                                <div style="font-size:11px;color:rgba(255,255,255,.3);">AY 2025–2026 · 1st Sem</div>
-                                <div style="font-size:11px;color:rgba(255,255,255,.3);margin-top:4px;">Last backup</div>
-                                <div style="font-size:12px;font-weight:700;color:#4ade80;">Today 06:00 AM ✓</div>
-                            </div>
-                        </div>
-                    </div>
+            {{-- ══ STAT CARDS ROW 1 ══ --}}
+            <div class="grid grid-cols-4 gap-3 mb-3">
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-blue-600"></div>
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-label">Total Users</div>
+                    <div class="stat-value">{{ $totalUsers }}</div>
+                    <div class="stat-sub">4 roles registered</div>
                 </div>
-
-                <!-- STAT CARDS ROW 1 -->
-                <div class="row g-3 mb-3">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#2563eb">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-label">Total Users</div>
-                            <div class="stat-value">{{ $totalUsers }}</div>
-                            <div class="stat-sub">4 roles registered</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#16a34a">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-label">System Status</div>
-                            <div class="stat-value" style="font-size:20px;">{{ $dbStatus }}</div>
-                            <div class="stat-sub">Vercel · Supabase active</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#d97706">
-                            <div class="stat-icon">👨‍🏫</div>
-                            <div class="stat-label">Total Faculty</div>
-                            <div class="stat-value">{{ $totalFaculty }}</div>
-                            <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#0891b2">
-                            <div class="stat-icon">🗄️</div>
-                            <div class="stat-label">DB Records</div>
-                            <div class="stat-value">{{ $dbRecords }}</div>
-                            <div class="stat-sub">Supabase PostgreSQL</div>
-                        </div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-green-600"></div>
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-label">System Status</div>
+                    <div class="text-[20px] font-extrabold text-slate-900 leading-none mb-1">{{ $dbStatus }}</div>
+                    <div class="stat-sub">Vercel · Supabase active</div>
                 </div>
-
-                <!-- STAT CARDS ROW 2 -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#7c3aed">
-                            <div class="stat-icon">🏫</div>
-                            <div class="stat-label">Total Sections</div>
-                            <div class="stat-value">{{ $totalSections }}</div>
-                            <div class="stat-sub">Across 3 programs</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#16a34a">
-                            <div class="stat-icon">📚</div>
-                            <div class="stat-label">Subjects Offered</div>
-                            <div class="stat-value">{{ $subjectsOffered }}</div>
-                            <div class="stat-sub">This semester</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#dc2626">
-                            <div class="stat-icon">⚡</div>
-                            <div class="stat-label">Schedule Conflicts</div>
-                            <div class="stat-value">{{ $scheduleConflicts }}</div>
-                            <div class="stat-sub">Needs resolution</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="stat-card" style="--accent:#0891b2">
-                            <div class="stat-icon">🚪</div>
-                            <div class="stat-label">Rooms Available</div>
-                            <div class="stat-value">{{ $roomsAvailable }}</div>
-                            <div class="stat-sub">{{ $roomsOccupied }} currently occupied</div>
-                        </div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-amber-500"></div>
+                    <div class="stat-icon">👨‍🏫</div>
+                    <div class="stat-label">Total Faculty</div>
+                    <div class="stat-value">{{ $totalFaculty }}</div>
+                    <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
                 </div>
-
-                <!-- USER ACCOUNTS + SYSTEM INFO -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-8">
-                        <div class="dash-card h-100">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
-                                <div>
-                                    <div class="card-title">User Accounts</div>
-                                    <div class="card-sub">All registered system users</div>
-                                </div>
-                                <span class="badge badge-blue">{{ $totalUsers }} Total</span>
-                            </div>
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Role</th>
-                                            <th>Status</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @php
-                                            $roleLabels = [
-                                                'faculty' => ['Faculty', 'badge-grey'],
-                                                'department_chair' => ['Dept. Chair', 'badge-amber'],
-                                                'dean' => ['Dean', 'badge-blue'],
-                                                'system_admin' => ['System Admin', 'badge-navy'],
-                                            ];
-                                        @endphp
-                                        @forelse($users as $user)
-                                            @php
-                                                [$roleLabel, $roleBadge] = $roleLabels[$user->usr_role] ?? [
-                                                    ucfirst($user->usr_role),
-                                                    'badge-grey',
-                                                ];
-                                            @endphp
-                                            <tr>
-                                                <td><b>{{ $user->usr_name }}</b></td>
-                                                <td><span
-                                                        class="badge {{ $roleBadge }}">{{ $roleLabel }}</span>
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
-                                                        {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <a href="{{ route('admin.users') }}"
-                                                        class="topbar-btn btn-secondary-custom"
-                                                        style="padding:4px 10px;font-size:11px;text-decoration:none;">
-                                                        Edit
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="4"
-                                                    style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">
-                                                    No user accounts found yet.
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 d-flex flex-column gap-3">
-                        <div class="dash-card">
-                            <div class="card-title mb-3">System Info</div>
-                            <div style="font-size:12px;color:var(--text2);line-height:1.8;">
-                                <div>🌐 <b>Host:</b> Vercel (Production)</div>
-                                <div>🗄️ <b>DB:</b> Supabase PostgreSQL</div>
-                                <div>🔐 <b>Auth:</b> JWT + Laravel</div>
-                                <div>📱 <b>Mobile:</b> React Native</div>
-                                <div>🎨 <b>Web UI:</b> Bootstrap 5</div>
-                                <div class="mt-2 pt-2" style="border-top:1px solid var(--border);">
-                                    <div style="font-size:11px;color:var(--text3);">Last backup</div>
-                                    <div style="font-weight:700;color:var(--green);">Today, 06:00 AM ✓</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="dash-card flex-grow-1">
-                            <div class="card-title mb-3">Role Distribution</div>
-                            @php
-                                $pct = fn($count) => $totalUsers > 0 ? round(($count / $totalUsers) * 100) : 0;
-                            @endphp
-                            <div class="workload-item">
-                                <div class="workload-header">
-                                    <div class="workload-name">Faculty Members</div>
-                                    <div class="workload-val" style="color:var(--blue)">{{ $roleCounts['faculty'] }}
-                                    </div>
-                                </div>
-                                <div class="workload-bar">
-                                    <div class="workload-fill"
-                                        style="width:{{ $pct($roleCounts['faculty']) }}%;background:var(--blue)">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="workload-item">
-                                <div class="workload-header">
-                                    <div class="workload-name">Dept. Chairs</div>
-                                    <div class="workload-val" style="color:var(--amber)">
-                                        {{ $roleCounts['department_chair'] }}</div>
-                                </div>
-                                <div class="workload-bar">
-                                    <div class="workload-fill"
-                                        style="width:{{ $pct($roleCounts['department_chair']) }}%;background:var(--amber)">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="workload-item">
-                                <div class="workload-header">
-                                    <div class="workload-name">Dean</div>
-                                    <div class="workload-val" style="color:var(--teal)">{{ $roleCounts['dean'] }}
-                                    </div>
-                                </div>
-                                <div class="workload-bar">
-                                    <div class="workload-fill"
-                                        style="width:{{ $pct($roleCounts['dean']) }}%;background:var(--teal)"></div>
-                                </div>
-                            </div>
-                            <div class="workload-item">
-                                <div class="workload-header">
-                                    <div class="workload-name">Tech Admin</div>
-                                    <div class="workload-val" style="color:var(--navy)">
-                                        {{ $roleCounts['system_admin'] }}</div>
-                                </div>
-                                <div class="workload-bar">
-                                    <div class="workload-fill"
-                                        style="width:{{ $pct($roleCounts['system_admin']) }}%;background:var(--navy)">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-cyan-600"></div>
+                    <div class="stat-icon">🗄️</div>
+                    <div class="stat-label">DB Records</div>
+                    <div class="stat-value">{{ $dbRecords }}</div>
+                    <div class="stat-sub">Supabase PostgreSQL</div>
                 </div>
+            </div>
 
-                <!-- SECTIONS + SCHEDULE COMPLETION -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-8">
-                        <div class="dash-card">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
-                                <div>
-                                    <div class="card-title">Current Sections</div>
-                                    <div class="card-sub">
-                                        AY {{ $academicYear->ay_year_label ?? 'N/A' }} ·
-                                        {{ $semester->sem_name ?? 'N/A' }}
-                                    </div>
-                                </div>
-                                <span class="badge badge-blue">{{ $section->count() }} Total</span>
-                            </div>
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Section</th>
-                                            <th>Program</th>
-                                            <th>Year</th>
-                                            <th>Students</th>
-                                            <th>Subjects</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse($subject as $subjects)
-                                            <tr>
-                                                <td><span
-                                                        style="font-family:var(--mono);font-size:12px;">{{ $subjects->subj_code }}</span>
-                                                </td>
-                                                <td><b>{{ $subjects->subj_name }}</b></td>
-                                                <td>{{ $subjects->subj_lecture_hours + $subjects->subj_lab_hours }}
-                                                </td>
-                                                <td>{{ $subjects->program->prog_name ?? 'N/A' }}</td>
-                                                <td><span style="color:var(--red);">Unassigned</span></td>
-                                                <td>
-                                                    <span
-                                                        class="badge {{ $subjects->subj_is_active ? 'badge-green' : 'badge-red' }}">
-                                                        {{ $subjects->subj_is_active ? 'Active' : 'Inactive' }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" style="text-align:center;">No subjects found.</td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-lg-4">
-                        <div class="dash-card h-100">
-                            <div class="card-title mb-1">Schedule Completion</div>
-                            <div class="card-sub mb-3">By program</div>
-
-                            @foreach ($program as $programs)
-                                <div class="workload-item">
-                                    <div class="workload-header">
-                                        <div class="workload-name">{{ $programs['name'] }}</div>
-                                        <div class="workload-val" style="color:var(--{{ $programs['color'] }})">
-                                            {{ $programs['percent'] }}%</div>
-                                    </div>
-                                    <div class="workload-bar">
-                                        <div class="workload-fill"
-                                            style="width:{{ $programs['percent'] }}%;background:var(--{{ $programs['color'] }})">
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-
-                            <div class="mt-3 pt-3" style="border-top:1px solid var(--border);">
-                                <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;">
-                                    Sections Summary</div>
-                                <div class="d-flex gap-2">
-                                    <div class="flex-fill text-center p-2 rounded-3"
-                                        style="background:var(--green-light);">
-                                        <div style="font-size:20px;font-weight:800;color:var(--green);">
-                                            {{ $scheduledCount }}</div>
-                                        <div style="font-size:10px;color:var(--green);font-weight:600;">Fully Scheduled
-                                        </div>
-                                    </div>
-                                    <div class="flex-fill text-center p-2 rounded-3"
-                                        style="background:var(--amber-light);">
-                                        <div style="font-size:20px;font-weight:800;color:var(--amber);">
-                                            {{ $inProgressCount }}</div>
-                                        <div style="font-size:10px;color:var(--amber);font-weight:600;">In Progress
-                                        </div>
-                                    </div>
-                                    <div class="flex-fill text-center p-2 rounded-3"
-                                        style="background:var(--red-light);">
-                                        <div style="font-size:20px;font-weight:800;color:var(--red);">
-                                            {{ $unscheduledCount }}</div>
-                                        <div style="font-size:10px;color:var(--red);font-weight:600;">Unscheduled</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            {{-- ══ STAT CARDS ROW 2 ══ --}}
+            <div class="grid grid-cols-4 gap-3 mb-4">
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-violet-600"></div>
+                    <div class="stat-icon">🏫</div>
+                    <div class="stat-label">Total Sections</div>
+                    <div class="stat-value">{{ $totalSections }}</div>
+                    <div class="stat-sub">Across 3 programs</div>
                 </div>
-
-                <!-- SUBJECTS + ROOM UTILIZATION -->
-                <div class="row g-3 mb-4">
-                    <div class="col-lg-8">
-                        <div class="dash-card">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
-                                <div>
-                                    <div class="card-title">Subjects Offered</div>
-                                    <div class="card-sub">Current semester — all programs</div>
-                                </div>
-                                <span class="badge badge-blue">{{ $subject->count() }} Subjects</span>
-                            </div>
-                            <div class="table-wrap">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Code</th>
-                                            <th>Subject</th>
-                                            <th>Units</th>
-                                            <th>Program</th>
-                                            <th>Assigned Faculty</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @forelse($subject as $subjects)
-                                            <tr>
-                                                <td><span
-                                                        style="font-family:var(--mono);font-size:12px;">{{ $subjects->code }}</span>
-                                                </td>
-                                                <td><b>{{ $subjects->title }}</b></td>
-                                                <td>{{ $subjects->units }}</td>
-                                                <td>{{ $subjects->program }}</td>
-                                                <td>
-                                                    @if ($subjects->faculty_name)
-                                                        {{ $subjects->faculty_name }}
-                                                    @else
-                                                        <span style="color:var(--red);">Unassigned</span>
-                                                    @endif
-                                                </td>
-                                                <td>
-                                                    <span
-                                                        class="badge badge-{{ match ($subjects->status) {
-                                                            'Active' => 'green',
-                                                            'Conflict' => 'amber',
-                                                            'No Faculty' => 'red',
-                                                            default => 'grey',
-                                                        } }}">
-                                                        {{ $subjects->status }}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" style="text-align:center;">No subjects found.</td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- room for odc -->
-                    <div class="col-lg-4">
-                        <div class="dash-card h-100">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <div>
-                                    <div class="card-title">Room Utilization</div>
-                                    <div class="card-sub">This week</div>
-                                </div>
-                            </div>
-
-                            <div id="room-util-track" style="overflow:hidden;position:relative;margin-top:8px;">
-                                <div id="room-util-list"
-                                    style="display:flex;flex-direction:column;transition:transform 0.4s ease;">
-                                    @foreach ($room as $rooms)
-                                        <div class="workload-item">
-                                            <div class="workload-header">
-                                                <div class="workload-name">{{ $rooms['name'] }}</div>
-                                                <div class="workload-val" style="color:var(--{{ $rooms['color'] }})">
-                                                    {{ $rooms['count'] }} {{ Str::plural('class', $rooms['count']) }}
-                                                </div>
-                                            </div>
-                                            <div class="workload-bar">
-                                                <div class="workload-fill"
-                                                    style="width:{{ $rooms['percent'] }}%;background:var(--{{ $rooms['color'] }})">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-
-                            <div id="room-util-nav"
-                                style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:10px;">
-                                <button id="room-util-prev" class="btn btn-sm btn-light"
-                                    style="padding:4px 12px;font-size:12px;border:1px solid var(--border);"
-                                    onclick="roomUtilPage(-1)">‹ Prev</button>
-                                <span id="room-util-indicator" style="font-size:12px;color:var(--text3);"></span>
-                                <button id="room-util-next" class="btn btn-sm btn-light"
-                                    style="padding:4px 12px;font-size:12px;border:1px solid var(--border);"
-                                    onclick="roomUtilPage(1)">Next ›</button>
-                            </div>
-
-                            <div class="d-flex justify-content-between mt-3 pt-3"
-                                style="border-top:1px solid var(--border);font-size:12px;">
-                                <div>
-                                    <div style="color:var(--text3);">Total Rooms</div>
-                                    <div style="font-weight:800;font-size:18px;color:var(--text);">{{ $totalRooms }}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style="color:var(--text3);">In Use</div>
-                                    <div style="font-weight:800;font-size:18px;color:var(--blue);">{{ $roomsInUse }}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style="color:var(--text3);">Available</div>
-                                    <div style="font-weight:800;font-size:18px;color:var(--green);">
-                                        {{ $roomsAvailable }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-green-600"></div>
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-label">Subjects Offered</div>
+                    <div class="stat-value">{{ $subjectsOffered }}</div>
+                    <div class="stat-sub">This semester</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-red-600"></div>
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-label">Schedule Conflicts</div>
+                    <div class="stat-value">{{ $scheduleConflicts }}</div>
+                    <div class="stat-sub">Needs resolution</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-bar bg-cyan-600"></div>
+                    <div class="stat-icon">🚪</div>
+                    <div class="stat-label">Rooms Available</div>
+                    <div class="stat-value">{{ $roomsAvailable }}</div>
+                    <div class="stat-sub">{{ $roomsOccupied }} currently occupied</div>
+                </div>
+            </div>
 
-                <!-- RECENT ACTIVITY -->
-                <div class="dash-card mb-4">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
+            {{-- ══ USER ACCOUNTS + SYSTEM INFO ══ --}}
+            <div class="grid grid-cols-12 gap-3 mb-4">
+
+                {{-- User Accounts Table --}}
+                <div class="col-span-8 card">
+                    <div class="card-header">
                         <div>
-                            <div class="card-title">Recent System Activity</div>
-                            <div class="card-sub">Latest actions across all users</div>
+                            <div class="card-title">User Accounts</div>
+                            <div class="card-sub">All registered system users</div>
                         </div>
+                        <span class="badge badge-blue">{{ $totalUsers }} Total</span>
                     </div>
-                    <div class="table-wrap">
-                        <table>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Time</th>
-                                    <th>User</th>
-                                    <th>Action</th>
-                                    <th>Details</th>
+                                    <th>Name</th>
+                                    <th>Role</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($audit_log as $log)
+                                @php
+                                    $roleLabels = [
+                                        'faculty'          => ['Faculty',     'badge-grey'],
+                                        'department_chair' => ['Dept. Chair', 'badge-amber'],
+                                        'dean'             => ['Dean',        'badge-blue'],
+                                        'system_admin'     => ['System Admin','badge-navy'],
+                                    ];
+                                @endphp
+                                @forelse($users as $user)
+                                    @php
+                                        [$roleLabel, $roleBadgeClass] = $roleLabels[$user->usr_role] ?? [ucfirst($user->usr_role), 'badge-grey'];
+                                    @endphp
                                     <tr>
-                                        <td style="font-family:var(--mono);font-size:11px;color:var(--text3);">
-                                            {{ $log->created_at->format('h:i A') }}
-                                        </td>
-                                        <td><b>{{ $log->user_name }}</b></td>
-                                        <td>{{ $log->action }}</td>
-                                        <td>{{ $log->details }}</td>
+                                        <td class="font-semibold">{{ $user->usr_name }}</td>
+                                        <td><span class="badge {{ $roleBadgeClass }}">{{ $roleLabel }}</span></td>
                                         <td>
-                                            <span
-                                                class="badge badge-{{ match ($log->status) {
-                                                    'Success' => 'green',
-                                                    'Info' => 'blue',
-                                                    'Warning' => 'red',
-                                                    default => 'grey',
-                                                } }}">
-                                                {{ $log->status }}
+                                            <span class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
+                                                {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
                                             </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('admin.users') }}"
+                                               class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-semibold no-underline hover:bg-slate-200 transition">
+                                                Edit
+                                            </a>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" style="text-align:center;">No recent activity.</td>
+                                        <td colspan="4" class="text-center py-6 text-slate-400">No user accounts found yet.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -561,99 +190,358 @@
                     </div>
                 </div>
 
-            </div><!-- end page-content -->
-        </div><!-- end main -->
-    </div><!-- end app-wrapper -->
+                {{-- System Info + Role Distribution --}}
+                <div class="col-span-4 flex flex-col gap-3">
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+                    <div class="card">
+                        <div class="card-title mb-3">System Info</div>
+                        <div class="text-[12px] text-slate-500 leading-[1.8]">
+                            <div>🌐 <b class="text-slate-700">Host:</b> Vercel (Production)</div>
+                            <div>🗄️ <b class="text-slate-700">DB:</b> Supabase PostgreSQL</div>
+                            <div>🔐 <b class="text-slate-700">Auth:</b> JWT + Laravel</div>
+                            <div>📱 <b class="text-slate-700">Mobile:</b> React Native</div>
+                            <div>🎨 <b class="text-slate-700">Web UI:</b> Tailwind CSS</div>
+                            <div class="mt-2 pt-2 border-t border-slate-100">
+                                <div class="text-[11px] text-slate-400">Last backup</div>
+                                <div class="font-bold text-green-600">Today, 06:00 AM ✓</div>
+                            </div>
+                        </div>
+                    </div>
 
-        
-        (function() {
-            const perPage = 5;
-            const list = document.getElementById('room-util-list');
-            if (!list) return;
+                    <div class="card flex-1">
+                        <div class="card-title mb-3">Role Distribution</div>
+                        @php $pct = fn($count) => $totalUsers > 0 ? round(($count / $totalUsers) * 100) : 0; @endphp
 
-            const items = Array.from(list.children);
-            const total = items.length;
-            if (total === 0) return;
+                        @foreach([
+                            ['Faculty Members',  'faculty',          'bg-blue-600'],
+                            ['Dept. Chairs',     'department_chair', 'bg-amber-500'],
+                            ['Dean',             'dean',             'bg-cyan-600'],
+                            ['Tech Admin',       'system_admin',     'bg-slate-800'],
+                        ] as [$label, $key, $color])
+                        <div class="workload-item">
+                            <div class="workload-header">
+                                <span class="workload-name">{{ $label }}</span>
+                                <span class="workload-val text-slate-500">{{ $roleCounts[$key] ?? 0 }}</span>
+                            </div>
+                            <div class="workload-bar">
+                                <div class="workload-fill {{ $color }}" style="width:{{ $pct($roleCounts[$key] ?? 0) }}%"></div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
 
-            const pages = Math.ceil(total / perPage);
-            let current = 0;
+            {{-- ══ SECTIONS + SCHEDULE COMPLETION ══ --}}
+            <div class="grid grid-cols-12 gap-3 mb-4">
 
-            function getItemHeight() {
-                // Measure actual rendered height (includes margin) of the first item
-                const first = items[0];
-                const style = window.getComputedStyle(first);
-                const marginBottom = parseFloat(style.marginBottom) || 0;
-                return first.offsetHeight + marginBottom;
-            }
+                <div class="col-span-8 card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Current Sections</div>
+                            <div class="card-sub">
+                                AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
+                            </div>
+                        </div>
+                        <span class="badge badge-blue">{{ $section->count() }} Total</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    @foreach(['Section','Program','Year','Students','Subjects','Status'] as $h)
+                                    <th>{{ $h }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($section as $sec)
+                                <tr>
+                                    <td class="font-semibold">{{ $sec->sec_name }}</td>
+                                    <td>{{ $sec->program->prog_code ?? 'N/A' }}</td>
+                                    <td>{{ $sec->sec_year_level }}</td>
+                                    <td>{{ $sec->sec_no_of_student }}</td>
+                                    <td>—</td>
+                                    <td>
+                                        <span class="badge {{ $sec->sec_status === 'active' ? 'badge-green' : 'badge-amber' }}">
+                                            {{ ucfirst($sec->sec_status) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="6" class="text-center py-6 text-slate-400">No sections found.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-            function render() {
-                const itemHeight = getItemHeight();
-                const track = document.getElementById('room-util-track');
-                track.style.height = (perPage * itemHeight) + 'px';
-                list.style.transform = `translateY(-${current * perPage * itemHeight}px)`;
+                {{-- Schedule Completion --}}
+                <div class="col-span-4 card">
+                    <div class="card-title mb-0.5">Schedule Completion</div>
+                    <div class="card-sub mb-4">By program</div>
 
-                document.getElementById('room-util-indicator').textContent = `Page ${current + 1} of ${pages}`;
-                document.getElementById('room-util-prev').disabled = current === 0;
-                document.getElementById('room-util-next').disabled = current === pages - 1;
-            }
+                    @foreach($program as $programs)
+                    @php
+                        $pcolor = match($programs['color']) {
+                            'blue'  => 'bg-blue-600',
+                            'amber' => 'bg-amber-500',
+                            'teal'  => 'bg-cyan-600',
+                            'red'   => 'bg-red-600',
+                            'green' => 'bg-green-600',
+                            default => 'bg-slate-500',
+                        };
+                        $tcolor = match($programs['color']) {
+                            'blue'  => 'text-blue-600',
+                            'amber' => 'text-amber-500',
+                            'teal'  => 'text-cyan-600',
+                            'red'   => 'text-red-600',
+                            'green' => 'text-green-600',
+                            default => 'text-slate-500',
+                        };
+                    @endphp
+                    <div class="workload-item">
+                        <div class="workload-header">
+                            <span class="workload-name">{{ $programs['name'] }}</span>
+                            <span class="workload-val {{ $tcolor }}">{{ $programs['percent'] }}%</span>
+                        </div>
+                        <div class="workload-bar">
+                            <div class="workload-fill {{ $pcolor }}" style="width:{{ $programs['percent'] }}%"></div>
+                        </div>
+                    </div>
+                    @endforeach
 
-            window.roomUtilPage = function(dir) {
-                const next = current + dir;
-                if (next < 0 || next >= pages) return;
-                current = next;
-                render();
-            };
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <div class="text-[12px] font-bold text-slate-500 mb-2">Sections Summary</div>
+                        <div class="flex gap-2">
+                            <div class="flex-1 text-center p-2 rounded-xl bg-green-50">
+                                <div class="text-[20px] font-extrabold text-green-600">{{ $scheduledCount }}</div>
+                                <div class="text-[10px] font-semibold text-green-600">Fully Scheduled</div>
+                            </div>
+                            <div class="flex-1 text-center p-2 rounded-xl bg-amber-50">
+                                <div class="text-[20px] font-extrabold text-amber-500">{{ $inProgressCount }}</div>
+                                <div class="text-[10px] font-semibold text-amber-500">In Progress</div>
+                            </div>
+                            <div class="flex-1 text-center p-2 rounded-xl bg-red-50">
+                                <div class="text-[20px] font-extrabold text-red-600">{{ $unscheduledCount }}</div>
+                                <div class="text-[10px] font-semibold text-red-600">Unscheduled</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            // Initial render (wait a tick so layout/fonts settle for accurate measurement)
-            requestAnimationFrame(render);
-            window.addEventListener('resize', render);
-        })();
+            {{-- ══ SUBJECTS + ROOM UTILIZATION ══ --}}
+            <div class="grid grid-cols-12 gap-3 mb-4">
 
-        (function () {
-        const quotes = [
-            { text: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
-            { text: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
-            { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" }
-        ];
+                <div class="col-span-8 card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Subjects Offered</div>
+                            <div class="card-sub">Current semester — all programs</div>
+                        </div>
+                        <span class="badge badge-blue">{{ $subject->count() }} Subjects</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    @foreach(['Code','Subject','Units','Program','Assigned Faculty','Status'] as $h)
+                                    <th>{{ $h }}</th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($subject as $subjects)
+                                <tr>
+                                    <td><span class="font-mono text-[12px] text-slate-600">{{ $subjects->subj_code }}</span></td>
+                                    <td class="font-semibold">{{ $subjects->subj_name }}</td>
+                                    <td>{{ $subjects->subj_lecture_hours + $subjects->subj_lab_hours }}</td>
+                                    <td>{{ $subjects->program->prog_name ?? 'N/A' }}</td>
+                                    <td class="text-red-500">Unassigned</td>
+                                    <td>
+                                        <span class="badge {{ $subjects->subj_is_active ? 'badge-green' : 'badge-red' }}">
+                                            {{ $subjects->subj_is_active ? 'Active' : 'Inactive' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr><td colspan="6" class="text-center py-6 text-slate-400">No subjects found.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
 
-        const textEl = document.getElementById('quote-text');
-        const authorEl = document.getElementById('quote-author');
-        const dotsEl = document.getElementById('quote-dots');
-        const prevBtn = document.getElementById('quote-prev');
-        const nextBtn = document.getElementById('quote-next');
+                {{-- Room Utilization --}}
+                <div class="col-span-4 card">
+                    <div class="card-title mb-0.5">Room Utilization</div>
+                    <div class="card-sub mb-3">This week</div>
 
-        if (!textEl || !dotsEl) return;
+                    <div id="room-util-track" class="overflow-hidden relative">
+                        <div id="room-util-list" class="flex flex-col transition-transform duration-400">
+                            @foreach($room as $rooms)
+                            @php
+                                $rc = match($rooms['color']) {
+                                    'blue'  => ['bg-blue-600',  'text-blue-600'],
+                                    'amber' => ['bg-amber-500', 'text-amber-500'],
+                                    'green' => ['bg-green-600', 'text-green-600'],
+                                    'red'   => ['bg-red-600',   'text-red-600'],
+                                    default => ['bg-slate-500', 'text-slate-500'],
+                                };
+                            @endphp
+                            <div class="workload-item">
+                                <div class="workload-header">
+                                    <span class="workload-name">{{ $rooms['name'] }}</span>
+                                    <span class="workload-val {{ $rc[1] }}">
+                                        {{ $rooms['count'] }} {{ Str::plural('class', $rooms['count']) }}
+                                    </span>
+                                </div>
+                                <div class="workload-bar">
+                                    <div class="workload-fill {{ $rc[0] }}" style="width:{{ $rooms['percent'] }}%"></div>
+                                </div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
 
-        let current = 0;
+                    <div class="flex justify-center items-center gap-2.5 mt-2.5">
+                        <button id="room-util-prev"
+                            class="px-3 py-1 text-[12px] border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 transition"
+                            onclick="roomUtilPage(-1)">‹ Prev</button>
+                        <span id="room-util-indicator" class="text-[12px] text-slate-400"></span>
+                        <button id="room-util-next"
+                            class="px-3 py-1 text-[12px] border border-slate-200 rounded-lg bg-slate-50 hover:bg-slate-100 transition"
+                            onclick="roomUtilPage(1)">Next ›</button>
+                    </div>
 
-        function renderDots() {
-            dotsEl.innerHTML = quotes.map((_, i) =>
-                `<span style="width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,${i === current ? '.9' : '.25'});"></span>`
-            ).join('');
-        }
+                    <div class="flex justify-between mt-4 pt-4 border-t border-slate-100 text-[12px]">
+                        <div>
+                            <div class="text-slate-400">Total Rooms</div>
+                            <div class="text-[18px] font-extrabold text-slate-900">{{ $totalRooms }}</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400">In Use</div>
+                            <div class="text-[18px] font-extrabold text-blue-600">{{ $roomsInUse }}</div>
+                        </div>
+                        <div>
+                            <div class="text-slate-400">Available</div>
+                            <div class="text-[18px] font-extrabold text-green-600">{{ $roomsAvailable }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        function renderQuote() {
-            textEl.textContent = `"${quotes[current].text}"`;
-            authorEl.textContent = `— ${quotes[current].author}`;
-            renderDots();
-        }
+            {{-- ══ RECENT ACTIVITY ══ --}}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Recent System Activity</div>
+                        <div class="card-sub">Latest actions across all users</div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                @foreach(['Time','User','Action','Details','Status'] as $h)
+                                <th>{{ $h }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($audit_log as $log)
+                            <tr>
+                                <td class="font-mono text-[11px] text-slate-400">{{ $log->created_at->format('h:i A') }}</td>
+                                <td class="font-semibold">{{ $log->user_name }}</td>
+                                <td>{{ $log->action }}</td>
+                                <td class="text-slate-500">{{ $log->details }}</td>
+                                <td>
+                                    @php
+                                        $logBadgeClass = match($log->status) {
+                                            'Success' => 'badge-green',
+                                            'Info'    => 'badge-blue',
+                                            'Warning' => 'badge-red',
+                                            default   => 'badge-grey',
+                                        };
+                                    @endphp
+                                    <span class="badge {{ $logBadgeClass }}">{{ $log->status }}</span>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr><td colspan="5" class="text-center py-6 text-slate-400">No recent activity.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-        prevBtn.addEventListener('click', function () {
-            current = (current - 1 + quotes.length) % quotes.length;
-            renderQuote();
-        });
+        </div>{{-- end page-content --}}
+    </div>{{-- end app-main --}}
+</div>{{-- end app-shell --}}
 
-        nextBtn.addEventListener('click', function () {
-            current = (current + 1) % quotes.length;
-            renderQuote();
-        });
+<script>
+(function() {
+    const perPage = 5;
+    const list = document.getElementById('room-util-list');
+    if (!list) return;
+    const items = Array.from(list.children);
+    const total = items.length;
+    if (total === 0) return;
+    const pages = Math.ceil(total / perPage);
+    let current = 0;
+    function getItemHeight() {
+        const first = items[0];
+        const style = window.getComputedStyle(first);
+        return first.offsetHeight + (parseFloat(style.marginBottom) || 0);
+    }
+    function render() {
+        const itemHeight = getItemHeight();
+        const track = document.getElementById('room-util-track');
+        track.style.height = (perPage * itemHeight) + 'px';
+        list.style.transform = `translateY(-${current * perPage * itemHeight}px)`;
+        document.getElementById('room-util-indicator').textContent = `Page ${current + 1} of ${pages}`;
+        document.getElementById('room-util-prev').disabled = current === 0;
+        document.getElementById('room-util-next').disabled = current === pages - 1;
+    }
+    window.roomUtilPage = function(dir) {
+        const next = current + dir;
+        if (next < 0 || next >= pages) return;
+        current = next;
+        render();
+    };
+    requestAnimationFrame(render);
+    window.addEventListener('resize', render);
+})();
 
-        renderQuote();
-    })();
-    </script>
+(function() {
+    const quotes = [
+        { text: "Education is the most powerful weapon which you can use to change the world.", author: "Nelson Mandela" },
+        { text: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
+        { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" }
+    ];
+    const textEl   = document.getElementById('quote-text');
+    const authorEl = document.getElementById('quote-author');
+    const dotsEl   = document.getElementById('quote-dots');
+    const prevBtn  = document.getElementById('quote-prev');
+    const nextBtn  = document.getElementById('quote-next');
+    if (!textEl || !dotsEl) return;
+    let current = 0;
+    function renderDots() {
+        dotsEl.innerHTML = quotes.map((_, i) =>
+            `<span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:rgba(255,255,255,${i === current ? '.9' : '.25'});"></span>`
+        ).join('');
+    }
+    function renderQuote() {
+        textEl.textContent = `"${quotes[current].text}"`;
+        authorEl.textContent = `— ${quotes[current].author}`;
+        renderDots();
+    }
+    prevBtn.addEventListener('click', () => { current = (current - 1 + quotes.length) % quotes.length; renderQuote(); });
+    nextBtn.addEventListener('click', () => { current = (current + 1) % quotes.length; renderQuote(); });
+    renderQuote();
+})();
+</script>
+
 </body>
-
 </html>
