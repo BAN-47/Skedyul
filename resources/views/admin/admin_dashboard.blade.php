@@ -19,18 +19,7 @@
     <div class="app-main">
 
         {{-- ══ TOPBAR ══ --}}
-        <div class="topbar">
-            <div class="topbar-title">Technical Admin Dashboard</div>
-            <div class="relative">
-                <button type="button"
-                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
-                    Notifications
-                    <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        {{ $notifCount }}
-                    </span>
-                </button>
-            </div>
-        </div>
+        @include('partials.admin_header', ['title' => 'Technical Admin Dashboard'])
 
         {{-- ══ PAGE CONTENT ══ --}}
         <div class="page-content">

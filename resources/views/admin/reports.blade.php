@@ -13,13 +13,8 @@
     <div class="app-main">
 
         {{-- TOPBAR --}}
-        <div class="topbar">
-            <div class="topbar-title">Schedule Reports</div>
-            <div class="flex gap-2">
-                <button onclick="printReport()" class="btn btn-secondary">🖨 Print</button>
-                <button onclick="exportCSV()" class="btn btn-primary">⬇ Export CSV</button>
-            </div>
-        </div>
+        @include('partials.admin_header', ['title' => 'Technical Admin Reports'])
+
 
         {{-- FLASH --}}
         @if(session("success"))

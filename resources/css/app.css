@@ -1,3 +1,9 @@
+/* ── FONTS ──────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── ICONS ──────────────────────────────────────────────────────────────── */
+@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
+
 @import 'tailwindcss';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -5,16 +11,21 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
-/* ── FONTS ──────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
-
-/* ── ICONS ──────────────────────────────────────────────────────────────── */
-@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
-
 /* ── THEME ──────────────────────────────────────────────────────────────── */
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'DM Mono', ui-monospace, monospace;
+}
+
+:root {
+    --navy: #1a2d5a;
+    --blue: #2563eb;
+    --teal: #0891b2;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --text3: #94a3b8;
+    --border: #e2e8f0;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -109,6 +120,14 @@
         @apply flex items-center justify-between mb-4;
     }
 
+    .topbar-actions {
+        @apply flex items-center gap-3;
+    }
+
+    .row {
+        @apply flex gap-5;
+    }
+
     /* ── TABLE ───────────────────────────────────────────────────────────── */
     /* Standard data table used everywhere */
     .data-table {
@@ -169,6 +188,128 @@
         @apply h-full rounded-full transition-all duration-700;
     }
 
+    .approval-item {
+        @apply flex items-start gap-3.5 py-3.5 border-b border-slate-200;
+    }
+
+    .approval-item:last-child {
+        @apply border-b-0;
+    }
+
+    .approval-avatar {
+        @apply w-10 h-10 rounded-full flex items-center justify-center
+               text-sm font-bold text-white shrink-0;
+    }
+
+    .approval-content {
+        @apply flex-1 min-w-0;
+    }
+
+    .approval-name {
+        @apply text-[13px] font-bold text-slate-900;
+    }
+
+    .approval-detail {
+        @apply text-[12px] text-slate-400 mt-0.5 leading-relaxed;
+    }
+
+    .approval-actions {
+        @apply flex flex-wrap gap-2 mt-2.5;
+    }
+
+    .quick-actions {
+        @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3;
+    }
+
+    .quick-btn {
+        @apply flex items-center justify-center min-h-16 p-3 bg-slate-50
+               border border-slate-200 rounded-xl cursor-pointer text-center
+               no-underline transition hover:border-blue-600 hover:bg-blue-50;
+    }
+
+    .quick-btn-label {
+        @apply text-[13px] font-bold text-slate-800;
+    }
+
+    .row > .card {
+        @apply flex-1;
+    }
+
+    .main {
+        @apply flex flex-col flex-1 overflow-hidden;
+    }
+
+    .screen {
+        @apply hidden w-full h-screen;
+    }
+
+    .screen.active {
+        @apply flex;
+    }
+
+    .page {
+        @apply hidden flex-1 overflow-y-auto p-7;
+    }
+
+    .page.active {
+        @apply block;
+    }
+
+    .three-col {
+        @apply grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5;
+    }
+
+    .field-group {
+        @apply flex flex-col gap-1.5;
+    }
+
+    .modal {
+        @apply bg-white rounded-2xl w-[560px] max-w-full max-h-[90vh]
+               overflow-y-auto shadow-[0_24px_60px_rgba(0,0,0,.2)];
+    }
+
+    .modal-body {
+        @apply p-6;
+    }
+
+    .dept-card {
+        @apply bg-white rounded-2xl border border-slate-200 p-5 cursor-pointer
+               transition-all hover:border-blue-600 hover:-translate-y-0.5
+               hover:shadow-[0_4px_16px_rgba(37,99,235,.1)];
+    }
+
+    .dept-card-header {
+        @apply flex items-start justify-between mb-4;
+    }
+
+    .dept-card-code {
+        @apply text-lg font-extrabold leading-none mb-1;
+    }
+
+    .dept-card-name {
+        @apply text-xs text-slate-400 max-w-40 leading-relaxed;
+    }
+
+    .dept-card-arrow {
+        @apply text-[22px] text-slate-400 font-light leading-none mt-0.5;
+    }
+
+    .dept-info-grid {
+        @apply grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5;
+    }
+
+    .dept-info-cell {
+        @apply bg-slate-50 rounded-xl p-3.5 text-center border border-slate-200;
+    }
+
+    .dept-info-cell-val {
+        @apply text-[22px] font-extrabold text-slate-900;
+    }
+
+    .dept-info-cell-label {
+        @apply text-[11px] text-slate-400 mt-0.5 font-semibold uppercase tracking-wide;
+    }
+
     /* ── BUTTONS ─────────────────────────────────────────────────────────── */
     .btn {
         @apply px-4 py-2 rounded-lg text-[13px] font-semibold
@@ -218,6 +359,60 @@
     .modal-box {
         @apply bg-white rounded-2xl max-w-[92vw] max-h-[88vh]
                overflow-y-auto p-6 shadow-[0_20px_60px_rgba(0,0,0,.25)];
+    }
+
+    .profile-modal-banner {
+        @apply flex items-center gap-3.5 p-3.5 mb-4 rounded-xl
+               bg-gradient-to-r from-slate-900 to-blue-900;
+    }
+
+    .profile-modal-avatar {
+        @apply w-12 h-12 shrink-0 rounded-full flex items-center justify-center
+               text-lg font-extrabold text-white border-2 border-white/20;
+    }
+
+    .profile-modal-name {
+        @apply text-[14px] font-extrabold text-white truncate;
+    }
+
+    .profile-modal-role {
+        @apply text-[11px] text-white/60 mb-1;
+    }
+
+    .profile-modal-status {
+        @apply inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold;
+    }
+
+    .profile-modal-status.is-active {
+        @apply bg-emerald-100 text-emerald-700;
+    }
+
+    .profile-modal-status.is-inactive {
+        @apply bg-amber-100 text-amber-700;
+    }
+
+    .profile-modal-grid {
+        @apply grid grid-cols-2 gap-2;
+    }
+
+    .profile-modal-field {
+        @apply min-w-0 rounded-lg bg-slate-50 p-2.5;
+    }
+
+    .profile-modal-field-wide {
+        @apply col-span-2;
+    }
+
+    .profile-modal-label {
+        @apply mb-1 text-[9px] font-bold uppercase tracking-wide text-slate-400;
+    }
+
+    .profile-modal-value {
+        @apply break-words text-[11px] font-semibold leading-snug text-slate-700;
+    }
+
+    .profile-modal-actions {
+        @apply flex justify-end gap-2 mt-4;
     }
 
     .modal-header {
@@ -405,4 +600,58 @@
     }
 
     .toggle-track.on .toggle-thumb { @apply translate-x-4; }
+}
+@layer base {
+ 
+    table {
+        @apply w-full border-collapse;
+    }
+ 
+    thead th {
+        @apply text-[11px] font-bold uppercase tracking-[.6px] text-slate-400
+               px-3.5 py-2.5 text-left border-b-2 border-slate-200 whitespace-nowrap;
+    }
+ 
+    tbody td {
+        @apply text-[13px] text-slate-900 px-3.5 py-3 border-b border-slate-100;
+    }
+ 
+    tbody tr:hover td {
+        @apply bg-slate-50;
+    }
+}
+:root {
+    --navy: #1a2d5a;
+    --blue: #2563eb;
+    --teal: #0891b2;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --text3: #94a3b8;
+    --border: #e2e8f0;
+ 
+    /* ── NEWLY RESTORED — used throughout departments.blade.php and its JS ── */
+    --grey: #f8fafc;
+    --text: #0f172a;
+    --text2: #475569;
+    --red-light: #fee2e2;
+    --mono: 'DM Mono', ui-monospace, monospace;
+}
+ 
+/* Add these inside your existing @layer components { ... } block */
+@layer components {
+ 
+    /* Alias for .btn — used as "topbar-btn btn-primary" etc. throughout
+       departments.blade.php's static markup */
+    .topbar-btn {
+        @apply px-4 py-2 rounded-lg text-[13px] font-semibold
+               cursor-pointer transition-all border-none;
+    }
+ 
+    /* Alias for .field-input — used on <select> elements in the export/notify modals */
+    .field-select {
+        @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-[13px]
+               focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100
+               transition bg-white;
+    }
 }
