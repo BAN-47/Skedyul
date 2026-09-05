@@ -229,7 +229,7 @@
                 <div class="env-cell"><div class="env-cell-label">Host / Deploy</div><div class="env-cell-val">Vercel (Production)</div></div>
                 <div class="env-cell"><div class="env-cell-label">Database</div><div class="env-cell-val">Supabase PostgreSQL</div></div>
                 <div class="env-cell"><div class="env-cell-label">Authentication</div><div class="env-cell-val">JWT + Laravel Sanctum</div></div>
-                <div class="env-cell"><div class="env-cell-label">Frontend Stack</div><div class="env-cell-val">Bootstrap 5 + Vanilla JS</div></div>
+                <div class="env-cell"><div class="env-cell-label">Frontend Stack</div><div class="env-cell-val">Tailwind CSS 4 + Vanilla JS</div></div>
                 <div class="env-cell"><div class="env-cell-label">Mobile App</div><div class="env-cell-val">React Native</div></div>
                 <div class="env-cell"><div class="env-cell-label">Last Backup</div><div class="env-cell-val" style="color:var(--green);">Today, 06:00 AM</div></div>
                 <div class="env-cell"><div class="env-cell-label">Uptime (30 days)</div><div class="env-cell-val" style="color:var(--green);">99.98%</div></div>

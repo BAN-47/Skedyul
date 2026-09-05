@@ -5,28 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL — Dean Dashboard</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/dean/departments.css') }}">
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body>
 
     <div id="screen-app" class="screen active" style="flex-direction:row;">
 
-        @include('partials.dean_sidebar')
-
         <!-- Main -->
         <div class="main">
-            <div class="topbar">
-                <div class="topbar-title" id="topbar-title">Department Overview</div>
-                <div class="topbar-actions">
-                    <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-                    <button class="topbar-btn btn-secondary"
-                        onclick="showToast('3 pending approvals')">Notifications</button>
-                </div>
-            </div>
+
+        @include('partials.dean_header', ['title' => 'Dean Departments'])
 
             <!-- DEPARTMENTS PAGE -->
             <div id="page-departments" class="page active">
@@ -45,24 +34,6 @@
                                             {{ $d['code'] }}</div>
                                         <div class="dept-card-name">{{ $d['name'] }}</div>
                                     </div><span class="dept-card-arrow">›</span>
-                                </div>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-                                    <div
-                                        style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;">
-                                        <div style="font-size:20px;font-weight:800;">{{ $d['facultyCount'] }}</div>
-                                        <div style="font-size:11px;color:var(--text3)">Faculty</div>
-                                    </div>
-                                    <div
-                                        style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;">
-                                        <div style="font-size:20px;font-weight:800;">{{ $d['sections'] }}</div>
-                                        <div style="font-size:11px;color:var(--text3)">Sections</div>
-                                    </div>
-                                </div>
-                                <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2)">Avg
-                                    Load: {{ $d['avgLoad'] }} / {{ $d['maxLoad'] }} max</div>
-                                <div class="workload-bar">
-                                    <div class="workload-fill"
-                                        style="width:{{ $d['loadPct'] }}%;background:{{ $d['loadColor'] }}"></div>
                                 </div>
                                 <div style="margin-top:12px;display:flex;justify-content:space-between;"><span
                                         class="badge badge-{{ $d['statusBadge'] }}">{{ $d['scheduleStatus'] }}</span>
@@ -223,7 +194,7 @@
                         <strong>1 Conflict Detected:</strong> Carlo Mendoza is scheduled for CC 311 and IT 201 at the
                         same time on Monday 8:30–10:00 AM.
                     </div>
-                    <table>
+                        <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Faculty</th>
@@ -314,6 +285,7 @@
 
             function openModal(id) {
                 document.getElementById(id).classList.add('open');
+                if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
             }
 
             function closeModal(id) {
@@ -526,19 +498,6 @@
       <div style="font-size:22px;font-weight:800;color:${d.color}">${d.code}</div>
       <div style="font-size:14px;color:var(--text3);margin-top:2px;">${d.name}</div>
     </div>
-    <div class="dept-info-grid">
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.facultyCount}</div><div class="dept-info-cell-label">Faculty</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.sections}</div><div class="dept-info-cell-label">Sections</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.avgLoad}</div><div class="dept-info-cell-label">Avg Load</div></div>
-      <div class="dept-info-cell"><div class="dept-info-cell-val">${d.maxLoad}</div><div class="dept-info-cell-label">Max Load</div></div>
-    </div>
-    <div class="card" style="margin-bottom:20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div style="font-size:13px;font-weight:600;color:var(--text2)">Department Load — ${d.avgLoad} / ${d.maxLoad}</div>
-        <div style="display:flex;gap:8px;"><span class="badge badge-${d.statusBadge}">${d.scheduleStatus}</span></div>
-      </div>
-      <div class="workload-bar" style="height:10px;"><div class="workload-fill" style="width:${d.loadPct}%;background:${d.loadColor}"></div></div>
-    </div>
     <div style="margin-bottom:12px;">
       <div style="font-size:16px;font-weight:800;color:var(--text);">Programs</div>
       <div style="font-size:13px;color:var(--text3);margin-top:2px;">Select a program to view its faculty</div>
@@ -595,7 +554,7 @@
     <div class="card">
       <div class="card-header"><div><div class="card-title">Faculty Members</div><div class="card-sub">${p.faculty.length} faculty in this program</div></div></div>
       <div class="table-wrap">
-        <table>
+        <table class="data-table">
           <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
           <tbody>${rows || `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text3);font-size:13px;">No faculty assigned to this program yet.</td></tr>`}</tbody>
         </table>

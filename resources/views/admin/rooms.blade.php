@@ -6,198 +6,229 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>SKEDYUL — Room Management</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/admin/rooms.css') }}">
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
-<div class="screen active" style="display:flex;">
+<div class="app-shell">
   @include('partials.admin_sidebar')
 
-  <!-- MAIN -->
+  <div class="app-main">
+        @include('partials.admin_header', ['title' => 'Technical Admin Rooms'])
 
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Room Management</div>
-      <div id="topbar-notif-bell" style="position:relative;">
-        <button onclick="toggleNotifDropdown()" style="padding:8px 14px;border-radius:8px;background:var(--grey2);border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;">
-          Notifications <span id="notif-count" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">3</span>
-        </button>
-        <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:100;overflow:hidden;">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text);">Notifications</div>
-          <div id="notif-list" style="max-height:320px;overflow-y:auto;"></div>
-          <div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center;">
-            <button onclick="markAllRead()" style="font-size:12px;color:var(--blue);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--font);">Mark all as read</button>
-          </div>
+
+    <div class="page-content" id="page-rooms">
+
+      {{-- STAT CARDS --}}
+      <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="stat-card">
+          <div class="stat-card-bar bg-blue-600"></div>
+          <div class="stat-label">Total Rooms</div>
+          <div class="stat-value" id="stat-total">{{ $rooms->count() }}</div>
+          <div class="stat-sub">Lecture + Lab</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-bar bg-green-600"></div>
+          <div class="stat-label">Available</div>
+          <div class="stat-value" id="stat-available">{{ $rooms->where('room_is_available', true)->count() }}</div>
+          <div class="stat-sub">Ready to assign</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-bar bg-red-600"></div>
+          <div class="stat-label">In Use</div>
+          <div class="stat-value" id="stat-inuse">{{ $rooms->where('room_is_available', false)->count() }}</div>
+          <div class="stat-sub">Currently occupied</div>
+        </div>
+      </div>
+
+      {{-- ROOMS TABLE CARD --}}
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Room Management</div>
+          <button onclick="openModal('modal-add-room')" class="btn btn-primary">+ Add Room</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table" id="rooms-table">
+            <tr>
+              @foreach(['Room','Type','Capacity','Status','Actions'] as $h)
+              <th>{{ $h }}</th>
+              @endforeach
+            </tr>
+            @foreach ($rooms as $room)
+            <tr data-room-id="{{ $room->room_id }}">
+              <td class="cell-name font-semibold">{{ $room->room_name }}</td>
+              <td class="cell-type">{{ $room->room_type }}</td>
+              <td class="cell-capacity">{{ $room->room_capacity }}</td>
+              <td class="cell-status">
+                @if ($room->room_is_available)
+                  <span class="badge badge-green">Available</span>
+                @else
+                  <span class="badge badge-amber">In Use</span>
+                @endif
+              </td>
+              <td>
+                <div class="flex gap-1.5">
+                  <button onclick="openViewRoom('{{ $room->room_id }}')" class="btn btn-secondary text-[11px] px-3 py-1.5">View</button>
+                  <button onclick="openEditRoom('{{ $room->room_id }}')" class="btn btn-secondary text-[11px] px-3 py-1.5">Edit</button>
+                  <button onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>
+                </div>
+              </td>
+            </tr>
+            @endforeach
+          </table>
         </div>
       </div>
     </div>
-
-<div id="page-rooms" class="page active">
-  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-    <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Total Rooms</div><div class="stat-value" id="stat-total">{{ $rooms->count() }}</div><div class="stat-sub">Lecture + Lab</div></div>
-    <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">Available</div><div class="stat-value" id="stat-available">{{ $rooms->where('room_is_available', true)->count() }}</div><div class="stat-sub">Ready to assign</div></div>
-    <div class="stat-card" style="--accent:#dc2626"><div class="stat-label">In Use</div><div class="stat-value" id="stat-inuse">{{ $rooms->where('room_is_available', false)->count() }}</div><div class="stat-sub">Currently occupied</div></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><div class="card-title">Room Management</div><button class="topbar-btn btn-primary" onclick="openModal('modal-add-room')">+ Add Room</button></div>
-    <div class="table-wrap"><table id="rooms-table">
-      <tr><th>Room</th><th>Type</th><th>Capacity</th><th>Status</th><th>Actions</th></tr>
-      @foreach ($rooms as $room)
-      <tr data-room-id="{{ $room->room_id }}">
-        <td class="cell-name"><b>{{ $room->room_name }}</b></td>
-        <td class="cell-type">{{ $room->room_type }}</td>
-        <td class="cell-capacity">{{ $room->room_capacity }}</td>
-        <td class="cell-status">
-          @if ($room->room_is_available)
-            <span class="badge badge-green">Available</span>
-          @else
-            <span class="badge badge-amber">In Use</span>
-          @endif
-        </td>
-        <td style="display:flex;gap:6px;">
-          <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('{{ $room->room_id }}')">View</button>
-          <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('{{ $room->room_id }}')">Edit</button>
-          <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')">Delete</button>
-        </td>
-      </tr>
-      @endforeach
-    </table></div>
   </div>
 </div>
 
-  </div>
-</div>
-
-<!-- ADD ROOM MODAL -->
-
+{{-- ADD ROOM MODAL --}}
 <div class="modal-overlay" id="modal-add-room">
-  <div class="modal" style="width:500px;">
+  <div class="modal-box w-[500px]">
     <div class="modal-header">
       <div class="modal-title">Add New Room</div>
-      <button class="modal-close" onclick="closeModal('modal-add-room')">✕</button>
+      <button onclick="closeModal('modal-add-room')" class="modal-close">✕</button>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Room Name / Number</label><input class="field-input" id="add-room-name" placeholder="e.g. Room 303"></div>
-      <div class="field-group"><label class="field-label">Room Type</label>
-        <select class="field-select" id="add-room-type">
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="field-label">Room Name / Number</label>
+        <input id="add-room-name" placeholder="e.g. Room 303" class="field-input">
+      </div>
+      <div>
+        <label class="field-label">Room Type</label>
+        <select id="add-room-type" class="field-input">
           <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option>
         </select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Capacity</label><input class="field-input" id="add-room-capacity" type="number" min="1" placeholder="e.g. 40"></div>
-      <div class="field-group"><label class="field-label">Building</label><input class="field-input" id="add-room-building" placeholder="e.g. ICT Building"></div>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="field-label">Capacity</label>
+        <input id="add-room-capacity" type="number" min="1" placeholder="e.g. 40" class="field-input">
+      </div>
+      <div>
+        <label class="field-label">Building</label>
+        <input id="add-room-building" placeholder="e.g. ICT Building" class="field-input">
+      </div>
     </div>
-    <div class="field-group" style="margin-bottom:16px;"><label class="field-label">Location / Floor</label><input class="field-input" id="add-room-location" placeholder="e.g. 2nd Floor"></div>
+    <div class="mb-4">
+      <label class="field-label">Location / Floor</label>
+      <input id="add-room-location" placeholder="e.g. 2nd Floor" class="field-input">
+    </div>
     <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-add-room')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="saveAddRoom()">Add Room</button>
+      <button onclick="closeModal('modal-add-room')" class="btn btn-secondary">Cancel</button>
+      <button onclick="saveAddRoom()" class="btn btn-primary">Add Room</button>
     </div>
   </div>
 </div>
 
-<!-- VIEW ROOM MODAL -->
-
+{{-- VIEW ROOM MODAL --}}
 <div class="modal-overlay" id="modal-view-room">
-  <div class="modal" style="width:480px;">
+  <div class="modal-box w-[480px]">
     <div class="modal-header">
       <div class="modal-title">Room Details</div>
-      <button class="modal-close" onclick="closeModal('modal-view-room')">✕</button>
+      <button onclick="closeModal('modal-view-room')" class="modal-close">✕</button>
     </div>
-    <!-- Room Header -->
-    <div style="display:flex;align-items:center;gap:16px;padding:18px;background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:14px;margin-bottom:20px;">
-      <div style="width:56px;height:56px;border-radius:14px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;">🚪</div>
+    <div class="flex items-center gap-4 p-4.5 rounded-2xl mb-5" style="background:linear-gradient(135deg,#0f172a,#1e3a8a);">
+      <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl flex-shrink-0">🚪</div>
       <div>
-        <div id="vr-name" style="font-size:20px;font-weight:800;color:#fff;"></div>
-        <div id="vr-type" style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:2px;"></div>
-        <div id="vr-status-badge" style="margin-top:6px;"></div>
+        <div id="vr-name" class="text-xl font-extrabold text-white"></div>
+        <div id="vr-type" class="text-[13px] text-white/60 mt-0.5"></div>
+        <div id="vr-status-badge" class="mt-1.5"></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Capacity</div>
-        <div id="vr-capacity" style="font-size:22px;font-weight:800;color:var(--text);"></div>
-        <div style="font-size:11px;color:var(--text3);">students</div>
+    <div class="grid grid-cols-2 gap-3 mb-3.5">
+      <div class="bg-slate-50 rounded-lg p-3.5">
+        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Capacity</div>
+        <div id="vr-capacity" class="text-xl font-extrabold text-slate-900"></div>
+        <div class="text-[11px] text-slate-400">students</div>
       </div>
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Building</div>
-        <div id="vr-building" style="font-size:13px;font-weight:600;color:var(--text);">—</div>
+      <div class="bg-slate-50 rounded-lg p-3.5">
+        <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Building</div>
+        <div id="vr-building" class="text-[13px] font-semibold text-slate-900">—</div>
       </div>
     </div>
-    <div style="background:var(--grey);border-radius:10px;padding:14px;margin-bottom:20px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Location / Floor</div>
-      <div id="vr-location" style="font-size:13px;font-weight:600;color:var(--text);">—</div>
+    <div class="bg-slate-50 rounded-lg p-3.5 mb-5">
+      <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Location / Floor</div>
+      <div id="vr-location" class="text-[13px] font-semibold text-slate-900">—</div>
     </div>
     <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-view-room')">Close</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteFromView()">Delete</button>
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-view-room'); openEditRoom(currentRoomId)">Edit Room</button>
+      <button onclick="closeModal('modal-view-room')" class="btn btn-secondary">Close</button>
+      <button onclick="deleteFromView()" class="btn btn-danger">Delete</button>
+      <button onclick="closeModal('modal-view-room'); openEditRoom(currentRoomId)" class="btn btn-primary">Edit Room</button>
     </div>
   </div>
 </div>
 
-<!-- EDIT ROOM MODAL -->
-
+{{-- EDIT ROOM MODAL --}}
 <div class="modal-overlay" id="modal-edit-room">
-  <div class="modal" style="width:500px;">
+  <div class="modal-box w-[500px]">
     <div class="modal-header">
       <div class="modal-title">Edit Room</div>
-      <button class="modal-close" onclick="closeModal('modal-edit-room')">✕</button>
+      <button onclick="closeModal('modal-edit-room')" class="modal-close">✕</button>
     </div>
-    <div style="display:flex;align-items:center;gap:16px;padding:16px;background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:12px;margin-bottom:20px;">
-      <div style="width:50px;height:50px;border-radius:12px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">🚪</div>
-      <div id="edit-room-header" style="font-size:17px;font-weight:800;color:#fff;"></div>
+    <div class="flex items-center gap-4 p-4 rounded-xl mb-5" style="background:linear-gradient(135deg,#0f172a,#1e3a8a);">
+      <div class="w-[50px] h-[50px] rounded-xl bg-blue-600 flex items-center justify-center text-[22px] flex-shrink-0">🚪</div>
+      <div id="edit-room-header" class="text-[17px] font-extrabold text-white"></div>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Room Name / Number</label><input class="field-input" id="edit-room-name" placeholder="e.g. Room 301"></div>
-      <div class="field-group"><label class="field-label">Room Type</label>
-        <select class="field-select" id="edit-room-type">
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="field-label">Room Name / Number</label>
+        <input id="edit-room-name" placeholder="e.g. Room 301" class="field-input">
+      </div>
+      <div>
+        <label class="field-label">Room Type</label>
+        <select id="edit-room-type" class="field-input">
           <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option>
         </select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Capacity</label><input class="field-input" id="edit-room-capacity" type="number" min="1"></div>
-      <div class="field-group"><label class="field-label">Status</label>
-        <select class="field-select" id="edit-room-status">
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="field-label">Capacity</label>
+        <input id="edit-room-capacity" type="number" min="1" class="field-input">
+      </div>
+      <div>
+        <label class="field-label">Status</label>
+        <select id="edit-room-status" class="field-input">
           <option value="1">Available</option><option value="0">In Use</option>
         </select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Building</label><input class="field-input" id="edit-room-building" placeholder="e.g. ICT Building"></div>
-      <div class="field-group"><label class="field-label">Location / Floor</label><input class="field-input" id="edit-room-location" placeholder="e.g. 2nd Floor"></div>
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="field-label">Building</label>
+        <input id="edit-room-building" placeholder="e.g. ICT Building" class="field-input">
+      </div>
+      <div>
+        <label class="field-label">Location / Floor</label>
+        <input id="edit-room-location" placeholder="e.g. 2nd Floor" class="field-input">
+      </div>
     </div>
-    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:4px;">
+    <div class="bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2.5 text-[12px] text-amber-800 mb-1">
       ⚠️ Changes will be reflected immediately in the room directory.
     </div>
     <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-edit-room')">Cancel</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);padding:8px 16px;" onclick="deleteFromEdit()">Delete</button>
-      <button class="topbar-btn btn-primary" onclick="saveEditRoom()">Save Changes</button>
+      <button onclick="closeModal('modal-edit-room')" class="btn btn-secondary">Cancel</button>
+      <button onclick="deleteFromEdit()" class="btn btn-danger">Delete</button>
+      <button onclick="saveEditRoom()" class="btn btn-primary">Save Changes</button>
     </div>
   </div>
 </div>
 
-<!-- ERROR MODAL -->
-
+{{-- ERROR MODAL --}}
 <div class="modal-overlay" id="modal-error">
-  <div class="modal" style="width:400px;">
-    <div style="display:flex;align-items:center;gap:14px;padding:8px 0 16px;">
-      <div style="width:44px;height:44px;border-radius:50%;background:var(--red-light);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">⚠️</div>
-      <div class="modal-title" style="margin:0;">Action Failed</div>
+  <div class="modal-box w-[400px]">
+    <div class="flex items-center gap-3.5 pb-4">
+      <div class="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center text-[22px] flex-shrink-0">⚠️</div>
+      <div class="modal-title">Action Failed</div>
     </div>
-    <div id="error-modal-message" style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:20px;"></div>
+    <div id="error-modal-message" class="text-sm text-slate-600 leading-relaxed mb-5"></div>
     <div class="modal-footer">
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-error')">OK</button>
+      <button onclick="closeModal('modal-error')" class="btn btn-primary">OK</button>
     </div>
   </div>
 </div>
-
-<!-- TOAST -->
 
 <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
 
@@ -205,7 +236,6 @@
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 let currentRoomId = null;
 
-// Room data passed from backend, keyed by room_id, for instant modal fill (no extra fetch)
 const ROOMS_DATA = {
   @foreach ($rooms as $room)
   "{{ $room->room_id }}": {
@@ -218,55 +248,6 @@ const ROOMS_DATA = {
   },
   @endforeach
 };
-
-// ── NOTIFICATION BELL ────────────────────────────────────────────────────────
-const ADMIN_NOTIFS = [
-  { dot:'var(--red)', text:'<b>Conflict Detected</b> — GE002 Room 205 double-booked Wed 1PM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Faculty Overload</b> — Carlo Mendoza at 31h/30h max load.', time:'Today, 08:00 AM', unread:true },
-  { dot:'var(--blue)', text:'<b>New User Pending</b> — Ana Reyes account awaiting verification.', time:'Yesterday, 4:00 PM', unread:true },
-  { dot:'var(--green)', text:'<b>Backup Complete</b> — System backup successful at 06:00 AM.', time:'Today, 06:00 AM', unread:false },
-  { dot:'var(--blue)', text:'<b>User Created</b> — New faculty account created for Liza Cruz.', time:'Yesterday, 7:55 AM', unread:false },
-];
-
-function renderNotifList() {
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = ADMIN_NOTIFS.map((n) => `
-    <div class="notif-drop-item ${n.unread?'unread':''}" onclick="markRead(this)">
-      <div class="notif-drop-dot" style="background:${n.dot};"></div>
-      <div><div class="notif-drop-text">${n.text}</div><div class="notif-drop-time">${n.time}</div></div>
-    </div>`).join('');
-  updateNotifCount();
-}
-
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  const dd = document.getElementById('notif-dropdown');
-  if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
-});
-function markRead(el) {
-  el.classList.remove('unread');
-  updateNotifCount();
-}
-function markAllRead() {
-  document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
-  updateNotifCount();
-}
-function updateNotifCount() {
-  const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-  const badge = document.getElementById('notif-count');
-  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline' : 'none'; }
-}
-renderNotifList();
 
 // ── MODALS ─────────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -344,7 +325,6 @@ async function saveAddRoom() {
 
     const room = data.room;
 
-    // Add to local data store
     ROOMS_DATA[room.room_id] = {
       name: room.room_name,
       type: room.room_type,
@@ -354,20 +334,21 @@ async function saveAddRoom() {
       location: room.room_location
     };
 
-    // Insert new row into table
     const tbody = document.getElementById('rooms-table');
     const tr = document.createElement('tr');
     tr.setAttribute('data-room-id', room.room_id);
     tr.style.opacity = '0';
     tr.innerHTML = `
-      <td class="cell-name"><b>${room.room_name}</b></td>
+      <td class="cell-name font-semibold">${room.room_name}</td>
       <td class="cell-type">${room.room_type}</td>
       <td class="cell-capacity">${room.room_capacity}</td>
       <td class="cell-status"><span class="badge badge-green">Available</span></td>
-      <td style="display:flex;gap:6px;">
-        <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openViewRoom('${room.room_id}')">View</button>
-        <button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditRoom('${room.room_id}')">Edit</button>
-        <button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteRoom('${room.room_id}', '${room.room_name}')">Delete</button>
+      <td>
+        <div class="flex gap-1.5">
+          <button onclick="openViewRoom('${room.room_id}')" class="btn btn-secondary text-[11px] px-3 py-1.5">View</button>
+          <button onclick="openEditRoom('${room.room_id}')" class="btn btn-secondary text-[11px] px-3 py-1.5">Edit</button>
+          <button onclick="deleteRoom('${room.room_id}', '${room.room_name}')" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>
+        </div>
       </td>`;
     tbody.appendChild(tr);
     requestAnimationFrame(() => { tr.style.transition = 'opacity 0.3s'; tr.style.opacity = '1'; });
@@ -397,8 +378,8 @@ function openViewRoom(roomId) {
   document.getElementById('vr-building').textContent = room.building || '—';
   document.getElementById('vr-location').textContent = room.location || '—';
   const status = room.available ? 'Available' : 'In Use';
-  const colors = { 'Available':'badge-green', 'In Use':'badge-amber' };
-  document.getElementById('vr-status-badge').innerHTML = `<span class="badge ${colors[status]}">${status}</span>`;
+  const badgeClass = room.available ? 'badge badge-green' : 'badge badge-amber';
+  document.getElementById('vr-status-badge').innerHTML = `<span class="${badgeClass}">${status}</span>`;
   openModal('modal-view-room');
 }
 
@@ -455,7 +436,6 @@ async function saveEditRoom() {
 
     const room = data.room;
 
-    // Update local data store
     ROOMS_DATA[room.room_id] = {
       name: room.room_name,
       type: room.room_type,
@@ -465,16 +445,14 @@ async function saveEditRoom() {
       location: room.room_location
     };
 
-    // Update the table row in place
     const row = document.querySelector(`tr[data-room-id="${room.room_id}"]`);
     if (row) {
-      row.querySelector('.cell-name').innerHTML = `<b>${room.room_name}</b>`;
+      row.querySelector('.cell-name').textContent = room.room_name;
       row.querySelector('.cell-type').textContent = room.room_type;
       row.querySelector('.cell-capacity').textContent = room.room_capacity;
       row.querySelector('.cell-status').innerHTML = room.room_is_available
         ? `<span class="badge badge-green">Available</span>`
         : `<span class="badge badge-amber">In Use</span>`;
-      // Update delete button's captured name argument
       const deleteBtn = row.querySelector('button[onclick^="deleteRoom("]');
       if (deleteBtn) deleteBtn.setAttribute('onclick', `deleteRoom('${room.room_id}', '${room.room_name}')`);
     }
