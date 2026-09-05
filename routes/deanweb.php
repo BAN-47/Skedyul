@@ -7,6 +7,8 @@ use App\Http\Controllers\Dean\DeanDepartmentController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
 use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
+use App\Http\Controllers\Dean\NotificationController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -75,5 +77,13 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     Route::get('/settings', function () {
         return view('dean.settings');
     })->name('settings');
+
+
+    // Notification Routes
+ 
+Route::get ('/notifications',         [NotificationController::class, 'index'])       ->name('notifications');
+Route::post('/notifications/send',    [NotificationController::class, 'send'])         ->name('notifications.send');
+Route::get ('/notifications/unread',  [NotificationController::class, 'unreadCount'])  ->name('notifications.unread');
+Route::post('/notifications/{id}/read',[NotificationController::class, 'markRead'])   ->name('notifications.read');
 
 });

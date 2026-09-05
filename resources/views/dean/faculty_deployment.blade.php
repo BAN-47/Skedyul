@@ -11,16 +11,8 @@
 
 <div class="app-shell">
 
- @include('partials.dean_sidebar')
-
   <div class="app-main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Faculty Deployment</div>
-      <div class="flex items-center gap-2.5">
-        <button class="btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="btn btn-secondary" onclick="showToast('3 pending approvals')">Notifications</button>
-      </div>
-    </div>
+ @include('partials.dean_header', ['title' => 'Dean Faculty Deployment Overview'])
 
     <div class="page-content">
       <div class="flex items-center justify-between mb-5">

@@ -12,8 +12,6 @@
 
     <div class="app-shell">
 
-        @include('partials.dean_sidebar')
-
         <!-- ══════════ MAIN ══════════ -->
         <div class="app-main">
 
@@ -247,6 +245,7 @@
         function openModal(id) {
             const m = document.getElementById(id);
             if (m) m.classList.add('open');
+            if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
         }
 
         function closeModal(id) {

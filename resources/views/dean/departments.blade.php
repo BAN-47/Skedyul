@@ -12,8 +12,6 @@
 
     <div id="screen-app" class="screen active" style="flex-direction:row;">
 
-        @include('partials.dean_sidebar')
-
         <!-- Main -->
         <div class="main">
 
@@ -287,6 +285,7 @@
 
             function openModal(id) {
                 document.getElementById(id).classList.add('open');
+                if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
             }
 
             function closeModal(id) {

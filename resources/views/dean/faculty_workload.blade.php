@@ -10,16 +10,9 @@
 
 <div class="app-shell">
 
-@include('partials.dean_sidebar')
-
   <div class="app-main">
-    <div class="topbar">
-      <div class="topbar-title">Faculty Workload Overview</div>
-      <div class="flex items-center gap-2.5">
-        <button class="btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="btn btn-secondary" onclick="showToast('3 pending approvals')">Notifications</button>
-      </div>
-    </div>
+
+            @include('partials.dean_header', ['title' => 'Dean Faculty Workload Overview'])
 
     <div class="page-content">
       <div class="flex items-center justify-between mb-5">
@@ -135,7 +128,10 @@
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
+}
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));

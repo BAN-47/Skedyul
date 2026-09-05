@@ -10,7 +10,7 @@
         </div>
         <div class="overflow-hidden">
             <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
-            <div class="sidebar-user-role">Dean</div>
+                <div class="sidebar-user-role">Dean, CCICT</div>
         </div>
     </div>
 
