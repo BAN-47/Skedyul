@@ -15,7 +15,7 @@
 
   <div class="sidebar-nav">
     <div class="nav-section-label">Main</div>
-    <a href="{{ route('faculty.faculty_dashboard') }}" class="nav-item {{ request()->routeIs('faculty.faculty_dashboard') ? 'active' : '' }}">
+    <a href="{{ route('faculty.dashboard') }}" class="nav-item {{ request()->routeIs('faculty.dashboard') ? 'active' : '' }}">
       <span class="nav-icon"></span> My Dashboard
     </a>
     <a href="{{ route('faculty.subjects') }}" class="nav-item {{ request()->routeIs('faculty.subjects') ? 'active' : '' }}">
