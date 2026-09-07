@@ -45,28 +45,28 @@
         [
         'admin.dashboard',
         route('admin.dashboard'),
-        '🏠',
+        '',
         'Dashboard'
         ],
 
         [
         'admin.users',
         route('admin.users'),
-        '👥',
+        '',
         'User Accounts'
         ],
 
         [
         'subject.index',
         route('subject.index'),
-        '📚',
+        '',
         'Subjects'
         ],
 
         [
         'admin.rooms',
         route('admin.rooms'),
-        '🚪',
+        '',
         'Rooms'
         ],
         ];
@@ -75,14 +75,14 @@
         [
         'admin.reports',
         route('admin.reports'),
-        '📊',
+        '',
         'Reports'
         ],
 
         [
         'admin.settings',
         route('admin.settings'),
-        '⚙️',
+        '',
         'Settings'
         ],
         ];

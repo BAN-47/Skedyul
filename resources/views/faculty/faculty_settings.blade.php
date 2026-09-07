@@ -31,7 +31,7 @@
     </div>
   </div>
 
-  <!-- Main -->
+  <!-- Main --> 
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbar-title">Settings</div>

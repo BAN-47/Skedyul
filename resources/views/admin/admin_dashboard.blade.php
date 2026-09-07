@@ -59,28 +59,28 @@
             <div class="grid grid-cols-4 gap-3 mb-3">
                 <div class="stat-card">
                     <div class="stat-card-bar bg-blue-600"></div>
-                    <div class="stat-icon">👥</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Total Users</div>
                     <div class="stat-value">{{ $totalUsers }}</div>
                     <div class="stat-sub">4 roles registered</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-green-600"></div>
-                    <div class="stat-icon">✅</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">System Status</div>
                     <div class="text-[20px] font-extrabold text-slate-900 leading-none mb-1">{{ $dbStatus }}</div>
                     <div class="stat-sub">Vercel · Supabase active</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-amber-500"></div>
-                    <div class="stat-icon">👨‍🏫</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Total Faculty</div>
                     <div class="stat-value">{{ $totalFaculty }}</div>
                     <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-cyan-600"></div>
-                    <div class="stat-icon">🗄️</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">DB Records</div>
                     <div class="stat-value">{{ $dbRecords }}</div>
                     <div class="stat-sub">Supabase PostgreSQL</div>
@@ -91,28 +91,28 @@
             <div class="grid grid-cols-4 gap-3 mb-4">
                 <div class="stat-card">
                     <div class="stat-card-bar bg-violet-600"></div>
-                    <div class="stat-icon">🏫</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Total Sections</div>
                     <div class="stat-value">{{ $totalSections }}</div>
                     <div class="stat-sub">Across 3 programs</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-green-600"></div>
-                    <div class="stat-icon">📚</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Subjects Offered</div>
                     <div class="stat-value">{{ $subjectsOffered }}</div>
                     <div class="stat-sub">This semester</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-red-600"></div>
-                    <div class="stat-icon">⚡</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Schedule Conflicts</div>
                     <div class="stat-value">{{ $scheduleConflicts }}</div>
                     <div class="stat-sub">Needs resolution</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-bar bg-cyan-600"></div>
-                    <div class="stat-icon">🚪</div>
+                    <div class="stat-icon"></div>
                     <div class="stat-label">Rooms Available</div>
                     <div class="stat-value">{{ $roomsAvailable }}</div>
                     <div class="stat-sub">{{ $roomsOccupied }} currently occupied</div>
