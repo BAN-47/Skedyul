@@ -4,41 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>SKEDYUL — Faculty Workload</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/dean/schedule_reports.css') }}">
+<title>SKEDYUL — Schedule Reports</title>
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
 
-<div id="screen-app" class="screen active" style="flex-direction:row;">
+<div id="screen-app" class="screen active flex-row">
 
-  @include('partials.dean_sidebar')
 
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Schedule Reports</div>
-      <div class="topbar-actions">
-        <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="topbar-btn btn-secondary" onclick="showToast('3 pending approvals')">Notifications</button>
-      </div>
-    </div>
+@include('partials.dean_header', ['title' => 'Dean Schedule Reports Overview'])
 
     <div id="page-reports" class="page active">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
-        <div><div style="font-size:20px;font-weight:800;">Schedule Reports</div></div>
+      <div class="mb-5 flex items-center justify-between">
+        <div class="text-xl font-extrabold">Schedule Reports</div>
         <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export All</button>
       </div>
 
-      <div class="tab-bar" id="reports-tabs">
-        <button class="tab-btn active" onclick="switchTab('reports-tabs','tab-by-dept',this)">By Department</button>
-        <button class="tab-btn" onclick="switchTab('reports-tabs','tab-by-faculty',this)">By Faculty</button>
-        <button class="tab-btn" onclick="switchTab('reports-tabs','tab-by-section',this)">By Section</button>
+      <div class="mb-5 flex gap-1 border-b-2 border-slate-200" id="reports-tabs">
+        <button class="border-b-2 border-blue-600 px-4 py-2.5 text-[13px] font-semibold text-blue-600" onclick="switchTab('reports-tabs','tab-by-dept',this)">By Department</button>
+        <button class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600" onclick="switchTab('reports-tabs','tab-by-faculty',this)">By Faculty</button>
+        <button class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600" onclick="switchTab('reports-tabs','tab-by-section',this)">By Section</button>
       </div>
 
-      <div id="tab-by-dept" class="tab-panel active">
-        <div class="card">
+      <div id="tab-by-dept" class="block">
+        <div class="card overflow-x-auto">
           <table>
             <thead><tr><th>Dept</th><th>Section</th><th>Subject</th><th>Faculty</th><th>Day & Time</th></tr></thead>
             <tbody>
@@ -47,8 +37,8 @@
                   <td><span class="badge badge-blue">{{ $sl->section->program->department->dept_code ?? 'N/A' }}</span></td>
                   <td>{{ $sl->section->sec_name ?? 'N/A' }}</td>
                   <td>{{ $sl->subject->subj_code ?? '' }} — {{ $sl->subject->subj_name ?? 'N/A' }}</td>
-                  <td>{{ $sl->faculty->usr_name ?? 'Unassigned' }}</td>
-                  <td>{{ $sl->sl_day }} {{ $sl->sl_time_start }}–{{ $sl->sl_time_end }}</td>
+                  <td>{{ $sl->faculty->user->usr_name ?? $sl->faculty->full_name ?? 'Unassigned' }}</td>
+                  <td>{{ $sl->sch_day }} {{ $sl->sch_start_time }}–{{ $sl->sch_end_time }}</td>
                 </tr>
               @empty
                 <tr><td colspan="5" class="text-center">No schedule data found.</td></tr>
@@ -58,8 +48,8 @@
         </div>
       </div>
 
-      <div id="tab-by-faculty" class="tab-panel">
-        <div class="card">
+      <div id="tab-by-faculty" class="hidden">
+        <div class="card overflow-x-auto">
           <table>
             <thead><tr><th>Faculty</th><th>Subjects</th><th>Load</th></tr></thead>
             <tbody>
@@ -77,8 +67,8 @@
         </div>
       </div>
 
-      <div id="tab-by-section" class="tab-panel">
-        <div class="card">
+      <div id="tab-by-section" class="hidden">
+        <div class="card overflow-x-auto">
           <table>
             <thead><tr><th>Section</th><th>Program</th><th>Year</th></tr></thead>
             <tbody>
@@ -100,8 +90,8 @@
 </div>
 
 <!-- MODAL: EXPORT -->
-<div class="modal-overlay" id="modal-export">
-  <div class="modal" style="width:440px;">
+<div class="modal-overlay p-5" id="modal-export">
+  <div class="modal w-[440px]">
     <div class="modal-header"><div class="modal-title">Export Report</div><button class="modal-close" onclick="closeModal('modal-export')">✕</button></div>
     <div class="modal-body">
       <div class="field-group" style="margin-bottom:14px;">
@@ -132,8 +122,8 @@
 </div>
 
 <!-- MODAL: NOTIFY CHAIRS -->
-<div class="modal-overlay" id="modal-notify">
-  <div class="modal" style="width:520px;">
+<div class="modal-overlay p-5" id="modal-notify">
+  <div class="modal w-[520px]">
     <div class="modal-header">
       <div class="modal-title">Send Notification to Chairs</div>
       <button class="modal-close" onclick="closeModal('modal-notify')">✕</button>
@@ -200,8 +190,8 @@
 </div>
 
 <!-- MODAL: REVIEW (populated dynamically via openReview()) -->
-<div class="modal-overlay" id="modal-review">
-  <div class="modal" style="width:560px;">
+<div class="modal-overlay p-5" id="modal-review">
+  <div class="modal w-[560px]">
     <div class="modal-header"><div class="modal-title" id="review-title">Schedule Review</div><button class="modal-close" onclick="closeModal('modal-review')">✕</button></div>
     <div class="modal-body" id="review-body">
       <!-- filled by openReview() -->
@@ -241,7 +231,7 @@ async function sendNotifToChairs() {
   if (selected.length === 0) { showToast('Please select at least one recipient.'); return; }
 
   try {
-    const res = await fetch('{{ route("dean.notify") }}', {
+    const res = await fetch('{{ route("dean.notifications.send") }}', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,13 +281,17 @@ function showToast(msg) {
 
 function switchTab(barId, panelId, btn) {
   const bar = document.getElementById(barId); if (!bar) return;
-  bar.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  bar.querySelectorAll('button').forEach(b => {
+    b.classList.remove('border-blue-600', 'text-blue-600');
+    b.classList.add('border-transparent', 'text-slate-400');
+  });
+  btn.classList.remove('border-transparent', 'text-slate-400');
+  btn.classList.add('border-blue-600', 'text-blue-600');
   ['tab-by-dept', 'tab-by-faculty', 'tab-by-section'].forEach(p => {
-    const el = document.getElementById(p); if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+    const el = document.getElementById(p); if (el) el.classList.add('hidden');
   });
   const target = document.getElementById(panelId);
-  if (target) { target.style.display = 'block'; target.classList.add('active'); }
+  if (target) target.classList.remove('hidden');
 }
 
 // Replaces hardcoded deptData + openDept()

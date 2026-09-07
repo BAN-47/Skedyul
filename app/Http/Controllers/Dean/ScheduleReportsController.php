@@ -18,7 +18,7 @@ class ScheduleReportsController extends Controller
     {
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $byDepartment = Schedule::with(['section.program.department', 'subject', 'faculty', 'room'])
+        $byDepartment = Schedule::with(['section.program.department', 'subject', 'faculty.user', 'room'])
             ->where('sch_is_active', true)
             ->get();
 

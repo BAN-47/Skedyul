@@ -3,26 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>SKEDYUL — Pending Approvals</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/dean/pending_approvals.css') }}">
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
 
 <div id="screen-app" class="screen active" style="flex-direction:row;">
 
-  @include('partials.dean_sidebar')
 
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Pending Approvals</div>
-      <div class="topbar-actions">
-        <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="topbar-btn btn-secondary" onclick="openModal('modal-notify')">Notify Chairs</button>
-      </div>
-    </div>
+            @include('partials.dean_header', ['title' => 'Dean Pending Approvals Overview'])
+
 
     {{-- ── FLASH ── --}}
     @if(session("success"))
@@ -35,20 +27,20 @@
     <div id="page-approvals" class="page active">
 
       {{-- ── STAT CARDS ── --}}
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;">
-        <div class="stat-card" style="--accent:#d97706;">
+      <div class="mb-5 grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+        <div class="stat-card before:bg-amber-600">
           <div class="stat-icon">⏳</div>
           <div class="stat-label">Pending</div>
           <div class="stat-value">{{ $pendingCount }}</div>
           <div class="stat-sub">Awaiting your review</div>
         </div>
-        <div class="stat-card" style="--accent:#16a34a;">
+        <div class="stat-card before:bg-green-600">
           <div class="stat-icon">✅</div>
           <div class="stat-label">Approved</div>
           <div class="stat-value">{{ $approvedCount }}</div>
           <div class="stat-sub">This semester</div>
         </div>
-        <div class="stat-card" style="--accent:#dc2626;">
+        <div class="stat-card before:bg-red-600">
           <div class="stat-icon">↩️</div>
           <div class="stat-label">Returned</div>
           <div class="stat-value">{{ $returnedCount }}</div>
@@ -56,11 +48,11 @@
         </div>
       </div>
 
-      <div style="margin-bottom:20px;">
-        <div style="font-size:20px;font-weight:800;">Schedule Approvals</div>
+      <div class="mb-5">
+        <div class="text-xl font-extrabold">Schedule Approvals</div>
         @if($semester)
-          <div style="font-size:13px;color:var(--text3);margin-top:2px;">
-            {{ $semester->sem_name }} · AY {{ $semester->academicYear->ay_academic_year ?? '' }}
+          <div class="mt-0.5 text-[13px] text-slate-400">
+            {{ $semester->sem_name }} &middot; AY {{ $semester->academicYear->ay_academic_year ?? '' }}
           </div>
         @endif
       </div>
@@ -95,18 +87,18 @@
                   @if($sub->submittedBy)
                     {{ $sub->submittedBy->usr_name }}
                   @else
-                    <span style="color:var(--text3);">Unknown</span>
+                    <span class="text-slate-400">Unknown</span>
                   @endif
                 </td>
-                <td style="font-size:12px;color:var(--text2);">
+                <td class="text-xs text-slate-600">
                   {{ \Carbon\Carbon::parse($sub->schsub_submitted_at)->format('M d, Y') }}
                 </td>
                 <td>{{ $sub->faculty_count }}</td>
                 <td>
                   @if($sub->conflict_count > 0)
-                    <span style="color:var(--red);font-weight:700;">{{ $sub->conflict_count }}</span>
+                    <span class="font-bold text-red-600">{{ $sub->conflict_count }}</span>
                   @else
-                    <span style="color:var(--green);font-weight:700;">0</span>
+                    <span class="font-bold text-green-600">0</span>
                   @endif
                 </td>
                 <td>
@@ -126,23 +118,23 @@
                 </td>
                 <td>
                   @if($sub->schsub_status === 'pending' || $sub->schsub_status === 'returned')
-                    <button class="topbar-btn btn-secondary"
-                      style="padding:4px 10px;font-size:11px;"
+                    <button class="topbar-btn btn-secondary px-2.5 py-1 text-[11px]"
                       onclick="openReview(
                         '{{ $sub->schsub_id }}',
                         '{{ $sub->department->dept_code ?? "" }}',
-                        {{ $sub->conflict_count }}
+                        {{ $sub->conflict_count }},
+                        '{{ route('dean.pending_approvals.review', $sub->schsub_id) }}'
                       )">
                       Review
                     </button>
                   @else
-                    <span style="font-size:12px;color:var(--text3);">Approved</span>
+                    <span class="text-xs text-slate-400">Approved</span>
                   @endif
                 </td>
               </tr>
               @empty
               <tr>
-                <td colspan="7" style="text-align:center;padding:40px;color:var(--text3);">
+                <td colspan="7" class="p-10 text-center text-slate-400">
                   No schedule submissions found for this semester.
                 </td>
               </tr>
@@ -155,55 +147,7 @@
   </div>
 </div>
 
-{{-- ══════════════════════════════════════════════════════════════
-     MODAL: REVIEW — approve or return
-     ══════════════════════════════════════════════════════════════ --}}
-<div class="modal-overlay" id="modal-review">
-  <div class="modal" style="width:620px;">
-    <div class="modal-header">
-      <div class="modal-title" id="review-modal-title">Schedule Review</div>
-      <button class="modal-close" type="button" onclick="closeModal('modal-review')">✕</button>
-    </div>
-    <div class="modal-body" id="review-modal-body">
-      <div style="text-align:center;padding:40px;color:var(--text3);">Loading schedules…</div>
-    </div>
-
-    {{-- APPROVE FORM --}}
-    <form id="form-approve" method="POST" action="" style="display:none;">
-      @csrf
-      @method('POST')
-      <input type="hidden" name="_action" value="approve">
-      <textarea name="remarks" style="display:none;"></textarea>
-    </form>
-
-    {{-- RETURN FORM --}}
-    <form id="form-return" method="POST" action="">
-      @csrf
-      @method('POST')
-      <div class="modal-body" style="padding-top:0;">
-        <div class="field-group" style="margin-top:12px;">
-          <label class="field-label">Return Note <span style="color:var(--red)">*</span></label>
-          <textarea class="field-input" name="remarks" id="return-note" rows="3"
-            placeholder="Explain what the Chair needs to fix before resubmitting…"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="topbar-btn btn-secondary" type="button" onclick="closeModal('modal-review')">Close</button>
-        <button class="topbar-btn"
-          type="button"
-          id="btn-return"
-          style="background:var(--red-light);color:var(--red);">
-          ↩ Return to Chair
-        </button>
-        <button class="topbar-btn btn-primary"
-          type="button"
-          id="btn-approve">
-          ✓ Approve Schedule
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+<div id="review-modal-container"></div>
 
 {{-- ══════════════════════════════════════════════════════════════
      MODAL: EXPORT
@@ -307,46 +251,45 @@ function showToast(msg) {
 }
 
 // ── REVIEW MODAL ──────────────────────────────────────────────────────────
-let currentSubId = null;
+function openReview(subId, deptCode, conflictCount, reviewUrl) {
+  const container = document.getElementById('review-modal-container');
+  container.innerHTML = '<div class="modal-overlay open p-5"><div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]"><div class="modal-body p-10 text-center text-slate-400">Loading schedules…</div></div></div>';
 
-function openReview(subId, deptCode, conflictCount) {
-  currentSubId = subId;
-  document.getElementById('review-modal-title').textContent = 'Schedule Review — ' + deptCode;
-  document.getElementById('review-modal-body').innerHTML =
-    '<div style="text-align:center;padding:40px;color:var(--text3);">Loading schedules…</div>';
-
-  document.getElementById('form-approve').action = '/dean/pending-approvals/' + subId + '/approve';
-  document.getElementById('form-return').action  = '/dean/pending-approvals/' + subId + '/return';
-
-  document.getElementById('btn-approve').onclick = () => {
-    if (conflictCount > 0) {
-      showToast('❌ Cannot approve — resolve ' + conflictCount + ' conflict(s) first.');
-      return;
-    }
-    if (!confirm('Approve the schedule for ' + deptCode + '?')) return;
-    document.getElementById('form-approve').submit();
-  };
-
-  document.getElementById('btn-return').onclick = () => {
-    const note = document.getElementById('return-note').value.trim();
-    if (!note) { showToast('Please enter a return note before sending.'); return; }
-    if (!confirm('Return schedule to Chair with your note?')) return;
-    document.getElementById('form-return').submit();
-  };
-
-  fetch('/dean/pending-approvals/' + subId + '/review', {
+  fetch(reviewUrl, {
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
   })
-  .then(r => r.text())
+  .then(response => {
+    if (!response.ok) throw new Error('Review request failed.');
+    return response.text();
+  })
   .then(html => {
-    document.getElementById('review-modal-body').innerHTML = html;
+    container.innerHTML = html;
+    const modal = document.getElementById('modal-review');
+    modal.addEventListener('click', event => {
+      if (event.target === modal) closeModal('modal-review');
+    });
+
+    document.getElementById('btn-approve').onclick = () => {
+      if (conflictCount > 0) {
+        showToast('❌ Cannot approve — resolve ' + conflictCount + ' conflict(s) first.');
+        return;
+      }
+      if (!confirm('Approve the schedule for ' + deptCode + '?')) return;
+      document.getElementById('form-approve').submit();
+    };
+
+    document.getElementById('btn-return').onclick = () => {
+      const note = document.getElementById('return-note').value.trim();
+      if (!note) { showToast('Please enter a return note before sending.'); return; }
+      if (!confirm('Return schedule to Chair with your note?')) return;
+      document.getElementById('form-return').submit();
+    };
+
+    openModal('modal-review');
   })
   .catch(() => {
-    document.getElementById('review-modal-body').innerHTML =
-      '<div style="color:var(--red);padding:20px;">Failed to load schedules. Please try again.</div>';
+    container.innerHTML = '<div class="modal-overlay open p-5"><div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]"><div class="modal-body p-5 text-sm text-red-700">Failed to load schedules. Please close this window and try again.</div></div></div>';
   });
-
-  openModal('modal-review');
 }
 
 // ── NOTIFY CHAIRS ────────────────────────────────────────────────────────

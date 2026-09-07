@@ -13,17 +13,10 @@
 
 <div id="screen-app" class="screen active" style="flex-direction:row;">
 
-  @include('partials.dean_sidebar')
 
   <!-- Main -->
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">Settings</div>
-      <div class="topbar-actions">
-        <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export Report</button>
-        <button class="topbar-btn btn-secondary" onclick="showToast('3 pending approvals')">Notifications</button>
-      </div>
-    </div>
+@include('partials.dean_header', ['title' => 'Dean Settings'])
 
     <!-- SETTINGS PAGE -->
     <!-- ══════════════════════════════════════

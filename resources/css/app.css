@@ -17,17 +17,6 @@
     --font-mono: 'DM Mono', ui-monospace, monospace;
 }
 
-:root {
-    --navy: #1a2d5a;
-    --blue: #2563eb;
-    --teal: #0891b2;
-    --green: #16a34a;
-    --red: #dc2626;
-    --amber: #d97706;
-    --text3: #94a3b8;
-    --border: #e2e8f0;
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    SHARED COMPONENTS
    Used across: admin_dashboard, user_accounts, rooms, settings,

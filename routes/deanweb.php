@@ -8,6 +8,7 @@ use App\Http\Controllers\Dean\PendingApprovalsController;
 use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
 use App\Http\Controllers\Dean\NotificationController;
+use App\Http\Controllers\Dean\ScheduleReportsController;
 
 
 /*
@@ -63,9 +64,8 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
         ->name('pending_approvals.return');
 
     // Schedule Reports
-    Route::get('/schedule-reports', function () {
-        return view('dean.schedule_reports');
-    })->name('schedule_reports');
+    Route::get('/schedule-reports', [ScheduleReportsController::class, 'index'])
+        ->name('schedule_reports');
 
     Route::get('/faculty-deployment', [FacultyDeploymentController::class, 'index'])
         ->name('faculty_deployment');
