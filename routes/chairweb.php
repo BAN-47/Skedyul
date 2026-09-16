@@ -6,6 +6,8 @@ use App\Http\Controllers\Chair\ChairController;
 use App\Http\Controllers\Chair\ScheduleController;
 use App\Http\Controllers\Chair\ChairSubjectController;
 use App\Http\Controllers\Chair\ChairRoomController;
+use App\Http\Controllers\Chair\ChairFacultyLoadController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -23,31 +25,31 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::middleware('auth')->prefix('chair')->group(function () {
 // Chair dashboard index 
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
+    Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.readAll');
+    Route::post('/notifications/{notification}/read', [ChairController::class, 'markNotificationRead'])->name('chair.notifications.read');
 
-// schedule Plotter
-Route::get('/schedule-plotter', [ScheduleController::class, 'index'])->name('chair.schedule_plotter');
-Route::post('/schedule-plotter', [ScheduleController::class, 'store'])->name('chair.schedule_plotter.store');
-Route::delete('/schedule-plotter/{id}', [ScheduleController::class, 'destroy'])->name('chair.schedule_plotter.destroy');
+// Chair Faculty Load
+    Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
+    Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
 
+    // PBS — Program by Section
+   Route::get('/pbs', function () {return view('chair.pbs');})->name('chair.pbs');
 
-    Route::get('/faculty-load', function () {
-        return view('chair.faculty_load');
-    })->name('chair.faculty_load');
-
+   // PBT - Program by Teacher 
+   Route::get('/pbt', function () {return view('chair.pbt');})->name('chair.pbt');
+   
+    //Subject
     Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
     Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
     Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('chair.subject.update');
     Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('chair.subject.destroy');
 
-
+     // Room
     Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
     Route::post('/rooms', [ChairRoomController::class, 'store'])->name('chair.rooms.store');
     Route::post('/schedules', [ChairRoomController::class, 'assignSchedule'])->name('chair.schedules.store');
     Route::put('/schedules/{schedule}', [ChairRoomController::class, 'updateSchedule'])->name('chair.schedules.update');
 
-    Route::get('/conflict-checker', function () {
-        return view('chair.conflict_checker');
-    })->name('chair.conflict_checker');
 
     Route::get('/submit-dean', function () {
         return view('chair.submit_dean');

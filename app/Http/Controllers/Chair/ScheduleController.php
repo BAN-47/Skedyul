@@ -137,38 +137,48 @@ class ScheduleController extends Controller
             ]);
         }
 
-        // ---------- SAVE — atomic, all-or-nothing ----------
-        DB::transaction(function () use ($data, $semester, $newTotal) {
-            $studyLoad = Study_Load::create([
-                'sl_fac_id'      => $data['fac_id'],
-                'sl_subj_id'     => $data['subj_id'],
-                'sl_sec_id'      => $data['sec_id'],
-                'sl_sem_id'      => $semester->sem_id,
-                'sl_assigned_by' => Auth::id(),
-            ]);
+        try {
+            // ---------- SAVE — atomic, all-or-nothing ----------
+            DB::transaction(function () use ($data, $semester, $newTotal) {
+                $studyLoad = Study_Load::create([
+                    'sl_fac_id'      => $data['fac_id'],
+                    'sl_subj_id'     => $data['subj_id'],
+                    'sl_sec_id'      => $data['sec_id'],
+                    'sl_sem_id'      => $semester->sem_id,
+                    'sl_assigned_by' => Auth::id(),
+                ]);
 
-            Schedule::create([
-                'sch_load_id'    => $studyLoad->sl_id,
-                'sch_fac_id'     => $data['fac_id'],
-                'sch_subj_id'    => $data['subj_id'],
-                'sch_sec_id'     => $data['sec_id'],
-                'sch_room_id'    => $data['room_id'],
-                'sch_sem_id'     => $semester->sem_id,
-                'sch_day'        => $data['day'],
-                'sch_start_time' => $data['start_time'],
-                'sch_end_time'   => $data['end_time'],
-                'sch_created_by' => Auth::id(),
-            ]);
+                Schedule::create([
+                    'sch_load_id'    => $studyLoad->sl_id,
+                    'sch_fac_id'     => $data['fac_id'],
+                    'sch_subj_id'    => $data['subj_id'],
+                    'sch_sec_id'     => $data['sec_id'],
+                    'sch_room_id'    => $data['room_id'],
+                    'sch_sem_id'     => $semester->sem_id,
+                    'sch_day'        => $data['day'],
+                    'sch_start_time' => $data['start_time'],
+                    'sch_end_time'   => $data['end_time'],
+                    'sch_created_by' => Auth::id(),
+                ]);
 
-            Workload::updateOrCreate(
-                [
-                    'wl_fac_id' => $data['fac_id'],
-                    'wl_sem_id' => $semester->sem_id,
-                    'wl_ay_id'  => $semester->sem_ay_id,
-                ],
-                ['wl_total_hours' => $newTotal]
-            );
-        });
+                Workload::updateOrCreate(
+                    [
+                        'wl_fac_id' => $data['fac_id'],
+                        'wl_sem_id' => $semester->sem_id,
+                        'wl_ay_id'  => $semester->sem_ay_id,
+                    ],
+                    ['wl_total_hours' => $newTotal]
+                );
+            });
+        } catch (\Throwable $e) {
+            $message = strtolower($e->getMessage());
+
+            if ($e instanceof \Illuminate\Database\QueryException && ($e->getCode() === '23505' || str_contains($message, 'duplicate'))) {
+                return back()->withInput()->with('error', 'Duplicate record detected. Please check for duplicate schedule data and try again.');
+            }
+
+            return back()->withInput()->with('error', 'Unable to assign the class right now because of a database error. Please try again.');
+        }
 
         return back()->with('success', 'Class assigned successfully.');
     }
@@ -176,7 +186,13 @@ class ScheduleController extends Controller
     public function destroy($id)
     {
         $this->currentDept();
-        Schedule::findOrFail($id)->update(['sch_is_active' => false]);
+
+        try {
+            Schedule::findOrFail($id)->update(['sch_is_active' => false]);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Unable to remove this schedule because of a database error. Please try again.');
+        }
+
         return back()->with('success', 'Class removed from the schedule.');
     }
 }

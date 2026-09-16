@@ -13,14 +13,20 @@ use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\Workload;
+use App\Models\Notification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 
 class ChairController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+
         // ---------- WHICH DEPARTMENT DOES THIS CHAIR MANAGE? ----------
-        $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        $deptChair = Dept_Chair::with(['department', 'program'])
+            ->where('dc_usr_id', $user->usr_id)
+            ->first();
 
         if (!$deptChair) {
             abort(403, 'Your account is not assigned as a department chair.');
@@ -45,9 +51,9 @@ class ChairController extends Controller
                 ->when($academicYear, fn ($q) => $q->where('wl_ay_id', $academicYear->ay_id))
                 ->first();
 
-            $totalHours = $workload->wl_total_hours ?? 0;
+            $totalHours = (float) ($workload->wl_total_hours ?? 0);
             $remaining  = max(0, 30 - $totalHours);
-            $percent    = min(100, round(($totalHours / 30) * 100));
+            $percent    = min(100, (int) round(($totalHours / 30) * 100));
 
             $status = match (true) {
                 $f->fac_employment_type === 'part_time' => 'Part-time',
@@ -57,7 +63,8 @@ class ChairController extends Controller
             };
 
             return [
-                'name'       => $f->user->usr_name ?? 'Unknown',
+                'fac_id'     => $f->fac_id,
+                'name'       => trim($f->fac_first_name . ' ' . $f->fac_last_name),
                 'hours'      => $totalHours,
                 'remaining'  => $remaining,
                 'percent'    => $percent,
@@ -82,19 +89,56 @@ class ChairController extends Controller
         $plottedSubjIds = $semester
             ? Study_Load::where('sl_sem_id', $semester->sem_id)
                 ->whereIn('sl_subj_id', $subject->pluck('subj_id'))
+                ->distinct()
                 ->pluck('sl_subj_id')
-                ->unique()
             : collect();
 
         $subjectsPlotted = $plottedSubjIds->count();
 
+        // ---------- NOTIFICATIONS (drives the bell panel + Conflicts stat) ----------
+        $notifications = Notification::where('notif_usr_id', $user->usr_id)
+            ->orderByDesc('notif_created_at')
+            ->limit(20)
+            ->get();
+
+        $unreadCount    = $notifications->where('notif_is_read', false)->count();
+        $conflictsCount = $notifications
+            ->where('notif_type', 'conflict')
+            ->where('notif_is_read', false)
+            ->count();
+
         return view('chair.chair_dashboard', compact(
-            'academicYear', 'semester',
+            'deptChair', 'academicYear', 'semester',
             'faculty', 'totalFaculty', 'facultyLoad',
             'section', 'totalSections',
-            'subject', 'totalSubjects', 'subjectsPlotted'
+            'subject', 'totalSubjects', 'subjectsPlotted',
+            'notifications', 'unreadCount', 'conflictsCount'
         ));
     }
-    
-    
+
+    /**
+     * Mark a single notification as read.
+     * Route suggestion: POST /chair/notifications/{notification}/read
+     */
+    public function markNotificationRead(Request $request, Notification $notification)
+    {
+        abort_unless($notification->notif_usr_id === Auth::id(), 403);
+
+        $notification->update(['notif_is_read' => true]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Mark every notification for this chair as read.
+     * Route suggestion: POST /chair/notifications/read-all
+     */
+    public function markAllNotificationsRead(Request $request)
+    {
+        Notification::where('notif_usr_id', Auth::id())
+            ->where('notif_is_read', false)
+            ->update(['notif_is_read' => true]);
+
+        return response()->json(['success' => true]);
+    }
 }

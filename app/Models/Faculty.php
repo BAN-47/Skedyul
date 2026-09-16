@@ -1,10 +1,12 @@
 <?php 
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class Faculty extends Model {
+class Faculty extends Model
+{
+    use HasUuids;
 
     protected $table = 'faculty';
     protected $primaryKey = 'fac_id';
@@ -23,14 +25,36 @@ class Faculty extends Model {
         'fac_suffix',
         'fac_phone_number',
         'fac_gmail',
+        'fac_address',
         'fac_employment_type',
         'fac_rank',
-        'fac_profile_image'
+        'fac_profile_image',
     ];
 
-    public function user() { return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id'); }
-    public function department() { return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id'); }
-    public function studyLoads() { return $this->hasMany(Study_Load::class, 'sl_fac_id', 'fac_id'); }
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'fac_usr_id', 'usr_id');
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id');
+    }
+
+    public function workloads()
+    {
+        return $this->hasMany(Workload::class, 'wl_fac_id', 'fac_id');
+    }
+
+    public function studyLoads()
+    {
+        return $this->hasMany(Study_Load::class, 'sl_fac_id', 'fac_id');
+    }
+
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'sch_fac_id', 'fac_id');
+    }
 
     public function getFullNameAttribute(): string
     {

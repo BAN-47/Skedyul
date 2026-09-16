@@ -48,6 +48,11 @@ class User extends Authenticatable
     {
         return $this->hasOne(Dean::class, 'dean_usr_id', 'usr_id');
     }
+    
+       public function deptChair()
+    {
+        return $this->hasOne(Dept_Chair::class, 'dc_usr_id', 'usr_id');
+    }
 
     public function deptChairRecord()
     {

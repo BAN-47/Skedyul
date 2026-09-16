@@ -49,26 +49,42 @@ class NotificationController extends Controller
 
         $sent = 0;
 
-        foreach ($request->chair_ids as $usrId) {
-            $exists = DB::table(DB::raw('"USER"'))
-                ->where('usr_id', $usrId)
-                ->where('usr_role', 'department_chair')
-                ->exists();
+        try {
+            foreach ($request->chair_ids as $usrId) {
+                $exists = DB::table(DB::raw('"USER"'))
+                    ->where('usr_id', $usrId)
+                    ->where('usr_role', 'department_chair')
+                    ->exists();
 
-            if (!$exists) continue;
+                if (!$exists) continue;
 
-            DB::table('notification')->insert([
-                'notif_id'         => (string) Str::uuid(),
-                'notif_usr_id'     => $usrId,
-                'notif_title'      => $request->title,
-                'notif_message'    => $request->message,
-                'notif_type'       => $request->type,
-                'notif_is_read'    => false,
-                'notif_created_at' => now(),
-                'notif_updated_at' => now(),
-            ]);
+                DB::table('notification')->insert([
+                    'notif_id'         => (string) Str::uuid(),
+                    'notif_usr_id'     => $usrId,
+                    'notif_title'      => $request->title,
+                    'notif_message'    => $request->message,
+                    'notif_type'       => $request->type,
+                    'notif_is_read'    => false,
+                    'notif_created_at' => now(),
+                    'notif_updated_at' => now(),
+                ]);
 
-            $sent++;
+                $sent++;
+            }
+        } catch (\Throwable $e) {
+            $message = strtolower($e->getMessage());
+
+            if ($e instanceof \Illuminate\Database\QueryException && ($e->getCode() === '23505' || str_contains($message, 'duplicate'))) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Duplicate notification entry detected. Please review the selected chairs and try again.',
+                ], 409);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to send the notification because of a database error. Please try again.',
+            ], 500);
         }
 
         return response()->json([
@@ -92,13 +108,20 @@ class NotificationController extends Controller
     // POST /dean/notifications/{id}/read
     public function markRead($id)
     {
-        DB::table('notification')
-            ->where('notif_id', $id)
-            ->where('notif_usr_id', auth()->id())
-            ->update([
-                'notif_is_read'    => true,
-                'notif_updated_at' => now(),
-            ]);
+        try {
+            DB::table('notification')
+                ->where('notif_id', $id)
+                ->where('notif_usr_id', auth()->id())
+                ->update([
+                    'notif_is_read'    => true,
+                    'notif_updated_at' => now(),
+                ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to update the notification because of a database error.',
+            ], 500);
+        }
 
         return response()->json(['success' => true]);
     }

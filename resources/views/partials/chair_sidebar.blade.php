@@ -19,9 +19,27 @@
     <a href="{{ route('chair.dashboard') }}" class="nav-item {{ request()->routeIs('chair.dashboard') ? 'active' : '' }}">
       <span class="nav-icon"></span> Dashboard
     </a>
-    <a href="{{ route('chair.schedule_plotter') }}" class="nav-item {{ request()->routeIs('chair.schedule_plotter') ? 'active' : '' }}">
-      <span class="nav-icon"></span> Schedule Plotter
+
+    <a href="{{ route('chair.pbs') }}" class="nav-item {{ request()->routeIs('chair.pbs') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Program by Section (PBS)
     </a>
+
+        <a href="{{ route('chair.pbt') }}" class="nav-item {{ request()->routeIs('chair.pbt') ? 'active' : '' }}">
+      <span class="nav-icon"></span> Program by Teacher (PBT)
+    </a>
+
+    {{--
+      PBT and MIS Code are on the roadmap but not built yet. Uncomment
+      these once chair.pbt and chair.mis_code routes + controllers exist.
+      Keep this a real Blade comment block, not an HTML comment, or the
+      route() calls below still execute even though the links stay
+      visually hidden, which throws RouteNotFoundException.
+
+    <a href="{{ route('chair.mis_code') }}" class="nav-item {{ request()->routeIs('chair.mis_code') ? 'active' : '' }}">
+      <span class="nav-icon"></span> MIS Code
+    </a>
+    --}}
+
     <a href="{{ route('chair.faculty_load') }}" class="nav-item {{ request()->routeIs('chair.faculty_load') ? 'active' : '' }}">
       <span class="nav-icon"></span> Faculty Load
     </a>

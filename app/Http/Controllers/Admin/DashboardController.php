@@ -73,8 +73,14 @@ class DashboardController extends Controller
         $roomsOccupied  = $totalRooms - $roomsAvailable;
         $roomsInUse     = $roomsOccupied;
 
-        $room = Room::all()->map(function ($r) {
-            $bookings = Schedule::where('sch_room_id', $r->room_id)->count();
+        $roomBookings = Schedule::query()
+            ->select('sch_room_id', DB::raw('COUNT(*) as booking_count'))
+            ->where('sch_is_active', true)
+            ->groupBy('sch_room_id')
+            ->pluck('booking_count', 'sch_room_id');
+
+        $room = Room::query()->get()->map(function ($r) use ($roomBookings) {
+            $bookings = (int) ($roomBookings[$r->room_id] ?? 0);
             $percent  = min(100, round(($bookings / 40) * 100)); // assumes 40 weekly slots
 
             $color = match (true) {

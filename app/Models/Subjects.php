@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Subjects extends Model
 {
+    use HasUuids;
+
     protected $table = 'subject';
     protected $primaryKey = 'subj_id';
     public $incrementing = false;
@@ -21,7 +24,7 @@ class Subjects extends Model
         'subj_name',
         'subj_lecture_hours',
         'subj_lab_hours',
-        'subj_is_active'
+        'subj_is_active',
     ];
 
     public function department()
@@ -39,5 +42,3 @@ class Subjects extends Model
         return $this->hasMany(Study_Load::class, 'sl_subj_id', 'subj_id');
     }
 }
-
-?>
