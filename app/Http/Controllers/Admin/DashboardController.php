@@ -36,8 +36,8 @@ class DashboardController extends Controller
 
         // ---------- SECTIONS ----------
         $section = Section::with('program')
-            ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
-            ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
+            ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
+            ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->get();
 
         $totalSections    = $section->count();
@@ -46,7 +46,7 @@ class DashboardController extends Controller
         $unscheduledCount = $section->where('sec_status', 'Unscheduled')->count();
 
         $program = $section
-            ->groupBy(fn ($s) => $s->program->prog_name ?? 'Unknown')
+            ->groupBy(fn($s) => $s->program->prog_name ?? 'Unknown')
             ->map(function ($group, $programName) {
                 $total     = $group->count();
                 $scheduled = $group->where('sec_status', 'Scheduled')->count();
@@ -68,8 +68,10 @@ class DashboardController extends Controller
         $scheduleConflicts  = $subject->where('subj_is_active', false)->count();
 
         // ---------- ROOMS ----------
-        $totalRooms     = Room::count();
-        $roomsAvailable = Room::where('room_is_available', true)->count();
+        $allRooms = Room::all();
+
+        $totalRooms     = $allRooms->count();
+        $roomsAvailable = $allRooms->where('room_is_available', true)->count();
         $roomsOccupied  = $totalRooms - $roomsAvailable;
         $roomsInUse     = $roomsOccupied;
 
@@ -79,24 +81,16 @@ class DashboardController extends Controller
             ->groupBy('sch_room_id')
             ->pluck('booking_count', 'sch_room_id');
 
-        $room = Room::query()->get()->map(function ($r) use ($roomBookings) {
+        $room = $allRooms->map(function ($r) use ($roomBookings) {
             $bookings = (int) ($roomBookings[$r->room_id] ?? 0);
-            $percent  = min(100, round(($bookings / 40) * 100)); // assumes 40 weekly slots
-
+            $percent  = min(100, round(($bookings / 40) * 100));
             $color = match (true) {
                 $percent >= 80 => 'red',
                 $percent >= 40 => 'amber',
                 default        => 'green',
             };
-
-            return [
-                'name'    => $r->room_name,
-                'count'   => $bookings,
-                'percent' => $percent,
-                'color'   => $color,
-            ];
+            return ['name' => $r->room_name, 'count' => $bookings, 'percent' => $percent, 'color' => $color];
         });
-
         // ---------- NOTIFICATIONS ----------
         $notifCount = Notification::where('notif_usr_id', Auth::id())
             ->where('notif_is_read', false)
@@ -116,13 +110,30 @@ class DashboardController extends Controller
         $dbRecords = $totalUsers + $totalSections + $subjectsOffered + $totalRooms;
 
         return view('admin.admin_dashboard', compact(
-            'users', 'roleCounts', 'totalUsers', 'totalFaculty',
-            'academicYear', 'semester',
-            'section', 'totalSections', 'program',
-            'scheduledCount', 'inProgressCount', 'unscheduledCount',
-            'subject', 'subjectsOffered', 'scheduleConflicts',
-            'room', 'totalRooms', 'roomsInUse', 'roomsAvailable', 'roomsOccupied',
-            'audit_log', 'dbRecords', 'dbStatus', 'notifCount'
+            'users',
+            'roleCounts',
+            'totalUsers',
+            'totalFaculty',
+            'academicYear',
+            'semester',
+            'section',
+            'totalSections',
+            'program',
+            'scheduledCount',
+            'inProgressCount',
+            'unscheduledCount',
+            'subject',
+            'subjectsOffered',
+            'scheduleConflicts',
+            'room',
+            'totalRooms',
+            'roomsInUse',
+            'roomsAvailable',
+            'roomsOccupied',
+            'audit_log',
+            'dbRecords',
+            'dbStatus',
+            'notifCount'
         ));
     }
 }
