@@ -36,6 +36,7 @@ class User extends Authenticatable
         'usr_civil_status',
         'usr_dob',
         'usr_nationality',
+        'language',
     ];
 
     protected $hidden = [
