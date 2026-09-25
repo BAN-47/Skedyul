@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>SKEDYUL — Settings</title>
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -40,14 +41,22 @@
               <div class="card-header"><div><div class="card-title">Profile Picture</div><div class="card-sub">Click the avatar to upload a new photo</div></div></div>
               <div class="flex items-center gap-6 py-2">
                 <div class="relative flex-shrink-0">
-                  <div id="profile-pic-preview" class="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-extrabold text-white border-4 border-slate-200 overflow-hidden"></div>
+                  <div id="profile-pic-preview"
+                      class="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-3xl font-extrabold text-white border-4 border-slate-200 overflow-hidden"
+                      @if(auth()->user()->profile_picture)
+                        style="background-image: url('{{ auth()->user()->profile_picture }}'); background-size: cover; background-position: center;"
+                      @endif>
+                    @unless(auth()->user()->profile_picture)
+                      {{ strtoupper(substr(auth()->user()->usr_name, 0, 1)) }}
+                    @endunless
+                  </div>
                   <div onclick="document.getElementById('pic-upload').click()"
                     class="absolute bottom-0 right-0 w-[30px] h-[30px] bg-blue-600 rounded-full flex items-center justify-center cursor-pointer border-2 border-white text-sm">✏️</div>
                   <input type="file" id="pic-upload" accept="image/*" class="hidden" onchange="previewProfilePic(this)">
                 </div>
                 <div>
-                  <div class="text-sm font-bold text-slate-900">Tech Admin</div>
-                  <div class="text-xs text-slate-400 mt-0.5">Technical Administrator · CCICT</div>
+                  <div class="text-sm font-bold text-slate-900">{{ auth()->user()->usr_name }}</div>
+                  <div class="text-xs text-slate-400 mt-0.5">{{ ucfirst(auth()->user()->usr_role) }} · CCICT</div>
                   <div class="flex gap-2 mt-3">
                     <button class="btn btn-primary text-xs px-3.5 py-1.5" onclick="document.getElementById('pic-upload').click()">Upload Photo</button>
                     <button class="btn btn-secondary text-xs px-3.5 py-1.5" onclick="resetProfilePic()">Remove</button>
@@ -58,39 +67,46 @@
             <div class="card mb-4">
               <div class="card-header"><div><div class="card-title">Personal Information</div><div class="card-sub">Update your name, rank, and contact details</div></div></div>
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">First Name</label><input class="field-input" id="pi-firstname" value="Tech"></div>
-                <div><label class="field-label">Last Name</label><input class="field-input" id="pi-lastname" value="Admin"></div>
+              <div><label class="field-label">First Name</label><input class="field-input" id="pi-firstname" value="{{ auth()->user()->usr_first_name }}"></div>
+              <div><label class="field-label">Last Name</label><input class="field-input" id="pi-lastname" value="{{ auth()->user()->usr_last_name }}"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">Middle Name</label><input class="field-input" id="pi-middlename" placeholder="Optional" value="{{ auth()->user()->usr_middle_name }}"></div>
+              <div><label class="field-label">Suffix</label>
+                <select class="field-input" id="pi-suffix">
+                  <option value="" {{ !auth()->user()->usr_suffix ? 'selected' : '' }}>None</option>
+                  <option {{ auth()->user()->usr_suffix === 'Jr.' ? 'selected' : '' }}>Jr.</option>
+                  <option {{ auth()->user()->usr_suffix === 'Sr.' ? 'selected' : '' }}>Sr.</option>
+                  <option {{ auth()->user()->usr_suffix === 'II' ? 'selected' : '' }}>II</option>
+                  <option {{ auth()->user()->usr_suffix === 'III' ? 'selected' : '' }}>III</option>
+                </select>
               </div>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Middle Name</label><input class="field-input" id="pi-middlename" placeholder="Optional"></div>
-                <div><label class="field-label">Suffix</label>
-                  <select class="field-input" id="pi-suffix"><option value="">None</option><option>Jr.</option><option>Sr.</option><option>II</option><option>III</option></select>
-                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">Rank / Title</label><input class="field-input" id="rank-title" value="{{ auth()->user()->usr_rank_title }}"></div>
+              <div><label class="field-label">Employee ID</label><input class="field-input" id="pi-empid" value="{{ auth()->user()->usr_employee_id }}"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">Gender</label>
+                <select class="field-input" id="pi-gender">
+                  <option {{ auth()->user()->usr_gender === 'Male' ? 'selected' : '' }}>Male</option>
+                  <option {{ auth()->user()->usr_gender === 'Female' ? 'selected' : '' }}>Female</option>
+                  <option {{ auth()->user()->usr_gender === 'Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option>
+                </select>
               </div>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Rank / Title</label>
-                  <select class="field-input" id="pi-rank">
-                    <option selected>Technical Administrator</option>
-                    <option>Senior Technical Administrator</option>
-                    <option>IT Officer</option>
-                    <option>Systems Analyst</option>
-                    <option>Network Administrator</option>
-                  </select>
-                </div>
-                <div><label class="field-label">Employee ID</label><input class="field-input" id="pi-empid" value="CTU-2024-001"></div>
+              <div><label class="field-label">Civil Status</label>
+                <select class="field-input" id="pi-civil">
+                  <option {{ auth()->user()->usr_civil_status === 'Single' ? 'selected' : '' }}>Single</option>
+                  <option {{ auth()->user()->usr_civil_status === 'Married' ? 'selected' : '' }}>Married</option>
+                  <option {{ auth()->user()->usr_civil_status === 'Widowed' ? 'selected' : '' }}>Widowed</option>
+                  <option {{ auth()->user()->usr_civil_status === 'Separated' ? 'selected' : '' }}>Separated</option>
+                </select>
               </div>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Gender</label>
-                  <select class="field-input" id="pi-gender"><option>Male</option><option>Female</option><option>Prefer not to say</option></select>
-                </div>
-                <div><label class="field-label">Civil Status</label>
-                  <select class="field-input" id="pi-civil"><option>Single</option><option>Married</option><option>Widowed</option><option>Separated</option></select>
-                </div>
-              </div>
-              <div class="grid grid-cols-2 gap-3 mb-1">
-                <div><label class="field-label">Date of Birth</label><input class="field-input" id="pi-dob" type="date" value="1990-01-01"></div>
-                <div><label class="field-label">Nationality</label><input class="field-input" id="pi-nationality" value="Filipino"></div>
-              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-1">
+              <div><label class="field-label">Date of Birth</label><input class="field-input" id="pi-dob" type="date" value="{{ auth()->user()->usr_dob }}"></div>
+              <div><label class="field-label">Nationality</label><input class="field-input" id="pi-nationality" value="{{ auth()->user()->usr_nationality }}"></div>
+            </div>
               <div class="flex justify-end mt-1">
                 <button class="btn btn-primary" onclick="savePersonalInfo()">Save Changes</button>
               </div>
@@ -360,32 +376,93 @@ function showSettingsSection(section, el) {
 // ── PROFILE PICTURE ────────────────────────────────────────────────────────────
 function previewProfilePic(input) {
   if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const preview = document.getElementById('profile-pic-preview');
+
+  // instant local preview while it uploads
   const reader = new FileReader();
   reader.onload = e => {
-    const preview = document.getElementById('profile-pic-preview');
     preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
-    showToast('Profile photo updated!');
   };
-  reader.readAsDataURL(input.files[0]);
+  reader.readAsDataURL(file);
+
+  // real upload to Cloudinary
+  const formData = new FormData();
+  formData.append('profile_picture', file);
+
+  fetch('{{ route("admin.profile.picture.update") }}', {
+    method: 'POST',
+    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+    body: formData,
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        showToast('❌ Upload failed');
+        return;
+      }
+      preview.innerHTML = `<img src="${data.url}" style="width:100%;height:100%;object-fit:cover;">`;
+      showToast('Profile photo updated!');
+    })
+    .catch(() => showToast('❌ Something went wrong uploading the photo.'));
 }
 
 function resetProfilePic() {
-  document.getElementById('profile-pic-preview').innerHTML = '';
-  document.getElementById('pic-upload').value = '';
-  showToast('Profile photo removed.');
+  if (!confirm('Remove your profile picture?')) return;
+
+  fetch('{{ route("admin.profile.picture.remove") }}', {
+    method: 'DELETE',
+    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+  })
+    .then(res => res.json())
+    .then(() => {
+      document.getElementById('profile-pic-preview').innerHTML = '{{ strtoupper(substr(auth()->user()->usr_name, 0, 1)) }}';
+      document.getElementById('pic-upload').value = '';
+      showToast('Profile photo removed.');
+    })
+    .catch(() => showToast('❌ Something went wrong removing the photo.'));
 }
 
 // ── PERSONAL INFO ──────────────────────────────────────────────────────────────
 function savePersonalInfo() {
   const first = document.getElementById('pi-firstname').value.trim();
   const last  = document.getElementById('pi-lastname').value.trim();
-  const rank  = document.getElementById('pi-rank').value;
   if (!first || !last) { alert('First and Last name are required.'); return; }
-  const sbName = document.getElementById('sb-name');
-  const sbRole = document.getElementById('sb-role');
-  if (sbName) sbName.textContent = first + ' ' + last;
-  if (sbRole) sbRole.textContent = rank;
-  showToast('Personal info saved — ' + first + ' ' + last + '!');
+
+  const payload = {
+    usr_first_name: first,
+    usr_last_name: last,
+    usr_middle_name: document.getElementById('pi-middlename').value.trim(),
+    usr_suffix: document.getElementById('pi-suffix').value,
+    usr_rank_title: document.getElementById('rank-title').value.trim(),
+    usr_employee_id: document.getElementById('pi-empid').value.trim(),
+    usr_gender: document.getElementById('pi-gender').value,
+    usr_civil_status: document.getElementById('pi-civil').value,
+    usr_dob: document.getElementById('pi-dob').value,
+    usr_nationality: document.getElementById('pi-nationality').value.trim(),
+  };
+
+  fetch('{{ route("admin.profile.personal-info.update") }}', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        showToast('❌ Failed to save changes');
+        return;
+      }
+      const sbName = document.getElementById('sb-name');
+      const sbRole = document.getElementById('sb-role');
+      if (sbName) sbName.textContent = data.usr_name;
+      if (sbRole) sbRole.textContent = document.getElementById('rank-title').value;
+      showToast('Personal info saved successfully!');
+    })
+    .catch(() => showToast('❌ Something went wrong saving.'));
 }
 
 // ── NOTIFICATION TOGGLE SWITCHES ────────────────────────────────────────────────
