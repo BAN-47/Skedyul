@@ -22,21 +22,21 @@ class ScheduleReportsController extends Controller
             ->where('sch_is_active', true)
             ->get();
 
-        $byFaculty = Faculty::with(['studyLoads.subject'])
-            ->get()
-            ->map(function ($fac) use ($activeSemester) {
-                $subjects = $fac->studyLoads->pluck('subject.subj_code')->filter()->unique()->implode(', ');
+        $faculty = Faculty::with(['studyLoads.subject'])->get();
 
-                $hours = Workload::where('wl_fac_id', $fac->fac_id)
-                    ->when($activeSemester, fn ($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-                    ->sum('wl_total_hours');
+        $facultyIds = $faculty->pluck('fac_id');
+        $workloadTotals = Workload::whereIn('wl_fac_id', $facultyIds)
+            ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
+            ->selectRaw('wl_fac_id, SUM(wl_total_hours) as total')
+            ->groupBy('wl_fac_id')
+            ->pluck('total', 'wl_fac_id');
 
-                return [
-                    'name'     => $fac->full_name,
-                    'subjects' => $subjects,
-                    'hours'    => $hours,
-                ];
-            });
+        $byFaculty = $faculty->map(function ($fac) use ($workloadTotals) {
+            $subjects = $fac->studyLoads->pluck('subject.subj_code')->filter()->unique()->implode(', ');
+            $hours = $workloadTotals->get($fac->fac_id, 0);   // ← no query, just lookup
+
+            return ['name' => $fac->full_name, 'subjects' => $subjects, 'hours' => $hours];
+        });
 
         $sections = Section::with('program')->get();
 
@@ -49,11 +49,17 @@ class ScheduleReportsController extends Controller
     {
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::where('fac_dept_id', $deptId)->get()->map(function ($fac) use ($activeSemester) {
-            $hours = Workload::where('wl_fac_id', $fac->fac_id)
-                ->when($activeSemester, fn ($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-                ->sum('wl_total_hours');
+        $facultyRecords = Faculty::where('fac_dept_id', $deptId)->get();
+        $facultyIds = $facultyRecords->pluck('fac_id');
 
+        $workloadTotals = Workload::whereIn('wl_fac_id', $facultyIds)
+            ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
+            ->selectRaw('wl_fac_id, SUM(wl_total_hours) as total')
+            ->groupBy('wl_fac_id')
+            ->pluck('total', 'wl_fac_id');
+
+        $faculty = $facultyRecords->map(function ($fac) use ($workloadTotals) {
+            $hours = $workloadTotals->get($fac->fac_id, 0);
             return [
                 'name'       => $fac->full_name,
                 'rank'       => $fac->fac_rank,
@@ -63,7 +69,7 @@ class ScheduleReportsController extends Controller
             ];
         });
 
-        $sections = Section::whereHas('program', fn ($q) => $q->where('prog_dept_id', $deptId))->get();
+        $sections = Section::whereHas('program', fn($q) => $q->where('prog_dept_id', $deptId))->get();
 
         return response()->json([
             'faculty'  => $faculty,
@@ -75,7 +81,7 @@ class ScheduleReportsController extends Controller
     {
         $schedules = Schedule::with(['faculty', 'subject', 'room'])
             ->where('sch_is_active', true)
-            ->when($sectionId, fn ($q) => $q->where('sch_sec_id', $sectionId))
+            ->when($sectionId, fn($q) => $q->where('sch_sec_id', $sectionId))
             ->get();
 
         $conflicts = [];
