@@ -24,6 +24,18 @@ class User extends Authenticatable
         'usr_role',
         'usr_is_active',
         'usr_bio',
+        'profile_picture',
+        'profile_picture_public_id',
+        'usr_first_name',
+        'usr_last_name',
+        'usr_middle_name',
+        'usr_suffix',
+        'usr_rank_title',
+        'usr_employee_id',
+        'usr_gender',
+        'usr_civil_status',
+        'usr_dob',
+        'usr_nationality',
     ];
 
     protected $hidden = [
@@ -91,4 +103,5 @@ class User extends Authenticatable
 
         return $rooms?->implode('; ');
     }
+    
 }
