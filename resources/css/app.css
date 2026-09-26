@@ -5,6 +5,7 @@
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
 
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -38,12 +39,12 @@
     /* ── TOPBAR ──────────────────────────────────────────────────────────── */
     /* Top navigation bar — white bar at the top of every page */
     .topbar {
-        @apply h-[60px] bg-white border-b border-slate-200
-               flex items-center px-7 gap-4 flex-shrink-0;
+        @apply h-[60px] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800
+            flex items-center px-7 gap-4 flex-shrink-0;
     }
 
     .topbar-title {
-        @apply flex-1 text-lg font-bold text-slate-900;
+        @apply flex-1 text-lg font-bold text-slate-900 dark:text-slate-100;
     }
 
     /* ── PAGE CONTENT ────────────────────────────────────────────────────── */
@@ -66,8 +67,8 @@
     /* ── STAT CARD ───────────────────────────────────────────────────────── */
     /* The metric cards at the top of each dashboard */
     .stat-card {
-        @apply relative bg-white rounded-2xl p-5
-               border border-slate-200 overflow-hidden;
+        @apply relative bg-white dark:bg-slate-900 rounded-2xl p-5
+            border border-slate-200 dark:border-slate-800 overflow-hidden;
     }
 
     /* Colored top accent bar — add color class: bg-blue-600, bg-green-600, etc. */
@@ -84,7 +85,7 @@
     }
 
     .stat-value {
-        @apply text-[28px] font-extrabold text-slate-900 leading-none mb-1;
+        @apply text-[28px] font-extrabold text-slate-900 dark:text-slate-100 leading-none mb-1;
     }
 
     .stat-sub {
@@ -94,15 +95,15 @@
     /* ── CARD / DASH-CARD ────────────────────────────────────────────────── */
     /* Generic white rounded card used for tables, charts, forms */
     .card {
-        @apply bg-white rounded-2xl border border-slate-200 p-5;
+        @apply bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5;
     }
 
     .card-title {
-        @apply text-[15px] font-bold text-slate-900;
+        @apply text-[15px] font-bold text-slate-900 dark:text-slate-100;
     }
 
     .card-sub {
-        @apply text-[12px] text-slate-400 mt-0.5;
+        @apply text-[12px] text-slate-400 dark:text-slate-500 mt-0.5;
     }
 
     .card-header {
@@ -129,11 +130,11 @@
     }
 
     .data-table td {
-        @apply text-[13px] text-slate-900 px-3.5 py-3 border-b border-slate-100;
+        @apply text-[13px] text-slate-900 dark:text-slate-200 px-3.5 py-3 border-b border-slate-100 dark:border-slate-800;
     }
 
     .data-table tr:hover td {
-        @apply bg-slate-50;
+        @apply bg-slate-50 dark:bg-slate-800;
     }
 
     /* ── BADGES ──────────────────────────────────────────────────────────── */
@@ -310,7 +311,8 @@
     }
 
     .btn-secondary {
-        @apply bg-slate-100 text-slate-600 hover:bg-slate-200;
+        @apply bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300
+            hover:bg-slate-200 dark:hover:bg-slate-700;
     }
 
     .btn-danger {
@@ -320,13 +322,15 @@
     /* ── FORM FIELDS ─────────────────────────────────────────────────────── */
     /* Text inputs, selects, textareas */
     .field-input {
-        @apply w-full border border-slate-200 rounded-lg px-3 py-2.5 text-[13px]
-               focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100
-               transition;
+        @apply w-full border border-slate-200 dark:border-slate-700
+            bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100
+            rounded-lg px-3 py-2.5 text-[13px]
+            focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900
+            transition;
     }
 
     .field-label {
-        @apply block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5;
+        @apply block text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5;
     }
 
     /* ── MODAL ───────────────────────────────────────────────────────────── */
@@ -564,8 +568,8 @@
     /* ── SETTINGS NAV ────────────────────────────────────────────────────── */
     .settings-nav-item {
         @apply flex items-center px-5 py-2.5 text-[13px] font-medium
-               text-slate-600 cursor-pointer transition-all
-               hover:bg-slate-50 hover:text-slate-900;
+            text-slate-600 dark:text-slate-400 cursor-pointer transition-all
+            hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100;
     }
 
     .settings-nav-item.active {

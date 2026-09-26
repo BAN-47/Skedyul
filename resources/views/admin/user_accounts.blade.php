@@ -19,20 +19,6 @@
       {{-- TOPBAR --}}
       @include('partials.admin_header', ['title' => 'User Accounts'])
 
-      {{-- FLASH MESSAGES --}}
-      @if(session("success"))
-      <script>
-        document.addEventListener("DOMContentLoaded", () => showToast("✅ {{ session("
-          success ") }}"));
-      </script>
-      @endif
-      @if(session("error"))
-      <script>
-        document.addEventListener("DOMContentLoaded", () => showToast("❌ {{ session("
-          error ") }}"));
-      </script>
-      @endif
-
       <div class="page-content" id="page-user-accounts">
 
         {{-- STAT CARDS --}}
@@ -394,7 +380,15 @@
   </div>
 
   {{-- TOAST --}}
-  <div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+  <div class="toast" id="toast"><span id="toast-msg"></span></div>
+
+  @if(session('error') || session('success'))
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      showToast(@json(session('error') ?? session('success')));
+    });
+  </script>
+  @endif
 
   <script>
     const AVATAR_COLORS = ['#2563eb', '#16a34a', '#d97706', '#0891b2', '#7c3aed'];

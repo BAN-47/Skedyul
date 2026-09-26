@@ -195,12 +195,16 @@ class PendingApprovalsController extends Controller
             return back()->with('error', 'Cannot approve — schedule has unresolved conflicts. Return it to the Chair first.');
         }
 
-        $submission->update([
-            'schsub_status'      => 'approved',
-            'schsub_reviewed_by' => Auth::id(),
-            'schsub_reviewed_at' => now(),
-            'schsub_remarks'     => $request->remarks ?? null,
-        ]);
+        try {
+            $submission->update([
+                'schsub_status'      => 'approved',
+                'schsub_reviewed_by' => Auth::id(),
+                'schsub_reviewed_at' => now(),
+                'schsub_remarks'     => $request->remarks ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->redirectWithDbError($e, 'Unable to approve this schedule because of a database error.');
+        }
 
         return redirect()
             ->route('dean.pending_approvals')
@@ -226,12 +230,16 @@ class PendingApprovalsController extends Controller
             abort(403, 'You cannot return schedules for another department.');
         }
 
-        $submission->update([
-            'schsub_status'      => 'returned',
-            'schsub_reviewed_by' => Auth::id(),
-            'schsub_reviewed_at' => now(),
-            'schsub_remarks'     => $request->remarks,
-        ]);
+        try {
+            $submission->update([
+                'schsub_status'      => 'returned',
+                'schsub_reviewed_by' => Auth::id(),
+                'schsub_reviewed_at' => now(),
+                'schsub_remarks'     => $request->remarks,
+            ]);
+        } catch (\Throwable $e) {
+            return $this->redirectWithDbError($e, 'Unable to return this schedule because of a database error.');
+        }
 
         return redirect()
             ->route('dean.pending_approvals')

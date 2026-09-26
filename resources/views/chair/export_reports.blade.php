@@ -1,116 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SKEDYUL — Export Reports</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/chair/export_reports.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKEDYUL — Export Reports</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-900 antialiased">
 
-<div class="screen active" style="display:flex;">
+<div class="flex h-screen overflow-hidden">
   @include('partials.chair_sidebar')
 
-  <!-- MAIN -->
-  <div class="main">
-    <div class="topbar">
-      <div class="topbar-title">Export Reports</div>
-      <div id="topbar-notif-bell" style="position:relative;">
-        <button onclick="toggleNotifDropdown()" style="padding:8px 14px;border-radius:8px;background:var(--grey2);border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:6px;">
-          Notifications <span id="notif-count" style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;">2</span>
-        </button>
-        <div id="notif-dropdown" style="display:none;position:absolute;top:44px;right:0;width:340px;background:var(--white);border:1px solid var(--border);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);z-index:100;overflow:hidden;">
-          <div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:700;color:var(--text);">Notifications</div>
-          <div id="notif-list" style="max-height:320px;overflow-y:auto;"></div>
-          <div style="padding:10px 16px;border-top:1px solid var(--border);text-align:center;">
-            <button onclick="markAllRead()" style="font-size:12px;color:var(--blue);font-weight:600;background:none;border:none;cursor:pointer;font-family:var(--font);">Mark all as read</button>
+  <main class="flex-1 overflow-hidden">
+    @include('partials.chair_header', ['title' => 'Export Reports', 'badgeText' => 'BSIS Department'])
+
+    <div id="page-reports" class="page-content">
+      <div class="mb-5">
+        <div class="text-[20px] font-extrabold text-slate-900">Export Reports</div>
+        <div class="mt-1 text-[13px] text-slate-500">BSIS Department · AY 2025–2026 · 1st Semester</div>
+      </div>
+
+      <div class="mb-6 grid gap-4 md:grid-cols-3">
+        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-xl">📅</div>
+          <div class="mb-1 text-sm font-bold text-slate-900">Faculty Schedule</div>
+          <div class="mb-4 text-xs text-slate-500">Individual timetables per faculty member</div>
+          <div class="flex gap-2">
+            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Faculty Schedule','PDF')">PDF</button>
+            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Faculty Schedule','Excel')">Excel</button>
+          </div>
+        </div>
+
+        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-xl">📋</div>
+          <div class="mb-1 text-sm font-bold text-slate-900">Section Master List</div>
+          <div class="mb-4 text-xs text-slate-500">Complete schedule per section/class</div>
+          <div class="flex gap-2">
+            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Section Master List','PDF')">PDF</button>
+            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Section Master List','Excel')">Excel</button>
+          </div>
+        </div>
+
+        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
+          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-xl">📊</div>
+          <div class="mb-1 text-sm font-bold text-slate-900">Workload Summary</div>
+          <div class="mb-4 text-xs text-slate-500">Units per faculty with load breakdown</div>
+          <div class="flex gap-2">
+            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Workload Summary','PDF')">PDF</button>
+            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Workload Summary','Excel')">Excel</button>
           </div>
         </div>
       </div>
-    </div>
 
-    <div id="page-reports" class="page active">
-
-      <!-- Page header -->
-      <div style="margin-bottom:20px;">
-        <div style="font-size:20px;font-weight:800;color:var(--text);">Export Reports</div>
-        <div style="font-size:13px;color:var(--text3);">BSIS Department · AY 2025–2026 · 1st Semester</div>
-      </div>
-
-      <!-- Report cards -->
-      <div class="three-col" style="margin-bottom:24px;">
-
-        <div class="card" style="cursor:pointer;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='0 4px 20px rgba(37,99,235,.15)'" onmouseout="this.style.boxShadow=''">
-          <div style="width:40px;height:40px;border-radius:10px;background:var(--blue-pale);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;">📅</div>
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Faculty Schedule</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Individual timetables per faculty member</div>
-          <div style="display:flex;gap:8px;">
-            <button class="topbar-btn btn-primary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Faculty Schedule','PDF')">PDF</button>
-            <button class="topbar-btn btn-secondary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Faculty Schedule','Excel')">Excel</button>
-          </div>
-        </div>
-
-        <div class="card" style="cursor:pointer;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='0 4px 20px rgba(37,99,235,.15)'" onmouseout="this.style.boxShadow=''">
-          <div style="width:40px;height:40px;border-radius:10px;background:var(--green-light);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;">📋</div>
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Section Master List</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Complete schedule per section/class</div>
-          <div style="display:flex;gap:8px;">
-            <button class="topbar-btn btn-primary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Section Master List','PDF')">PDF</button>
-            <button class="topbar-btn btn-secondary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Section Master List','Excel')">Excel</button>
-          </div>
-        </div>
-
-        <div class="card" style="cursor:pointer;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='0 4px 20px rgba(37,99,235,.15)'" onmouseout="this.style.boxShadow=''">
-          <div style="width:40px;height:40px;border-radius:10px;background:var(--amber-light);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px;">📊</div>
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Workload Summary</div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:16px;">Units per faculty with load breakdown</div>
-          <div style="display:flex;gap:8px;">
-            <button class="topbar-btn btn-primary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Workload Summary','PDF')">PDF</button>
-            <button class="topbar-btn btn-secondary" style="font-size:12px;padding:6px 14px;flex:1;" onclick="exportReport('Workload Summary','Excel')">Excel</button>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Recent exports -->
-      <div class="card">
-        <div class="card-header">
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div class="mb-4 flex items-center justify-between">
           <div>
-            <div class="card-title">Recent Exports</div>
-            <div class="card-sub">Last generated reports this semester</div>
+            <div class="text-[15px] font-bold text-slate-900">Recent Exports</div>
+            <div class="text-[12px] text-slate-500">Last generated reports this semester</div>
           </div>
         </div>
-        <div id="recent-exports-list">
-          <div class="check-item">
-            <div class="check-dot" style="background:var(--blue);"></div>
-            <div class="check-label">Faculty Schedule — PDF</div>
-            <div class="check-status" style="color:var(--text3);font-weight:400;font-size:12px;">Jun 20, 2026 · 10:34 AM</div>
+        <div id="recent-exports-list" class="space-y-2">
+          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+            <div class="h-2.5 w-2.5 rounded-full bg-blue-500"></div>
+            <div class="flex-1 text-sm text-slate-700">Faculty Schedule — PDF</div>
+            <div class="text-[11px] text-slate-500">Jun 20, 2026 · 10:34 AM</div>
           </div>
-          <div class="check-item">
-            <div class="check-dot" style="background:var(--green);"></div>
-            <div class="check-label">Section Master List — Excel</div>
-            <div class="check-status" style="color:var(--text3);font-weight:400;font-size:12px;">Jun 18, 2026 · 3:12 PM</div>
+          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
+            <div class="flex-1 text-sm text-slate-700">Section Master List — Excel</div>
+            <div class="text-[11px] text-slate-500">Jun 18, 2026 · 3:12 PM</div>
           </div>
-          <div class="check-item">
-            <div class="check-dot" style="background:var(--amber);"></div>
-            <div class="check-label">Workload Summary — PDF</div>
-            <div class="check-status" style="color:var(--text3);font-weight:400;font-size:12px;">Jun 15, 2026 · 9:00 AM</div>
+          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+            <div class="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
+            <div class="flex-1 text-sm text-slate-700">Workload Summary — PDF</div>
+            <div class="text-[11px] text-slate-500">Jun 15, 2026 · 9:00 AM</div>
           </div>
         </div>
       </div>
-
     </div>
-  </div>
+  </main>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-// ── NOTIFICATION BELL ────────────────────────────────────────────────────────
 const CHAIR_NOTIFS = [
   { dot:'var(--red)', text:'<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
   { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time:'Today, 08:00 AM', unread:true },
@@ -121,9 +94,12 @@ function renderNotifList() {
   const list = document.getElementById('notif-list');
   if (!list) return;
   list.innerHTML = CHAIR_NOTIFS.map(n => `
-    <div class="notif-drop-item ${n.unread?'unread':''}" onclick="markRead(this)">
-      <div class="notif-drop-dot" style="background:${n.dot};"></div>
-      <div><div class="notif-drop-text">${n.text}</div><div class="notif-drop-time">${n.time}</div></div>
+    <div class="flex items-start gap-3 border-b border-slate-100 px-4 py-3 ${n.unread ? 'bg-slate-50' : ''}" onclick="markRead(this)">
+      <div class="mt-1.5 h-2.5 w-2.5 rounded-full" style="background:${n.dot};"></div>
+      <div class="min-w-0 flex-1">
+        <div class="text-[12.5px] leading-relaxed text-slate-600">${n.text}</div>
+        <div class="mt-1 text-[11px] text-slate-400">${n.time}</div>
+      </div>
     </div>`).join('');
   updateNotifCount();
 }
@@ -142,19 +118,18 @@ document.addEventListener('click', e => {
     if (dd) dd.style.display = 'none';
   }
 });
-function markRead(el) { el.classList.remove('unread'); updateNotifCount(); }
+function markRead(el) { el.classList.remove('bg-slate-50'); updateNotifCount(); }
 function markAllRead() {
-  document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
+  document.querySelectorAll('#notif-list > div').forEach(el => el.classList.remove('bg-slate-50'));
   updateNotifCount();
 }
 function updateNotifCount() {
-  const unread = document.querySelectorAll('.notif-drop-item.unread').length;
+  const unread = document.querySelectorAll('#notif-list > div.bg-slate-50').length;
   const badge = document.getElementById('notif-count');
-  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline' : 'none'; }
+  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline-flex' : 'none'; }
 }
 renderNotifList();
 
-// ── TOAST ──────────────────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
@@ -162,23 +137,19 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3200);
 }
 
-// ── EXPORT REPORT ──────────────────────────────────────────────────────────────
-const dotColors = { 'Faculty Schedule':'var(--blue)', 'Section Master List':'var(--green)', 'Workload Summary':'var(--amber)' };
+const dotColors = { 'Faculty Schedule':'#3b82f6', 'Section Master List':'#10b981', 'Workload Summary':'#f59e0b' };
 
 function exportReport(name, format) {
   showToast(name + ' — ' + format + ' generated successfully!');
-
-  // Add to recent exports list
   const list = document.getElementById('recent-exports-list');
   const now = new Date();
   const time = now.toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
   const item = document.createElement('div');
-  item.className = 'check-item';
-  item.style.animation = 'fadeIn .3s ease';
+  item.className = 'flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5';
   item.innerHTML = `
-    <div class="check-dot" style="background:${dotColors[name]||'var(--blue)'};"></div>
-    <div class="check-label">${name} — ${format}</div>
-    <div class="check-status" style="color:var(--text3);font-weight:400;font-size:12px;">${time}</div>`;
+    <div class="h-2.5 w-2.5 rounded-full" style="background:${dotColors[name] || '#3b82f6'};"></div>
+    <div class="flex-1 text-sm text-slate-700">${name} — ${format}</div>
+    <div class="text-[11px] text-slate-500">${time}</div>`;
   list.insertBefore(item, list.firstChild);
 }
 </script>

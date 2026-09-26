@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\NotifController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\AdminProfileController;
 
 // Models
 use App\Models\AcademicYear;
@@ -211,3 +212,27 @@ Route::get('/programs', [ProgramController::class, 'index'])
 
 Route::get('/departments', [DepartmentController::class, 'index'])
     ->name('admin.departments');
+
+/*
+|--------------------------------------------------------------------------
+| SETTINGS
+|--------------------------------------------------------------------------
+*/
+
+    Route::get('/settings', function () {
+        return view('admin.admin_settings');
+    })->name('admin.settings');
+
+    Route::post('/profile/picture', [AdminProfileController::class, 'updateProfilePicture'])
+        ->name('admin.profile.picture.update');
+
+    Route::delete('/profile/picture', [AdminProfileController::class, 'removeProfilePicture'])
+        ->name('admin.profile.picture.remove');
+
+    Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
+        ->name('admin.profile.personal-info.update');
+
+    Route::put('/admin/profile/appearance', [AdminProfileController::class, 'updateAppearance'])
+        ->name('admin.profile.appearance.update');
+
+        

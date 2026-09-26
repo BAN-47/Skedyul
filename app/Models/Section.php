@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Program;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class Section extends Model
 {
+    use HasUuids;
+
     protected $table = 'section';
     protected $primaryKey = 'sec_id';
     public $incrementing = false;
@@ -22,6 +24,7 @@ class Section extends Model
         'sec_name',
         'sec_year_level',
         'sec_no_of_student',
+        'sec_max_capacity',
         'sec_status',
     ];
 
@@ -29,6 +32,24 @@ class Section extends Model
     {
         return $this->belongsTo(Program::class, 'sec_prog_id', 'prog_id');
     }
-}
 
-?>
+    public function academicYear()
+    {
+        return $this->belongsTo(AcademicYear::class, 'sec_ay_id', 'ay_id');
+    }
+
+    public function semester()
+    {
+        return $this->belongsTo(Semester::class, 'sec_sem_id', 'sem_id');
+    }
+
+    public function studyLoads()
+    {
+        return $this->hasMany(Study_Load::class, 'sl_sec_id', 'sec_id');
+    }
+
+    public function schedules()
+    {
+        return $this->hasMany(Schedule::class, 'sch_sec_id', 'sec_id');
+    }
+}

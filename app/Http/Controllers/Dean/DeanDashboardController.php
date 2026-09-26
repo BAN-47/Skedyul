@@ -100,16 +100,20 @@ class DeanDashboardController extends Controller
         $pendingApprovals = Schedule_Submission::with('department')
             ->when($semester, fn($q) => $q->where('schsub_sem_id', $semester->sem_id))
             ->where('schsub_status', 'Pending')
-            ->get()
-            ->map(function ($sub) {
-                $submitter = User::find($sub->schsub_submitted_by);
-                return [
-                    'submission'  => $sub,
-                    'dept_name'   => $sub->department->dept_name ?? 'Unknown Dept',
-                    'submitted_by'=> $submitter->usr_name ?? 'Unknown',
-                    'submitted_at'=> $sub->schsub_submitted_at,
-                ];
-            });
+            ->get();
+
+        $submitterIds = $pendingApprovals->pluck('schsub_submitted_by');
+        $submittersById = User::whereIn('usr_id', $submitterIds)->get()->keyBy('usr_id');
+
+        $pendingApprovals = $pendingApprovals->map(function ($sub) use ($submittersById) {
+            $submitter = $submittersById->get($sub->schsub_submitted_by);
+            return [
+                'submission'  => $sub,
+                'dept_name'   => $sub->department->dept_name ?? 'Unknown Dept',
+                'submitted_by' => $submitter->usr_name ?? 'Unknown',
+                'submitted_at' => $sub->schsub_submitted_at,
+            ];
+        });
 
         $scheduledApprovedCount = Schedule_Submission::when($semester, fn($q) => $q->where('schsub_sem_id', $semester->sem_id))
             ->where('schsub_status', 'Approved')
@@ -118,11 +122,18 @@ class DeanDashboardController extends Controller
         $pendingDeptCount = $pendingApprovals->count();
 
         return view('dean.dean_dashboard', compact(
-            'academicYear', 'semester',
-            'totalFaculty', 'avgFacultyLoad', 'overloadCount',
-            'facultyAlerts', 'deptSummary',
-            'subjectsTotal', 'subjectsPlotted',
-            'pendingApprovals', 'scheduledApprovedCount', 'pendingDeptCount'
+            'academicYear',
+            'semester',
+            'totalFaculty',
+            'avgFacultyLoad',
+            'overloadCount',
+            'facultyAlerts',
+            'deptSummary',
+            'subjectsTotal',
+            'subjectsPlotted',
+            'pendingApprovals',
+            'scheduledApprovedCount',
+            'pendingDeptCount'
         ));
     }
 

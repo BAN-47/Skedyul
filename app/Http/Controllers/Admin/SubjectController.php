@@ -44,7 +44,11 @@ class SubjectController extends Controller
 
         $validated['subj_is_active'] = $request->boolean('subj_is_active');
 
-        Subjects::create($validated);
+        try {
+            Subjects::create($validated);
+        } catch (\Throwable $e) {
+            return $this->redirectWithDbError($e, 'Unable to create the subject right now. Please check your input and try again.');
+        }
 
         return redirect()->route('subject.index')
             ->with('success', 'Subject created successfully.');
@@ -85,7 +89,11 @@ class SubjectController extends Controller
 
         $validated['subj_is_active'] = $request->boolean('subj_is_active');
 
-        $subject->update($validated);
+        try {
+            $subject->update($validated);
+        } catch (\Throwable $e) {
+            return $this->redirectWithDbError($e, 'Unable to update the subject right now. Please try again.');
+        }
 
         return redirect()->route('subject.index')
             ->with('success', 'Subject updated successfully.');
@@ -97,13 +105,8 @@ class SubjectController extends Controller
 
         try {
             $subject->delete();
-        } catch (QueryException $e) {
-            if ($e->getCode() === '23503') {
-                return redirect()->route('subject.index')
-                    ->with('error', 'Cannot delete this subject — it is still assigned in one or more study loads.');
-            }
-
-            throw $e;
+        } catch (\Throwable $e) {
+            return $this->redirectWithDbError($e, 'Cannot delete this subject because it is still assigned in another record.');
         }
 
         return redirect()->route('subject.index')
