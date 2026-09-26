@@ -33,7 +33,12 @@ class ChairFacultyLoadController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
+        // Scoped to the chair's specific program (fac_prog_id) when they have
+        // one, same pattern $subjects already used below — a chair only
+        // manages faculty actually assigned to their program, not the whole
+        // department.
         $faculty = Faculty::where('fac_dept_id', $deptChair->dc_dept_id)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
             ->orderBy('fac_first_name')
             ->get();
 
@@ -121,8 +126,16 @@ class ChairFacultyLoadController extends Controller
         $rooms = Room::where('room_is_available', true)->orderBy('room_name')->get();
 
         return view('chair.faculty_load', compact(
-            'deptChair', 'department', 'program', 'academicYear', 'semester',
-            'facultyLoad', 'faculty', 'subjects', 'sections', 'rooms'
+            'deptChair',
+            'department',
+            'program',
+            'academicYear',
+            'semester',
+            'facultyLoad',
+            'faculty',
+            'subjects',
+            'sections',
+            'rooms'
         ));
     }
 
