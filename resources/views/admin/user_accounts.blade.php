@@ -63,7 +63,7 @@
             <div class="flex gap-2 items-center">
               <input id="user-search" placeholder="Search users..." oninput="filterUsers(this.value)"
                 class="field-input w-[200px]">
-              <button type="button" onclick="openModal('modal-add-user')" class="btn btn-primary">
+              <button type="button" onclick="openAddModal()" class="btn btn-primary">
                 + Add User
               </button>
             </div>
@@ -134,13 +134,7 @@
                       <button
                         type="button"
                         class="btn btn-secondary !px-3 !py-1.5 !text-[12px]"
-                        onclick="openEditModal(
-        '{{ $user->usr_id }}',
-        @js($user->usr_name),
-        @js($user->usr_email),
-        @js($user->usr_role),
-        {{ $user->usr_is_active ? 'true' : 'false' }}
-    )">
+                        onclick="openEditModal('{{ $user->usr_id }}')">
                         Edit
                       </button>
                       <form method="POST" action="{{ route('admin.users.destroy', ['id' => $user->usr_id]) }}" onsubmit="return confirm('Delete this user?')" class="inline">
@@ -180,27 +174,22 @@
 
   {{-- MODAL: ADD USER --}}
   <div class="modal-overlay" id="modal-add-user">
-    <div class="modal-box w-[640px]">
+    <div class="modal-box w-[720px]">
       <div class="modal-header">
         <div class="modal-title">Add New User</div>
         <button type="button" onclick="closeModal('modal-add-user')" class="modal-close">✕</button>
       </div>
-      <form method="POST" action="{{ route('admin.users.store') }}">
+      <form method="POST" action="{{ route('admin.users.store') }}" id="form-add-user">
         @csrf
+
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label class="field-label">Full Name</label>
-            <input name="usr_name" placeholder="e.g. Juan Dela Cruz" required class="field-input">
-          </div>
           <div>
             <label class="field-label">Email</label>
             <input name="usr_email" type="email" placeholder="user@ctu.edu.ph" required class="field-input">
           </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label class="field-label">Role</label>
-            <select name="usr_role" required class="field-input">
+            <select name="usr_role" class="field-input" required onchange="toggleRoleFields(this)">
               <option value="">— Select role —</option>
               <option value="faculty">Faculty Member</option>
               <option value="department_chair">Department Chair</option>
@@ -208,7 +197,77 @@
               <option value="system_admin">Technical Administrator</option>
             </select>
           </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
+            <label class="field-label">Password</label>
+            <input name="password" type="password" placeholder="Temporary password" required minlength="8" class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Employee ID</label>
+            <input name="usr_employee_id" placeholder="e.g. 2026-00123" class="field-input">
+          </div>
+        </div>
+
+        <div class="border-t border-slate-200 my-3"></div>
+        <div class="text-[12px] font-bold text-slate-500 uppercase mb-2">Personal Information</div>
+
+        <div class="grid grid-cols-4 gap-3 mb-3">
+          <div>
+            <label class="field-label">First Name</label>
+            <input name="usr_first_name" placeholder="Juan" required class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Middle Name</label>
+            <input name="usr_middle_name" placeholder="A." class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Last Name</label>
+            <input name="usr_last_name" placeholder="Dela Cruz" required class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Suffix</label>
+            <input name="usr_suffix" placeholder="Jr., Sr., III" class="field-input">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3 mb-3">
+          <div>
+            <label class="field-label">Gender</label>
+            <select name="usr_gender" class="field-input">
+              <option value="">— Select —</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Civil Status</label>
+            <select name="usr_civil_status" class="field-input">
+              <option value="">— Select —</option>
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Widowed">Widowed</option>
+              <option value="Separated">Separated</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Date of Birth</label>
+            <input name="usr_dob" type="date" class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Nationality</label>
+            <input name="usr_nationality" placeholder="Filipino" class="field-input">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="field-label">Rank / Title</label>
+            <input name="usr_rank_title" placeholder="e.g. Instructor I" class="field-input">
+          </div>
+          <div class="role-field" data-roles="faculty" style="display:none;">
             <label class="field-label">Employment Type</label>
             <select name="employment_type" class="field-input">
               <option value="full_time">Full-time</option>
@@ -216,21 +275,50 @@
             </select>
           </div>
         </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label class="field-label">Password</label>
-            <input name="password" type="password" placeholder="Temporary password" required minlength="8" class="field-input">
+
+        <div class="border-t border-slate-200 my-3"></div>
+
+        <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
+          <div class="text-[12px] font-bold text-slate-500 uppercase mb-2">Role Details</div>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="field-label">Phone Number</label>
+              <input name="role_phone_number" placeholder="0912 345 6789" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Gmail</label>
+              <input name="role_gmail" type="email" placeholder="name@gmail.com" class="field-input">
+            </div>
           </div>
-          <div>
-            <label class="field-label">Department</label>
-            <select name="department" class="field-input">
-              <option value="BSIS">BSIS</option>
-              <option value="BSIT">BSIT</option>
-              <option value="BIT-CT">BIT-CT</option>
-              <option value="CCICT">CCICT</option>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="field-label">Address</label>
+              <input name="role_address" placeholder="Cebu City" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Department</label>
+              <select name="dept_id" class="field-input">
+                <option value="">— Select department —</option>
+                @foreach($departments as $dept)
+                  <option value="{{ $dept->dept_id }}">{{ $dept->dept_name }} ({{ $dept->dept_code }})</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+
+          <div class="role-field" data-roles="department_chair" style="display:none;">
+            <label class="field-label">Program</label>
+            <select name="prog_id" class="field-input">
+              <option value="">— Select program —</option>
+              @foreach($programs as $prog)
+                <option value="{{ $prog->prog_id }}">{{ $prog->prog_name }} ({{ $prog->prog_code }})</option>
+              @endforeach
             </select>
           </div>
         </div>
+
         <div class="modal-footer">
           <button type="button" onclick="closeModal('modal-add-user')" class="btn btn-secondary">Cancel</button>
           <button type="submit" class="btn btn-primary">Create Account</button>
@@ -241,7 +329,7 @@
 
   {{-- MODAL: EDIT USER --}}
   <div class="modal-overlay" id="modal-edit-user">
-    <div class="modal-box w-[370px] max-w-[calc(100vw-32px)]">
+    <div class="modal-box w-[720px]">
       <div class="modal-header">
         <div class="modal-title">Edit User</div>
         <button type="button" onclick="closeModal('modal-edit-user')" class="modal-close">✕</button>
@@ -256,44 +344,24 @@
       <form id="form-edit-user" method="POST" action="">
         @csrf
         @method('PUT')
+
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label class="field-label">Full Name</label>
-            <input id="edit-name" name="usr_name" placeholder="Full Name" required class="field-input">
-          </div>
           <div>
             <label class="field-label">Email</label>
             <input id="edit-email" name="usr_email" type="email" placeholder="email@ctu.edu.ph" required class="field-input">
           </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label class="field-label">Role</label>
-            <select id="edit-role" name="usr_role" class="field-input">
+            <select id="edit-role" name="usr_role" class="field-input" required onchange="toggleRoleFields(this)">
               <option value="faculty">Faculty</option>
               <option value="department_chair">Dept. Chair</option>
               <option value="dean">Dean</option>
               <option value="system_admin">Technical Administrator</option>
             </select>
           </div>
-          <div>
-            <label class="field-label">Department</label>
-            <select id="edit-department" class="field-input">
-              <option value="CCICT">CCICT</option>
-              <option value="BSIS">BSIS</option>
-              <option value="BSIT">BSIT</option>
-              <option value="BIT-CT">BIT-CT</option>
-            </select>
-          </div>
         </div>
+
         <div class="grid grid-cols-2 gap-3 mb-3">
-          <div>
-            <label class="field-label">Employment Type</label>
-            <select id="edit-employment" class="field-input">
-              <option value="full_time">Full-time</option>
-              <option value="part_time">Part-time</option>
-            </select>
-          </div>
           <div>
             <label class="field-label">Status</label>
             <select id="edit-status" name="usr_is_active" class="field-input">
@@ -301,24 +369,130 @@
               <option value="0">Inactive</option>
             </select>
           </div>
+          <div>
+            <label class="field-label">Employee ID</label>
+            <input id="edit-employee-id" name="usr_employee_id" class="field-input">
+          </div>
         </div>
+
+        <div class="border-t border-slate-200 my-3"></div>
+        <div class="text-[12px] font-bold text-slate-500 uppercase mb-2">Personal Information</div>
+
+        <div class="grid grid-cols-4 gap-3 mb-3">
+          <div>
+            <label class="field-label">First Name</label>
+            <input id="edit-first-name" name="usr_first_name" required class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Middle Name</label>
+            <input id="edit-middle-name" name="usr_middle_name" class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Last Name</label>
+            <input id="edit-last-name" name="usr_last_name" required class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Suffix</label>
+            <input id="edit-suffix" name="usr_suffix" class="field-input">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-3 mb-3">
+          <div>
+            <label class="field-label">Gender</label>
+            <select id="edit-gender" name="usr_gender" class="field-input">
+              <option value="">— Select —</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Civil Status</label>
+            <select id="edit-civil-status" name="usr_civil_status" class="field-input">
+              <option value="">— Select —</option>
+              <option value="Single">Single</option>
+              <option value="Married">Married</option>
+              <option value="Widowed">Widowed</option>
+              <option value="Separated">Separated</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Date of Birth</label>
+            <input id="edit-dob" name="usr_dob" type="date" class="field-input">
+          </div>
+          <div>
+            <label class="field-label">Nationality</label>
+            <input id="edit-nationality" name="usr_nationality" class="field-input">
+          </div>
+        </div>
+
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
-            <label class="field-label">Office Location</label>
-            <input id="edit-office" class="field-input" readonly>
+            <label class="field-label">Rank / Title</label>
+            <input id="edit-rank-title" name="usr_rank_title" class="field-input">
           </div>
-          <div>
-            <label class="field-label">Contact Number</label>
-            <input id="edit-contact" class="field-input" value="(032) 401-7777">
+          <div class="role-field" data-roles="faculty" style="display:none;">
+            <label class="field-label">Employment Type</label>
+            <select id="edit-employment" name="employment_type" class="field-input">
+              <option value="full_time">Full-time</option>
+              <option value="part_time">Part-time</option>
+            </select>
           </div>
         </div>
+
+        <div class="border-t border-slate-200 my-3"></div>
+
+        <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
+          <div class="text-[12px] font-bold text-slate-500 uppercase mb-2">Role Details</div>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="field-label">Phone Number</label>
+              <input id="edit-phone" name="role_phone_number" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Gmail</label>
+              <input id="edit-gmail" name="role_gmail" type="email" class="field-input">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label class="field-label">Address</label>
+              <input id="edit-address" name="role_address" class="field-input">
+            </div>
+            <div>
+              <label class="field-label">Department</label>
+              <select id="edit-department" name="dept_id" class="field-input">
+                <option value="">— Select department —</option>
+                @foreach($departments as $dept)
+                  <option value="{{ $dept->dept_id }}">{{ $dept->dept_name }} ({{ $dept->dept_code }})</option>
+                @endforeach
+              </select>
+            </div>
+          </div>
+
+          <div class="role-field" data-roles="department_chair" style="display:none;">
+            <label class="field-label">Program</label>
+            <select id="edit-program" name="prog_id" class="field-input">
+              <option value="">— Select program —</option>
+              @foreach($programs as $prog)
+                <option value="{{ $prog->prog_id }}">{{ $prog->prog_name }} ({{ $prog->prog_code }})</option>
+              @endforeach
+            </select>
+          </div>
+        </div>
+
         <div class="mb-3">
           <label class="field-label">About / Bio</label>
           <textarea id="edit-about" name="usr_bio" class="field-input min-h-12 resize-y" rows="2"></textarea>
         </div>
+
         <div class="bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2.5 text-[12px] text-amber-800 mb-1">
           ⚠️ Changes will be reflected immediately across the system.
         </div>
+
         <div class="modal-footer">
           <button type="button" onclick="closeModal('modal-edit-user')" class="btn btn-secondary">Cancel</button>
           <button type="button" onclick="confirmDeleteFromEdit()" class="btn btn-danger">Delete</button>
@@ -400,7 +574,7 @@
     };
 
     const EDIT_URL_TEMPLATE = "{{ route('admin.users.edit', ['id' => '__ID__']) }}";
-    const UPDATE_URL_TEMPLATE = "{{ route('admin.users.update', ['id' => '__ID__']) }}";
+    const UPDATE_URL_TEMPLATE = "{{ url('admin/users') }}/__ID__";
 
     function openModal(id) {
       document.getElementById(id).classList.add('active');
@@ -424,39 +598,74 @@
       return hash;
     }
 
-    function openEditModal(userId, name, email, role, isActive) {
+    // Shows/hides .role-field elements INSIDE THE SAME FORM as the <select>
+    // that triggered it, so Add and Edit modals never interfere with each other.
+    function toggleRoleFields(selectEl) {
+      const role = selectEl.value;
+      const form = selectEl.closest('form');
+      if (!form) return;
 
-      document.getElementById('edit-name').value = name || '';
-      document.getElementById('edit-email').value = email || '';
-      document.getElementById('edit-role').value = role || 'faculty';
-      document.getElementById('edit-status').value = isActive ? '1' : '0';
-      const editRow = document.querySelector(`tr[data-user-id="${CSS.escape(String(userId))}"]`);
-      document.getElementById('edit-office').value = editRow?.dataset.roomLocation || 'No room assigned';
-      document.getElementById('edit-about').value = editRow?.dataset.bio || '';
+      form.querySelectorAll('.role-field').forEach(el => {
+        const allowed = (el.dataset.roles || '').split(',').map(r => r.trim());
+        const show = allowed.includes(role);
+        el.style.display = show ? '' : 'none';
+        el.querySelectorAll('input, select').forEach(input => { input.disabled = !show; });
+      });
+    }
 
-      const colorIndex =
-        simpleHash(name || '') % AVATAR_COLORS.length;
+    function openAddModal() {
+      const form = document.getElementById('form-add-user');
+      form.reset();
+      form.querySelectorAll('.role-field').forEach(el => {
+        el.style.display = 'none';
+        el.querySelectorAll('input, select').forEach(input => { input.disabled = true; });
+      });
+      openModal('modal-add-user');
+    }
 
+    // Now fetches full profile + role data from admin.users.edit (JSON) instead
+    // of relying on table row attributes, since we need first/last/role fields
+    // that aren't in the row's data-* attributes.
+    async function openEditModal(userId) {
+      const res = await fetch(EDIT_URL_TEMPLATE.replace('__ID__', userId));
+      if (!res.ok) { showToast('Could not load user.'); return; }
+      const data = await res.json();
+
+      document.getElementById('edit-email').value = data.usr_email || '';
+      document.getElementById('edit-role').value = data.usr_role || 'faculty';
+      document.getElementById('edit-status').value = data.usr_is_active ? '1' : '0';
+      document.getElementById('edit-employee-id').value = data.usr_employee_id || '';
+
+      document.getElementById('edit-first-name').value = data.usr_first_name || '';
+      document.getElementById('edit-middle-name').value = data.usr_middle_name || '';
+      document.getElementById('edit-last-name').value = data.usr_last_name || '';
+      document.getElementById('edit-suffix').value = data.usr_suffix || '';
+      document.getElementById('edit-gender').value = data.usr_gender || '';
+      document.getElementById('edit-civil-status').value = data.usr_civil_status || '';
+      document.getElementById('edit-dob').value = data.usr_dob ? data.usr_dob.substring(0, 10) : '';
+      document.getElementById('edit-nationality').value = data.usr_nationality || '';
+      document.getElementById('edit-rank-title').value = data.usr_rank_title || '';
+      document.getElementById('edit-about').value = data.usr_bio || '';
+
+      document.getElementById('edit-phone').value = data.role_phone_number || '';
+      document.getElementById('edit-gmail').value = data.role_gmail || '';
+      document.getElementById('edit-address').value = data.role_address || '';
+      document.getElementById('edit-department').value = data.dept_id || '';
+      document.getElementById('edit-program').value = data.prog_id || '';
+      document.getElementById('edit-employment').value = data.employment_type || 'full_time';
+
+      toggleRoleFields(document.getElementById('edit-role'));
+
+      const fullName = [data.usr_first_name, data.usr_last_name].filter(Boolean).join(' ') || data.usr_name || '';
+      const colorIndex = simpleHash(fullName) % AVATAR_COLORS.length;
       const avatarEl = document.getElementById('edit-avatar');
+      avatarEl.style.background = AVATAR_COLORS[colorIndex];
+      avatarEl.textContent = (fullName || '?').charAt(0).toUpperCase();
+      document.getElementById('edit-avatar-name').textContent = fullName;
+      document.getElementById('edit-avatar-role').textContent = ROLE_LABELS[data.usr_role] || data.usr_role || '';
 
-      avatarEl.style.background =
-        AVATAR_COLORS[colorIndex];
-
-      avatarEl.textContent =
-        (name || '?').charAt(0).toUpperCase();
-
-      document.getElementById('edit-avatar-name').textContent =
-        name || '';
-
-      document.getElementById('edit-avatar-role').textContent =
-        ROLE_LABELS[role] || role || '';
-
-      const form =
-        document.getElementById('form-edit-user');
-
-      form.action =
-        "{{ url('admin/users') }}/" + userId;
-
+      const form = document.getElementById('form-edit-user');
+      form.action = UPDATE_URL_TEMPLATE.replace('__ID__', userId);
       form.dataset.userId = userId;
 
       openModal('modal-edit-user');
@@ -502,10 +711,9 @@
     }
 
     function editProfileUser() {
-      const row = document.querySelector(`tr[data-user-id="${CSS.escape(String(profileUserId))}"]`);
-      if (!row) return;
+      if (!profileUserId) return;
       closeModal('modal-user-profile');
-      openEditModal(profileUserId, row.dataset.name, row.dataset.email, row.dataset.role, row.dataset.active === '1');
+      openEditModal(profileUserId);
     }
 
     function confirmDeleteFromEdit() {
