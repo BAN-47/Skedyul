@@ -114,28 +114,28 @@
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">New User Registration</div><div class="text-xs text-slate-400 mt-0.5">Alert when a new account is created or pending approval</div></div>
                   <label class="toggle-switch">
-                    <input type="checkbox" data-field="notif_new_user_registration" {{ auth()->user()->notif_new_user_registration ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                    <input type="checkbox" data-field="notif_new_user_registration" {{ (bool) \App\Models\SystemSetting::get('notif_new_user_registration', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
                     <span class="toggle-track {{ auth()->user()->notif_new_user_registration ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">Faculty Overload</div><div class="text-xs text-slate-400 mt-0.5">Notify when a faculty member exceeds their max load</div></div>
                   <label class="toggle-switch">
-                    <input type="checkbox" data-field="notif_faculty_overload" {{ auth()->user()->notif_faculty_overload ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                    <input type="checkbox" data-field="notif_faculty_overload" {{ (bool) \App\Models\SystemSetting::get('notif_faculty_overload', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
                     <span class="toggle-track {{ auth()->user()->notif_faculty_overload ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">System Backups</div><div class="text-xs text-slate-400 mt-0.5">Receive confirmation after each automatic backup</div></div>
                   <label class="toggle-switch">
-                    <input type="checkbox" data-field="notif_system_backups" {{ auth()->user()->notif_system_backups ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                    <input type="checkbox" data-field="notif_system_backups" {{ (bool) \App\Models\SystemSetting::get('notif_system_backups', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
                     <span class="toggle-track {{ auth()->user()->notif_system_backups ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">Login Activity</div><div class="text-xs text-slate-400 mt-0.5">Notify on new logins from unrecognized devices</div></div>
                   <label class="toggle-switch">
-                    <input type="checkbox" data-field="notif_login_activity" {{ auth()->user()->notif_login_activity ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                    <input type="checkbox" data-field="notif_login_activity" {{ (bool) \App\Models\SystemSetting::get('notif_login_activity', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
                     <span class="toggle-track {{ auth()->user()->notif_login_activity ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
@@ -187,18 +187,18 @@
               <div>
                 <label class="field-label">Session Timeout</label>
                 <select class="field-input" id="sec-session-timeout">
-                  <option value="15" {{ auth()->user()->usr_session_timeout_minutes == 15 ? 'selected' : '' }}>15 minutes</option>
-                  <option value="30" {{ auth()->user()->usr_session_timeout_minutes == 30 ? 'selected' : '' }}>30 minutes</option>
-                  <option value="60" {{ auth()->user()->usr_session_timeout_minutes == 60 ? 'selected' : '' }}>1 hour</option>
-                  <option value="999999" {{ auth()->user()->usr_session_timeout_minutes == 999999 ? 'selected' : '' }}>Never</option>
+                  <option value="15" {{ \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30) == 15 ? 'selected' : '' }}>15 minutes</option>
+                  <option value="30" {{ \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30) == 30 ? 'selected' : '' }}>30 minutes</option>
+                  <option value="60" {{ \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30) == 60 ? 'selected' : '' }}>1 hour</option>
+                  <option value="999999" {{ \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30) == 999999 ? 'selected' : '' }}>Never</option>
                 </select>
               </div>
               <div>
                 <label class="field-label">Max Login Attempts</label>
                 <select class="field-input" id="sec-max-attempts">
-                  <option value="3" {{ auth()->user()->usr_max_login_attempts == 3 ? 'selected' : '' }}>3</option>
-                  <option value="5" {{ auth()->user()->usr_max_login_attempts == 5 ? 'selected' : '' }}>5</option>
-                  <option value="10" {{ auth()->user()->usr_max_login_attempts == 10 ? 'selected' : '' }}>10</option>
+                  <option value="3" {{ \App\Models\SystemSetting::get('usr_max_login_attempts', 5) == 3 ? 'selected' : '' }}>3</option>
+                  <option value="5" {{ \App\Models\SystemSetting::get('usr_max_login_attempts', 5) == 5 ? 'selected' : '' }}>5</option>
+                  <option value="10" {{ \App\Models\SystemSetting::get('usr_max_login_attempts', 5) == 10 ? 'selected' : '' }}>10</option>
                 </select>
               </div>
             </div>
@@ -219,8 +219,37 @@
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Auth</div><div class="text-[13px] font-semibold text-slate-900">JWT + Laravel Sanctum</div></div>
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Frontend</div><div class="text-[13px] font-semibold text-slate-900">Tailwind CSS + Vanilla JS</div></div>
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Mobile App</div><div class="text-[13px] font-semibold text-slate-900">React Native</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Last Backup</div><div class="text-[13px] font-semibold text-green-600">Today, 06:00 AM ✓</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Uptime</div><div class="text-[13px] font-semibold text-slate-900">99.98% (last 30 days)</div></div>
+                @php
+                    $latestBackup = \App\Models\SystemBackup::orderByDesc('bkp_ran_at')->first();
+                @endphp
+                <div class="bg-slate-50 rounded-lg p-3.5">
+                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Last Backup</div>
+                  @if($latestBackup)
+                    <div class="text-[13px] font-semibold {{ $latestBackup->bkp_status === 'success' ? 'text-green-600' : 'text-red-600' }}">
+                      {{ $latestBackup->bkp_ran_at->format('M j, Y, h:i A') }}
+                      {{ $latestBackup->bkp_status === 'success' ? '✓' : '✗' }}
+                    </div>
+                  @else
+                    <div class="text-[13px] font-semibold text-slate-400">No backups yet</div>
+                  @endif
+                </div>
+                @php
+                  $uptimeText = 'Unknown';
+                  try {
+                      $output = shell_exec('wmic process where "name=\'httpd.exe\'" get CreationDate /value');
+                      preg_match('/CreationDate=(\d{14})/', $output, $matches);
+                      if (isset($matches[1])) {
+                          $startTime = \Carbon\Carbon::createFromFormat('YmdHis', substr($matches[1], 0, 14));
+                          $uptimeText = $startTime->diffForHumans(now(), true) . ' (since ' . $startTime->format('M j, g:i A') . ')';
+                      }
+                  } catch (\Exception $e) {
+                      $uptimeText = 'Unable to determine';
+                  }
+              @endphp
+              <div class="bg-slate-50 rounded-lg p-3.5">
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Server Uptime</div>
+                <div class="text-[13px] font-semibold text-slate-900">{{ $uptimeText }}</div>
+              </div>
               </div>
             </div>
           </div>

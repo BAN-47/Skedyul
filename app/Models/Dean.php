@@ -53,15 +53,28 @@ class Dean extends Model
     protected $fillable = [
         'dean_usr_id',
         'dean_dept_id',
+        'dean_prog_id',
         'dean_first_name',
         'dean_middle_name',
         'dean_last_name',
         'dean_suffix',
         'dean_phone_number',
         'dean_gmail',
-        'dean_address',
+        'dean_office_address',
         'dean_profile_image',
+        'dean_profile_image_public_id',
         'dean_assigned_at',
+        'dean_employee_id',
+        'dean_gender',
+        'dean_civil_status',
+        'dean_dob',
+        'dean_nationality',
+        'dean_bio',
+    ];
+
+    protected $casts = [
+        'dean_dob' => 'date',
+        'dean_assigned_at' => 'datetime',
     ];
 
     /**

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Models\SystemSetting;
 
 class AdminProfileController extends Controller
 {
@@ -37,7 +38,9 @@ class AdminProfileController extends Controller
             'notif_login_activity' => 'sometimes|required|boolean',
         ]);
 
-        Auth::user()->update($validated);
+        foreach ($validated as $key => $value) {
+            SystemSetting::set($key, $value ? '1' : '0', Auth::id());
+        }
 
         return response()->json(['success' => true]);
     }
@@ -71,7 +74,9 @@ class AdminProfileController extends Controller
             'usr_max_login_attempts' => 'required|integer|in:3,5,10',
         ]);
 
-        Auth::user()->update($validated);
+        foreach ($validated as $key => $value) {
+            SystemSetting::set($key, $value, Auth::id());
+        }
 
         return response()->json(['success' => true]);
     }
