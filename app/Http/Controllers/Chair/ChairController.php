@@ -39,16 +39,21 @@ class ChairController extends Controller
         $semester     = Semester::where('sem_is_active', true)->first();
 
         // ---------- FACULTY IN THIS DEPARTMENT ----------
+        // Scoped down to the chair's specific program (fac_prog_id) when they
+        // have one — a chair only manages faculty actually assigned to their
+        // program, not the whole department (same pattern used everywhere
+        // else a chair is program-specific).
         $faculty = Faculty::with('user')
             ->where('fac_dept_id', $deptId)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
             ->get();
 
         $totalFaculty = $faculty->count();
 
         $facultyLoad = $faculty->map(function ($f) use ($semester, $academicYear) {
             $workload = Workload::where('wl_fac_id', $f->fac_id)
-                ->when($semester, fn ($q) => $q->where('wl_sem_id', $semester->sem_id))
-                ->when($academicYear, fn ($q) => $q->where('wl_ay_id', $academicYear->ay_id))
+                ->when($semester, fn($q) => $q->where('wl_sem_id', $semester->sem_id))
+                ->when($academicYear, fn($q) => $q->where('wl_ay_id', $academicYear->ay_id))
                 ->first();
 
             $totalHours = (float) ($workload->wl_total_hours ?? 0);
@@ -74,23 +79,29 @@ class ChairController extends Controller
         });
 
         // ---------- SECTIONS IN THIS DEPARTMENT'S PROGRAMS ----------
+        // Also narrowed to the chair's specific program when they have one,
+        // same reasoning as $faculty above.
         $section = Section::with('program')
-            ->whereHas('program', fn ($q) => $q->where('prog_dept_id', $deptId))
-            ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
-            ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
+            ->whereHas('program', fn($q) => $q->where('prog_dept_id', $deptId))
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('sec_prog_id', $deptChair->dc_prog_id))
+            ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
+            ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->get();
 
         $totalSections = $section->count();
 
         // ---------- SUBJECTS FOR THIS DEPARTMENT ----------
-        $subject = Subjects::where('subj_dept_id', $deptId)->get();
+        // Same fix again: subj_prog_id narrows this to the chair's program.
+        $subject = Subjects::where('subj_dept_id', $deptId)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
+            ->get();
         $totalSubjects = $subject->count();
 
         $plottedSubjIds = $semester
             ? Study_Load::where('sl_sem_id', $semester->sem_id)
-                ->whereIn('sl_subj_id', $subject->pluck('subj_id'))
-                ->distinct()
-                ->pluck('sl_subj_id')
+            ->whereIn('sl_subj_id', $subject->pluck('subj_id'))
+            ->distinct()
+            ->pluck('sl_subj_id')
             : collect();
 
         $subjectsPlotted = $plottedSubjIds->count();
@@ -108,11 +119,20 @@ class ChairController extends Controller
             ->count();
 
         return view('chair.chair_dashboard', compact(
-            'deptChair', 'academicYear', 'semester',
-            'faculty', 'totalFaculty', 'facultyLoad',
-            'section', 'totalSections',
-            'subject', 'totalSubjects', 'subjectsPlotted',
-            'notifications', 'unreadCount', 'conflictsCount'
+            'deptChair',
+            'academicYear',
+            'semester',
+            'faculty',
+            'totalFaculty',
+            'facultyLoad',
+            'section',
+            'totalSections',
+            'subject',
+            'totalSubjects',
+            'subjectsPlotted',
+            'notifications',
+            'unreadCount',
+            'conflictsCount'
         ));
     }
 
