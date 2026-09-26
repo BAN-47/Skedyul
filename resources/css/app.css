@@ -581,6 +581,10 @@
     /* Used on settings notifications page */
     .toggle-switch { @apply relative inline-flex cursor-pointer; }
 
+    .toggle-switch input {
+        @apply absolute inset-0 opacity-0 cursor-pointer w-full h-full m-0 z-10;
+    }
+
     .toggle-track {
         @apply w-10 h-6 rounded-full bg-slate-200 transition-colors relative;
     }
@@ -589,7 +593,7 @@
 
     .toggle-thumb {
         @apply absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full
-               shadow transition-transform;
+            shadow transition-transform;
     }
 
     .toggle-track.on .toggle-thumb { @apply translate-x-4; }

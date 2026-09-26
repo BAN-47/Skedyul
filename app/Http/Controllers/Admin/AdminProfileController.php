@@ -5,51 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class AdminProfileController extends Controller
 {
-    public function updateProfilePicture(Request $request)
-    {
-        $request->validate([
-            'profile_picture' => 'required|image|mimes:jpg,jpeg,png,webp|max:2048',
-        ]);
-
-        $user = Auth::user();
-
-        if ($user->profile_picture_public_id) {
-            Storage::disk('cloudinary')->delete($user->profile_picture_public_id);
-        }
-
-        $path = $request->file('profile_picture')->store('skedyul/profile_pictures', 'cloudinary');
-
-        $user->update([
-            'profile_picture' => Storage::disk('cloudinary')->url($path),
-            'profile_picture_public_id' => $path,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'url' => Storage::disk('cloudinary')->url($path),
-        ]);
-    }
-
-    public function removeProfilePicture(Request $request)
-    {
-        $user = Auth::user();
-
-        if ($user->profile_picture_public_id) {
-            Storage::disk('cloudinary')->delete($user->profile_picture_public_id);
-        }
-
-        $user->update([
-            'profile_picture' => null,
-            'profile_picture_public_id' => null,
-        ]);
-
-        return response()->json(['success' => true]);
-    }
-
     public function updatePersonalInfo(Request $request)
     {
         $validated = $request->validate([
@@ -57,12 +17,6 @@ class AdminProfileController extends Controller
             'usr_last_name' => 'required|string|max:100',
             'usr_middle_name' => 'nullable|string|max:100',
             'usr_suffix' => 'nullable|string|max:10',
-            'usr_rank_title' => 'nullable|string|max:150',
-            'usr_employee_id' => 'nullable|string|max:50',
-            'usr_gender' => 'nullable|string|max:50',
-            'usr_civil_status' => 'nullable|string|max:50',
-            'usr_dob' => 'nullable|date',
-            'usr_nationality' => 'nullable|string|max:100',
         ]);
 
         $user = Auth::user();
@@ -74,22 +28,51 @@ class AdminProfileController extends Controller
         ]);
     }
 
-    public function updateAppearance(Request $request)
+    public function updateNotificationPreferences(Request $request)
     {
         $validated = $request->validate([
-            'language'    => 'required|in:en,fil,ceb',
-            'date_format' => 'nullable|string',
-            'time_format' => 'nullable|string',
+            'notif_new_user_registration' => 'sometimes|required|boolean',
+            'notif_faculty_overload' => 'sometimes|required|boolean',
+            'notif_system_backups' => 'sometimes|required|boolean',
+            'notif_login_activity' => 'sometimes|required|boolean',
         ]);
-    
-        $request->user()->update([
-            'language' => $validated['language'],
-            // date_format / time_format aren't columns on `users` yet.
-            // Add them as columns (like `language`) if you want them persisted,
-            // or store them in a separate settings table if they should be
-            // app-wide rather than per-user.
+
+        Auth::user()->update($validated);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
         ]);
-    
+
+        $user = Auth::user();
+
+        if (!Hash::check($request->current_password, $user->usr_password_hash)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['The current password is incorrect. Please try again.'],
+            ]);
+        }
+
+        $user->update([
+            'usr_password_hash' => Hash::make($request->new_password),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function updateSecuritySettings(Request $request)
+    {
+        $validated = $request->validate([
+            'usr_session_timeout_minutes' => 'required|integer|in:15,30,60,999999',
+            'usr_max_login_attempts' => 'required|integer|in:3,5,10',
+        ]);
+
+        Auth::user()->update($validated);
+
         return response()->json(['success' => true]);
     }
 }
