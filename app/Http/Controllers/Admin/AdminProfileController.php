@@ -73,4 +73,23 @@ class AdminProfileController extends Controller
             'usr_name' => $user->usr_name,
         ]);
     }
+
+    public function updateAppearance(Request $request)
+    {
+        $validated = $request->validate([
+            'language'    => 'required|in:en,fil,ceb',
+            'date_format' => 'nullable|string',
+            'time_format' => 'nullable|string',
+        ]);
+    
+        $request->user()->update([
+            'language' => $validated['language'],
+            // date_format / time_format aren't columns on `users` yet.
+            // Add them as columns (like `language`) if you want them persisted,
+            // or store them in a separate settings table if they should be
+            // app-wide rather than per-user.
+        ]);
+    
+        return response()->json(['success' => true]);
+    }
 }

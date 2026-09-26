@@ -231,3 +231,8 @@ Route::get('/departments', [DepartmentController::class, 'index'])
 
     Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
         ->name('admin.profile.personal-info.update');
+
+    Route::put('/admin/profile/appearance', [AdminProfileController::class, 'updateAppearance'])
+        ->name('admin.profile.appearance.update');
+
+        
