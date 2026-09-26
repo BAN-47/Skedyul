@@ -14,6 +14,8 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\AdminProfileController;
+use App\Http\Controllers\Admin\InstitutionController;
+use App\Http\Controllers\Admin\AcademicYearController;
 
 // Models
 use App\Models\AcademicYear;
@@ -152,6 +154,11 @@ Route::prefix('admin')->group(function () {
 
 });
 
+Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
+    ->name('admin.profile.personal-info.update');
+
+Route::put('/institution', [InstitutionController::class, 'update'])
+    ->name('admin.institution.update');
 
 /*
 |--------------------------------------------------------------------------
@@ -223,16 +230,14 @@ Route::get('/departments', [DepartmentController::class, 'index'])
         return view('admin.admin_settings');
     })->name('admin.settings');
 
-    Route::post('/profile/picture', [AdminProfileController::class, 'updateProfilePicture'])
-        ->name('admin.profile.picture.update');
+    Route::put('/academic-year', [AcademicYearController::class, 'update'])
+        ->name('admin.academic-year.update');
 
-    Route::delete('/profile/picture', [AdminProfileController::class, 'removeProfilePicture'])
-        ->name('admin.profile.picture.remove');
+    Route::put('/profile/notification-preferences', [AdminProfileController::class, 'updateNotificationPreferences'])
+        ->name('admin.profile.notification-preferences.update');
 
-    Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
-        ->name('admin.profile.personal-info.update');
-
-    Route::put('/admin/profile/appearance', [AdminProfileController::class, 'updateAppearance'])
-        ->name('admin.profile.appearance.update');
-
-        
+    Route::put('/profile/password', [AdminProfileController::class, 'updatePassword'])
+        ->name('admin.profile.password.update');
+    
+    Route::put('/profile/security-settings', [AdminProfileController::class, 'updateSecuritySettings'])
+        ->name('admin.profile.security-settings.update');
