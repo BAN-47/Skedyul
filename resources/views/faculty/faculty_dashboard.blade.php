@@ -51,7 +51,7 @@
       <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
         <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Teaching Load</div><div class="stat-value">{{ $totalHours }}h</div><div class="stat-sub">of 30h max</div></div>
         <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">My Subjects</div><div class="stat-value">{{ $mySubjects->count() }}</div><div class="stat-sub">This semester</div></div>
-        <div class="stat-card" style="--accent:#d97706"><div class="stat-label">My Sections</div><div class="stat-value">{{ $mySections->count() }}</div><div class="stat-sub">{{ $mySections->implode(', ') ?: 'None assigned' }}</div></div>
+        <div class="stat-card" style="--accent:#d97706"><div class="stat-label">My Sections</div><div class="stat-value">{{ $mySections->count() }}</div><div class="stat-sub">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div></div>
       </div>
 
       <div class="row">
@@ -84,9 +84,9 @@
               <div class="workload-item">
                 <div class="workload-header">
                   <div class="workload-name">{{ $subj->subj_code }} — {{ $subj->subj_name }}</div>
-                  <div class="workload-val" style="color:{{ $colors[$i % count($colors)] }};">{{ $subj->subj_units ?? '' }}u</div>
+                  <div class="workload-val" style="--wc: {{ $colors[$i % count($colors)] }}; color: var(--wc);">{{ $subj->subj_units ?? '' }}u</div>
                 </div>
-                <div class="workload-bar"><div class="workload-fill" style="width:100%;background:{{ $colors[$i % count($colors)] }};"></div></div>
+                <div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--wc);"></div></div>
               </div>
             @empty
               <div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">No subjects assigned.</div>
