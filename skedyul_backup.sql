@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict h9HTcD9B3kh2TY63R87nks1u7hYDtBqd0EtGLzegJqZcthlK4eXgAZ4yaF2qtbp
+\restrict qxiToOh3TzjTtV9tx8aexssct5CdjhsF3q2azMj73xidAtZVwkRhq07053U39wJ
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -4546,7 +4546,11 @@ CREATE TABLE public."USER" (
     usr_created_at timestamp with time zone DEFAULT now() NOT NULL,
     usr_updated_at timestamp with time zone DEFAULT now() NOT NULL,
     usr_bio text,
-    CONSTRAINT "USER_usr_role_check" CHECK (((usr_role)::text = ANY ((ARRAY['system_admin'::character varying, 'dean'::character varying, 'department_chair'::character varying, 'faculty'::character varying])::text[])))
+    usr_first_name character varying(255),
+    usr_last_name character varying(255),
+    usr_middle_name character varying(255),
+    usr_suffix character varying(255),
+    CONSTRAINT "USER_usr_role_check" CHECK (((usr_role)::text = ANY (ARRAY[('system_admin'::character varying)::text, ('dean'::character varying)::text, ('department_chair'::character varying)::text, ('faculty'::character varying)::text])))
 );
 
 
@@ -4639,10 +4643,18 @@ CREATE TABLE public.dean (
     dean_suffix character varying(10),
     dean_phone_number character varying(20) NOT NULL,
     dean_gmail character varying(255),
-    dean_address character varying(255),
+    dean_office_address character varying(255),
     dean_profile_image text,
     dean_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
-    dean_dept_id uuid
+    dean_dept_id uuid,
+    dean_prog_id uuid,
+    dean_employee_id character varying(50),
+    dean_gender character varying(50),
+    dean_civil_status character varying(50),
+    dean_dob date,
+    dean_nationality character varying(100),
+    dean_profile_image_public_id character varying(255),
+    dean_bio text
 );
 
 
@@ -4679,7 +4691,12 @@ CREATE TABLE public.department_chair (
     dc_address character varying(255),
     dc_profile_image text,
     dc_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
-    dc_prog_id uuid
+    dc_prog_id uuid,
+    dc_employee_id character varying(50),
+    dc_gender character varying(50),
+    dc_civil_status character varying(50),
+    dc_dob date,
+    dc_nationality character varying(100)
 );
 
 
@@ -4698,7 +4715,7 @@ CREATE TABLE public.fac_preference (
     fpref_preference_score integer DEFAULT 1,
     fpref_created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT fac_preference_fpref_preference_score_check CHECK (((fpref_preference_score >= 1) AND (fpref_preference_score <= 5))),
-    CONSTRAINT fac_preference_fpref_preferred_day_check CHECK (((fpref_preferred_day)::text = ANY ((ARRAY['Monday'::character varying, 'Tuesday'::character varying, 'Wednesday'::character varying, 'Thursday'::character varying, 'Friday'::character varying, 'Saturday'::character varying, 'Sunday'::character varying])::text[])))
+    CONSTRAINT fac_preference_fpref_preferred_day_check CHECK (((fpref_preferred_day)::text = ANY (ARRAY[('Monday'::character varying)::text, ('Tuesday'::character varying)::text, ('Wednesday'::character varying)::text, ('Thursday'::character varying)::text, ('Friday'::character varying)::text, ('Saturday'::character varying)::text, ('Sunday'::character varying)::text])))
 );
 
 
@@ -4737,7 +4754,13 @@ CREATE TABLE public.faculty (
     fac_profile_image text,
     fac_created_at timestamp with time zone DEFAULT now() NOT NULL,
     fac_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT faculty_fac_employment_type_check CHECK (((fac_employment_type)::text = ANY ((ARRAY['full_time'::character varying, 'part_time'::character varying])::text[])))
+    fac_prog_id uuid,
+    fac_employee_id character varying(50),
+    fac_gender character varying(50),
+    fac_civil_status character varying(50),
+    fac_dob date,
+    fac_nationality character varying(100),
+    CONSTRAINT faculty_fac_employment_type_check CHECK (((fac_employment_type)::text = ANY (ARRAY[('full_time'::character varying)::text, ('part_time'::character varying)::text])))
 );
 
 
@@ -4800,6 +4823,25 @@ CREATE TABLE public.historical_schedule (
 
 
 ALTER TABLE public.historical_schedule OWNER TO postgres;
+
+--
+-- Name: institution; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.institution (
+    inst_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    inst_name character varying(255) NOT NULL,
+    inst_branch_campus character varying(255) NOT NULL,
+    inst_college character varying(255) NOT NULL,
+    inst_abbreviation character varying(50) NOT NULL,
+    inst_contact_email character varying(255) NOT NULL,
+    inst_phone character varying(50) NOT NULL,
+    inst_created_at timestamp without time zone DEFAULT now(),
+    inst_updated_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.institution OWNER TO postgres;
 
 --
 -- Name: job_batches; Type: TABLE; Schema: public; Owner: postgres
@@ -4982,8 +5024,8 @@ CREATE TABLE public.schedule (
     sch_created_at timestamp with time zone DEFAULT now() NOT NULL,
     sch_updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT schedule_check CHECK ((sch_end_time > sch_start_time)),
-    CONSTRAINT schedule_sch_day_check CHECK (((sch_day)::text = ANY ((ARRAY['Monday'::character varying, 'Tuesday'::character varying, 'Wednesday'::character varying, 'Thursday'::character varying, 'Friday'::character varying, 'Saturday'::character varying, 'Sunday'::character varying])::text[]))),
-    CONSTRAINT schedule_sch_status_check CHECK (((sch_status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'archived'::character varying])::text[])))
+    CONSTRAINT schedule_sch_day_check CHECK (((sch_day)::text = ANY (ARRAY[('Monday'::character varying)::text, ('Tuesday'::character varying)::text, ('Wednesday'::character varying)::text, ('Thursday'::character varying)::text, ('Friday'::character varying)::text, ('Saturday'::character varying)::text, ('Sunday'::character varying)::text]))),
+    CONSTRAINT schedule_sch_status_check CHECK (((sch_status)::text = ANY (ARRAY[('draft'::character varying)::text, ('published'::character varying)::text, ('archived'::character varying)::text])))
 );
 
 
@@ -5003,7 +5045,7 @@ CREATE TABLE public.schedule_submission (
     schsub_reviewed_at timestamp with time zone,
     schsub_status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     schsub_remarks text,
-    CONSTRAINT schedule_submission_schsub_status_check CHECK (((schsub_status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'returned'::character varying])::text[])))
+    CONSTRAINT schedule_submission_schsub_status_check CHECK (((schsub_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text])))
 );
 
 
@@ -5092,7 +5134,7 @@ CREATE TABLE public.study_load (
     sl_assigned_by uuid NOT NULL,
     sl_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
     sl_status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
-    CONSTRAINT study_load_sl_status_check CHECK (((sl_status)::text = ANY ((ARRAY['draft'::character varying, 'submitted'::character varying, 'approved'::character varying, 'returned'::character varying, 'published'::character varying])::text[])))
+    CONSTRAINT study_load_sl_status_check CHECK (((sl_status)::text = ANY (ARRAY[('draft'::character varying)::text, ('submitted'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text, ('published'::character varying)::text])))
 );
 
 
@@ -5117,6 +5159,21 @@ CREATE TABLE public.subject (
 
 
 ALTER TABLE public.subject OWNER TO postgres;
+
+--
+-- Name: system_backup; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.system_backup (
+    bkp_id uuid NOT NULL,
+    bkp_file_path character varying(255) NOT NULL,
+    bkp_status character varying(255) NOT NULL,
+    bkp_error_message text,
+    bkp_ran_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE public.system_backup OWNER TO postgres;
 
 --
 -- Name: system_setting; Type: TABLE; Schema: public; Owner: postgres
@@ -5146,45 +5203,6 @@ CREATE TABLE public.token_blacklist (
 
 
 ALTER TABLE public.token_blacklist OWNER TO postgres;
-
---
--- Name: users; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.users (
-    id bigint NOT NULL,
-    name character varying(255) NOT NULL,
-    email character varying(255) NOT NULL,
-    email_verified_at timestamp(0) without time zone,
-    password character varying(255) NOT NULL,
-    remember_token character varying(100),
-    created_at timestamp(0) without time zone,
-    updated_at timestamp(0) without time zone
-);
-
-
-ALTER TABLE public.users OWNER TO postgres;
-
---
--- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
---
-
-CREATE SEQUENCE public.users_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
-ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
-
---
--- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
---
-
-ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
-
 
 --
 -- Name: workload; Type: TABLE; Schema: public; Owner: postgres
@@ -5232,7 +5250,7 @@ ALTER TABLE realtime.messages OWNER TO supabase_realtime_admin;
 
 CREATE TABLE realtime.schema_migrations (
     version bigint NOT NULL,
-    inserted_at timestamp(0) without time zone
+    inserted_at timestamp(0) without time zone DEFAULT now()
 );
 
 
@@ -5475,13 +5493,6 @@ ALTER TABLE ONLY public.jobs ALTER COLUMN id SET DEFAULT nextval('public.jobs_id
 --
 
 ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.migrations_id_seq'::regclass);
-
-
---
--- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
 
 
 --
@@ -5786,18 +5797,18 @@ COPY auth.webauthn_credentials (id, user_id, credential_id, public_key, attestat
 -- Data for Name: USER; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public."USER" (usr_id, usr_name, usr_email, usr_password_hash, usr_role, usr_is_active, usr_created_at, usr_updated_at, usr_bio) FROM stdin;
-d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juan Dela Cruz	dean@ctu.edu.ph	$2y$12$gywJ/ZZRLVc0gIsG9yUoyOvH8dLtBUmTH9GYFiy.AHlbGYriK0xHS	dean	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
-bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Dr. Carlos Mendoza	carlos.mendoza@ctu.edu.ph	$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi	dean	t	2026-07-17 14:23:53.460898+00	2026-07-17 14:23:53.460898+00	\N
-335c70b6-c19a-4214-8b7b-fb771a2c9e02	Noreen B. Fuentes	noreen.fuentes@ctu.edu.ph	$2a$10$qq/oocHtejo3bTt5g4oyreQuEm1uUi8LEDOBXzZKazoQ2LpkvWkES	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N
-0180a717-2d4b-4d0d-a418-153b7b24911e	Pet Andrew P. Nacua	pet.nacua@ctu.edu.ph	$2a$10$1vYcHeYhAvHsHn0Hd7CErua/OYUS7XChXvdn1qdgIrXNa3MK.22Bm	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N
-3abae64c-f024-4897-940b-fb4531d720ee	Marie Joy B. Alit	mariejoy.alit@ctu.edu.ph	$2a$10$ozIRrnZ8byIcj88Cr.p3p.PwSPUqtJnrZf8D7HFzK07G6HqcflHCu	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N
-56b56f76-e432-490c-a35b-b4f588ddf716	Christopher Dignos	christopher@ctu.edu.ph	$2y$10$facultyhash1	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	I am Christopher Dignos A Web Developer
-ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel Reyes	emmanuel@ctu.edu.ph	$2y$12$rxmpl0IC9sk.TayU6.xT9uln7PIilX4/V/Q1RAG7vOzOxqx85ST4K	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
-270ad7b7-7c4d-4823-b314-816b91773cb9	System Administrator	admin@skedyul.ctu.edu.ph	$2y$12$1FtUkjuUrma5GxMa.68ehujDeTikQ5JE27l/CSmQ.AYbs2ktb780a	system_admin	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
-b0e4adf0-59b3-4a5f-a9ab-9094f130ae9b	Tristan Obeso	Obeso@ctu.edu.ph	$2y$12$Ca.uTtlwxv29PnMuyuIoNeQc.oOFgutfUSs.3jl38DR5UnXAyidA6	dean	t	2026-09-08 06:08:30.229609+00	2026-09-08 06:08:30.229609+00	\N
-30552f5d-6983-426f-8e9f-2854ab12fc24	Odyssy Subingsubing	odc@ctu.edu.ph	$2y$12$DF5Jmi5BMyeDKWH3KOPkf.c45WYWu3Y0G70vntP2CJtDa9fI0dJ4C	faculty	t	2026-09-08 06:13:37.615704+00	2026-09-08 06:13:37.615704+00	\N
-41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria Santos	chair.ccict@ctu.edu.ph	$2y$12$btn7JzikHUxIc/TPmy16wO/pSUH4Do5v9TtKinwfHVXiAQtZViGdO	department_chair	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
+COPY public."USER" (usr_id, usr_name, usr_email, usr_password_hash, usr_role, usr_is_active, usr_created_at, usr_updated_at, usr_bio, usr_first_name, usr_last_name, usr_middle_name, usr_suffix) FROM stdin;
+bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Dr. Carlos Mendoza	carlos.mendoza@ctu.edu.ph	$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi	dean	t	2026-07-17 14:23:53.460898+00	2026-07-17 14:23:53.460898+00	\N	\N	\N	\N	\N
+ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel Reyes	emmanuel@ctu.edu.ph	$2y$12$rxmpl0IC9sk.TayU6.xT9uln7PIilX4/V/Q1RAG7vOzOxqx85ST4K	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
+b0e4adf0-59b3-4a5f-a9ab-9094f130ae9b	Tristan Obeso	Obeso@ctu.edu.ph	$2y$12$Ca.uTtlwxv29PnMuyuIoNeQc.oOFgutfUSs.3jl38DR5UnXAyidA6	dean	t	2026-09-08 06:08:30.229609+00	2026-09-08 06:08:30.229609+00	\N	\N	\N	\N	\N
+30552f5d-6983-426f-8e9f-2854ab12fc24	Odyssy Subingsubing	odc@ctu.edu.ph	$2y$12$DF5Jmi5BMyeDKWH3KOPkf.c45WYWu3Y0G70vntP2CJtDa9fI0dJ4C	faculty	t	2026-09-08 06:13:37.615704+00	2026-09-08 06:13:37.615704+00	\N	\N	\N	\N	\N
+41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria Santos	chair.ccict@ctu.edu.ph	$2y$12$btn7JzikHUxIc/TPmy16wO/pSUH4Do5v9TtKinwfHVXiAQtZViGdO	department_chair	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
+270ad7b7-7c4d-4823-b314-816b91773cb9	System Administrator	admin@skedyul.ctu.edu.ph	$2y$12$5UjYtBYFQ/VoBJn20OHFi.99w85lPfLCPSVilGSt3kFTj04mZU4Si	system_admin	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	Inde	Navarette	Golan	\N
+56b56f76-e432-490c-a35b-b4f588ddf716	Christopher Dignos	christopher@ctu.edu.ph	$2y$12$YYunHuHXAcvAy4E1Zb1Ga.NbrSisSTrKRVjLtCWSAi3mYEfxnw7Nu	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	I am Christopher Dignos A Web Developer	\N	\N	\N	\N
+335c70b6-c19a-4214-8b7b-fb771a2c9e02	Noreen B. Fuentes	noreen.fuentes@ctu.edu.ph	$2y$12$dd0z0SiJN5J96e/JDLRyxuU2KZtRVZMwR3xIFg5NwAJudPZS5h3Wq	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	\N	\N	\N	\N
+0180a717-2d4b-4d0d-a418-153b7b24911e	Pet Andrew P. Nacua	pet.nacua@ctu.edu.ph	$2y$12$RYI3Bz9DBTQyErHy.P0zt.33ZcC5ye/XyWV.iry9aSZSPe1RIrmCi	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	Pet Andrew	Nacua\r\n	P.\r\n	\N
+d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juan Dela Cruz	dean@ctu.edu.ph	$2y$12$kzLQbjP0ge0BeNboWgniW.QXZHlSbUziKWYFZHI5Bch7HL/T0XyNW	dean	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
+3abae64c-f024-4897-940b-fb4531d720ee	Marie Joy B. Alit	mariejoy.alit@ctu.edu.ph	$2y$12$vNLEGDWqyifQeyPV6LeE2OwtBpkxEJIoyqCyliDimViwiHPFDbbka	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	\N	\N	\N	\N
 \.
 
 
@@ -5808,9 +5819,10 @@ b0e4adf0-59b3-4a5f-a9ab-9094f130ae9b	Tristan Obeso	Obeso@ctu.edu.ph	$2y$12$Ca.uT
 COPY public.academic_year (ay_id, ay_academic_year, ay_year_label, ay_is_active, ay_created_at) FROM stdin;
 a880a964-ef79-4b67-948b-acf76c0c0c09	2023-2024	Academic Year 2023-2024	f	2026-07-15 15:02:46.174993+00
 fbd45845-3a8b-4484-8cc5-0312408111e2	2024-2025	Academic Year 2024-2025	f	2026-07-15 15:02:46.174993+00
-ceaa38d7-0d5c-48ae-a811-68b24925a534	2025-2026	Academic Year 2025-2026	t	2026-07-15 15:02:46.174993+00
 929e267e-ac05-41eb-bbeb-dd7f5cd273e3	2026-2027	Academic Year 2026-2027	f	2026-07-15 15:02:46.174993+00
 5f924702-240c-4eec-9e44-968756421168	2027-2028	Academic Year 2027-2028	f	2026-07-15 15:02:46.174993+00
+ceaa38d7-0d5c-48ae-a811-68b24925a534	2025-2026	Academic Year 2025-2026	f	2026-07-15 15:02:46.174993+00
+7f59daaa-01ff-44c3-babe-0efeb21e1cb0	2020-2021	2020-2021	t	2026-09-26 05:23:35+00
 \.
 
 
@@ -5860,12 +5872,12 @@ COPY public.cache_locks (key, owner, expiration) FROM stdin;
 -- Data for Name: dean; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.dean (dean_id, dean_usr_id, dean_first_name, dean_middle_name, dean_last_name, dean_suffix, dean_phone_number, dean_gmail, dean_address, dean_profile_image, dean_assigned_at, dean_dept_id) FROM stdin;
-2bc08823-8770-41ff-a8ad-71795272cf99	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juan	A.	Dela Cruz	\N	09171234567	dean@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
-c9fb747c-05a7-410d-aaf9-99a07194f794	ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel	D.	Reyes	\N	09201234567	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	bb09daa1-3065-4718-b08f-e4569311ace3
-1e861607-fb8a-4dc7-ad87-25237eb8075f	41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria	S.	Santos	\N	09211234567	chair.ccict@ctu.edu.ph	Lapu-Lapu City	\N	2026-07-15 15:02:55.862627+00	d2762742-5d6f-4013-9124-1cd3105c2708
-e4b6c925-9647-4d2b-bfd7-e8c5d2c3aa47	270ad7b7-7c4d-4823-b314-816b91773cb9	Pedro	B.	Garcia	\N	09181234567	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c
-4916e80e-1cc2-467b-be21-366b484def4b	bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Carlos	\N	Mendoza	\N	09190000000	carlos.mendoza@ctu.edu.ph	Cebu City	\N	2026-07-17 14:23:53.460898+00	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b
+COPY public.dean (dean_id, dean_usr_id, dean_first_name, dean_middle_name, dean_last_name, dean_suffix, dean_phone_number, dean_gmail, dean_office_address, dean_profile_image, dean_assigned_at, dean_dept_id, dean_prog_id, dean_employee_id, dean_gender, dean_civil_status, dean_dob, dean_nationality, dean_profile_image_public_id, dean_bio) FROM stdin;
+c9fb747c-05a7-410d-aaf9-99a07194f794	ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel	D.	Reyes	\N	09201234567	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	bb09daa1-3065-4718-b08f-e4569311ace3	\N	\N	\N	\N	\N	\N	\N	\N
+1e861607-fb8a-4dc7-ad87-25237eb8075f	41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria	S.	Santos	\N	09211234567	chair.ccict@ctu.edu.ph	Lapu-Lapu City	\N	2026-07-15 15:02:55.862627+00	d2762742-5d6f-4013-9124-1cd3105c2708	\N	\N	\N	\N	\N	\N	\N	\N
+e4b6c925-9647-4d2b-bfd7-e8c5d2c3aa47	270ad7b7-7c4d-4823-b314-816b91773cb9	Pedro	B.	Garcia	\N	09181234567	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	\N	\N	\N	\N	\N	\N	\N	\N
+4916e80e-1cc2-467b-be21-366b484def4b	bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Carlos	\N	Mendoza	\N	09190000000	carlos.mendoza@ctu.edu.ph	Cebu City	\N	2026-07-17 14:23:53.460898+00	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	\N	\N	\N	\N	\N	\N	\N	\N
+2bc08823-8770-41ff-a8ad-71795272cf99	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juana	B.	Dela	Sr.	09123456789	juana@gmail.com	corner San Juan St., Cebu City, Cebu	https://res.cloudinary.com/dlsr0ebdd/image/upload/v1790441922/skedyul/dean-avatars/dean_2bc08823-8770-41ff-a8ad-71795272cf99.jpg	2026-07-15 15:02:55.862627+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	\N	\N	Female	Married	2004-02-03	Filipino	skedyul/dean-avatars/dean_2bc08823-8770-41ff-a8ad-71795272cf99	WOWWW
 \.
 
 
@@ -5886,15 +5898,15 @@ d2762742-5d6f-4013-9124-1cd3105c2708	College of Technology	COT	2026-07-15 15:02:
 -- Data for Name: department_chair; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.department_chair (dc_id, dc_usr_id, dc_dept_id, dc_first_name, dc_middle_name, dc_last_name, dc_suffix, dc_phone_number, dc_gmail, dc_address, dc_profile_image, dc_assigned_at, dc_prog_id) FROM stdin;
-73673a05-8a7a-4e85-ac81-79730ff40cfc	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	Juan	A.	Dela Cruz	\N	09183333333	juan@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N
-9f9394f8-7c61-4b6f-8100-d5bbbfa3c284	56b56f76-e432-490c-a35b-b4f588ddf716	bb09daa1-3065-4718-b08f-e4569311ace3	Christopher	C.	Dignos	\N	09184444444	christopher@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N
-67faa0f0-a98c-4ad5-a5f8-8330f7c1141a	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Pedro	B.	Garcia	\N	09182222222	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860
-c005d277-5430-4566-8bc8-c2fdd96d02e0	ea9ad791-09c3-4f91-a464-c3bb72922747	d2762742-5d6f-4013-9124-1cd3105c2708	Emmanuel	R.	Reyes	\N	09185555555	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	69310995-f8bc-4ff9-9032-14f9e6ef2eb7
-cb3ee758-bb9d-43d7-bebd-d567f86dd883	41a4e102-068a-4a65-8e1d-70e5289f99ef	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Maria	S.	Santos	\N	09181111111	chair.ccict@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N
-b8faf6e3-c9a7-4718-b974-b2c6c020eb75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Noreen	B.	Fuentes	Ph.D	09170000010	noreen.fuentes@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11
-d7b63c0d-375a-45ab-be0f-a03cd0f14504	0180a717-2d4b-4d0d-a418-153b7b24911e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Pet Andrew	P.	Nacua	Ph.D	09170000011	pet.nacua@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38
-1e0fe4bd-42d5-4867-901a-6fe2a5e871cf	3abae64c-f024-4897-940b-fb4531d720ee	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Marie Joy	B.	Alit	Ph.D	09170000012	mariejoy.alit@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7
+COPY public.department_chair (dc_id, dc_usr_id, dc_dept_id, dc_first_name, dc_middle_name, dc_last_name, dc_suffix, dc_phone_number, dc_gmail, dc_address, dc_profile_image, dc_assigned_at, dc_prog_id, dc_employee_id, dc_gender, dc_civil_status, dc_dob, dc_nationality) FROM stdin;
+73673a05-8a7a-4e85-ac81-79730ff40cfc	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	Juan	A.	Dela Cruz	\N	09183333333	juan@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
+9f9394f8-7c61-4b6f-8100-d5bbbfa3c284	56b56f76-e432-490c-a35b-b4f588ddf716	bb09daa1-3065-4718-b08f-e4569311ace3	Christopher	C.	Dignos	\N	09184444444	christopher@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
+67faa0f0-a98c-4ad5-a5f8-8330f7c1141a	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Pedro	B.	Garcia	\N	09182222222	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
+c005d277-5430-4566-8bc8-c2fdd96d02e0	ea9ad791-09c3-4f91-a464-c3bb72922747	d2762742-5d6f-4013-9124-1cd3105c2708	Emmanuel	R.	Reyes	\N	09185555555	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	\N	\N	\N	\N	\N
+cb3ee758-bb9d-43d7-bebd-d567f86dd883	41a4e102-068a-4a65-8e1d-70e5289f99ef	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Maria	S.	Santos	\N	09181111111	chair.ccict@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
+b8faf6e3-c9a7-4718-b974-b2c6c020eb75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Noreen	B.	Fuentes	Ph.D	09170000010	noreen.fuentes@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	\N	\N	\N	\N	\N
+d7b63c0d-375a-45ab-be0f-a03cd0f14504	0180a717-2d4b-4d0d-a418-153b7b24911e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Pet Andrew	P.	Nacua	Ph.D	09170000011	pet.nacua@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N
+1e0fe4bd-42d5-4867-901a-6fe2a5e871cf	3abae64c-f024-4897-940b-fb4531d720ee	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Marie Joy	B.	Alit	Ph.D	09170000012	mariejoy.alit@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	\N	\N	\N	\N	\N
 \.
 
 
@@ -5928,12 +5940,12 @@ e1604a4f-e289-4777-b6d5-a6db1d140919	bec360f4-9e21-4e8b-9429-0d5f2079d187	Indust
 -- Data for Name: faculty; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.faculty (fac_id, fac_usr_id, fac_dept_id, fac_first_name, fac_middle_name, fac_last_name, fac_suffix, fac_phone_number, fac_gmail, fac_address, fac_employment_type, fac_rank, fac_profile_image, fac_created_at, fac_updated_at) FROM stdin;
-71a00f35-6a60-4165-8c14-85c402eaada1	56b56f76-e432-490c-a35b-b4f588ddf716	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Christopher	C.	Dignos	\N	09170000001	christopher@ctu.edu.ph	Cebu City	full_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-91c58e81-54ce-4ce1-8c49-b78324b9e2c8	ea9ad791-09c3-4f91-a464-c3bb72922747	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Emmanuel	R.	Reyes	\N	09170000002	emmanuel@ctu.edu.ph	Cebu City	full_time	Instructor II	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-c980c068-8108-4881-85f6-0d8df6a70870	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Mark	L.	Perez	\N	09170000003	mark@ctu.edu.ph	Cebu City	part_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-56e063b6-76e5-4382-85c9-89296f4cc916	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Juan	A.	Dela Cruz	\N	09170000004	juan@ctu.edu.ph	Cebu City	full_time	Associate Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-bec360f4-9e21-4e8b-9429-0d5f2079d187	41a4e102-068a-4a65-8e1d-70e5289f99ef	d2762742-5d6f-4013-9124-1cd3105c2708	Maria	S.	Santos	\N	09170000005	maria@ctu.edu.ph	Cebu City	full_time	Assistant Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
+COPY public.faculty (fac_id, fac_usr_id, fac_dept_id, fac_first_name, fac_middle_name, fac_last_name, fac_suffix, fac_phone_number, fac_gmail, fac_address, fac_employment_type, fac_rank, fac_profile_image, fac_created_at, fac_updated_at, fac_prog_id, fac_employee_id, fac_gender, fac_civil_status, fac_dob, fac_nationality) FROM stdin;
+91c58e81-54ce-4ce1-8c49-b78324b9e2c8	ea9ad791-09c3-4f91-a464-c3bb72922747	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Emmanuel	R.	Reyes	\N	09170000002	emmanuel@ctu.edu.ph	Cebu City	full_time	Instructor II	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	\N	\N	\N	\N	\N
+71a00f35-6a60-4165-8c14-85c402eaada1	56b56f76-e432-490c-a35b-b4f588ddf716	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Christopher	C.	Dignos	\N	09170000001	christopher@ctu.edu.ph	Cebu City	full_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N
+c980c068-8108-4881-85f6-0d8df6a70870	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Mark	L.	Perez	\N	09170000003	mark@ctu.edu.ph	Cebu City	part_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
+56e063b6-76e5-4382-85c9-89296f4cc916	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Juan	A.	Dela Cruz	\N	09170000004	juan@ctu.edu.ph	Cebu City	full_time	Associate Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
+bec360f4-9e21-4e8b-9429-0d5f2079d187	41a4e102-068a-4a65-8e1d-70e5289f99ef	d2762742-5d6f-4013-9124-1cd3105c2708	Maria	S.	Santos	\N	09170000005	maria@ctu.edu.ph	Cebu City	full_time	Assistant Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	\N	\N	\N	\N	\N
 \.
 
 
@@ -5955,6 +5967,15 @@ a244234e-df61-4741-8113-8ce965e1f47a	71a00f35-6a60-4165-8c14-85c402eaada1	4a4abb
 27c3ea7c-9d61-4588-90fe-24aeca8fb9d9	56e063b6-76e5-4382-85c9-89296f4cc916	2df9b47a-70ed-4f45-833f-c4f0f8320746	06988bfc-08c2-4fc7-ae9c-7fe6c491bdfe	Wednesday	08:00:00	11:00:00	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	a880a964-ef79-4b67-948b-acf76c0c0c09	2026-07-15 15:03:40.332265+00
 912b163f-1623-46db-a69d-1ae72edffce3	c980c068-8108-4881-85f6-0d8df6a70870	75fb12d1-3626-45fb-b09c-6a61aea1fd03	36afdb09-814e-4bbf-b287-61e5480163b7	Thursday	09:00:00	12:00:00	4be9ba82-adf8-4625-a376-d18b4dddd352	a880a964-ef79-4b67-948b-acf76c0c0c09	2026-07-15 15:03:40.332265+00
 2fb96ee6-7745-41b3-a49a-de10b645ab8e	bec360f4-9e21-4e8b-9429-0d5f2079d187	99ba581e-ac78-4217-b3ad-3669926651ec	7ad85261-33d4-4332-9801-d86f76b08cb1	Friday	08:00:00	11:00:00	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	fbd45845-3a8b-4484-8cc5-0312408111e2	2026-07-15 15:03:40.332265+00
+\.
+
+
+--
+-- Data for Name: institution; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.institution (inst_id, inst_name, inst_branch_campus, inst_college, inst_abbreviation, inst_contact_email, inst_phone, inst_created_at, inst_updated_at) FROM stdin;
+14234048-d639-4c98-811e-ce04b2296c0d	Cebu Technological University	Main Campus	College of Computing, Information and Communications Technology	CCICT	information@ctu.edu.ph	(032) 402-4060	2026-09-26 05:04:11	2026-09-26 05:04:11
 \.
 
 
@@ -5982,6 +6003,15 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 1	0001_01_01_000000_create_users_table	1
 2	0001_01_01_000001_create_cache_table	1
 3	0001_01_01_000002_create_jobs_table	1
+5	2026_09_25_061547_admin_profile_images	2
+6	2026_09_25_072000_personal_info	3
+7	2026_09_25_144040_languages_website	4
+8	2026_09_26_060349_notification_preferences	5
+9	2026_09_26_063945_security_settings	6
+10	2026_09_26_065439_system_backup	7
+11	2026_09_26_121724_remove_settings_columns	8
+12	2026_09_26_143833_profile_images	9
+13	2026_09_26_154339_dean_bio	10
 \.
 
 
@@ -5990,11 +6020,11 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 --
 
 COPY public.notification (notif_id, notif_usr_id, notif_title, notif_message, notif_type, notif_is_read, notif_created_at, notif_updated_at) FROM stdin;
-a5c57ddc-3746-428f-a710-60df9a567053	270ad7b7-7c4d-4823-b314-816b91773cb9	System Backup	Daily backup completed successfully.	info	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
 d26b7f76-a879-4fcd-a04f-41f6ffaebf0f	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Schedule Approval	CCICT schedule is ready for approval.	approval	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
 762d13ee-5192-4013-9f18-a60fc78fad10	56b56f76-e432-490c-a35b-b4f588ddf716	Teaching Assignment	You have been assigned a new subject.	assignment	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
 2a855c78-7e13-4053-b284-e66cec1715c8	ea9ad791-09c3-4f91-a464-c3bb72922747	Reminder	Please update your faculty preferences.	warning	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
 4abba15e-673b-4838-bb98-d2dfd66f1dce	41a4e102-068a-4a65-8e1d-70e5289f99ef	Faculty Load	Faculty workloads have been submitted.	info	t	2026-07-15 15:05:53.620819+00	2026-09-14 04:25:47+00
+a5c57ddc-3746-428f-a710-60df9a567053	270ad7b7-7c4d-4823-b314-816b91773cb9	System Backup	Daily backup completed successfully.	info	t	2026-07-15 15:05:53.620819+00	2026-09-26 11:57:33+00
 \.
 
 
@@ -6089,11 +6119,12 @@ d8d489ba-c71b-4387-a022-ed46b12cb415	81603ad3-7337-4ae5-ae9f-c9456f3641bb	2af0aa
 --
 
 COPY public.semester (sem_id, sem_ay_id, sem_name, sem_start_date, sem_end_date, sem_is_active, sem_created_at) FROM stdin;
-244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	First Semester	2025-08-04	2025-12-20	t	2026-07-15 15:02:46.174993+00
 4be9ba82-adf8-4625-a376-d18b4dddd352	ceaa38d7-0d5c-48ae-a811-68b24925a534	Second Semester	2026-01-12	2026-05-30	f	2026-07-15 15:02:46.174993+00
 485b73a3-fe9d-4bf5-894f-4724e0c260b9	fbd45845-3a8b-4484-8cc5-0312408111e2	First Semester	2024-08-05	2024-12-20	f	2026-07-15 15:02:46.174993+00
 26e8ea67-4058-44cc-8b76-614368754057	fbd45845-3a8b-4484-8cc5-0312408111e2	Second Semester	2025-01-13	2025-05-30	f	2026-07-15 15:02:46.174993+00
 e1cddb17-e1a6-4c80-841e-81a7a95e96d7	929e267e-ac05-41eb-bbeb-dd7f5cd273e3	First Semester	2026-08-03	2026-12-18	f	2026-07-15 15:02:46.174993+00
+244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	First Semester	2025-08-04	2025-12-20	f	2026-07-15 15:02:46.174993+00
+f19da36a-54e7-4f86-8c0b-94a82ec827bc	7f59daaa-01ff-44c3-babe-0efeb21e1cb0	1st Semester	2020-08-20	2021-01-01	t	2026-09-26 05:23:37.777397+00
 \.
 
 
@@ -6133,6 +6164,15 @@ COPY public.subject (subj_id, subj_dept_id, subj_prog_id, subj_code, subj_name, 
 
 
 --
+-- Data for Name: system_backup; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.system_backup (bkp_id, bkp_file_path, bkp_status, bkp_error_message, bkp_ran_at) FROM stdin;
+01a0dd82-ab7c-70e0-9762-a18c4f615839	C:\\xampp\\htdocs\\Skedyul\\storage\\app/backups/backup_2026-09-26_113812.sql	success	\N	2026-09-26 11:38:39
+\.
+
+
+--
 -- Data for Name: system_setting; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
@@ -6142,6 +6182,11 @@ a722401a-8e82-4f3f-b770-628dc3366f31	current_academic_year	2025-2026	270ad7b7-7c
 84fcd59e-e0b4-4464-938a-9f383c22c14d	max_faculty_load	30	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:06:05.210873+00
 02d20d74-e8d3-4ce2-b729-fef54e25bc4e	allow_schedule_edit	true	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:06:05.210873+00
 07c8f870-3d5a-4dd3-b19f-d4a6fe348f48	system_name	SKEDYUL	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:06:05.210873+00
+01a0ddaf-22e9-7060-b827-5ee1f9ee58c5	notif_system_backups	0	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:27:18.450108+00
+01a0ddb0-eadb-72dc-ae70-71990f3d5453	notif_login_activity	0	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:29:15.176931+00
+01a0ddae-f4ef-7266-8330-54b7af58839c	notif_new_user_registration	1	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:27:06.769017+00
+01a0ddaf-10b3-70a7-9b0c-e36039d6339d	notif_faculty_overload	1	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:27:13.784826+00
+01a0e0d1-957a-7352-9921-27c8671593f5	dean_notif_faculty_overload	0	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-09-27 03:03:47.881612+00
 \.
 
 
@@ -6155,14 +6200,6 @@ COPY public.token_blacklist (tbl_id, tbl_usr_id, tbl_token, tbl_revoked_at) FROM
 5800814a-18d1-4b8e-ad6b-f860e218f760	41a4e102-068a-4a65-8e1d-70e5289f99ef	token_chair_001	2026-07-15 15:05:47.220445+00
 9762c359-1575-4504-aff2-281fd44415c0	56b56f76-e432-490c-a35b-b4f588ddf716	token_faculty1_001	2026-07-15 15:05:47.220445+00
 ed5be699-73d0-4a4b-979a-f97886cfd126	ea9ad791-09c3-4f91-a464-c3bb72922747	token_faculty2_001	2026-07-15 15:05:47.220445+00
-\.
-
-
---
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.users (id, name, email, email_verified_at, password, remember_token, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -6184,92 +6221,92 @@ COPY public.workload (wl_id, wl_fac_id, wl_sem_id, wl_ay_id, wl_type, wl_total_h
 --
 
 COPY realtime.schema_migrations (version, inserted_at) FROM stdin;
-20211116024918	2026-06-01 04:52:31
-20211116045059	2026-06-01 04:52:31
-20211116050929	2026-06-01 04:52:31
-20211116051442	2026-06-01 04:52:31
-20211116212300	2026-06-01 04:52:31
-20211116213355	2026-06-01 04:52:31
-20211116213934	2026-06-01 04:52:31
-20211116214523	2026-06-01 04:52:31
-20211122062447	2026-06-01 04:52:31
-20211124070109	2026-06-01 04:52:31
-20211202204204	2026-06-01 04:52:31
-20211202204605	2026-06-01 04:52:31
-20211210212804	2026-06-01 04:52:31
-20211228014915	2026-06-01 04:52:31
-20220107221237	2026-06-01 04:52:31
-20220228202821	2026-06-01 04:52:31
-20220312004840	2026-06-01 04:52:31
-20220603231003	2026-06-01 04:52:31
-20220603232444	2026-06-01 04:52:31
-20220615214548	2026-06-01 04:52:31
-20220712093339	2026-06-01 04:52:31
-20220908172859	2026-06-01 04:52:31
-20220916233421	2026-06-01 04:52:31
-20230119133233	2026-06-01 04:52:31
-20230128025114	2026-06-01 04:52:31
-20230128025212	2026-06-01 04:52:31
-20230227211149	2026-06-01 04:52:31
-20230228184745	2026-06-01 04:52:31
-20230308225145	2026-06-01 04:52:31
-20230328144023	2026-06-01 04:52:31
-20231018144023	2026-06-01 04:52:31
-20231204144023	2026-06-01 04:52:31
-20231204144024	2026-06-01 04:52:31
-20231204144025	2026-06-01 04:52:31
-20240108234812	2026-06-01 04:52:31
-20240109165339	2026-06-01 04:52:31
-20240227174441	2026-06-01 04:52:31
-20240311171622	2026-06-01 04:52:31
-20240321100241	2026-06-01 04:52:31
-20240401105812	2026-06-01 04:52:31
-20240418121054	2026-06-01 04:52:31
-20240523004032	2026-06-01 04:52:31
-20240618124746	2026-06-01 04:52:31
-20240801235015	2026-06-01 04:52:31
-20240805133720	2026-06-01 04:52:31
-20240827160934	2026-06-01 04:52:31
-20240919163303	2026-06-01 04:52:31
-20240919163305	2026-06-01 04:52:31
-20241019105805	2026-06-01 04:52:31
-20241030150047	2026-06-01 04:52:32
-20241108114728	2026-06-01 04:52:32
-20241121104152	2026-06-01 04:52:32
-20241130184212	2026-06-01 04:52:32
-20241220035512	2026-06-01 04:52:32
-20241220123912	2026-06-01 04:52:32
-20241224161212	2026-06-01 04:52:32
-20250107150512	2026-06-01 04:52:32
-20250110162412	2026-06-01 04:52:32
-20250123174212	2026-06-01 04:52:32
-20250128220012	2026-06-01 04:52:32
-20250506224012	2026-06-01 04:52:32
-20250523164012	2026-06-01 04:52:32
-20250714121412	2026-06-01 04:52:32
-20250905041441	2026-06-01 04:52:32
-20251103001201	2026-06-01 04:52:32
-20251120212548	2026-06-01 04:52:32
-20251120215549	2026-06-01 04:52:32
-20260218120000	2026-06-01 04:52:32
-20260326120000	2026-06-01 04:52:32
-20260514120000	2026-06-08 09:00:31
-20260527120000	2026-06-08 09:00:31
-20260528120000	2026-06-08 09:00:31
-20260603120000	2026-06-08 09:00:31
-20260605120000	2026-06-24 04:06:17
-20260606110000	2026-06-24 04:06:17
-20260616120000	2026-07-13 13:28:12
-20260624120000	2026-07-13 13:28:12
-20260626120000	2026-07-13 13:28:12
-20260706120000	2026-07-13 13:28:12
-20260707120000	2026-07-15 02:37:04
-20260709120000	2026-07-15 02:37:05
-20260714120000	2026-09-05 03:59:29
-20260827120000	2026-09-16 12:35:32
-20260914120000	2026-09-24 07:21:10
-20260916120000	2026-09-24 07:21:10
-20260922120000	2026-09-24 07:21:10
+20211116024918	2026-09-24 12:22:22
+20211116045059	2026-09-24 12:22:22
+20211116050929	2026-09-24 12:22:22
+20211116051442	2026-09-24 12:22:22
+20211116212300	2026-09-24 12:22:22
+20211116213355	2026-09-24 12:22:22
+20211116213934	2026-09-24 12:22:22
+20211116214523	2026-09-24 12:22:22
+20211122062447	2026-09-24 12:22:22
+20211124070109	2026-09-24 12:22:22
+20211202204204	2026-09-24 12:22:22
+20211202204605	2026-09-24 12:22:22
+20211210212804	2026-09-24 12:22:22
+20211228014915	2026-09-24 12:22:22
+20220107221237	2026-09-24 12:22:22
+20220228202821	2026-09-24 12:22:22
+20220312004840	2026-09-24 12:22:22
+20220603231003	2026-09-24 12:22:22
+20220603232444	2026-09-24 12:22:22
+20220615214548	2026-09-24 12:22:22
+20220712093339	2026-09-24 12:22:22
+20220908172859	2026-09-24 12:22:22
+20220916233421	2026-09-24 12:22:22
+20230119133233	2026-09-24 12:22:22
+20230128025114	2026-09-24 12:22:22
+20230128025212	2026-09-24 12:22:22
+20230227211149	2026-09-24 12:22:22
+20230228184745	2026-09-24 12:22:22
+20230308225145	2026-09-24 12:22:22
+20230328144023	2026-09-24 12:22:22
+20231018144023	2026-09-24 12:22:22
+20231204144023	2026-09-24 12:22:22
+20231204144024	2026-09-24 12:22:22
+20231204144025	2026-09-24 12:22:22
+20240108234812	2026-09-24 12:22:22
+20240109165339	2026-09-24 12:22:22
+20240227174441	2026-09-24 12:22:22
+20240311171622	2026-09-24 12:22:22
+20240321100241	2026-09-24 12:22:22
+20240401105812	2026-09-24 12:22:22
+20240418121054	2026-09-24 12:22:22
+20240523004032	2026-09-24 12:22:22
+20240618124746	2026-09-24 12:22:22
+20240801235015	2026-09-24 12:22:22
+20240805133720	2026-09-24 12:22:22
+20240827160934	2026-09-24 12:22:22
+20240919163303	2026-09-24 12:22:22
+20240919163305	2026-09-24 12:22:22
+20241019105805	2026-09-24 12:22:22
+20241030150047	2026-09-24 12:22:22
+20241108114728	2026-09-24 12:22:22
+20241121104152	2026-09-24 12:22:22
+20241130184212	2026-09-24 12:22:22
+20241220035512	2026-09-24 12:22:22
+20241220123912	2026-09-24 12:22:22
+20241224161212	2026-09-24 12:22:22
+20250107150512	2026-09-24 12:22:22
+20250110162412	2026-09-24 12:22:22
+20250123174212	2026-09-24 12:22:22
+20250128220012	2026-09-24 12:22:22
+20250506224012	2026-09-24 12:22:22
+20250523164012	2026-09-24 12:22:22
+20250714121412	2026-09-24 12:22:22
+20250905041441	2026-09-24 12:22:22
+20251103001201	2026-09-24 12:22:22
+20251120212548	2026-09-24 12:22:22
+20251120215549	2026-09-24 12:22:22
+20260218120000	2026-09-24 12:22:22
+20260326120000	2026-09-24 12:22:22
+20260514120000	2026-09-24 12:22:22
+20260527120000	2026-09-24 12:22:22
+20260528120000	2026-09-24 12:22:22
+20260603120000	2026-09-24 12:22:22
+20260605120000	2026-09-24 12:22:22
+20260606110000	2026-09-24 12:22:22
+20260616120000	2026-09-24 12:22:22
+20260624120000	2026-09-24 12:22:22
+20260626120000	2026-09-24 12:22:22
+20260706120000	2026-09-24 12:22:22
+20260707120000	2026-09-24 12:22:22
+20260709120000	2026-09-24 12:22:22
+20260714120000	2026-09-24 12:22:22
+20260827120000	2026-09-24 12:22:22
+20260914120000	2026-09-24 12:22:22
+20260916120000	2026-09-24 12:22:22
+20260922120000	2026-09-24 12:22:22
 \.
 
 
@@ -6310,79 +6347,79 @@ COPY storage.buckets_vectors (id, type, created_at, updated_at) FROM stdin;
 --
 
 COPY storage.migrations (id, name, hash, executed_at) FROM stdin;
-0	create-migrations-table	e18db593bcde2aca2a408c4d1100f6abba2195df	2026-06-01 04:52:34.781351
-1	initialmigration	6ab16121fbaa08bbd11b712d05f358f9b555d777	2026-06-01 04:52:34.820282
-2	storage-schema	f6a1fa2c93cbcd16d4e487b362e45fca157a8dbd	2026-06-01 04:52:34.824362
-3	pathtoken-column	2cb1b0004b817b29d5b0a971af16bafeede4b70d	2026-06-01 04:52:34.846316
-4	add-migrations-rls	427c5b63fe1c5937495d9c635c263ee7a5905058	2026-06-01 04:52:34.857926
-5	add-size-functions	79e081a1455b63666c1294a440f8ad4b1e6a7f84	2026-06-01 04:52:34.86253
-6	change-column-name-in-get-size	ded78e2f1b5d7e616117897e6443a925965b30d2	2026-06-01 04:52:34.868185
-7	add-rls-to-buckets	e7e7f86adbc51049f341dfe8d30256c1abca17aa	2026-06-01 04:52:34.873892
-8	add-public-to-buckets	fd670db39ed65f9d08b01db09d6202503ca2bab3	2026-06-01 04:52:34.879142
-9	fix-search-function	af597a1b590c70519b464a4ab3be54490712796b	2026-06-01 04:52:34.884293
-10	search-files-search-function	b595f05e92f7e91211af1bbfe9c6a13bb3391e16	2026-06-01 04:52:34.890162
-11	add-trigger-to-auto-update-updated_at-column	7425bdb14366d1739fa8a18c83100636d74dcaa2	2026-06-01 04:52:34.895498
-12	add-automatic-avif-detection-flag	8e92e1266eb29518b6a4c5313ab8f29dd0d08df9	2026-06-01 04:52:34.900827
-13	add-bucket-custom-limits	cce962054138135cd9a8c4bcd531598684b25e7d	2026-06-01 04:52:34.905671
-14	use-bytes-for-max-size	941c41b346f9802b411f06f30e972ad4744dad27	2026-06-01 04:52:34.910328
-15	add-can-insert-object-function	934146bc38ead475f4ef4b555c524ee5d66799e5	2026-06-01 04:52:34.938647
-16	add-version	76debf38d3fd07dcfc747ca49096457d95b1221b	2026-06-01 04:52:34.943233
-17	drop-owner-foreign-key	f1cbb288f1b7a4c1eb8c38504b80ae2a0153d101	2026-06-01 04:52:34.947954
-18	add_owner_id_column_deprecate_owner	e7a511b379110b08e2f214be852c35414749fe66	2026-06-01 04:52:34.952476
-19	alter-default-value-objects-id	02e5e22a78626187e00d173dc45f58fa66a4f043	2026-06-01 04:52:34.959135
-20	list-objects-with-delimiter	cd694ae708e51ba82bf012bba00caf4f3b6393b7	2026-06-01 04:52:34.963768
-21	s3-multipart-uploads	8c804d4a566c40cd1e4cc5b3725a664a9303657f	2026-06-01 04:52:34.970946
-22	s3-multipart-uploads-big-ints	9737dc258d2397953c9953d9b86920b8be0cdb73	2026-06-01 04:52:34.984196
-23	optimize-search-function	9d7e604cddc4b56a5422dc68c9313f4a1b6f132c	2026-06-01 04:52:34.994472
-24	operation-function	8312e37c2bf9e76bbe841aa5fda889206d2bf8aa	2026-06-01 04:52:34.999918
-25	custom-metadata	d974c6057c3db1c1f847afa0e291e6165693b990	2026-06-01 04:52:35.004524
-26	objects-prefixes	215cabcb7f78121892a5a2037a09fedf9a1ae322	2026-06-01 04:52:35.009678
-27	search-v2	859ba38092ac96eb3964d83bf53ccc0b141663a6	2026-06-01 04:52:35.014024
-28	object-bucket-name-sorting	c73a2b5b5d4041e39705814fd3a1b95502d38ce4	2026-06-01 04:52:35.018324
-29	create-prefixes	ad2c1207f76703d11a9f9007f821620017a66c21	2026-06-01 04:52:35.022373
-30	update-object-levels	2be814ff05c8252fdfdc7cfb4b7f5c7e17f0bed6	2026-06-01 04:52:35.026369
-31	objects-level-index	b40367c14c3440ec75f19bbce2d71e914ddd3da0	2026-06-01 04:52:35.030416
-32	backward-compatible-index-on-objects	e0c37182b0f7aee3efd823298fb3c76f1042c0f7	2026-06-01 04:52:35.034718
-33	backward-compatible-index-on-prefixes	b480e99ed951e0900f033ec4eb34b5bdcb4e3d49	2026-06-01 04:52:35.040959
-34	optimize-search-function-v1	ca80a3dc7bfef894df17108785ce29a7fc8ee456	2026-06-01 04:52:35.045268
-35	add-insert-trigger-prefixes	458fe0ffd07ec53f5e3ce9df51bfdf4861929ccc	2026-06-01 04:52:35.0495
-36	optimise-existing-functions	6ae5fca6af5c55abe95369cd4f93985d1814ca8f	2026-06-01 04:52:35.053786
-37	add-bucket-name-length-trigger	3944135b4e3e8b22d6d4cbb568fe3b0b51df15c1	2026-06-01 04:52:35.058032
-38	iceberg-catalog-flag-on-buckets	02716b81ceec9705aed84aa1501657095b32e5c5	2026-06-01 04:52:35.063241
-39	add-search-v2-sort-support	6706c5f2928846abee18461279799ad12b279b78	2026-06-01 04:52:35.075285
-40	fix-prefix-race-conditions-optimized	7ad69982ae2d372b21f48fc4829ae9752c518f6b	2026-06-01 04:52:35.079769
-41	add-object-level-update-trigger	07fcf1a22165849b7a029deed059ffcde08d1ae0	2026-06-01 04:52:35.084143
-42	rollback-prefix-triggers	771479077764adc09e2ea2043eb627503c034cd4	2026-06-01 04:52:35.088356
-43	fix-object-level	84b35d6caca9d937478ad8a797491f38b8c2979f	2026-06-01 04:52:35.092572
-44	vector-bucket-type	99c20c0ffd52bb1ff1f32fb992f3b351e3ef8fb3	2026-06-01 04:52:35.096668
-45	vector-buckets	049e27196d77a7cb76497a85afae669d8b230953	2026-06-01 04:52:35.101614
-46	buckets-objects-grants	fedeb96d60fefd8e02ab3ded9fbde05632f84aed	2026-06-01 04:52:35.11179
-47	iceberg-table-metadata	649df56855c24d8b36dd4cc1aeb8251aa9ad42c2	2026-06-01 04:52:35.116511
-48	iceberg-catalog-ids	e0e8b460c609b9999ccd0df9ad14294613eed939	2026-06-01 04:52:35.120969
-49	buckets-objects-grants-postgres	072b1195d0d5a2f888af6b2302a1938dd94b8b3d	2026-06-01 04:52:35.136799
-50	search-v2-optimised	6323ac4f850aa14e7387eb32102869578b5bd478	2026-06-01 04:52:35.141755
-51	index-backward-compatible-search	2ee395d433f76e38bcd3856debaf6e0e5b674011	2026-06-01 04:52:35.161454
-52	drop-not-used-indexes-and-functions	5cc44c8696749ac11dd0dc37f2a3802075f3a171	2026-06-01 04:52:35.163784
-53	drop-index-lower-name	d0cb18777d9e2a98ebe0bc5cc7a42e57ebe41854	2026-06-01 04:52:35.1785
-54	drop-index-object-level	6289e048b1472da17c31a7eba1ded625a6457e67	2026-06-01 04:52:35.181446
-55	prevent-direct-deletes	262a4798d5e0f2e7c8970232e03ce8be695d5819	2026-06-01 04:52:35.184228
-56	fix-optimized-search-function	b823ed1e418101032fa01374edc9a436e54e3ed4	2026-06-01 04:52:35.18961
-57	s3-multipart-uploads-metadata	f127886e00d1b374fadbc7c6b31e09336aad5287	2026-06-01 04:52:35.195354
-58	operation-ergonomics	00ca5d483b3fe0d522133d9002ccc5df98365120	2026-06-01 04:52:35.200311
-59	drop-unused-functions	38456f13e39691c2bbb4b5151d0d1cdbabd4a8c4	2026-06-01 04:52:35.205476
-60	optimize-existing-functions-again	db35e1c91a9201e59f4fef8d972c2f277d68b157	2026-06-01 04:52:35.210505
-61	mark-filename-immutable	fe0096517ae9d60aaec1d110172ba9036dc66bb7	2026-08-22 11:53:40.91771
-62	object-versioning-core	0b855f00ff3be0bfca91efee02a9858912491a9a	2026-08-22 11:53:40.935322
-63	fix-search-name-relative-to-prefix	c7485e417624f795ce8bb2da21927f48e088904d	2026-08-24 03:10:50.392664
-64	fix-search-by-timestamp-sqli	0af424ecd388a39bb1645184b222185a12149675	2026-08-24 03:10:50.418823
-66	objects-current-version-index	191466c93aa2c46a00e36505577c5fcab8d7cb4b	2026-09-08 06:00:52.956481
-67	objects-null-version-index	15bfe8c35b66642b6c78ba60060fa8793bd2207a	2026-09-08 06:00:52.962092
-65	objects-key-version-index	da319c4b89ba800ce795d1b699f3a70675138058	2026-09-08 06:00:52.946931
-68	bucket-lifecycle-configuration	3c08f6f889922f399519722a932b51007c11bebc	2026-09-24 07:20:07.755548
-69	validate-bucket-lifecycle-constraints	4febacaaaa0e61e2b783bef081fe03a287e65eb3	2026-09-24 07:20:07.805926
-70	list-objects-with-versions	5c17c3777616cd8d7b18b82835525fa3205af57b	2026-09-24 07:20:07.815234
-71	objects-delete-marker-index	6d14858e66c66f8d6accf8a2630aefd1527fddba	2026-09-24 07:20:08.822018
-72	drop-bucketid-objname-index	302beb09e1b469d7d4db19566f2389d280b64aa3	2026-09-24 07:20:08.842575
+0	create-migrations-table	e18db593bcde2aca2a408c4d1100f6abba2195df	2026-09-24 12:22:22.560544
+1	initialmigration	6ab16121fbaa08bbd11b712d05f358f9b555d777	2026-09-24 12:22:22.569833
+2	storage-schema	f6a1fa2c93cbcd16d4e487b362e45fca157a8dbd	2026-09-24 12:22:22.57477
+3	pathtoken-column	2cb1b0004b817b29d5b0a971af16bafeede4b70d	2026-09-24 12:22:22.5935
+4	add-migrations-rls	427c5b63fe1c5937495d9c635c263ee7a5905058	2026-09-24 12:22:22.611309
+5	add-size-functions	79e081a1455b63666c1294a440f8ad4b1e6a7f84	2026-09-24 12:22:22.616447
+6	change-column-name-in-get-size	ded78e2f1b5d7e616117897e6443a925965b30d2	2026-09-24 12:22:22.622283
+7	add-rls-to-buckets	e7e7f86adbc51049f341dfe8d30256c1abca17aa	2026-09-24 12:22:22.627792
+8	add-public-to-buckets	fd670db39ed65f9d08b01db09d6202503ca2bab3	2026-09-24 12:22:22.632483
+9	fix-search-function	af597a1b590c70519b464a4ab3be54490712796b	2026-09-24 12:22:22.638174
+10	search-files-search-function	b595f05e92f7e91211af1bbfe9c6a13bb3391e16	2026-09-24 12:22:22.643578
+11	add-trigger-to-auto-update-updated_at-column	7425bdb14366d1739fa8a18c83100636d74dcaa2	2026-09-24 12:22:22.650591
+12	add-automatic-avif-detection-flag	8e92e1266eb29518b6a4c5313ab8f29dd0d08df9	2026-09-24 12:22:22.656384
+13	add-bucket-custom-limits	cce962054138135cd9a8c4bcd531598684b25e7d	2026-09-24 12:22:22.663563
+14	use-bytes-for-max-size	941c41b346f9802b411f06f30e972ad4744dad27	2026-09-24 12:22:22.669244
+15	add-can-insert-object-function	934146bc38ead475f4ef4b555c524ee5d66799e5	2026-09-24 12:22:22.693712
+16	add-version	76debf38d3fd07dcfc747ca49096457d95b1221b	2026-09-24 12:22:22.700433
+17	drop-owner-foreign-key	f1cbb288f1b7a4c1eb8c38504b80ae2a0153d101	2026-09-24 12:22:22.705884
+18	add_owner_id_column_deprecate_owner	e7a511b379110b08e2f214be852c35414749fe66	2026-09-24 12:22:22.711095
+19	alter-default-value-objects-id	02e5e22a78626187e00d173dc45f58fa66a4f043	2026-09-24 12:22:22.719156
+20	list-objects-with-delimiter	cd694ae708e51ba82bf012bba00caf4f3b6393b7	2026-09-24 12:22:22.724155
+21	s3-multipart-uploads	8c804d4a566c40cd1e4cc5b3725a664a9303657f	2026-09-24 12:22:22.732025
+22	s3-multipart-uploads-big-ints	9737dc258d2397953c9953d9b86920b8be0cdb73	2026-09-24 12:22:22.751394
+23	optimize-search-function	9d7e604cddc4b56a5422dc68c9313f4a1b6f132c	2026-09-24 12:22:22.787993
+24	operation-function	8312e37c2bf9e76bbe841aa5fda889206d2bf8aa	2026-09-24 12:22:22.793787
+25	custom-metadata	d974c6057c3db1c1f847afa0e291e6165693b990	2026-09-24 12:22:22.799852
+26	objects-prefixes	215cabcb7f78121892a5a2037a09fedf9a1ae322	2026-09-24 12:22:22.806688
+27	search-v2	859ba38092ac96eb3964d83bf53ccc0b141663a6	2026-09-24 12:22:22.811724
+28	object-bucket-name-sorting	c73a2b5b5d4041e39705814fd3a1b95502d38ce4	2026-09-24 12:22:22.816575
+29	create-prefixes	ad2c1207f76703d11a9f9007f821620017a66c21	2026-09-24 12:22:22.821822
+30	update-object-levels	2be814ff05c8252fdfdc7cfb4b7f5c7e17f0bed6	2026-09-24 12:22:22.82643
+31	objects-level-index	b40367c14c3440ec75f19bbce2d71e914ddd3da0	2026-09-24 12:22:22.846313
+32	backward-compatible-index-on-objects	e0c37182b0f7aee3efd823298fb3c76f1042c0f7	2026-09-24 12:22:22.854503
+33	backward-compatible-index-on-prefixes	b480e99ed951e0900f033ec4eb34b5bdcb4e3d49	2026-09-24 12:22:22.859735
+34	optimize-search-function-v1	ca80a3dc7bfef894df17108785ce29a7fc8ee456	2026-09-24 12:22:22.864992
+35	add-insert-trigger-prefixes	458fe0ffd07ec53f5e3ce9df51bfdf4861929ccc	2026-09-24 12:22:22.869682
+36	optimise-existing-functions	6ae5fca6af5c55abe95369cd4f93985d1814ca8f	2026-09-24 12:22:22.874194
+37	add-bucket-name-length-trigger	3944135b4e3e8b22d6d4cbb568fe3b0b51df15c1	2026-09-24 12:22:22.878724
+38	iceberg-catalog-flag-on-buckets	02716b81ceec9705aed84aa1501657095b32e5c5	2026-09-24 12:22:22.885291
+39	add-search-v2-sort-support	6706c5f2928846abee18461279799ad12b279b78	2026-09-24 12:22:22.898413
+40	fix-prefix-race-conditions-optimized	7ad69982ae2d372b21f48fc4829ae9752c518f6b	2026-09-24 12:22:22.902775
+41	add-object-level-update-trigger	07fcf1a22165849b7a029deed059ffcde08d1ae0	2026-09-24 12:22:22.907251
+42	rollback-prefix-triggers	771479077764adc09e2ea2043eb627503c034cd4	2026-09-24 12:22:22.911763
+43	fix-object-level	84b35d6caca9d937478ad8a797491f38b8c2979f	2026-09-24 12:22:22.916485
+44	vector-bucket-type	99c20c0ffd52bb1ff1f32fb992f3b351e3ef8fb3	2026-09-24 12:22:22.921155
+45	vector-buckets	049e27196d77a7cb76497a85afae669d8b230953	2026-09-24 12:22:22.930497
+46	buckets-objects-grants	fedeb96d60fefd8e02ab3ded9fbde05632f84aed	2026-09-24 12:22:22.944588
+47	iceberg-table-metadata	649df56855c24d8b36dd4cc1aeb8251aa9ad42c2	2026-09-24 12:22:22.951153
+48	iceberg-catalog-ids	e0e8b460c609b9999ccd0df9ad14294613eed939	2026-09-24 12:22:22.957696
+49	buckets-objects-grants-postgres	072b1195d0d5a2f888af6b2302a1938dd94b8b3d	2026-09-24 12:22:22.98118
+50	search-v2-optimised	6323ac4f850aa14e7387eb32102869578b5bd478	2026-09-24 12:22:22.988509
+51	index-backward-compatible-search	2ee395d433f76e38bcd3856debaf6e0e5b674011	2026-09-24 12:22:23.276644
+52	drop-not-used-indexes-and-functions	5cc44c8696749ac11dd0dc37f2a3802075f3a171	2026-09-24 12:22:23.278763
+53	drop-index-lower-name	d0cb18777d9e2a98ebe0bc5cc7a42e57ebe41854	2026-09-24 12:22:23.290723
+54	drop-index-object-level	6289e048b1472da17c31a7eba1ded625a6457e67	2026-09-24 12:22:23.293822
+55	prevent-direct-deletes	262a4798d5e0f2e7c8970232e03ce8be695d5819	2026-09-24 12:22:23.296116
+56	fix-optimized-search-function	b823ed1e418101032fa01374edc9a436e54e3ed4	2026-09-24 12:22:23.303234
+57	s3-multipart-uploads-metadata	f127886e00d1b374fadbc7c6b31e09336aad5287	2026-09-24 12:22:23.310921
+58	operation-ergonomics	00ca5d483b3fe0d522133d9002ccc5df98365120	2026-09-24 12:22:23.315914
+59	drop-unused-functions	38456f13e39691c2bbb4b5151d0d1cdbabd4a8c4	2026-09-24 12:22:23.32224
+60	optimize-existing-functions-again	db35e1c91a9201e59f4fef8d972c2f277d68b157	2026-09-24 12:22:23.327933
+61	mark-filename-immutable	fe0096517ae9d60aaec1d110172ba9036dc66bb7	2026-09-24 12:22:23.334979
+62	object-versioning-core	0b855f00ff3be0bfca91efee02a9858912491a9a	2026-09-24 12:22:23.341952
+63	fix-search-name-relative-to-prefix	c7485e417624f795ce8bb2da21927f48e088904d	2026-09-24 12:22:23.349592
+64	fix-search-by-timestamp-sqli	0af424ecd388a39bb1645184b222185a12149675	2026-09-24 12:22:23.357033
+65	objects-key-version-index	da319c4b89ba800ce795d1b699f3a70675138058	2026-09-24 12:22:23.370336
+66	objects-current-version-index	191466c93aa2c46a00e36505577c5fcab8d7cb4b	2026-09-24 12:22:23.378596
+67	objects-null-version-index	15bfe8c35b66642b6c78ba60060fa8793bd2207a	2026-09-24 12:22:23.391561
+68	bucket-lifecycle-configuration	3c08f6f889922f399519722a932b51007c11bebc	2026-09-24 12:22:23.394549
+69	validate-bucket-lifecycle-constraints	4febacaaaa0e61e2b783bef081fe03a287e65eb3	2026-09-24 12:22:23.408421
+70	list-objects-with-versions	5c17c3777616cd8d7b18b82835525fa3205af57b	2026-09-24 12:22:23.419337
+71	objects-delete-marker-index	6d14858e66c66f8d6accf8a2630aefd1527fddba	2026-09-24 12:22:23.444767
+72	drop-bucketid-objname-index	302beb09e1b469d7d4db19566f2389d280b64aa3	2026-09-24 12:22:23.451403
 \.
 
 
@@ -6451,14 +6488,7 @@ SELECT pg_catalog.setval('public.jobs_id_seq', 1, false);
 -- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.migrations_id_seq', 4, true);
-
-
---
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
---
-
-SELECT pg_catalog.setval('public.users_id_seq', 1, false);
+SELECT pg_catalog.setval('public.migrations_id_seq', 13, true);
 
 
 --
@@ -6901,30 +6931,6 @@ ALTER TABLE ONLY public.department
 
 
 --
--- Name: schedule exclude_faculty_overlap; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.schedule
-    ADD CONSTRAINT exclude_faculty_overlap EXCLUDE USING gist (sch_fac_id WITH =, sch_day WITH =, sch_sem_id WITH =, sch_time_range WITH &&);
-
-
---
--- Name: schedule exclude_room_overlap; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.schedule
-    ADD CONSTRAINT exclude_room_overlap EXCLUDE USING gist (sch_room_id WITH =, sch_day WITH =, sch_sem_id WITH =, sch_time_range WITH &&);
-
-
---
--- Name: schedule exclude_section_overlap; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.schedule
-    ADD CONSTRAINT exclude_section_overlap EXCLUDE USING gist (sch_sec_id WITH =, sch_day WITH =, sch_sem_id WITH =, sch_time_range WITH &&);
-
-
---
 -- Name: fac_preference fac_preference_fpref_fac_id_fpref_subj_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6994,6 +7000,14 @@ ALTER TABLE ONLY public.failed_jobs
 
 ALTER TABLE ONLY public.historical_schedule
     ADD CONSTRAINT historical_schedule_pkey PRIMARY KEY (hist_id);
+
+
+--
+-- Name: institution institution_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.institution
+    ADD CONSTRAINT institution_pkey PRIMARY KEY (inst_id);
 
 
 --
@@ -7181,6 +7195,14 @@ ALTER TABLE ONLY public.subject
 
 
 --
+-- Name: system_backup system_backup_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.system_backup
+    ADD CONSTRAINT system_backup_pkey PRIMARY KEY (bkp_id);
+
+
+--
 -- Name: system_setting system_setting_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -7226,22 +7248,6 @@ ALTER TABLE ONLY public.department_chair
 
 ALTER TABLE ONLY public.dean
     ADD CONSTRAINT uq_dean_dept UNIQUE (dean_dept_id);
-
-
---
--- Name: users users_email_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_email_unique UNIQUE (email);
-
-
---
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
 
 --
@@ -7932,10 +7938,24 @@ CREATE INDEX idx_dean_dept ON public.dean USING btree (dean_dept_id);
 
 
 --
+-- Name: idx_dean_prog; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dean_prog ON public.dean USING btree (dean_prog_id);
+
+
+--
 -- Name: idx_faculty_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_faculty_dept ON public.faculty USING btree (fac_dept_id);
+
+
+--
+-- Name: idx_faculty_prog; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_faculty_prog ON public.faculty USING btree (fac_prog_id);
 
 
 --
@@ -8505,6 +8525,14 @@ ALTER TABLE ONLY public.dean
 
 
 --
+-- Name: dean dean_dean_prog_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.dean
+    ADD CONSTRAINT dean_dean_prog_id_fkey FOREIGN KEY (dean_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+
+
+--
 -- Name: dean dean_dean_usr_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -8566,6 +8594,14 @@ ALTER TABLE ONLY public.fac_specialization
 
 ALTER TABLE ONLY public.faculty
     ADD CONSTRAINT faculty_fac_dept_id_fkey FOREIGN KEY (fac_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+
+
+--
+-- Name: faculty faculty_fac_prog_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.faculty
+    ADD CONSTRAINT faculty_fac_prog_id_fkey FOREIGN KEY (fac_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
 
 
 --
@@ -9045,6 +9081,12 @@ ALTER TABLE public.failed_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.historical_schedule ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: institution; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.institution ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: job_batches; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9135,6 +9177,12 @@ ALTER TABLE public.study_load ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subject ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: system_backup; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.system_backup ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: system_setting; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9145,12 +9193,6 @@ ALTER TABLE public.system_setting ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY;
-
---
--- Name: users; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: workload; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -9259,9 +9301,9 @@ GRANT USAGE ON SCHEMA public TO service_role;
 
 GRANT USAGE ON SCHEMA realtime TO postgres WITH GRANT OPTION;
 GRANT USAGE ON SCHEMA realtime TO anon;
-GRANT USAGE ON SCHEMA realtime TO authenticated;
 GRANT USAGE ON SCHEMA realtime TO service_role;
 GRANT ALL ON SCHEMA realtime TO supabase_realtime_admin;
+GRANT USAGE ON SCHEMA realtime TO authenticated;
 
 
 --
@@ -12277,6 +12319,15 @@ GRANT ALL ON TABLE public.historical_schedule TO service_role;
 
 
 --
+-- Name: TABLE institution; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.institution TO anon;
+GRANT ALL ON TABLE public.institution TO authenticated;
+GRANT ALL ON TABLE public.institution TO service_role;
+
+
+--
 -- Name: TABLE job_batches; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12430,6 +12481,15 @@ GRANT ALL ON TABLE public.subject TO service_role;
 
 
 --
+-- Name: TABLE system_backup; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.system_backup TO anon;
+GRANT ALL ON TABLE public.system_backup TO authenticated;
+GRANT ALL ON TABLE public.system_backup TO service_role;
+
+
+--
 -- Name: TABLE system_setting; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12445,24 +12505,6 @@ GRANT ALL ON TABLE public.system_setting TO service_role;
 GRANT ALL ON TABLE public.token_blacklist TO anon;
 GRANT ALL ON TABLE public.token_blacklist TO authenticated;
 GRANT ALL ON TABLE public.token_blacklist TO service_role;
-
-
---
--- Name: TABLE users; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.users TO anon;
-GRANT ALL ON TABLE public.users TO authenticated;
-GRANT ALL ON TABLE public.users TO service_role;
-
-
---
--- Name: SEQUENCE users_id_seq; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON SEQUENCE public.users_id_seq TO anon;
-GRANT ALL ON SEQUENCE public.users_id_seq TO authenticated;
-GRANT ALL ON SEQUENCE public.users_id_seq TO service_role;
 
 
 --
@@ -12484,6 +12526,14 @@ GRANT ALL ON TABLE realtime.messages TO dashboard_user;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO anon;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO authenticated;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO service_role;
+
+
+--
+-- Name: TABLE schema_migrations; Type: ACL; Schema: realtime; Owner: supabase_admin
+--
+
+GRANT ALL ON TABLE realtime.schema_migrations TO postgres;
+GRANT ALL ON TABLE realtime.schema_migrations TO dashboard_user;
 
 
 --
@@ -12892,5 +12942,5 @@ ALTER EVENT TRIGGER pgrst_drop_watch OWNER TO supabase_admin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict h9HTcD9B3kh2TY63R87nks1u7hYDtBqd0EtGLzegJqZcthlK4eXgAZ4yaF2qtbp
+\unrestrict qxiToOh3TzjTtV9tx8aexssct5CdjhsF3q2azMj73xidAtZVwkRhq07053U39wJ
 

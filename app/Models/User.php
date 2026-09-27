@@ -19,24 +19,24 @@ class User extends Authenticatable
     protected $fillable = [
         'usr_id',
         'usr_name',
+        'usr_first_name',
+        'usr_middle_name',
+        'usr_last_name',
+        'usr_suffix',
         'usr_email',
         'usr_password_hash',
         'usr_role',
         'usr_is_active',
         'usr_bio',
-        'profile_picture',
-        'profile_picture_public_id',
-        'usr_first_name',
-        'usr_last_name',
-        'usr_middle_name',
-        'usr_suffix',
-        'usr_rank_title',
+        // These live on USER too (not just Faculty/Dean/Dept_Chair), so
+        // every role - including system_admin, which has no profile table
+        // row at all - actually keeps this data.
         'usr_employee_id',
+        'usr_rank_title',
         'usr_gender',
         'usr_civil_status',
         'usr_dob',
         'usr_nationality',
-        'language',
     ];
 
     protected $hidden = [
@@ -52,19 +52,37 @@ class User extends Authenticatable
         return $this->usr_password_hash;
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Role Profiles
+    |--------------------------------------------------------------------------
+    */
+
     public function faculty()
     {
-        return $this->hasOne(Faculty::class, 'fac_usr_id', 'usr_id');
+        return $this->hasOne(
+            Faculty::class,
+            'fac_usr_id',
+            'usr_id'
+        );
     }
 
     public function dean()
     {
-        return $this->hasOne(Dean::class, 'dean_usr_id', 'usr_id');
+        return $this->hasOne(
+            Dean::class,
+            'dean_usr_id',
+            'usr_id'
+        );
     }
-    
-       public function deptChair()
+
+    public function deptChair()
     {
-        return $this->hasOne(Dept_Chair::class, 'dc_usr_id', 'usr_id');
+        return $this->hasOne(
+            Dept_Chair::class,
+            'dc_usr_id',
+            'usr_id'
+        );
     }
 
     public function deptChairRecord()
@@ -76,15 +94,35 @@ class User extends Authenticatable
         );
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Get the correct profile based on the user's role
+    |--------------------------------------------------------------------------
+    */
+
     public function profile()
     {
         return match ($this->usr_role) {
-            'faculty' => $this->faculty,
-            'dean' => $this->dean,
-            'department_chair' => $this->deptChairRecord,
-            default => null,
+
+            'faculty' =>
+                $this->faculty,
+
+            'dean' =>
+                $this->dean,
+
+            'department_chair' =>
+                $this->deptChair,
+
+            default =>
+                null,
         };
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Faculty Room Location
+    |--------------------------------------------------------------------------
+    */
 
     public function getRoomLocationAttribute(): ?string
     {
@@ -92,11 +130,14 @@ class User extends Authenticatable
             ->map(fn ($load) => $load->schedule?->room)
             ->filter()
             ->map(function ($room) {
+
                 return collect([
                     $room->room_name,
                     $room->room_building,
                     $room->room_location,
-                ])->filter()->implode(', ');
+                ])
+                    ->filter()
+                    ->implode(', ');
             })
             ->filter()
             ->unique()
@@ -104,5 +145,4 @@ class User extends Authenticatable
 
         return $rooms?->implode('; ');
     }
-    
 }

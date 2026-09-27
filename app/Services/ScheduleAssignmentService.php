@@ -2,139 +2,161 @@
 
 namespace App\Services;
 
-use App\Models\Semester;
-use App\Models\Study_Load;
 use App\Models\Schedule;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\StudyLoad;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
+/**
+ * Single place where PBS and PBT both create/update/delete schedule entries.
+ * Neither controller talks to the `schedule` table directly — this keeps the
+ * conflict rules (faculty / room / section double-booking) defined exactly
+ * once, so a class added from either page is checked the same way.
+ *
+ * Every method returns an array shaped like:
+ *   ['success' => true,  'schedule' => Schedule]
+ *   ['success' => false, 'conflict' => true,  'message' => '...']   <- don't save, show as a toast
+ *   ['success' => false, 'conflict' => false, 'message' => '...']   <- some other failure
+ */
 class ScheduleAssignmentService
 {
-    /**
-     * Create a new Study_Load + Schedule pair.
-     *
-     * $data keys: subj_id, fac_id, sec_id, room_id, sch_day, sch_start_time, sch_end_time
-     *
-     * @return array{success:bool,status:int,message:string,conflict?:bool}
-     */
     public function assign(array $data): array
     {
-        $semester = Semester::where('sem_is_active', true)->first();
-        if (!$semester) {
-            return [
-                'success' => false,
-                'status'  => 422,
-                'message' => 'No active semester is set. Ask the Technical Admin to activate one first.',
-            ];
+        if ($conflict = $this->findConflict($data)) {
+            return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
 
         try {
-            DB::beginTransaction();
+            return DB::transaction(function () use ($data) {
+                // schedule.sch_load_id is UNIQUE — a (faculty, subject, section,
+                // semester) combination can only carry ONE meeting time in this
+                // schema. We reuse the study_load row if it already exists.
+                $studyLoad = StudyLoad::firstOrCreate(
+                    [
+                        'sl_fac_id'  => $data['fac_id'],
+                        'sl_subj_id' => $data['subj_id'],
+                        'sl_sec_id'  => $data['sec_id'],
+                        'sl_sem_id'  => $data['sem_id'],
+                    ],
+                    [
+                        'sl_assigned_by' => Auth::id(),
+                        'sl_status'      => 'approved',
+                    ]
+                );
 
-            $studyLoad = Study_Load::create([
-                'sl_fac_id'      => $data['fac_id'],
-                'sl_subj_id'     => $data['subj_id'],
-                'sl_sec_id'      => $data['sec_id'],
-                'sl_sem_id'      => $semester->sem_id,
-                'sl_assigned_by' => Auth::id(),
-                'sl_status'      => 'draft',
-            ]);
+                if (Schedule::where('sch_load_id', $studyLoad->sl_id)->exists()) {
+                    throw new RuntimeException('DUPLICATE_LOAD');
+                }
 
-            Schedule::create([
-                'sch_load_id'    => $studyLoad->sl_id,
-                'sch_fac_id'     => $data['fac_id'],
-                'sch_subj_id'    => $data['subj_id'],
-                'sch_sec_id'     => $data['sec_id'],
-                'sch_room_id'    => $data['room_id'],
-                'sch_sem_id'     => $semester->sem_id,
-                'sch_day'        => $data['sch_day'],
-                'sch_start_time' => $data['sch_start_time'],
-                'sch_end_time'   => $data['sch_end_time'],
-                'sch_status'     => 'draft',
-                'sch_created_by' => Auth::id(),
-            ]);
-
-            DB::commit();
-
-            return [
-                'success' => true,
-                'status'  => 200,
-                'message' => 'Subject assigned successfully.',
-            ];
-        } catch (QueryException $e) {
-            DB::rollBack();
-            return $this->handleConflict($e);
-        }
-    }
-
-    /**
-     * Update an existing Schedule row (and keep its paired Study_Load in sync).
-     *
-     * $data keys: same shape as assign().
-     *
-     * @return array{success:bool,status:int,message:string,conflict?:bool}
-     */
-    public function update(Schedule $schedule, array $data): array
-    {
-        try {
-            DB::beginTransaction();
-
-            $schedule->update([
-                'sch_fac_id'     => $data['fac_id'],
-                'sch_subj_id'    => $data['subj_id'],
-                'sch_sec_id'     => $data['sec_id'],
-                'sch_room_id'    => $data['room_id'],
-                'sch_day'        => $data['sch_day'],
-                'sch_start_time' => $data['sch_start_time'],
-                'sch_end_time'   => $data['sch_end_time'],
-            ]);
-
-            $studyLoad = Study_Load::find($schedule->sch_load_id);
-            if ($studyLoad) {
-                $studyLoad->update([
-                    'sl_fac_id'  => $data['fac_id'],
-                    'sl_subj_id' => $data['subj_id'],
-                    'sl_sec_id'  => $data['sec_id'],
+                $schedule = Schedule::create([
+                    'sch_load_id'    => $studyLoad->sl_id,
+                    'sch_fac_id'     => $data['fac_id'],
+                    'sch_subj_id'    => $data['subj_id'],
+                    'sch_sec_id'     => $data['sec_id'],
+                    'sch_room_id'    => $data['room_id'],
+                    'sch_sem_id'     => $data['sem_id'],
+                    'sch_day'        => $data['day'],
+                    'sch_start_time' => $data['start_time'],
+                    'sch_end_time'   => $data['end_time'],
+                    'sch_status'     => 'draft',
+                    'sch_is_active'  => true,
+                    'sch_created_by' => Auth::id(),
                 ]);
+
+                return ['success' => true, 'schedule' => $schedule];
+            });
+        } catch (RuntimeException $e) {
+            if ($e->getMessage() === 'DUPLICATE_LOAD') {
+                return [
+                    'success'  => false,
+                    'conflict' => true,
+                    'message'  => 'Conflict: this teacher is already scheduled for this exact subject and section. Edit the existing schedule instead of adding a new one.',
+                ];
             }
-
-            DB::commit();
-
-            return [
-                'success' => true,
-                'status'  => 200,
-                'message' => 'Schedule updated successfully.',
-            ];
+            throw $e;
         } catch (QueryException $e) {
-            DB::rollBack();
-            return $this->handleConflict($e);
+            if (($e->errorInfo[0] ?? $e->getCode()) === '23505') {
+                return ['success' => false, 'conflict' => true, 'message' => 'Conflict: that schedule already exists.'];
+            }
+            throw $e;
         }
     }
 
-    /**
-     * Postgres GiST exclusion constraint violation (SQLSTATE 23P01) means
-     * exclude_room_overlap / exclude_faculty_overlap / exclude_section_overlap
-     * fired because the time range collides with an existing row.
-     */
-    protected function handleConflict(QueryException $e): array
+    public function update(string $scheduleId, array $data): array
     {
-        $isConflict = $e->getCode() === '23P01' || str_contains($e->getMessage(), 'exclude_');
+        $schedule = Schedule::findOrFail($scheduleId);
 
-        if ($isConflict) {
-            return [
-                'success'  => false,
-                'status'   => 409,
-                'conflict' => true,
-                'message'  => 'Schedule Conflict! This faculty, room, or section is already booked at this time slot. Choose a different day or time.',
-            ];
+        if ($conflict = $this->findConflict($data, excludeScheduleId: $scheduleId)) {
+            return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
 
-        return [
-            'success' => false,
-            'status'  => 500,
-            'message' => 'Failed to save. Please try again.',
-        ];
+        $schedule->update([
+            'sch_fac_id'     => $data['fac_id'],
+            'sch_subj_id'    => $data['subj_id'],
+            'sch_sec_id'     => $data['sec_id'],
+            'sch_room_id'    => $data['room_id'],
+            'sch_sem_id'     => $data['sem_id'],
+            'sch_day'        => $data['day'],
+            'sch_start_time' => $data['start_time'],
+            'sch_end_time'   => $data['end_time'],
+        ]);
+
+        return ['success' => true, 'schedule' => $schedule];
+    }
+
+    public function delete(string $scheduleId): array
+    {
+        $schedule = Schedule::findOrFail($scheduleId);
+        $loadId = $schedule->sch_load_id;
+        $schedule->delete();
+
+        // Free up the study load so the same faculty/subject/section/semester
+        // combo can be rescheduled later without hitting the unique constraint.
+        StudyLoad::where('sl_id', $loadId)->delete();
+
+        return ['success' => true, 'message' => 'Schedule deleted.'];
+    }
+
+    /**
+     * Checks faculty / room / section double-booking: same day, same
+     * semester, overlapping time range. Returns a human-readable conflict
+     * message, or null when the slot is free.
+     */
+    private function findConflict(array $data, ?string $excludeScheduleId = null): ?string
+    {
+        $base = Schedule::query()
+            ->where('sch_sem_id', $data['sem_id'])
+            ->where('sch_day', $data['day'])
+            ->where('sch_is_active', true)
+            ->where('sch_start_time', '<', $data['end_time'])
+            ->where('sch_end_time', '>', $data['start_time']);
+
+        if ($excludeScheduleId) {
+            $base->where('sch_id', '!=', $excludeScheduleId);
+        }
+
+        $facultyClash = (clone $base)->where('sch_fac_id', $data['fac_id'])->with('subject')->first();
+        if ($facultyClash) {
+            return "Conflict: this teacher already has {$this->codeOf($facultyClash)} at an overlapping time on {$data['day']}.";
+        }
+
+        $roomClash = (clone $base)->where('sch_room_id', $data['room_id'])->with('subject')->first();
+        if ($roomClash) {
+            return "Conflict: this room is already booked for {$this->codeOf($roomClash)} at an overlapping time on {$data['day']}.";
+        }
+
+        $sectionClash = (clone $base)->where('sch_sec_id', $data['sec_id'])->with('subject')->first();
+        if ($sectionClash) {
+            return "Conflict: this section already has {$this->codeOf($sectionClash)} at an overlapping time on {$data['day']}.";
+        }
+
+        return null;
+    }
+
+    private function codeOf(Schedule $schedule): string
+    {
+        return $schedule->subject->subj_code ?? 'another class';
     }
 }

@@ -16,15 +16,28 @@ class Dept_Chair extends Model
 
     protected $fillable = [
         'dc_usr_id',
+
+        // Department / Program
         'dc_dept_id',
         'dc_prog_id',
+
+        // Personal Information
         'dc_first_name',
         'dc_middle_name',
         'dc_last_name',
         'dc_suffix',
+        'dc_employee_id',
+        'dc_gender',
+        'dc_civil_status',
+        'dc_dob',
+        'dc_nationality',
+
+        // Contact Information
         'dc_phone_number',
         'dc_gmail',
         'dc_address',
+
+        // Profile
         'dc_profile_image',
     ];
 

@@ -7,6 +7,8 @@ use App\Http\Controllers\Chair\ScheduleController;
 use App\Http\Controllers\Chair\ChairSubjectController;
 use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
+use App\Http\Controllers\Chair\PbsController;
+use App\Http\Controllers\Chair\PbtController;
 
 
 /*
@@ -33,11 +35,25 @@ Route::middleware('auth')->prefix('chair')->group(function () {
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
 
     // PBS — Program by Section
-   Route::get('/pbs', function () {return view('chair.pbs');})->name('chair.pbs');
+    // Note: named 'chair.pbs' (not 'chair.pbs.index') to match the sidebar's
+    // route('chair.pbs') call, and left un-nested so the URL stays /chair/pbs
+    // (not /chair/chair/pbs) to match pbs.js's fetch('/chair/pbs') calls.
+    Route::get('/pbs', [PbsController::class, 'index'])->name('chair.pbs');
+    Route::post('/pbs', [PbsController::class, 'store'])->name('chair.pbs.store');
+    Route::put('/pbs/{id}', [PbsController::class, 'update'])->name('chair.pbs.update');
+    Route::delete('/pbs/{id}', [PbsController::class, 'destroy'])->name('chair.pbs.destroy');
+    Route::post('/pbs/save-draft', [PbsController::class, 'saveDraft'])->name('chair.pbs.save-draft');
+    Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
 
-   // PBT - Program by Teacher 
-   Route::get('/pbt', function () {return view('chair.pbt');})->name('chair.pbt');
-   
+    // PBT — Program by Teacher
+    // Same fix as PBS: flat 'chair.pbt' name, single /chair/pbt URL.
+    Route::get('/pbt', [PbtController::class, 'index'])->name('chair.pbt');
+    Route::post('/pbt', [PbtController::class, 'store'])->name('chair.pbt.store');
+    Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
+    Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
+    Route::post('/pbt/save-draft', [PbtController::class, 'saveDraft'])->name('chair.pbt.save-draft');
+    Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
+
     //Subject
     Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
     Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
@@ -68,5 +84,3 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 Route::post('/schedule', function () {
     return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
 })->name('schedule.store');
-
-?>
