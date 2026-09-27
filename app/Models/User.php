@@ -28,6 +28,8 @@ class User extends Authenticatable
         'usr_last_name',
         'usr_middle_name',
         'usr_suffix',
+        'usr_failed_login_attempts',
+        'usr_locked_until',
     ];
 
     protected $hidden = [
@@ -36,6 +38,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'usr_is_active' => 'boolean',
+        'usr_locked_until' => 'datetime',
     ];
 
     public function getAuthPassword()

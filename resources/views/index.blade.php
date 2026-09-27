@@ -104,7 +104,7 @@
         </div>
 
         {{-- Department badge --}}
-        <div class="mt-12 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-5 py-3.5 text-left">
+        <div class="mt-12 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-5 py-3.5 text-center">
           <div class="text-[12px] font-extrabold leading-snug text-white">
             College of Computing, Information and<br>Communications Technology
           </div>

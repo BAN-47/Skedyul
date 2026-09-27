@@ -134,23 +134,20 @@
 
           {{-- GENERAL --}}
           <div id="dsec-general" style="display:none;">
-            <div class="card mb-4">
-              <div class="card-header"><div><div class="card-title">Institution Details</div><div class="card-sub">Basic information about your school and college</div></div></div>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Institution Name</label><input class="field-input" value="Cebu Technological University"></div>
-                <div><label class="field-label">Campus</label><input class="field-input" value="Main Campus"></div>
-              </div>
-              <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">College / Unit</label><input class="field-input" value="College of Computing, Information and Communications Technology"></div>
-                <div><label class="field-label">Abbreviation</label><input class="field-input" value="CCICT"></div>
-              </div>
-              <div class="grid grid-cols-2 gap-3 mb-1">
-                <div><label class="field-label">Contact Email</label><input class="field-input" type="email" value="ccict@ctu.edu.ph"></div>
-                <div><label class="field-label">Phone</label><input class="field-input" value="(032) 401-7777"></div>
-              </div>
-              <div class="flex justify-end mt-1">
-                <button class="btn btn-primary" onclick="showToast('Institution details saved!')">Save Changes</button>
-              </div>
+            @php
+                $institution = \App\Models\Institution::first();
+            @endphp
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">Institution Name</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_name ?? 'Cebu Technological University' }}" readonly></div>
+              <div><label class="field-label">Campus</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_branch_campus ?? 'Main Campus' }}" readonly></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_college ?? 'College of Computing, Information and Communications Technology' }}" readonly></div>
+              <div><label class="field-label">Abbreviation</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_abbreviation ?? 'CCICT' }}" readonly></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-1">
+              <div><label class="field-label">Contact Email</label><input class="field-input bg-slate-100 cursor-not-allowed" type="email" value="{{ $institution->inst_contact_email ?? 'ccict@ctu.edu.ph' }}" readonly></div>
+              <div><label class="field-label">Phone</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_phone ?? '(032) 401-7777' }}" readonly></div>
             </div>
           </div>
 
@@ -158,29 +155,20 @@
           <div id="dsec-academic" style="display:none;">
             <div class="card mb-4">
               <div class="card-header">
-                <div><div class="card-title">Current Academic Year</div><div class="card-sub">Active semester configuration</div></div>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600">Active</span>
+                <div><div class="card-title">Current Academic Year</div><div class="card-sub">Managed by the Technical Administrator</div></div>
+                @if($academicYear)
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600">Active</span>
+                @else
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500">Not Set</span>
+                @endif
               </div>
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Academic Year</label><input class="field-input" value="2025-2026"></div>
-                <div>
-                  <label class="field-label">Semester</label>
-                  <select class="field-input"><option selected>1st Semester</option><option>2nd Semester</option><option>Summer</option></select>
-                </div>
+                <div><label class="field-label">Academic Year</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $academicYear->ay_academic_year ?? 'Not configured' }}" readonly></div>
+                <div><label class="field-label">Semester</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester->sem_name ?? 'Not configured' }}" readonly></div>
               </div>
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Start Date</label><input class="field-input" type="date" value="2025-08-11"></div>
-                <div><label class="field-label">End Date</label><input class="field-input" type="date" value="2025-12-20"></div>
-              </div>
-              <div class="grid grid-cols-2 gap-3 mb-1">
-                <div><label class="field-label">Schedule Submission Deadline</label><input class="field-input" type="date" value="2025-07-25"></div>
-                <div>
-                  <label class="field-label">School Days</label>
-                  <select class="field-input"><option selected>Monday - Saturday</option><option>Monday - Friday</option></select>
-                </div>
-              </div>
-              <div class="flex justify-end mt-1">
-                <button class="btn btn-primary" onclick="showToast('Academic year settings saved!')">Save Changes</button>
+                <div><label class="field-label">Start Date</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester?->sem_start_date?->format('Y-m-d') ?? '—' }}" readonly></div>
+                <div><label class="field-label">End Date</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester?->sem_end_date?->format('Y-m-d') ?? '—' }}" readonly></div>
               </div>
             </div>
           </div>
@@ -192,58 +180,10 @@
               <div class="flex flex-col gap-3 mt-1">
 
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">Schedule Submitted for Approval</div><div class="text-xs text-slate-400 mt-0.5">Notify when a Chair submits a department schedule for review</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_schedule_submitted" {{ (bool) \App\Models\SystemSetting::get('dean_notif_schedule_submitted', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_schedule_submitted', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">Faculty Overload Alert</div><div class="text-xs text-slate-400 mt-0.5">Notify when any faculty member exceeds their maximum unit load</div></div>
                   <label class="toggle-switch">
                     <input type="checkbox" data-field="dean_notif_faculty_overload" {{ (bool) \App\Models\SystemSetting::get('dean_notif_faculty_overload', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
                     <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_faculty_overload', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">Submission Deadline Reminder</div><div class="text-xs text-slate-400 mt-0.5">Remind 3 days before the schedule submission deadline</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_deadline_reminder" {{ (bool) \App\Models\SystemSetting::get('dean_notif_deadline_reminder', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_deadline_reminder', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">Weekly Workload Digest</div><div class="text-xs text-slate-400 mt-0.5">Receive a weekly email summary of faculty loads across all departments</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_weekly_digest" {{ (bool) \App\Models\SystemSetting::get('dean_notif_weekly_digest', false) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_weekly_digest', false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">Schedule Approval Reminders</div><div class="text-xs text-slate-400 mt-0.5">Remind when pending schedules have not been acted on for 48 hours</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_approval_reminders" {{ (bool) \App\Models\SystemSetting::get('dean_notif_approval_reminders', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_approval_reminders', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">Login Activity</div><div class="text-xs text-slate-400 mt-0.5">Notify on new logins from unrecognized devices or browsers</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_login_activity" {{ (bool) \App\Models\SystemSetting::get('dean_notif_login_activity', false) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_login_activity', false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
-                  </label>
-                </div>
-
-                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
-                  <div><div class="text-[13px] font-semibold text-slate-900">System Backups</div><div class="text-xs text-slate-400 mt-0.5">Receive confirmation after each automatic system backup</div></div>
-                  <label class="toggle-switch">
-                    <input type="checkbox" data-field="dean_notif_system_backups" {{ (bool) \App\Models\SystemSetting::get('dean_notif_system_backups', false) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('dean_notif_system_backups', false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
 
@@ -257,20 +197,38 @@
               <div class="card-header"><div><div class="card-title">Change Password</div><div class="card-sub">Update your Dean portal account password</div></div></div>
               <div class="mb-3.5">
                 <label class="field-label">Current Password</label>
-                <input class="field-input" type="password" placeholder="Enter your current password">
+                <div class="relative">
+                  <input class="field-input pr-10" type="password" placeholder="Enter your current password" id="pw-current">
+                  <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-current', this)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
               </div>
               <div class="grid grid-cols-2 gap-3 mb-1">
                 <div>
                   <label class="field-label">New Password</label>
-                  <input class="field-input" type="password" placeholder="Min. 8 characters" id="pw-new" oninput="checkPwStrength(this.value)">
+                  <div class="relative">
+                    <input class="field-input pr-10" type="password" placeholder="Min. 8 characters" id="pw-new" oninput="checkPwStrength(this.value)">
+                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-new', this)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
                   <div class="h-1 rounded bg-slate-200 mt-1.5 overflow-hidden">
                     <div class="h-full rounded transition-all" id="pw-bar" style="width:0"></div>
                   </div>
                 </div>
-                <div><label class="field-label">Confirm New Password</label><input class="field-input" type="password" placeholder="Re-enter new password"></div>
+                <div>
+                  <label class="field-label">Confirm New Password</label>
+                  <div class="relative">
+                    <input class="field-input pr-10" type="password" placeholder="Re-enter new password" id="pw-confirm">
+                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-confirm', this)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
               <div class="flex justify-end mt-1">
-                <button class="btn btn-primary" onclick="showToast('Password updated successfully!')">Update Password</button>
+                <button class="btn btn-primary" onclick="savePassword()">Update Password</button>
               </div>
             </div>
 
@@ -279,15 +237,26 @@
               <div class="grid grid-cols-2 gap-3 mb-1">
                 <div>
                   <label class="field-label">Session Timeout</label>
-                  <select class="field-input"><option>15 minutes</option><option selected>30 minutes</option><option>1 hour</option><option>Never</option></select>
+                  @php $timeout = (int) \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30); @endphp
+                  <select class="field-input" id="sec-timeout">
+                    <option value="15" {{ $timeout === 15 ? 'selected' : '' }}>15 minutes</option>
+                    <option value="30" {{ $timeout === 30 ? 'selected' : '' }}>30 minutes</option>
+                    <option value="60" {{ $timeout === 60 ? 'selected' : '' }}>1 hour</option>
+                    <option value="999999" {{ $timeout === 999999 ? 'selected' : '' }}>Never</option>
+                  </select>
                 </div>
                 <div>
                   <label class="field-label">Max Login Attempts</label>
-                  <select class="field-input"><option>3</option><option selected>5</option><option>10</option></select>
+                  @php $attempts = (int) \App\Models\SystemSetting::get('usr_max_login_attempts', 5); @endphp
+                  <select class="field-input" id="sec-attempts">
+                    <option value="3" {{ $attempts === 3 ? 'selected' : '' }}>3</option>
+                    <option value="5" {{ $attempts === 5 ? 'selected' : '' }}>5</option>
+                    <option value="10" {{ $attempts === 10 ? 'selected' : '' }}>10</option>
+                  </select>
                 </div>
               </div>
               <div class="flex justify-end mt-1">
-                <button class="btn btn-primary" onclick="showToast('Security settings saved!')">Save Changes</button>
+                <button class="btn btn-primary" onclick="saveSecuritySettings()">Save Changes</button>
               </div>
             </div>
           </div>
@@ -306,10 +275,38 @@
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Authentication</div><div class="text-[13px] font-semibold text-slate-900">JWT + Laravel Sanctum</div></div>
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Frontend Stack</div><div class="text-[13px] font-semibold text-slate-900">Tailwind CSS + Vanilla JS</div></div>
                 <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Mobile App</div><div class="text-[13px] font-semibold text-slate-900">React Native</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Last Backup</div><div class="text-[13px] font-semibold text-green-600">Today, 06:00 AM</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Uptime (30 days)</div><div class="text-[13px] font-semibold text-green-600">99.98%</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Environment</div><div class="text-[13px] font-semibold text-slate-900">Production</div></div>
-                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">API Version</div><div class="text-[13px] font-semibold text-slate-900">v2.3.1</div></div>
+                @php
+                    $latestBackup = \App\Models\SystemBackup::orderByDesc('bkp_ran_at')->first();
+
+                    $uptimeText = 'Unknown';
+                    try {
+                        $output = shell_exec('wmic process where "name=\'httpd.exe\'" get CreationDate /value');
+                        preg_match('/CreationDate=(\d{14})/', $output, $matches);
+                        if (isset($matches[1])) {
+                            $startTime = \Carbon\Carbon::createFromFormat('YmdHis', substr($matches[1], 0, 14));
+                            $uptimeText = $startTime->diffForHumans(now(), true) . ' (since ' . $startTime->format('M j, g:i A') . ')';
+                        }
+                    } catch (\Exception $e) {
+                        $uptimeText = 'Unable to determine';
+                    }
+                @endphp
+
+                <div class="bg-slate-50 rounded-lg p-3.5">
+                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Last Backup</div>
+                  @if($latestBackup)
+                    <div class="text-[13px] font-semibold {{ $latestBackup->bkp_status === 'success' ? 'text-green-600' : 'text-red-600' }}">
+                      {{ $latestBackup->bkp_ran_at->format('M j, Y, h:i A') }}
+                      {{ $latestBackup->bkp_status === 'success' ? '✓' : '✗' }}
+                    </div>
+                  @else
+                    <div class="text-[13px] font-semibold text-slate-400">No backups yet</div>
+                  @endif
+                </div>
+
+                <div class="bg-slate-50 rounded-lg p-3.5">
+                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Server Uptime</div>
+                  <div class="text-[13px] font-semibold text-slate-900">{{ $uptimeText }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -699,6 +696,138 @@ function saveContactInfo() {
     .then(({ status, data }) => {
       if (data.success) {
         showToast('Contact details saved successfully!');
+      } else {
+        const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
+        showToast(firstError);
+      }
+    })
+    .catch(() => showToast('Save failed. Please try again.'));
+}
+
+function saveInstitutionInfo() {
+  const payload = {
+    institution_name: document.getElementById('inst-name').value,
+    institution_campus: document.getElementById('inst-campus').value,
+    institution_college: document.getElementById('inst-college').value,
+    institution_abbr: document.getElementById('inst-abbr').value,
+    institution_email: document.getElementById('inst-email').value,
+    institution_phone: document.getElementById('inst-phone').value,
+  };
+
+  fetch("{{ route('dean.institution.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ status, data }) => {
+      if (data.success) {
+        showToast('Institution details saved!');
+      } else {
+        const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
+        showToast(firstError);
+      }
+    })
+    .catch(() => showToast('Save failed. Please try again.'));
+}
+
+function savePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+
+  if (!current) { showToast('Please enter your current password.'); return; }
+  if (newPw.length < 8) { showToast('New password must be at least 8 characters.'); return; }
+  if (newPw !== confirm) { showToast('New passwords do not match.'); return; }
+
+  fetch("{{ route('dean.profile.password.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      current_password: current,
+      new_password: newPw,
+      new_password_confirmation: confirm,
+    }),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ status, data }) => {
+      if (data.success) {
+        document.getElementById('pw-current').value = '';
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-confirm').value = '';
+        document.getElementById('pw-bar').style.width = '0';
+        showToast('Password updated successfully!');
+      } else {
+        showToast(data.message || 'Update failed. Please check your inputs.');
+      }
+    })
+    .catch(() => showToast('Update failed. Please try again.'));
+}
+
+function toggleSwitch(input) {
+  const track = input.nextElementSibling;
+  if (input.checked) { track.classList.add('on'); }
+  else { track.classList.remove('on'); }
+
+  const field = input.dataset.field;
+  if (!field) return;
+
+  fetch('{{ route("dean.profile.notification-preferences.update") }}', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+    },
+    body: JSON.stringify({ [field]: input.checked }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) {
+        showToast('❌ Failed to update preference');
+        return;
+      }
+      showToast('Preference updated!');
+    })
+    .catch(() => showToast('❌ Something went wrong saving.'));
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.innerHTML = isHidden
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+
+function saveSecuritySettings() {
+  const payload = {
+    usr_session_timeout_minutes: parseInt(document.getElementById('sec-timeout').value, 10),
+    usr_max_login_attempts: parseInt(document.getElementById('sec-attempts').value, 10),
+  };
+
+  fetch("{{ route('dean.security.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ status, data }) => {
+      if (data.success) {
+        showToast('Security settings saved!');
       } else {
         const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
         showToast(firstError);
