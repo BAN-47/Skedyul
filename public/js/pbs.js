@@ -21,7 +21,7 @@ function showToast(msg) {
     if (!t || !m) return;
     m.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3200);
+    setTimeout(() => t.classList.remove('show'), 4200);
 }
 
 function showInlineError(boxId, msg) {
@@ -33,6 +33,23 @@ function showInlineError(boxId, msg) {
 function clearInlineError(boxId) {
     const box = document.getElementById(boxId);
     if (box) box.classList.add('hidden');
+}
+
+/*
+  Backend responses come back as { success, conflict, message }.
+  - conflict === true  -> a double-booking (teacher/room/section already
+    busy at an overlapping time). Nothing was saved. Per spec, this is
+    surfaced as the bottom-right toast, not inline in the modal, and the
+    modal stays open with the form untouched so you can pick another slot.
+  - conflict === false (or absent) -> a plain validation/server error,
+    shown inline in the modal as before.
+*/
+function handleScheduleError(data, inlineBoxId) {
+    if (data.conflict) {
+        showToast(data.message || 'Conflict: that slot is already taken.');
+    } else {
+        showInlineError(inlineBoxId, data.message || 'Something went wrong.');
+    }
 }
 
 /* ── clock ── */
@@ -47,19 +64,13 @@ function tickClock() {
 tickClock();
 setInterval(tickClock, 30000);
 
-/* ── SHIFT TOGGLE ────────────────────────────────────────────────────────────
-   The grid rows are rendered server-side in the blade based on ?shift= param.
-   setShift() just updates the URL and reloads — the blade does the rendering.
-   paintShift() only updates button styles to match the current URL param.
-────────────────────────────────────────────────────────────────────────────── */
+/* ── SHIFT TOGGLE ── */
 function getCurrentShift() {
     return new URLSearchParams(window.location.search).get('shift') || 'day';
 }
 
 function setShift(shift) {
-    // Only reload if actually changing
     if (shift === getCurrentShift()) return;
-
     const params = new URLSearchParams(window.location.search);
     params.set('shift', shift);
     window.location.search = params.toString();
@@ -67,7 +78,6 @@ function setShift(shift) {
 
 function paintShift() {
     const shift = getCurrentShift();
-
     const dayBtn   = document.getElementById('shift-day');
     const nightBtn = document.getElementById('shift-night');
     if (!dayBtn || !nightBtn) return;
@@ -83,25 +93,17 @@ function paintShift() {
         nightBtn.className = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-blue-600 text-white border-l border-slate-300 rounded-r';
     }
 }
-
-// Run on page load
 paintShift();
 
 /* ── filters / date nav ── */
 function applyFilters() {
     const params = new URLSearchParams(window.location.search);
-    const map = {
-        program:  'filter-program',
-        year:     'filter-year',
-        section:  'filter-section',
-        semester: 'filter-semester',
-    };
+    const map = { program: 'filter-program', year: 'filter-year', section: 'filter-section', semester: 'filter-semester' };
     Object.entries(map).forEach(([key, id]) => {
         const el  = document.getElementById(id);
         const val = el ? el.value : '';
         val ? params.set(key, val) : params.delete(key);
     });
-    // Keep the current shift when applying filters
     if (!params.has('shift')) params.set('shift', getCurrentShift());
     window.location.search = params.toString();
 }
@@ -111,7 +113,6 @@ function shiftDate(delta) {
     d.setDate(d.getDate() + delta);
     const params = new URLSearchParams(window.location.search);
     params.set('date', d.toISOString().slice(0, 10));
-    // Keep the current shift when navigating dates
     if (!params.has('shift')) params.set('shift', getCurrentShift());
     window.location.search = params.toString();
 }
@@ -127,8 +128,8 @@ function addMinutesToTime(hhmm, minutesToAdd) {
 
 function openAddModal(day, startTime) {
     clearInlineError('add-error');
-    ['add-subject','add-faculty','add-semester','add-program',
-     'add-year','add-section','add-description'].forEach(id => {
+    ['add-subject', 'add-faculty', 'add-semester', 'add-program',
+     'add-year', 'add-section', 'add-description'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -150,15 +151,16 @@ function submitAdd() {
         prog_id:     document.getElementById('add-program').value,
         year_level:  document.getElementById('add-year').value,
         sec_id:      document.getElementById('add-section').value,
+        room_id:     document.getElementById('add-room').value,
         day:         document.getElementById('add-day').value,
         start_time:  document.getElementById('add-start').value,
         end_time:    document.getElementById('add-end').value,
         description: document.getElementById('add-description').value,
     };
 
-    if (!payload.subj_id || !payload.fac_id || !payload.sec_id ||
+    if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
         !payload.day || !payload.start_time || !payload.end_time) {
-        showInlineError('add-error', 'Please fill in subject, professor, section, day, and both times.');
+        showInlineError('add-error', 'Please fill in subject, professor, section, room, day, and both times.');
         return;
     }
     if (payload.end_time <= payload.start_time) {
@@ -171,11 +173,7 @@ function submitAdd() {
 
     fetch('/chair/pbs', {
         method:  'POST',
-        headers: {
-            'Content-Type':  'application/json',
-            'X-CSRF-TOKEN':  csrfToken(),
-            'Accept':        'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify(payload),
     })
     .then(async res => {
@@ -185,7 +183,7 @@ function submitAdd() {
             showToast(data.message || 'Schedule added.');
             setTimeout(() => location.reload(), 800);
         } else {
-            showInlineError('add-error', data.message || 'Could not save this schedule.');
+            handleScheduleError(data, 'add-error');
             btn.disabled = false;
         }
     })
@@ -218,6 +216,7 @@ function submitEdit() {
         fac_id:      document.getElementById('edit-faculty').value,
         sem_id:      document.getElementById('edit-semester').value,
         sec_id:      document.getElementById('edit-section').value,
+        room_id:     document.getElementById('edit-room')?.value || '',
         day:         document.getElementById('edit-day').value,
         start_time:  document.getElementById('edit-start').value,
         end_time:    document.getElementById('edit-end').value,
@@ -234,11 +233,7 @@ function submitEdit() {
 
     fetch(`/chair/pbs/${id}`, {
         method:  'POST',
-        headers: {
-            'Content-Type':  'application/json',
-            'X-CSRF-TOKEN':  csrfToken(),
-            'Accept':        'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify(payload),
     })
     .then(async res => {
@@ -248,7 +243,7 @@ function submitEdit() {
             showToast(data.message || 'Schedule updated.');
             setTimeout(() => location.reload(), 800);
         } else {
-            showInlineError('edit-error', data.message || 'Could not update this schedule.');
+            handleScheduleError(data, 'edit-error');
             btn.disabled = false;
         }
     })
@@ -292,11 +287,7 @@ function submitDelete() {
 
     fetch(`/chair/pbs/${id}`, {
         method:  'POST',
-        headers: {
-            'Content-Type':  'application/json',
-            'X-CSRF-TOKEN':  csrfToken(),
-            'Accept':        'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify({ _method: 'DELETE' }),
     })
     .then(async res => {
@@ -334,11 +325,7 @@ function clearAll() {
 
     fetch('/chair/pbs/clear', {
         method:  'POST',
-        headers: {
-            'Content-Type':  'application/json',
-            'X-CSRF-TOKEN':  csrfToken(),
-            'Accept':        'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
         body: JSON.stringify(Object.fromEntries(new URLSearchParams(window.location.search))),
     })
     .then(async res => {

@@ -16,20 +16,37 @@ class Faculty extends Model
     const CREATED_AT = 'fac_created_at';
     const UPDATED_AT = 'fac_updated_at';
 
-    protected $fillable = [
+       protected $fillable = [
         'fac_usr_id',
+
+        // Department / Program
         'fac_dept_id',
+        'fac_prog_id',
+
+        // Personal Information
         'fac_first_name',
         'fac_middle_name',
         'fac_last_name',
         'fac_suffix',
+        'fac_employee_id',
+        'fac_gender',
+        'fac_civil_status',
+        'fac_dob',
+        'fac_nationality',
+
+        // Contact Information
         'fac_phone_number',
         'fac_gmail',
         'fac_address',
+
+        // Faculty-only information
         'fac_employment_type',
         'fac_rank',
+
+        // Profile
         'fac_profile_image',
     ];
+
 
     public function user()
     {
@@ -40,7 +57,10 @@ class Faculty extends Model
     {
         return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id');
     }
-
+    public function program()
+    {
+        return $this->belongsTo(Program::class, 'fac_prog_id', 'prog_id');
+    }
     public function workloads()
     {
         return $this->hasMany(Workload::class, 'wl_fac_id', 'fac_id');
