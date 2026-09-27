@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Dean;
 
 use App\Models\Dean;
+use App\Models\SystemSetting;
+use App\Models\Schedule;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -190,5 +192,12 @@ class DeanProfileController extends Controller
         }
 
         return response()->json(['success' => true]);
+    }
+
+    public function pendingCount()
+    {
+        return response()->json([
+            'count' => Schedule::where('status', 'pending')->count(),
+        ]);
     }
 }

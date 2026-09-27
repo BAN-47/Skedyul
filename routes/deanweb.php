@@ -64,3 +64,5 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
 Route::put('/dean/profile/notification-preferences', [App\Http\Controllers\Dean\DeanProfileController::class, 'updateNotificationPreferences'])
             ->name('dean.profile.notification-preferences.update');
 
+Route::get('/notifications/pending-count', [DeanProfileController::class, 'pendingCount'])
+    ->name('dean.notifications.pending-count');

@@ -131,6 +131,23 @@
 
         <script>
         const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+        const pendingCountUrl = "{{ route('dean.notifications.pending-count') }}";
+
+        async function pollPendingCount() {
+            try {
+                const res = await fetch(pendingCountUrl, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await res.json();
+                const badge = document.getElementById('notif-badge');
+                const prev = parseInt(badge.textContent.trim(), 10) || 0;
+                badge.textContent = data.count;
+                if (data.count > prev) showToast('New pending approval received', '#2563eb');
+            } catch (err) {
+                console.error('Poll failed:', err);
+            }
+        }
+        setInterval(pollPendingCount, 15000);
 
         // ── MODALS ────────────────────────────────────────────────────────
         function openModal(id) {
