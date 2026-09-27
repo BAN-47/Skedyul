@@ -9,6 +9,7 @@ use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
 use App\Http\Controllers\Dean\NotificationController;
 use App\Http\Controllers\Dean\ScheduleReportsController;
+use App\Http\Controllers\Dean\DeanProfileController;
 
 
 /*
@@ -30,60 +31,28 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 */
 Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
 
-    // Dashboard
-    Route::get('/dashboard', [DeanDashboardController::class, 'index'])
-        ->name('dashboard');
+    Route::get('/dashboard', [DeanDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/departments', [DeanDepartmentController::class, 'index'])->name('departments');
+    Route::get('/faculty-workload', [FacultyWorkloadController::class, 'facultyWorkload'])->name('faculty_workload');
 
-    // Departments
-    Route::get('/departments', [DeanDepartmentController::class, 'index'])
-        ->name('departments');
+    Route::get('/pending-approvals', [PendingApprovalsController::class, 'index'])->name('pending_approvals');
+    Route::get('/pending-approvals/{id}/review', [PendingApprovalsController::class, 'review'])->name('pending_approvals.review');
+    Route::post('/pending-approvals/{id}/approve', [PendingApprovalsController::class, 'approve'])->name('pending_approvals.approve');
+    Route::post('/pending-approvals/{id}/return', [PendingApprovalsController::class, 'returnToChair'])->name('pending_approvals.return');
 
-    //Faculty Workload
-    Route::get('/faculty-workload', [FacultyWorkloadController::class, 'facultyWorkload'])
-        ->name('faculty_workload');
+    Route::get('/schedule-reports', [ScheduleReportsController::class, 'index'])->name('schedule_reports');
+    Route::get('/faculty-deployment', [FacultyDeploymentController::class, 'index'])->name('faculty_deployment');
+    Route::post('/faculty-deployment/notify', [FacultyDeploymentController::class, 'sendNotification'])->name('faculty_deployment.notify');
 
-    // ── PENDING APPROVALS ─────────────────────────────────────────────
-    // index    → GET  /dean/pending-approvals              → shows table of all submissions
-    // review   → GET  /dean/pending-approvals/{id}/review  → AJAX: returns schedule rows partial
-    // approve  → POST /dean/pending-approvals/{id}/approve → marks submission approved
-    // return   → POST /dean/pending-approvals/{id}/return  → returns with remarks to chair
-    Route::get ('/pending-approvals',
-                [PendingApprovalsController::class, 'index'])
-        ->name('pending_approvals');
+    // Settings — now backed by the controller, not a bare closure
+    Route::get('/settings', [DeanProfileController::class, 'settings'])->name('settings');
+    Route::post('/profile/avatar', [DeanProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
+    Route::delete('/profile/avatar', [DeanProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
+    Route::put('/profile/personal-info', [DeanProfileController::class, 'updatePersonalInfo'])->name('profile.personal-info.update');
+    Route::put('/profile/contact', [DeanProfileController::class, 'updateContact'])->name('profile.contact.update');
 
-    Route::get ('/pending-approvals/{id}/review',
-                [PendingApprovalsController::class, 'review'])
-        ->name('pending_approvals.review');
-
-    Route::post('/pending-approvals/{id}/approve',
-                [PendingApprovalsController::class, 'approve'])
-        ->name('pending_approvals.approve');
-
-    Route::post('/pending-approvals/{id}/return',
-                [PendingApprovalsController::class, 'returnToChair'])
-        ->name('pending_approvals.return');
-
-    // Schedule Reports
-    Route::get('/schedule-reports', [ScheduleReportsController::class, 'index'])
-        ->name('schedule_reports');
-
-    Route::get('/faculty-deployment', [FacultyDeploymentController::class, 'index'])
-        ->name('faculty_deployment');
-
-    Route::post('/faculty-deployment/notify', [FacultyDeploymentController::class, 'sendNotification'])
-        ->name('faculty_deployment.notify');
-
-    // Settings
-    Route::get('/settings', function () {
-        return view('dean.settings');
-    })->name('settings');
-
-
-    // Notification Routes
- 
-Route::get ('/notifications',         [NotificationController::class, 'index'])       ->name('notifications');
-Route::post('/notifications/send',    [NotificationController::class, 'send'])         ->name('notifications.send');
-Route::get ('/notifications/unread',  [NotificationController::class, 'unreadCount'])  ->name('notifications.unread');
-Route::post('/notifications/{id}/read',[NotificationController::class, 'markRead'])   ->name('notifications.read');
-
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications');
+    Route::post('/notifications/send', [NotificationController::class, 'send'])->name('notifications.send');
+    Route::get('/notifications/unread', [NotificationController::class, 'unreadCount'])->name('notifications.unread');
+    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 });

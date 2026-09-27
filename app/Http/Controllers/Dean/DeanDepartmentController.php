@@ -39,9 +39,12 @@ class DeanDepartmentController extends Controller
             ? Department::where('dept_id', $deanAssignment->dean_dept_id)->get()
             : collect(); // Dean has no department assigned yet — show nothing rather than everything
 
-        // Latest workload (total hours) per faculty for the active semester
-        $workloads = Workload::when($semester, fn ($q) => $q->where('wl_sem_id', $semester->sem_id))
-            ->when($academicYear, fn ($q) => $q->where('wl_ay_id', $academicYear->ay_id))
+        // Latest workload (total hours) per faculty for the active semester.
+        // Presence of a row here = faculty has actually been through
+        // scheduling this semester. Absence = not yet assigned anything,
+        // NOT "0 hours" — those two are treated differently below.
+        $workloads = Workload::when($semester, fn($q) => $q->where('wl_sem_id', $semester->sem_id))
+            ->when($academicYear, fn($q) => $q->where('wl_ay_id', $academicYear->ay_id))
             ->get()
             ->keyBy('wl_fac_id');
 
@@ -51,8 +54,13 @@ class DeanDepartmentController extends Controller
             $facultyList = Faculty::where('fac_dept_id', $dept->dept_id)->get();
 
             $facultyCount = $facultyList->count();
-            $avgLoad = $facultyCount > 0
-                ? round($facultyList->sum(fn ($f) => optional($workloads->get($f->fac_id))->wl_total_hours ?? 0) / $facultyCount)
+
+            // Only faculty with an actual workload record count toward the
+            // average — an unassigned faculty isn't a genuine "0h", so it
+            // shouldn't drag the department average down.
+            $assignedFaculty = $facultyList->filter(fn($f) => $workloads->has($f->fac_id));
+            $avgLoad = $assignedFaculty->count() > 0
+                ? round($assignedFaculty->sum(fn($f) => $workloads->get($f->fac_id)->wl_total_hours ?? 0) / $assignedFaculty->count())
                 : 0;
 
             $loadPct = min(100, round(($avgLoad / self::MAX_LOAD_HOURS) * 100));
@@ -66,36 +74,45 @@ class DeanDepartmentController extends Controller
             $programsData = [];
 
             foreach ($programs as $progIndex => $prog) {
-                $facultyIds = Study_Load::whereHas('subject', fn ($q) => $q->where('subj_prog_id', $prog->prog_id))
-                    ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
+                $facultyIds = Study_Load::whereHas('subject', fn($q) => $q->where('subj_prog_id', $prog->prog_id))
+                    ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
                     ->pluck('sl_fac_id')
                     ->unique();
+
+                // Faculty statically assigned to this program (fac_prog_id), even
+                // with no study_load record yet this semester
+                $staticFacultyIds = Faculty::where('fac_prog_id', $prog->prog_id)->pluck('fac_id');
+
+                $facultyIds = $facultyIds->merge($staticFacultyIds)->unique();
 
                 $progFaculty = Faculty::whereIn('fac_id', $facultyIds)->get();
 
                 $progFacultyRows = $progFaculty->map(function ($f) use ($workloads) {
-                    $hours = optional($workloads->get($f->fac_id))->wl_total_hours ?? 0;
-                    [$statusLabel, $statusColor] = $this->resolveStatus($hours, $f->fac_employment_type);
+                    $hasWorkload = $workloads->has($f->fac_id);
+                    $hours = $hasWorkload ? ($workloads->get($f->fac_id)->wl_total_hours ?? 0) : 0;
+                    [$statusLabel, $statusColor] = $this->resolveStatus($hours, $f->fac_employment_type, $hasWorkload);
 
                     return [
                         'name'       => $f->full_name ?: 'Unnamed Faculty',
                         'rank'       => $f->fac_rank ?? '—',
                         'employment' => $this->formatEmployment($f->fac_employment_type),
-                        'load'       => $hours . 'h',
+                        'load'       => $hasWorkload ? $hours . 'h' : '—',
                         'status'     => $statusLabel,
                         'badge'      => 'badge-' . $statusColor,
                     ];
                 })->values();
 
                 $progFacultyCount = $progFaculty->count();
-                $progAvgLoad = $progFacultyCount > 0
-                    ? round($progFaculty->sum(fn ($f) => optional($workloads->get($f->fac_id))->wl_total_hours ?? 0) / $progFacultyCount)
+
+                $progAssignedFaculty = $progFaculty->filter(fn($f) => $workloads->has($f->fac_id));
+                $progAvgLoad = $progAssignedFaculty->count() > 0
+                    ? round($progAssignedFaculty->sum(fn($f) => $workloads->get($f->fac_id)->wl_total_hours ?? 0) / $progAssignedFaculty->count())
                     : 0;
                 $progLoadPct = min(100, round(($progAvgLoad / self::MAX_LOAD_HOURS) * 100));
 
                 $progSectionCount = Section::where('sec_prog_id', $prog->prog_id)
-                    ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
-                    ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
+                    ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
+                    ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                     ->count();
 
                 $programsData[$prog->prog_id] = [
@@ -105,7 +122,7 @@ class DeanDepartmentController extends Controller
                     'chair'        => $this->resolveProgramChairName($prog->prog_id),
                     'facultyCount' => $progFacultyCount,
                     'sections'     => $progSectionCount,
-                    'avgLoad'      => $progAvgLoad . 'h',
+                    'avgLoad'      => $progAssignedFaculty->count() > 0 ? $progAvgLoad . 'h' : '—',
                     'maxLoad'      => self::MAX_LOAD_HOURS . 'h',
                     'loadPct'      => $progLoadPct,
                     'loadColor'    => $this->resolveLoadColor($progAvgLoad),
@@ -113,13 +130,13 @@ class DeanDepartmentController extends Controller
                 ];
             }
 
-            $sectionCount = Section::whereHas('program', fn ($q) => $q->where('prog_dept_id', $dept->dept_id))
-                ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
-                ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
+            $sectionCount = Section::whereHas('program', fn($q) => $q->where('prog_dept_id', $dept->dept_id))
+                ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
+                ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                 ->count();
 
             $submission = Schedule_Submission::where('schsub_dept_id', $dept->dept_id)
-                ->when($semester, fn ($q) => $q->where('schsub_sem_id', $semester->sem_id))
+                ->when($semester, fn($q) => $q->where('schsub_sem_id', $semester->sem_id))
                 ->orderByDesc('schsub_submitted_at')
                 ->first();
 
@@ -131,7 +148,7 @@ class DeanDepartmentController extends Controller
                 'name'           => $dept->dept_name,
                 'facultyCount'   => $facultyCount,
                 'sections'       => $sectionCount,
-                'avgLoad'        => $avgLoad . 'h',
+                'avgLoad'        => $assignedFaculty->count() > 0 ? $avgLoad . 'h' : '—',
                 'maxLoad'        => self::MAX_LOAD_HOURS . 'h',
                 'loadPct'        => $loadPct,
                 'loadColor'      => $this->resolveLoadColor($avgLoad),
@@ -180,6 +197,8 @@ class DeanDepartmentController extends Controller
     /**
      * Same OK/Near Max/Overload thresholds as individual faculty status,
      * applied to a department's average load for the summary bar color.
+     * Untouched by the "not yet assigned" change — an avgLoad of 0 here
+     * already reads as neutral/blue, which is fine for a summary bar.
      */
     private function resolveLoadColor(float $avgLoad): string
     {
@@ -195,9 +214,18 @@ class DeanDepartmentController extends Controller
     /**
      * Determines the badge label + color for a faculty member,
      * mirroring DeanFacultyWorkloadController's business rule.
+     *
+     * $hasWorkload = false means no Workload row exists for them this
+     * semester at all — i.e. they haven't been given a schedule yet.
+     * That's distinct from a genuine 0-hour workload record, so it's
+     * checked FIRST and short-circuits the hour-based thresholds below.
      */
-    private function resolveStatus(float $hours, ?string $employmentType): array
+    private function resolveStatus(float $hours, ?string $employmentType, bool $hasWorkload = true): array
     {
+        if (!$hasWorkload) {
+            return ['Not Yet Assigned', 'grey'];
+        }
+
         if ($hours > self::MAX_LOAD_HOURS) {
             return ['Overload', 'red'];
         }

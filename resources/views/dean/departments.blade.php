@@ -15,39 +15,17 @@
         <!-- Main -->
         <div class="main">
 
-        @include('partials.dean_header', ['title' => 'Dean Departments'])
+            @include('partials.dean_header', ['title' => 'Dean Departments'])
 
-            <!-- DEPARTMENTS PAGE -->
+            <!-- DEPARTMENTS PAGE (now: straight to Programs, no department step) -->
             <div id="page-departments" class="page active">
-                <div id="dept-list-view">
+                <div id="program-list-view">
                     <div style="margin-bottom:20px;">
-                        <div style="font-size:20px;font-weight:800;">Department Overview</div>
-                        <div style="font-size:13px;color:var(--text3);margin-top:3px;">Select a department to view
+                        <div style="font-size:20px;font-weight:800;">Program Overview</div>
+                        <div style="font-size:13px;color:var(--text3);margin-top:3px;">Select a program to view
                             details and faculty</div>
                     </div>
-                    <div class="three-col">
-                        @forelse ($deptData as $deptId => $d)
-                            <div class="dept-card" onclick="openDept('{{ $deptId }}')">
-                                <div class="dept-card-header">
-                                    <div>
-                                        <div class="dept-card-code" style="color:{{ $d['color'] }}">
-                                            {{ $d['code'] }}</div>
-                                        <div class="dept-card-name">{{ $d['name'] }}</div>
-                                    </div><span class="dept-card-arrow">›</span>
-                                </div>
-                                <div style="margin-top:12px;display:flex;justify-content:space-between;"><span
-                                        class="badge badge-{{ $d['statusBadge'] }}">{{ $d['scheduleStatus'] }}</span>
-                                </div>
-                            </div>
-                        @empty
-                            <div style="color:var(--text3);font-size:13px;">No departments found.</div>
-                        @endforelse
-                    </div>
-                </div>
-                <div id="dept-detail-view" style="display:none;">
-                    <button class="topbar-btn btn-secondary" onclick="closeDept()" style="margin-bottom:20px;">Back to
-                        Departments</button>
-                    <div id="dept-detail-content"></div>
+                    <div class="three-col" id="program-list-grid"></div>
                 </div>
                 <div id="program-detail-view" style="display:none;">
                     <button class="topbar-btn btn-secondary" onclick="closeProgram()" style="margin-bottom:20px;">Back
@@ -194,7 +172,7 @@
                         <strong>1 Conflict Detected:</strong> Carlo Mendoza is scheduled for CC 311 and IT 201 at the
                         same time on Monday 8:30–10:00 AM.
                     </div>
-                        <table class="data-table">
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Faculty</th>
@@ -268,7 +246,7 @@
                 const titles = {
                     'page-dashboard': 'Dean Dashboard',
                     'page-faculty': 'Faculty Workload Overview',
-                    'page-departments': 'Department Overview',
+                    'page-departments': 'Program Overview',
                     'page-approvals': 'Schedule Approvals',
                     'page-overload': 'Overload Alerts',
                     'page-reports': 'Schedule Reports',
@@ -460,28 +438,34 @@
             // Real department + faculty data from the database (built in DeanDepartmentController)
             const deptData = @json($deptData);
 
-            let currentDeptKey = null;
+            // Flatten every department's programs into one list, keeping the
+            // originating deptKey on each program so openProgram() still works.
+            function flattenPrograms() {
+                const list = [];
+                Object.keys(deptData).forEach(deptKey => {
+                    const d = deptData[deptKey];
+                    Object.keys(d.programs).forEach(progKey => {
+                        list.push({
+                            deptKey,
+                            progKey,
+                            ...d.programs[progKey]
+                        });
+                    });
+                });
+                return list;
+            }
 
-            // Auto-open the department directly — skip the list-click step
-            // when the dean only oversees a single department (e.g. CCICT).
-            // Once more departments exist, the list view returns automatically.
-            document.addEventListener('DOMContentLoaded', function() {
-                const keys = Object.keys(deptData);
-                if (keys.length === 1) {
-                    openDept(keys[0]);
+            function renderProgramList() {
+                const programs = flattenPrograms();
+                const grid = document.getElementById('program-list-grid');
+
+                if (!programs.length) {
+                    grid.innerHTML = `<div style="color:var(--text3);font-size:13px;">No programs found.</div>`;
+                    return;
                 }
-            });
 
-            function openDept(key) {
-                const d = deptData[key];
-                if (!d) return;
-                currentDeptKey = key;
-
-                const programKeys = Object.keys(d.programs);
-                const programCards = programKeys.map(pKey => {
-                    const p = d.programs[pKey];
-                    return `
-    <div class="dept-card" onclick="openProgram('${key}','${pKey}')">
+                grid.innerHTML = programs.map(p => `
+    <div class="dept-card" onclick="openProgram('${p.deptKey}','${p.progKey}')">
       <div class="dept-card-header"><div><div class="dept-card-code" style="color:${p.color}">${p.code}</div><div class="dept-card-name">${p.name}</div></div><span class="dept-card-arrow">›</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
         <div style="background:var(--grey);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:20px;font-weight:800;">${p.facultyCount}</div><div style="font-size:11px;color:var(--text3)">Faculty</div></div>
@@ -490,39 +474,12 @@
       <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2)">Avg Load: ${p.avgLoad} / ${p.maxLoad} max</div>
       <div class="workload-bar"><div class="workload-fill" style="width:${p.loadPct}%;background:${p.loadColor}"></div></div>
       <div style="margin-top:12px;"><span class="badge badge-grey">Chair: ${p.chair}</span></div>
-    </div>`;
-                }).join('');
-
-                document.getElementById('dept-detail-content').innerHTML = `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:22px;font-weight:800;color:${d.color}">${d.code}</div>
-      <div style="font-size:14px;color:var(--text3);margin-top:2px;">${d.name}</div>
-    </div>
-    <div style="margin-bottom:12px;">
-      <div style="font-size:16px;font-weight:800;color:var(--text);">Programs</div>
-      <div style="font-size:13px;color:var(--text3);margin-top:2px;">Select a program to view its faculty</div>
-    </div>
-    <div class="three-col">
-      ${programCards || `<div style="color:var(--text3);font-size:13px;">No programs found for this department.</div>`}
-    </div>`;
-
-                document.getElementById('dept-list-view').style.display = 'none';
-                document.getElementById('dept-detail-view').style.display = 'block';
-                document.getElementById('topbar-title').textContent = d.code + ' — Department Details';
-
-                // Hide "Back to Departments" when it's the only department —
-                // there's nothing meaningful to go back to.
-                const backBtn = document.querySelector('#dept-detail-view > .topbar-btn');
-                if (backBtn) {
-                    backBtn.style.display = Object.keys(deptData).length === 1 ? 'none' : 'inline-flex';
-                }
+    </div>`).join('');
             }
 
-            function closeDept() {
-                document.getElementById('dept-list-view').style.display = 'block';
-                document.getElementById('dept-detail-view').style.display = 'none';
-                document.getElementById('topbar-title').textContent = 'Department Overview';
-            }
+            // Programs are now the top-level view — render them immediately,
+            // no department click/selection step needed.
+            document.addEventListener('DOMContentLoaded', renderProgramList);
 
             function openProgram(deptKey, progKey) {
                 const d = deptData[deptKey];
@@ -561,18 +518,15 @@
       </div>
     </div>`;
 
-                document.getElementById('dept-detail-view').style.display = 'none';
+                document.getElementById('program-list-view').style.display = 'none';
                 document.getElementById('program-detail-view').style.display = 'block';
                 document.getElementById('topbar-title').textContent = p.code + ' — Faculty';
             }
 
             function closeProgram() {
                 document.getElementById('program-detail-view').style.display = 'none';
-                document.getElementById('dept-detail-view').style.display = 'block';
-                if (currentDeptKey) {
-                    document.getElementById('topbar-title').textContent = deptData[currentDeptKey].code +
-                        ' — Department Details';
-                }
+                document.getElementById('program-list-view').style.display = 'block';
+                document.getElementById('topbar-title').textContent = 'Program Overview';
             }
         </script>
 </body>

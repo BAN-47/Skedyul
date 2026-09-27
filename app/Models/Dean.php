@@ -47,6 +47,17 @@ class Dean extends Model
 
         // Assignment
         'dean_assigned_at',
+        'dean_employee_id',
+        'dean_gender',
+        'dean_civil_status',
+        'dean_dob',
+        'dean_nationality',
+        'dean_bio',
+    ];
+
+    protected $casts = [
+        'dean_dob' => 'date',
+        'dean_assigned_at' => 'datetime',
     ];
 
     public function user()
