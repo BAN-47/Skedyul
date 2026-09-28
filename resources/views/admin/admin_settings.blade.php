@@ -354,23 +354,31 @@ function saveAcademicYear() {
     sem_end_date: document.getElementById('ay-end').value,
   };
 
+  if (!payload.ay_academic_year || !payload.sem_start_date || !payload.sem_end_date) {
+    showToast('Please fill academic year, start date, and end date.');
+    return;
+  }
+
   fetch('{{ route("admin.academic-year.update") }}', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
       'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
     },
     body: JSON.stringify(payload),
   })
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) {
-        showToast('❌ Failed to save academic year settings');
+    .then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        showToast(data.message || 'Failed to save academic year settings');
         return;
       }
-      showToast('Academic year settings saved!');
+      showToast(data.message || 'Academic year settings saved!');
+      // Reload so the form reflects the newly active period
+      setTimeout(() => window.location.reload(), 700);
     })
-    .catch(() => showToast('❌ Something went wrong saving.'));
+    .catch(() => showToast('Something went wrong saving.'));
 }
 
 function saveNotificationPreferences() {
