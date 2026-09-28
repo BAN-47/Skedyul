@@ -257,7 +257,7 @@
                     $span = max(1, (int) ceil(($endMins - $startMins) / $slotMinutes));
                   @endphp
 
-                  <div class="group relative z-20 m-[2px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white px-1.5 py-1 shadow-sm"
+                  <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
                        style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
                        data-schedule-id="{{ $s->sch_id }}"
                        data-subject="{{ $s->sch_subj_id }}"
@@ -269,17 +269,24 @@
                        data-start="{{ substr($s->sch_start_time, 0, 5) }}"
                        data-end="{{ substr($s->sch_end_time, 0, 5) }}">
 
-                    <div class="absolute inset-x-0 top-0 hidden group-hover:flex gap-0.5 p-0.5">
+                    <div class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
                       <button type="button" onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
-                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[2px] text-[8px] font-bold text-slate-800">Edit Schedule</button>
+                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
                       <button type="button" onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
-                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[2px] text-[8px] font-bold text-red-700">Delete Schedule</button>
+                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
                     </div>
 
-                    <div class="pt-3 text-center leading-tight">
-                      <div class="text-[10.5px] font-extrabold">{{ $s->subject->subj_code ?? '—' }}</div>
-                      @if($s->faculty)<div class="text-[9px] opacity-90">Prof. {{ $s->faculty->fac_last_name }}</div>@endif
-                      <div class="text-[9px] opacity-90">{{ $s->section->sec_name ?? '' }}</div>
+                    {{-- Vertically + horizontally centered content (matches wireframe) --}}
+                    <div class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
+                      <div class="text-[13px] font-extrabold tracking-wide">{{ $s->subject->subj_code ?? '—' }}</div>
+                      @if($s->faculty)
+                        <div class="text-[11.5px] font-semibold mt-1">Prof. {{ $s->faculty->fac_last_name }}</div>
+                      @endif
+                      @if($s->room)
+                        <div class="text-[11.5px] font-medium mt-0.5 opacity-95">{{ $s->room->room_name }}</div>
+                      @elseif($s->section)
+                        <div class="text-[11.5px] font-medium mt-0.5 opacity-95">{{ $s->section->sec_name }}</div>
+                      @endif
                     </div>
                   </div>
                 @endforeach
