@@ -45,6 +45,7 @@ class Faculty extends Model
 
         // Profile
         'fac_profile_image',
+        'fac_bio',
     ];
 
 

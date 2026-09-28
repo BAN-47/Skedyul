@@ -48,7 +48,28 @@ class PbtController extends Controller
             'deans'            => Faculty::whereIn('fac_usr_id', Dean::pluck('dean_usr_id'))->orderBy('fac_last_name')->get(),
             'sections'         => DB::table('section')->orderBy('sec_name')->get(),
             'programs'         => DB::table('program')->orderBy('prog_name')->get(),
-            'semesters'        => DB::table('semester')->orderBy('sem_start_date', 'desc')->get(),
+            'semesters'        => DB::table('semester as s')
+                ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+                ->orderByDesc('s.sem_start_date')
+                ->select([
+                    's.sem_id',
+                    's.sem_name',
+                    's.sem_is_active',
+                    's.sem_start_date',
+                    's.sem_ay_id',
+                    'ay.ay_academic_year',
+                    'ay.ay_year_label',
+                ])
+                ->get()
+                ->map(function ($sem) {
+                    $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
+                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    if (!empty($sem->sem_is_active)) {
+                        $label .= ' (Current)';
+                    }
+                    $sem->label = $label !== '' ? $label : $sem->sem_name;
+                    return $sem;
+                }),
             'rooms'            => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
             'filters'          => $filters,
             'selectedFaculty'  => $selectedFaculty,

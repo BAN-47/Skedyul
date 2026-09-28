@@ -184,7 +184,7 @@
               <option value="">SEMESTER</option>
               @foreach($semesters as $sem)
                 <option value="{{ $sem->sem_id }}" @selected(($filters['semester'] ?? '') === $sem->sem_id)>
-                  {{ $sem->sem_name }}
+                  {{ $sem->label ?? $sem->sem_name }}
                 </option>
               @endforeach
             </select>
@@ -355,7 +355,7 @@
         <select id="add-semester" class="field-input">
           <option value="">-- Select Semester --</option>
           @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->sem_name }}</option>
+            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
           @endforeach
         </select>
       </div>
@@ -454,7 +454,7 @@
         <select id="edit-semester" class="field-input">
           <option value="">-- Select Semester --</option>
           @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->sem_name }}</option>
+            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
           @endforeach
         </select>
       </div>

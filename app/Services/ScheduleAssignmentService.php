@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Schedule;
-use App\Models\StudyLoad;
+use App\Models\Study_Load;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +33,7 @@ class ScheduleAssignmentService
                 // schedule.sch_load_id is UNIQUE — a (faculty, subject, section,
                 // semester) combination can only carry ONE meeting time in this
                 // schema. We reuse the study_load row if it already exists.
-                $studyLoad = StudyLoad::firstOrCreate(
+                $studyLoad = Study_Load::firstOrCreate(
                     [
                         'sl_fac_id'  => $data['fac_id'],
                         'sl_subj_id' => $data['subj_id'],
@@ -65,7 +65,7 @@ class ScheduleAssignmentService
                     'sch_created_by' => Auth::id(),
                 ]);
 
-                return ['success' => true, 'schedule' => $schedule];
+                return ['success' => true, 'schedule' => $schedule->load(['subject', 'faculty', 'section', 'room'])];
             });
         } catch (RuntimeException $e) {
             if ($e->getMessage() === 'DUPLICATE_LOAD') {
@@ -103,7 +103,7 @@ class ScheduleAssignmentService
             'sch_end_time'   => $data['end_time'],
         ]);
 
-        return ['success' => true, 'schedule' => $schedule];
+        return ['success' => true, 'schedule' => $schedule->load(['subject', 'faculty', 'section', 'room'])];
     }
 
     public function delete(string $scheduleId): array
@@ -114,7 +114,7 @@ class ScheduleAssignmentService
 
         // Free up the study load so the same faculty/subject/section/semester
         // combo can be rescheduled later without hitting the unique constraint.
-        StudyLoad::where('sl_id', $loadId)->delete();
+        Study_Load::where('sl_id', $loadId)->delete();
 
         return ['success' => true, 'message' => 'Schedule deleted.'];
     }

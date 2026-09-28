@@ -11,7 +11,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
@@ -150,6 +149,7 @@ class UserController extends Controller
                         'fac_address' => $request->role_address,
                         'fac_employment_type' => $request->employment_type,
                         'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
                 break;
@@ -172,6 +172,7 @@ class UserController extends Controller
                         'dean_phone_number' => $request->role_phone_number,
                         'dean_gmail' => $request->role_gmail,
                         'dean_address' => $request->role_address,
+                        'dean_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
                 break;
@@ -194,6 +195,7 @@ class UserController extends Controller
                         'dc_phone_number' => $request->role_phone_number,
                         'dc_gmail' => $request->role_gmail,
                         'dc_address' => $request->role_address,
+                        'dc_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
                 break;
@@ -239,27 +241,24 @@ class UserController extends Controller
 
         try {
             DB::transaction(function () use ($data, $request) {
-                // Generate UUID here so fac_usr_id / dean_usr_id / dc_usr_id is never null
-                $userId = (string) Str::uuid();
-
-                $user = User::create([
-                    'usr_id'             => $userId,
-                    'usr_name'           => $this->buildUserName($data),
-                    'usr_first_name'     => $data['usr_first_name'],
-                    'usr_middle_name'    => $data['usr_middle_name'] ?? null,
-                    'usr_last_name'      => $data['usr_last_name'],
-                    'usr_suffix'         => $data['usr_suffix'] ?? null,
-                    'usr_email'          => $data['usr_email'],
-                    'usr_password_hash'  => Hash::make($data['password']),
-                    'usr_role'           => $data['usr_role'],
-                    'usr_is_active'      => true,
-                    'usr_bio'            => $data['usr_bio'] ?? null,
-                ]);
-
-                // Extra safety – make sure the model has the ID
-                if (empty($user->usr_id)) {
-                    $user->usr_id = $userId;
+                // Bio lives on role profile tables (fac_bio / dc_bio / dean_bio).
+                // Only system_admin has no profile table, so keep usr_bio for that role.
+                $userPayload = [
+                    'usr_name' => $this->buildUserName($data),
+                    'usr_first_name' => $data['usr_first_name'],
+                    'usr_middle_name' => $data['usr_middle_name'] ?? null,
+                    'usr_last_name' => $data['usr_last_name'],
+                    'usr_suffix' => $data['usr_suffix'] ?? null,
+                    'usr_email' => $data['usr_email'],
+                    'usr_password_hash' => Hash::make($data['password']),
+                    'usr_role' => $data['usr_role'],
+                    'usr_is_active' => true,
+                ];
+                if (($data['usr_role'] ?? '') === 'system_admin') {
+                    $userPayload['usr_bio'] = $data['usr_bio'] ?? null;
                 }
+
+                $user = User::create($userPayload);
 
                 $this->syncRoleProfile(
                     $user,
@@ -325,6 +324,7 @@ class UserController extends Controller
                 'dept_id' => $profile->fac_dept_id ?? null,
                 'prog_id' => $profile->fac_prog_id ?? null,
                 'employment_type' => $profile->fac_employment_type ?? null,
+                'usr_bio' => $profile->fac_bio ?? null,
             ],
 
             'dean' => [
@@ -344,6 +344,7 @@ class UserController extends Controller
                 'dept_id' => $profile->dean_dept_id ?? null,
                 'prog_id' => $profile->dean_prog_id ?? null,
                 'employment_type' => null,
+                'usr_bio' => $profile->dean_bio ?? null,
             ],
 
             'department_chair' => [
@@ -363,6 +364,7 @@ class UserController extends Controller
                 'dept_id' => $profile->dc_dept_id ?? null,
                 'prog_id' => $profile->dc_prog_id ?? null,
                 'employment_type' => null,
+                'usr_bio' => $profile->dc_bio ?? null,
             ],
 
             default => [
@@ -382,6 +384,7 @@ class UserController extends Controller
                 'dept_id' => null,
                 'prog_id' => null,
                 'employment_type' => null,
+                'usr_bio' => $user->usr_bio,
             ],
         };
 
@@ -400,7 +403,6 @@ class UserController extends Controller
             'usr_email' => $user->usr_email,
             'usr_role' => $user->usr_role,
             'usr_is_active' => (bool) $user->usr_is_active,
-            'usr_bio' => $user->usr_bio,
         ], $roleFields));
     }
 
@@ -455,7 +457,7 @@ class UserController extends Controller
                 $request,
                 $oldRole
             ) {
-                $user->update([
+                $userPayload = [
                     'usr_name' => $this->buildUserName($data),
                     'usr_first_name' => $data['usr_first_name'],
                     'usr_middle_name' => $data['usr_middle_name'] ?? null,
@@ -464,8 +466,13 @@ class UserController extends Controller
                     'usr_email' => $data['usr_email'],
                     'usr_role' => $data['usr_role'],
                     'usr_is_active' => $data['usr_is_active'],
-                    'usr_bio' => $data['usr_bio'] ?? null,
-                ]);
+                ];
+                // Bio on USER only for system_admin; other roles store bio on profile tables
+                if (($data['usr_role'] ?? '') === 'system_admin') {
+                    $userPayload['usr_bio'] = $data['usr_bio'] ?? null;
+                }
+
+                $user->update($userPayload);
 
                 $this->syncRoleProfile(
                     $user,

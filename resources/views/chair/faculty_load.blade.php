@@ -15,12 +15,6 @@
 
 <div class="app-main relative">
 
-    {{--
-        NOTE: this topbar + notification panel is copy-pasted from chair_dashboard.blade.php,
-        the same duplication problem we fixed for the admin pages earlier. Once this page
-        is working, it's worth extracting into partials/chair_header.blade.php the same way
-        we did partials/admin_header.blade.php — happy to do that next if you want.
-    --}}
     <div class="topbar">
       <div class="topbar-title">Faculty Load Management</div>
       <div class="flex items-center gap-2.5">
@@ -52,7 +46,8 @@
           <div class="text-[13px] text-slate-400 mt-0.5">
             {{ $department->dept_name ?? 'Department' }}
             @if($program) &middot; {{ $program->prog_code }} @endif
-            &middot; Max {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_UNITS }} units/week
+            &middot; Full-time max {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_UNITS }}u
+            &middot; Part-time max {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_UNITS }}u
           </div>
         </div>
         <button type="button" onclick="openAssignModal()" class="btn btn-primary">+ Assign Subject</button>
@@ -76,11 +71,8 @@
                 <td class="text-slate-500">{{ $fl['subjects'] }}</td>
                 <td><span class="font-mono font-bold">{{ $fl['total_units'] }}u</span></td>
                 <td>
-                  @if($fl['is_part_time'])
-                    <span class="text-slate-400">—</span>
-                  @else
-                    <span class="badge {{ $fl['status_badge'] }}">{{ $fl['remaining'] }}u left</span>
-                  @endif
+                  <span class="badge {{ $fl['status_badge'] }}">{{ $fl['remaining'] }}u left</span>
+                  <span class="text-[10px] text-slate-400 ml-1">/ {{ $fl['max_units'] }}u</span>
                 </td>
                 <td><span class="badge {{ $fl['status_badge'] }}">{{ $fl['status_label'] }}</span></td>
                 <td>
@@ -107,98 +99,73 @@
 </div>
 </div>
 
-{{-- ASSIGN SUBJECT MODAL --}}
+{{-- ASSIGN SUBJECT MODAL — subject + faculty + section only (no room / day / time) --}}
 <div class="modal-overlay" id="modal-assign">
-  <div class="modal-box w-[560px]">
+  <div class="modal-box w-[520px]">
     <div class="modal-header">
       <div class="modal-title">Assign Subject to Faculty</div>
       <button type="button" onclick="closeModal('modal-assign')" class="modal-close">✕</button>
     </div>
 
-    <div class="grid grid-cols-2 gap-3 mb-3">
-      <div>
-        <label class="field-label">Subject</label>
-        <select id="assign-subject" class="field-input" onchange="updateAssignPreview()">
-          <option value="">— Select subject —</option>
-          @foreach($subjects as $subj)
-            <option value="{{ $subj->subj_id }}" data-units="{{ $subj->subj_lecture_hours + $subj->subj_lab_hours }}">
-              {{ $subj->subj_code }} — {{ $subj->subj_name }} ({{ $subj->subj_lecture_hours + $subj->subj_lab_hours }}u)
-            </option>
-          @endforeach
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Faculty Member</label>
-        <select id="assign-faculty" class="field-input" onchange="updateAssignPreview()">
-          <option value="">— Select faculty —</option>
-          @foreach($facultyLoad as $fl)
-            <option value="{{ $fl['id'] }}"
-              data-units="{{ $fl['total_units'] }}"
-              data-max="{{ $fl['max_units'] }}"
-              data-parttime="{{ $fl['is_part_time'] ? '1' : '0' }}">
-              {{ $fl['name'] }}
-            </option>
-          @endforeach
-        </select>
-      </div>
+    <p class="text-[12px] text-slate-500 mb-3">
+      Assigns the subject to the teacher’s load for the current semester.
+      Room and schedule time are set later in <strong>PBS</strong> / <strong>PBT</strong>.
+    </p>
+
+    <div class="mb-3">
+      <label class="field-label">Subject</label>
+      <select id="assign-subject" class="field-input" onchange="updateAssignPreview()">
+        <option value="">— Select subject —</option>
+        @foreach($subjects as $subj)
+          <option value="{{ $subj->subj_id }}"
+            data-units="{{ (float)$subj->subj_lecture_hours + (float)$subj->subj_lab_hours }}">
+            {{ $subj->subj_code }} — {{ $subj->subj_name }}
+            ({{ (float)$subj->subj_lecture_hours + (float)$subj->subj_lab_hours }}u)
+          </option>
+        @endforeach
+      </select>
     </div>
 
-    {{-- Near-max advisory (informational only, doesn't block saving) --}}
+    <div class="mb-3">
+      <label class="field-label">Faculty Member</label>
+      <select id="assign-faculty" class="field-input" onchange="updateAssignPreview()">
+        <option value="">— Select faculty —</option>
+        @foreach($facultyLoad as $fl)
+          <option value="{{ $fl['id'] }}"
+            data-units="{{ $fl['total_units'] }}"
+            data-max="{{ $fl['max_units'] }}"
+            data-parttime="{{ $fl['is_part_time'] ? '1' : '0' }}">
+            {{ $fl['name'] }}
+            ({{ $fl['total_units'] }}/{{ $fl['max_units'] }}u
+            · {{ $fl['is_part_time'] ? 'PT' : 'FT' }})
+          </option>
+        @endforeach
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="field-label">Section</label>
+      <select id="assign-section" class="field-input">
+        <option value="">— Select section —</option>
+        @foreach($sections as $sec)
+          <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+        @endforeach
+      </select>
+    </div>
+
+    @if($semester)
+      <input type="hidden" id="assign-semester" value="{{ $semester->sem_id }}">
+      <div class="mb-3 text-[12px] text-slate-500">
+        Semester: <strong>{{ $semester->sem_name }}</strong> (current)
+      </div>
+    @else
+      <div class="mb-3 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+        No active semester found. Set <code>sem_is_active = true</code> on a semester row.
+      </div>
+    @endif
+
     <div id="assign-warning" class="hidden bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2.5 text-[12.5px] text-amber-800 mb-3"></div>
-
-    <div class="grid grid-cols-2 gap-3 mb-3">
-      <div>
-        <label class="field-label">Day</label>
-        <select id="assign-day" class="field-input">
-          <option value="Monday">Monday</option>
-          <option value="Tuesday">Tuesday</option>
-          <option value="Wednesday">Wednesday</option>
-          <option value="Thursday">Thursday</option>
-          <option value="Friday">Friday</option>
-          <option value="Saturday">Saturday</option>
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Time Slot</label>
-        <select id="assign-timeslot" class="field-input">
-          <option value="07:00:00|08:30:00">7:00 – 8:30 AM</option>
-          <option value="08:30:00|10:00:00">8:30 – 10:00 AM</option>
-          <option value="10:00:00|11:30:00">10:00 – 11:30 AM</option>
-          <option value="11:30:00|13:00:00">11:30 AM – 1:00 PM</option>
-          <option value="13:00:00|14:30:00">1:00 – 2:30 PM</option>
-          <option value="14:30:00|16:00:00">2:30 – 4:00 PM</option>
-          <option value="16:00:00|17:30:00">4:00 – 5:30 PM</option>
-          <option value="17:30:00|19:00:00">5:30 – 7:00 PM</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3 mb-1">
-      <div>
-        <label class="field-label">Room</label>
-        <select id="assign-room" class="field-input">
-          <option value="">— Select room —</option>
-          @foreach($rooms as $room)
-            <option value="{{ $room->room_id }}">{{ $room->room_name }}</option>
-          @endforeach
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Section</label>
-        <select id="assign-section" class="field-input">
-          <option value="">— Select section —</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
-          @endforeach
-        </select>
-      </div>
-    </div>
-
-    {{-- Conflict banner (set by the server after Save Assignment, from the DB exclusion constraint) --}}
-    <div id="assign-conflict" class="hidden bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5 text-[12.5px] text-red-700 mt-3">
-      <div class="font-bold mb-0.5">Schedule Conflict!</div>
-      <div id="assign-conflict-message"></div>
-    </div>
+    <div id="assign-error" class="hidden bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5 text-[12.5px] text-red-700 mb-3"></div>
 
     <div class="modal-footer">
       <button type="button" onclick="closeModal('modal-assign')" class="btn btn-secondary">Cancel</button>
@@ -212,7 +179,6 @@
 <script>
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 
-// ── TOPBAR NOTIF PANEL (copied from chair_dashboard.blade.php) ─────────────
 function toggleNotifPanel() {
   document.getElementById('notif-panel').classList.toggle('hidden');
 }
@@ -224,10 +190,9 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// ── MODAL ────────────────────────────────────────────────────────────────
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+  document.getElementById(id).classList.remove('active');
   resetAssignForm();
 }
 document.querySelectorAll('.modal-overlay').forEach(m => {
@@ -246,13 +211,11 @@ function openAssignModal(preselectFacultyId) {
 function resetAssignForm() {
   document.getElementById('assign-subject').value = '';
   document.getElementById('assign-faculty').value = '';
-  document.getElementById('assign-room').value = '';
   document.getElementById('assign-section').value = '';
   document.getElementById('assign-warning').classList.add('hidden');
-  document.getElementById('assign-conflict').classList.add('hidden');
+  document.getElementById('assign-error').classList.add('hidden');
 }
 
-// ── LIVE "NEAR MAX" PREVIEW (client-side only, informational) ──────────────
 function updateAssignPreview() {
   const subjSel = document.getElementById('assign-subject');
   const facSel  = document.getElementById('assign-faculty');
@@ -266,48 +229,46 @@ function updateAssignPreview() {
     return;
   }
 
-  const subjUnits   = parseFloat(subjOpt.dataset.units || 0);
+  const subjUnits    = parseFloat(subjOpt.dataset.units || 0);
   const currentUnits = parseFloat(facOpt.dataset.units || 0);
   const maxUnits     = parseFloat(facOpt.dataset.max || 30);
   const isPartTime   = facOpt.dataset.parttime === '1';
   const newTotal     = currentUnits + subjUnits;
   const remaining    = Math.max(0, maxUnits - newTotal);
-  const facName      = facOpt.textContent.trim();
-
-  if (isPartTime) {
-    warning.textContent = `${facName} is part-time — verify this additional load is appropriate before assigning.`;
-    warning.classList.remove('hidden');
-    return;
-  }
+  const facName      = facOpt.textContent.trim().split('(')[0].trim();
+  const typeLabel    = isPartTime ? 'part-time' : 'full-time';
 
   if (newTotal > maxUnits) {
-    warning.textContent = `${facName} — currently ${currentUnits}u/${maxUnits}u. Adding ${subjUnits}u → ${newTotal}u exceeds the maximum load!`;
+    warning.textContent = `${facName} (${typeLabel}) — ${currentUnits}u/${maxUnits}u. Adding ${subjUnits}u → ${newTotal}u exceeds the maximum!`;
     warning.classList.remove('hidden');
   } else if (newTotal >= maxUnits - 3) {
-    warning.textContent = `${facName} — currently ${currentUnits}u/${maxUnits}u. Adding ${subjUnits}u → ${newTotal}u. Only ${remaining} unit(s) left — near maximum!`;
+    warning.textContent = `${facName} (${typeLabel}) — ${currentUnits}u/${maxUnits}u. Adding ${subjUnits}u → ${newTotal}u. Only ${remaining}u left — near maximum.`;
     warning.classList.remove('hidden');
   } else {
-    warning.classList.add('hidden');
+    warning.textContent = `${facName} — ${currentUnits}u + ${subjUnits}u = ${newTotal}u / ${maxUnits}u (${remaining}u left).`;
+    warning.classList.remove('hidden');
   }
 }
 
-// ── SAVE ASSIGNMENT ──────────────────────────────────────────────────────
 async function saveAssignment() {
-  const subjId  = document.getElementById('assign-subject').value;
-  const facId   = document.getElementById('assign-faculty').value;
-  const day     = document.getElementById('assign-day').value;
-  const slot    = document.getElementById('assign-timeslot').value;
-  const roomId  = document.getElementById('assign-room').value;
-  const secId   = document.getElementById('assign-section').value;
+  const subjId = document.getElementById('assign-subject').value;
+  const facId  = document.getElementById('assign-faculty').value;
+  const secId  = document.getElementById('assign-section').value;
+  const semEl  = document.getElementById('assign-semester');
+  const semId  = semEl ? semEl.value : '';
+  const errBox = document.getElementById('assign-error');
 
-  document.getElementById('assign-conflict').classList.add('hidden');
+  errBox.classList.add('hidden');
 
-  if (!subjId || !facId || !roomId || !secId) {
-    showToast('Please fill in all fields.');
+  if (!subjId || !facId || !secId) {
+    showToast('Please select subject, faculty, and section.');
+    return;
+  }
+  if (!semId) {
+    showToast('No active semester. Cannot assign.');
     return;
   }
 
-  const [startTime, endTime] = slot.split('|');
   const saveBtn = document.getElementById('assign-save-btn');
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
@@ -322,24 +283,18 @@ async function saveAssignment() {
       },
       body: JSON.stringify({
         subj_id: subjId,
-        fac_id: facId,
-        sec_id: secId,
-        room_id: roomId,
-        sch_day: day,
-        sch_start_time: startTime,
-        sch_end_time: endTime
+        fac_id:  facId,
+        sec_id:  secId,
+        sem_id:  semId
       })
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
-      if (data.conflict) {
-        document.getElementById('assign-conflict-message').textContent = data.message;
-        document.getElementById('assign-conflict').classList.remove('hidden');
-      } else {
-        showToast(data.message || 'Failed to save assignment.');
-      }
+    if (!res.ok || !data.success) {
+      errBox.textContent = data.message || 'Failed to save assignment.';
+      errBox.classList.remove('hidden');
+      showToast(data.message || 'Failed to save assignment.');
       return;
     }
 
@@ -355,7 +310,6 @@ async function saveAssignment() {
   }
 }
 
-// ── TOAST ────────────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;

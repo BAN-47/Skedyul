@@ -6,14 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
-use App\Models\Room;
 use App\Models\Study_Load;
 use App\Models\Subjects;
-use App\Models\Schedule;
 use App\Models\Program;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ChairSubjectController extends Controller {
@@ -28,17 +27,22 @@ class ChairSubjectController extends Controller {
 
         $subjectIds = $subjects->pluck('subj_id');
 
-        $assignedSchedules = Schedule::with(['faculty.user'])
-            ->whereIn('sch_subj_id', $subjectIds)
-            ->where('sch_is_active', true)
+        /*
+         * "Assigned" now means a Study_Load exists for the subject (faculty
+         * + section + semester, chosen right here on this page) - it no
+         * longer requires an actual time-slot Schedule row, since plotting
+         * the day/time/room now happens on PBS, not here.
+         */
+        $assignedLoads = Study_Load::with('faculty.user')
+            ->whereIn('sl_subj_id', $subjectIds)
             ->get()
-            ->groupBy('sch_subj_id');
+            ->groupBy('sl_subj_id');
 
-        $subjects = $subjects->map(function ($subject) use ($assignedSchedules) {
-            $schedule = $assignedSchedules->get($subject->subj_id)?->first();
+        $subjects = $subjects->map(function ($subject) use ($assignedLoads) {
+            $load = $assignedLoads->get($subject->subj_id)?->first();
 
-            $subject->assignedFaculty = $schedule && $schedule->sch_fac_id
-                ? ($schedule->faculty->user->usr_name ?? $schedule->faculty->full_name ?? 'Assigned')
+            $subject->assignedFaculty = $load && $load->faculty
+                ? ($load->faculty->user->usr_name ?? $load->faculty->full_name ?? 'Assigned')
                 : null;
 
             return $subject;
@@ -47,6 +51,25 @@ class ChairSubjectController extends Controller {
         $departments = Department::orderBy('dept_name')->get();
         $programs = Program::orderBy('prog_name')->get();
         $section = Section::orderBy('sec_name')->get();
+        // Join to academic_year so the dropdown can show "2026-2027 1st Sem"
+        // instead of just "First Semester" with no year context.
+        $semesters = DB::table('semester')
+            ->join('academic_year', 'semester.sem_ay_id', '=', 'academic_year.ay_id')
+            ->select('semester.*', 'academic_year.ay_academic_year')
+            ->orderBy('academic_year.ay_academic_year', 'desc')
+            ->orderBy('semester.sem_start_date', 'desc')
+            ->get()
+            ->map(function ($sem) {
+                $ordinal = match (true) {
+                    str_contains(strtolower($sem->sem_name), 'first')  => '1st Sem',
+                    str_contains(strtolower($sem->sem_name), 'second') => '2nd Sem',
+                    str_contains(strtolower($sem->sem_name), 'third')  => '3rd Sem',
+                    str_contains(strtolower($sem->sem_name), 'summer') => 'Summer',
+                    default => $sem->sem_name,
+                };
+                $sem->sem_label = "{$sem->ay_academic_year} {$ordinal}";
+                return $sem;
+            });
 
         // ---------- Data the Assign Faculty modal needs ----------
         // Scoped to the logged-in chair's own department so you can't
@@ -76,9 +99,7 @@ class ChairSubjectController extends Controller {
             });
         }
 
-        $rooms = Room::where('room_is_available', true)->orderBy('room_name')->get();
-
-        return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section', 'faculty', 'rooms'));
+        return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section', 'faculty', 'semesters'));
     }
 
     public function store(Request $request) {

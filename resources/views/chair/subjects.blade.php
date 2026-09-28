@@ -197,10 +197,11 @@
 
 {{--
     ASSIGN FACULTY MODAL
-    NOTE: this posts to chair.faculty_load.assign (the same endpoint the
-    Faculty Load page uses) rather than a new endpoint here, so there's one
-    place that creates Study_Load + Schedule rows and handles the DB's
-    conflict-detection constraints, instead of two copies of that logic.
+    Just Subject + Faculty + Section + Semester - creates a Study_Load row
+    only. Day/Time/Room are NOT set here anymore; that's PBS's job. PBS's
+    ScheduleAssignmentService already reuses a matching Study_Load (same
+    faculty/subject/section/semester) via firstOrCreate when you plot the
+    actual time slot there, so nothing is duplicated.
 --}}
 <div class="fixed inset-0 z-40 hidden bg-slate-900/40" id="modal-assign-backdrop"></div>
 <div class="fixed inset-0 z-50 hidden items-center justify-center p-4" id="modal-assign">
@@ -225,36 +226,11 @@
       </div>
       <div class="grid gap-4 md:grid-cols-2">
         <div>
-          <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Day</label>
-          <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" id="assign-day">
-            <option value="Monday">Monday</option>
-            <option value="Tuesday">Tuesday</option>
-            <option value="Wednesday">Wednesday</option>
-            <option value="Thursday">Thursday</option>
-            <option value="Friday">Friday</option>
-            <option value="Saturday">Saturday</option>
-          </select>
-        </div>
-        <div>
-          <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Time Slot</label>
-          <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" id="assign-timeslot">
-            <option value="07:00:00|08:30:00">7:00 – 8:30 AM</option>
-            <option value="08:30:00|10:00:00">8:30 – 10:00 AM</option>
-            <option value="10:00:00|11:30:00">10:00 – 11:30 AM</option>
-            <option value="11:30:00|13:00:00">11:30 AM – 1:00 PM</option>
-            <option value="13:00:00|14:30:00">1:00 – 2:30 PM</option>
-            <option value="14:30:00|16:00:00">2:30 – 4:00 PM</option>
-            <option value="16:00:00|17:30:00">4:00 – 5:30 PM</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid gap-4 md:grid-cols-2">
-        <div>
-          <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Room</label>
-          <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" id="assign-room">
-            <option value="">— Select room —</option>
-            @foreach($rooms as $room)
-              <option value="{{ $room->room_id }}">{{ $room->room_name }}</option>
+          <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Semester</label>
+          <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" id="assign-semester">
+            <option value="">— Select semester —</option>
+            @foreach($semesters as $sem)
+              <option value="{{ $sem->sem_id }}">{{ $sem->sem_label }}</option>
             @endforeach
           </select>
         </div>
@@ -270,7 +246,7 @@
       </div>
 
       <div id="assign-conflict" class="hidden bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5 text-[12.5px] text-red-700">
-        <div class="font-bold mb-0.5">Schedule Conflict!</div>
+        <div class="font-bold mb-0.5">Already Assigned!</div>
         <div id="assign-conflict-message"></div>
       </div>
     </div>
@@ -318,7 +294,7 @@ function openAssignModal(subjId, code, name, units) {
   document.getElementById('assign-subj-id').value = subjId;
   document.getElementById('assign-subj-title').textContent = `${code} — ${name} (${units}u)`;
   document.getElementById('assign-faculty').value = '';
-  document.getElementById('assign-room').value = '';
+  document.getElementById('assign-semester').value = '';
   document.getElementById('assign-section').value = '';
   document.getElementById('assign-conflict').classList.add('hidden');
   openModal('modal-assign');
@@ -327,19 +303,16 @@ function openAssignModal(subjId, code, name, units) {
 async function saveAssign() {
   const subjId = document.getElementById('assign-subj-id').value;
   const facId  = document.getElementById('assign-faculty').value;
-  const day    = document.getElementById('assign-day').value;
-  const slot   = document.getElementById('assign-timeslot').value;
-  const roomId = document.getElementById('assign-room').value;
+  const semId  = document.getElementById('assign-semester').value;
   const secId  = document.getElementById('assign-section').value;
 
   document.getElementById('assign-conflict').classList.add('hidden');
 
-  if (!facId || !roomId || !secId) {
+  if (!facId || !semId || !secId) {
     showToast('Please fill in all fields.');
     return;
   }
 
-  const [startTime, endTime] = slot.split('|');
   const btn = document.getElementById('assign-save-btn');
   btn.disabled = true;
   btn.textContent = 'Saving...';
@@ -356,10 +329,7 @@ async function saveAssign() {
         subj_id: subjId,
         fac_id: facId,
         sec_id: secId,
-        room_id: roomId,
-        sch_day: day,
-        sch_start_time: startTime,
-        sch_end_time: endTime
+        sem_id: semId
       })
     });
 

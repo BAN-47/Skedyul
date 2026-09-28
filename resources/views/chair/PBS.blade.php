@@ -13,14 +13,17 @@
 
 @php
   // ── Defaults so this page renders before PbsController exists ──
-  $schedules = $schedules ?? collect();
-  $subjects  = $subjects  ?? collect();
-  $faculty   = $faculty   ?? collect();
-  $sections  = $sections  ?? collect();
-  $programs  = $programs  ?? collect();
-  $semesters = $semesters ?? collect();
-  $years     = $years     ?? [1, 2, 3, 4];
-  $filters   = $filters   ?? [];
+  $schedules      = $schedules      ?? collect();
+  $subjects       = $subjects       ?? collect();
+  $faculty        = $faculty        ?? collect();
+  $sections       = $sections       ?? collect();
+  $programs       = $programs       ?? collect();
+  $semesters      = $semesters      ?? collect();
+  $rooms          = $rooms          ?? collect();
+  $academicYears  = $academicYears  ?? collect();
+  $years          = $years          ?? [1, 2, 3, 4]; // year levels (1–4)
+  $filters        = $filters        ?? [];
+  $chairProgram   = $chairProgram   ?? null;
 
   $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -122,26 +125,27 @@
         {{-- ══════════ PLOTTER ══════════ --}}
         <section class="card !p-0 overflow-hidden">
 
-          {{-- FILTER TOOLBAR --}}
+          {{-- FILTER TOOLBAR — program locked to logged-in chair's program --}}
           <div class="flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-b border-slate-200 bg-slate-50">
 
-            <select id="filter-program" onchange="applyFilters()" class="pbs-filter">
-              <option value="">PROGRAM</option>
-              @foreach($programs as $p)
-                <option value="{{ $p->prog_id }}" @selected(($filters['program'] ?? '') === $p->prog_id)>
-                  {{ $p->prog_code }}
-                </option>
-              @endforeach
-            </select>
-
-            <select id="filter-year" onchange="applyFilters()" class="pbs-filter">
-              <option value="">YEAR</option>
-              @foreach($years as $y)
-                <option value="{{ $y }}" @selected((string)($filters['year'] ?? '') === (string)$y)>Year {{ $y }}</option>
-              @endforeach
-            </select>
-
-            <select id="filter-section" onchange="applyFilters()" class="pbs-filter">
+            {{-- Locked program badge (BSIS chair only sees BSIS, etc.) --}}
+            @if(!empty($chairProgram))
+              <div class="px-2.5 py-1.5 rounded-md bg-blue-600 text-white text-[11px] font-extrabold uppercase tracking-wide">
+                {{ $chairProgram->prog_code ?? 'PROGRAM' }}
+              </div>
+              <input type="hidden" id="filter-program" value="{{ $chairProgram->prog_id }}">
+            @else
+              <select id="filter-program" onchange="applyFilters()" class="pbs-filter">
+                <option value="">PROGRAM</option>
+                @foreach($programs as $p)
+                  <option value="{{ $p->prog_id }}" @selected(($filters['program'] ?? '') === $p->prog_id)>
+                    {{ $p->prog_code }}
+                  </option>
+                @endforeach
+              </select>
+            @endif
+{{-- Sections only for this chair's program (BSIS 1-A, BSIS IV-A, …). Year is in the name. --}}
+            <select id="filter-section" onchange="applyFilters()" class="pbs-filter min-w-[130px]">
               <option value="">SECTION</option>
               @foreach($sections as $sec)
                 <option value="{{ $sec->sec_id }}" @selected(($filters['section'] ?? '') === $sec->sec_id)>
@@ -154,7 +158,7 @@
               <option value="">SEMESTER</option>
               @foreach($semesters as $sem)
                 <option value="{{ $sem->sem_id }}" @selected(($filters['semester'] ?? '') === $sem->sem_id)>
-                  {{ $sem->sem_name }}
+                  {{ $sem->label ?? $sem->sem_name }}
                 </option>
               @endforeach
             </select>
@@ -259,6 +263,7 @@
                        data-subject="{{ $s->sch_subj_id }}"
                        data-faculty="{{ $s->sch_fac_id }}"
                        data-section="{{ $s->sch_sec_id }}"
+                       data-room="{{ $s->sch_room_id }}"
                        data-semester="{{ $s->sch_sem_id }}"
                        data-day="{{ $s->sch_day }}"
                        data-start="{{ substr($s->sch_start_time, 0, 5) }}"
@@ -332,28 +337,45 @@
       </div>
 
       <div class="mb-3">
+        <label class="field-label">Room</label>
+        <select id="add-room" class="field-input">
+          <option value="">-- Select Room --</option>
+          @foreach($rooms as $r)
+            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      <div class="mb-3">
         <label class="field-label">Semester</label>
         <select id="add-semester" class="field-input">
           <option value="">-- Select Semester --</option>
           @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->sem_name }}</option>
+            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
           @endforeach
         </select>
       </div>
 
       <div class="mb-3">
         <label class="field-label">Program</label>
-        <select id="add-program" class="field-input">
-          <option value="">-- Select Program --</option>
-          @foreach($programs as $p)
-            <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
-          @endforeach
-        </select>
+        @if(!empty($chairProgram))
+          <div class="field-input bg-slate-100 font-semibold text-slate-700">
+            {{ $chairProgram->prog_code }} — {{ $chairProgram->prog_name }}
+          </div>
+          <input type="hidden" id="add-program" value="{{ $chairProgram->prog_id }}">
+        @else
+          <select id="add-program" class="field-input">
+            <option value="">-- Select Program --</option>
+            @foreach($programs as $p)
+              <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
+            @endforeach
+          </select>
+        @endif
       </div>
 
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="field-label">Year</label>
+          <label class="field-label">Year Level</label>
           <select id="add-year" class="field-input">
             <option value="">-- Select Year --</option>
             @foreach($years as $y)
@@ -441,28 +463,45 @@
       </div>
 
       <div class="mb-3">
+        <label class="field-label">Room</label>
+        <select id="edit-room" class="field-input">
+          <option value="">-- Select Room --</option>
+          @foreach($rooms as $r)
+            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      <div class="mb-3">
         <label class="field-label">Semester</label>
         <select id="edit-semester" class="field-input">
           <option value="">-- Select Semester --</option>
           @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->sem_name }}</option>
+            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
           @endforeach
         </select>
       </div>
 
       <div class="mb-3">
         <label class="field-label">Program</label>
-        <select id="edit-program" class="field-input">
-          <option value="">-- Select Program --</option>
-          @foreach($programs as $p)
-            <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
-          @endforeach
-        </select>
+        @if(!empty($chairProgram))
+          <div class="field-input bg-slate-100 font-semibold text-slate-700">
+            {{ $chairProgram->prog_code }} — {{ $chairProgram->prog_name }}
+          </div>
+          <input type="hidden" id="edit-program" value="{{ $chairProgram->prog_id }}">
+        @else
+          <select id="edit-program" class="field-input">
+            <option value="">-- Select Program --</option>
+            @foreach($programs as $p)
+              <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
+            @endforeach
+          </select>
+        @endif
       </div>
 
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="field-label">Year</label>
+          <label class="field-label">Year Level</label>
           <select id="edit-year" class="field-input">
             <option value="">-- Select Year --</option>
             @foreach($years as $y)

@@ -39,6 +39,7 @@ class Dept_Chair extends Model
 
         // Profile
         'dc_profile_image',
+        'dc_bio',
     ];
 
     public function user()

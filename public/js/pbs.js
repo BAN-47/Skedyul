@@ -47,8 +47,14 @@ function clearInlineError(boxId) {
 function handleScheduleError(data, inlineBoxId) {
     if (data.conflict) {
         showToast(data.message || 'Conflict: that slot is already taken.');
+    } else if (data.message) {
+        showInlineError(inlineBoxId, data.message);
+    } else if (data.errors) {
+        // Laravel validation errors: { errors: { field: ['msg'] } }
+        const first = Object.values(data.errors).flat()[0];
+        showInlineError(inlineBoxId, first || 'Validation failed.');
     } else {
-        showInlineError(inlineBoxId, data.message || 'Something went wrong.');
+        showInlineError(inlineBoxId, 'Something went wrong.');
     }
 }
 
@@ -82,12 +88,9 @@ function paintShift() {
     const nightBtn = document.getElementById('shift-night');
     if (!dayBtn || !nightBtn) return;
 
-    const activeClass   = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-blue-600 text-white rounded-l';
-    const inactiveClass = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-white text-slate-700 border-l border-slate-300 rounded-r';
-
     if (shift === 'day') {
-        dayBtn.className   = activeClass + ' rounded-l';
-        nightBtn.className = inactiveClass;
+        dayBtn.className   = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-blue-600 text-white rounded-l';
+        nightBtn.className = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-white text-slate-700 border-l border-slate-300 rounded-r';
     } else {
         dayBtn.className   = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-white text-slate-700 rounded-l';
         nightBtn.className = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-blue-600 text-white border-l border-slate-300 rounded-r';
@@ -98,12 +101,20 @@ paintShift();
 /* ── filters / date nav ── */
 function applyFilters() {
     const params = new URLSearchParams(window.location.search);
-    const map = { program: 'filter-program', year: 'filter-year', section: 'filter-section', semester: 'filter-semester' };
+
+    // Program locked server-side; semester label includes academic year.
+    const map = {
+        program:       'filter-program',
+        section:       'filter-section',
+        semester:      'filter-semester',
+    };
+
     Object.entries(map).forEach(([key, id]) => {
         const el  = document.getElementById(id);
         const val = el ? el.value : '';
         val ? params.set(key, val) : params.delete(key);
     });
+
     if (!params.has('shift')) params.set('shift', getCurrentShift());
     window.location.search = params.toString();
 }
@@ -128,15 +139,42 @@ function addMinutesToTime(hhmm, minutesToAdd) {
 
 function openAddModal(day, startTime) {
     clearInlineError('add-error');
-    ['add-subject', 'add-faculty', 'add-semester', 'add-program',
+
+    // Reset all form fields
+    ['add-subject', 'add-faculty', 'add-room', 'add-semester', 'add-program',
      'add-year', 'add-section', 'add-description'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
 
+    // Pre-fill day + times from the clicked cell
     document.getElementById('add-day').value   = day || '';
     document.getElementById('add-start').value = startTime || '';
     document.getElementById('add-end').value   = startTime ? addMinutesToTime(startTime, 60) : '';
+
+    // Pre-fill from current page filters when available
+    const params = new URLSearchParams(window.location.search);
+    const filterSemester = params.get('semester');
+    const filterSection  = params.get('section');
+    const filterProgram  = params.get('program');
+    const filterYear     = params.get('year');
+
+    if (filterSemester) {
+        const el = document.getElementById('add-semester');
+        if (el) el.value = filterSemester;
+    }
+    if (filterSection) {
+        const el = document.getElementById('add-section');
+        if (el) el.value = filterSection;
+    }
+    if (filterProgram) {
+        const el = document.getElementById('add-program');
+        if (el) el.value = filterProgram;
+    }
+    if (filterYear) {
+        const el = document.getElementById('add-year');
+        if (el) el.value = filterYear;
+    }
 
     document.getElementById('add-submit').disabled = false;
     openModal('modal-add-schedule');
@@ -144,23 +182,21 @@ function openAddModal(day, startTime) {
 
 function submitAdd() {
     clearInlineError('add-error');
+
     const payload = {
         subj_id:     document.getElementById('add-subject').value,
         fac_id:      document.getElementById('add-faculty').value,
-        sem_id:      document.getElementById('add-semester').value,
-        prog_id:     document.getElementById('add-program').value,
-        year_level:  document.getElementById('add-year').value,
-        sec_id:      document.getElementById('add-section').value,
         room_id:     document.getElementById('add-room').value,
+        sem_id:      document.getElementById('add-semester').value,
+        sec_id:      document.getElementById('add-section').value,
         day:         document.getElementById('add-day').value,
         start_time:  document.getElementById('add-start').value,
         end_time:    document.getElementById('add-end').value,
-        description: document.getElementById('add-description').value,
     };
 
     if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
-        !payload.day || !payload.start_time || !payload.end_time) {
-        showInlineError('add-error', 'Please fill in subject, professor, section, room, day, and both times.');
+        !payload.sem_id || !payload.day || !payload.start_time || !payload.end_time) {
+        showInlineError('add-error', 'Please fill in subject, professor, room, semester, section, day, and both times.');
         return;
     }
     if (payload.end_time <= payload.start_time) {
@@ -173,16 +209,23 @@ function submitAdd() {
 
     fetch('/chair/pbs', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+            'Accept': 'application/json',
+        },
         body: JSON.stringify(payload),
     })
     .then(async res => {
         const data = await res.json().catch(() => ({}));
+
         if (data.success) {
             closeModal('modal-add-schedule');
             showToast(data.message || 'Schedule added.');
             setTimeout(() => location.reload(), 800);
         } else {
+            // 422 conflict → toast (bottom-right), modal stays open
+            // other errors → inline in modal
             handleScheduleError(data, 'add-error');
             btn.disabled = false;
         }
@@ -196,7 +239,8 @@ function submitAdd() {
 /* ── EDIT ── */
 function openEditModal(block) {
     clearInlineError('edit-error');
-    document.getElementById('edit-id').value       = block.dataset.scheduleId;
+
+    document.getElementById('edit-id').value       = block.dataset.scheduleId || '';
     document.getElementById('edit-subject').value  = block.dataset.subject  || '';
     document.getElementById('edit-faculty').value  = block.dataset.faculty  || '';
     document.getElementById('edit-section').value  = block.dataset.section  || '';
@@ -204,25 +248,36 @@ function openEditModal(block) {
     document.getElementById('edit-day').value      = block.dataset.day      || '';
     document.getElementById('edit-start').value    = block.dataset.start    || '';
     document.getElementById('edit-end').value      = block.dataset.end      || '';
+
+    // Room from data-room attribute on the schedule block
+    const roomEl = document.getElementById('edit-room');
+    if (roomEl) roomEl.value = block.dataset.room || '';
+
     document.getElementById('edit-submit').disabled = false;
     openModal('modal-edit-schedule');
 }
 
 function submitEdit() {
     clearInlineError('edit-error');
-    const id      = document.getElementById('edit-id').value;
+
+    const id = document.getElementById('edit-id').value;
     const payload = {
         subj_id:     document.getElementById('edit-subject').value,
         fac_id:      document.getElementById('edit-faculty').value,
+        room_id:     document.getElementById('edit-room')?.value || '',
         sem_id:      document.getElementById('edit-semester').value,
         sec_id:      document.getElementById('edit-section').value,
-        room_id:     document.getElementById('edit-room')?.value || '',
         day:         document.getElementById('edit-day').value,
         start_time:  document.getElementById('edit-start').value,
         end_time:    document.getElementById('edit-end').value,
         _method:     'PUT',
     };
 
+    if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
+        !payload.sem_id || !payload.day || !payload.start_time || !payload.end_time) {
+        showInlineError('edit-error', 'Please fill in subject, professor, room, semester, section, day, and both times.');
+        return;
+    }
     if (payload.end_time <= payload.start_time) {
         showInlineError('edit-error', 'End time must be later than start time.');
         return;
@@ -233,11 +288,16 @@ function submitEdit() {
 
     fetch(`/chair/pbs/${id}`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+            'Accept': 'application/json',
+        },
         body: JSON.stringify(payload),
     })
     .then(async res => {
         const data = await res.json().catch(() => ({}));
+
         if (data.success) {
             closeModal('modal-edit-schedule');
             showToast(data.message || 'Schedule updated.');
@@ -287,7 +347,11 @@ function submitDelete() {
 
     fetch(`/chair/pbs/${id}`, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+            'Accept': 'application/json',
+        },
         body: JSON.stringify({ _method: 'DELETE' }),
     })
     .then(async res => {
@@ -323,10 +387,20 @@ function saveDraft() {
 function clearAll() {
     if (!confirm('Clear all plotted schedules for the current filter? This cannot be undone.')) return;
 
+    const params = new URLSearchParams(window.location.search);
+    const body = {
+        section:  params.get('section')  || '',
+        semester: params.get('semester') || '',
+    };
+
     fetch('/chair/pbs/clear', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
-        body: JSON.stringify(Object.fromEntries(new URLSearchParams(window.location.search))),
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+            'Accept': 'application/json',
+        },
+        body: JSON.stringify(body),
     })
     .then(async res => {
         const data = await res.json().catch(() => ({}));

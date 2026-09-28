@@ -9,19 +9,26 @@ use App\Models\Program;
 use App\Models\Faculty;
 use App\Models\Subjects;
 use App\Models\Section;
-use App\Models\Room;
 use App\Models\Study_Load;
 use App\Models\Semester;
 use App\Models\AcademicYear;
-use App\Services\ScheduleAssignmentService;
+use App\Models\Workload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
+/**
+ * Faculty Load = assign subjects to teachers (study_load only).
+ * Room + day/time belong to PBS / PBT schedule plotters, not here.
+ *
+ * Units = subject lecture + lab hours.
+ * Full-time max = 30u | Part-time max = 22u
+ */
 class ChairFacultyLoadController extends Controller
 {
-    // ASSUMPTION: adjust these if your team defines different caps.
     const FULL_TIME_MAX_UNITS = 30;
-    const PART_TIME_MAX_UNITS = 18;
+    const PART_TIME_MAX_UNITS = 22;
     const NEAR_MAX_BUFFER     = 3;
 
     public function index()
@@ -33,19 +40,15 @@ class ChairFacultyLoadController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        // Scoped to the chair's specific program (fac_prog_id) when they have
-        // one, same pattern $subjects already used below — a chair only
-        // manages faculty actually assigned to their program, not the whole
-        // department.
         $faculty = Faculty::where('fac_dept_id', $deptChair->dc_dept_id)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
+            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
             ->orderBy('fac_first_name')
             ->get();
 
         $facultyIds = $faculty->pluck('fac_id');
 
         $subjects = Subjects::where('subj_dept_id', $deptChair->dc_dept_id)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
+            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
             ->where('subj_is_active', true)
             ->orderBy('subj_code')
             ->get();
@@ -53,7 +56,7 @@ class ChairFacultyLoadController extends Controller
         $subjectsById = $subjects->keyBy('subj_id');
 
         $studyLoads = Study_Load::whereIn('sl_fac_id', $facultyIds)
-            ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
+            ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
             ->get()
             ->groupBy('sl_fac_id');
 
@@ -62,10 +65,12 @@ class ChairFacultyLoadController extends Controller
 
             $totalUnits = $loads->sum(function ($sl) use ($subjectsById) {
                 $subj = $subjectsById->get($sl->sl_subj_id);
-                return $subj ? ((float) $subj->subj_lecture_hours + (float) $subj->subj_lab_hours) : 0;
+                return $subj
+                    ? ((float) $subj->subj_lecture_hours + (float) $subj->subj_lab_hours)
+                    : 0;
             });
 
-            $subjectCodes = $loads->map(fn($sl) => optional($subjectsById->get($sl->sl_subj_id))->subj_code)
+            $subjectCodes = $loads->map(fn ($sl) => optional($subjectsById->get($sl->sl_subj_id))->subj_code)
                 ->filter()
                 ->implode(', ');
 
@@ -73,18 +78,18 @@ class ChairFacultyLoadController extends Controller
             $maxUnits   = $isPartTime ? self::PART_TIME_MAX_UNITS : self::FULL_TIME_MAX_UNITS;
             $remaining  = max(0, $maxUnits - $totalUnits);
 
-            if ($isPartTime) {
-                $statusLabel = 'Part-time';
-                $statusBadge = 'badge-teal';
-            } elseif ($totalUnits >= $maxUnits) {
+            if ($totalUnits >= $maxUnits) {
                 $statusLabel = 'Full';
                 $statusBadge = 'badge-red';
             } elseif ($totalUnits >= $maxUnits - self::NEAR_MAX_BUFFER) {
                 $statusLabel = 'Near Max';
                 $statusBadge = 'badge-amber';
-            } elseif ($totalUnits <= $maxUnits * 0.5) {
-                $statusLabel = 'Available';
-                $statusBadge = 'badge-blue';
+            } elseif ($totalUnits <= 0) {
+                $statusLabel = $isPartTime ? 'Part-time' : 'Available';
+                $statusBadge = $isPartTime ? 'badge-teal' : 'badge-blue';
+            } elseif ($isPartTime) {
+                $statusLabel = 'Part-time';
+                $statusBadge = 'badge-teal';
             } else {
                 $statusLabel = 'OK';
                 $statusBadge = 'badge-green';
@@ -93,7 +98,7 @@ class ChairFacultyLoadController extends Controller
             if ($totalUnits >= $maxUnits) {
                 $actionLabel = 'Full';
                 $actionStyle = 'disabled';
-            } elseif ($totalUnits == 0 || (!$isPartTime && $statusLabel === 'Available')) {
+            } elseif ($totalUnits == 0) {
                 $actionLabel = 'Assign';
                 $actionStyle = 'primary';
             } else {
@@ -117,13 +122,10 @@ class ChairFacultyLoadController extends Controller
             ];
         });
 
+        // Sections for this chair's program only (no AY/sem filter — names carry year)
         $sections = Section::where('sec_prog_id', $deptChair->dc_prog_id)
-            ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
-            ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->orderBy('sec_name')
             ->get();
-
-        $rooms = Room::where('room_is_available', true)->orderBy('room_name')->get();
 
         return view('chair.faculty_load', compact(
             'deptChair',
@@ -134,27 +136,152 @@ class ChairFacultyLoadController extends Controller
             'facultyLoad',
             'faculty',
             'subjects',
-            'sections',
-            'rooms'
+            'sections'
         ));
     }
 
+    /**
+     * Assign a subject to a faculty member for a section + semester.
+     * Creates study_load only — NO schedule / room (that is PBS/PBT).
+     * Updates workload total units for the semester.
+     */
     public function assign(Request $request)
     {
-        $validated = $request->validate([
-            'subj_id'        => 'required|uuid|exists:subject,subj_id',
-            'fac_id'         => 'required|uuid|exists:faculty,fac_id',
-            'sec_id'         => 'required|uuid|exists:section,sec_id',
-            'room_id'        => 'required|uuid|exists:room,room_id',
-            'sch_day'        => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'sch_start_time' => 'required',
-            'sch_end_time'   => 'required',
+        $data = $request->validate([
+            'subj_id' => 'required|uuid|exists:subject,subj_id',
+            'fac_id'  => 'required|uuid|exists:faculty,fac_id',
+            'sec_id'  => 'required|uuid|exists:section,sec_id',
+            'sem_id'  => 'required|uuid|exists:semester,sem_id',
         ]);
 
-        $result = app(ScheduleAssignmentService::class)->assign($validated);
-        $status = $result['status'];
-        unset($result['status']);
+        $faculty = Faculty::findOrFail($data['fac_id']);
+        $subject = Subjects::findOrFail($data['subj_id']);
 
-        return response()->json($result, $status);
+        $subjectUnits = (float) $subject->subj_lecture_hours + (float) $subject->subj_lab_hours;
+        if ($subjectUnits <= 0) {
+            $subjectUnits = 3; // fallback if hours not set
+        }
+
+        $isPartTime = $faculty->fac_employment_type === 'part_time';
+        $maxUnits   = $isPartTime ? self::PART_TIME_MAX_UNITS : self::FULL_TIME_MAX_UNITS;
+
+        // Current load from study_load (source of truth)
+        $currentUnits = Study_Load::where('sl_fac_id', $data['fac_id'])
+            ->where('sl_sem_id', $data['sem_id'])
+            ->get()
+            ->sum(function ($sl) {
+                $s = Subjects::find($sl->sl_subj_id);
+                return $s
+                    ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                    : 0;
+            });
+
+        if (($currentUnits + $subjectUnits) > $maxUnits) {
+            $label = $isPartTime ? 'part-time' : 'full-time';
+            return response()->json([
+                'success' => false,
+                'message' => "Workload limit exceeded ({$label} max {$maxUnits}u). "
+                    . "Currently {$currentUnits}u — adding {$subjectUnits}u would reach "
+                    . ($currentUnits + $subjectUnits) . "u.",
+            ], 422);
+        }
+
+        // Already assigned this exact subject+section+semester?
+        $exists = Study_Load::where([
+            'sl_fac_id'  => $data['fac_id'],
+            'sl_subj_id' => $data['subj_id'],
+            'sl_sec_id'  => $data['sec_id'],
+            'sl_sem_id'  => $data['sem_id'],
+        ])->exists();
+
+        if ($exists) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This faculty is already assigned that subject for this section and semester.',
+            ], 422);
+        }
+
+        try {
+            $load = DB::transaction(function () use ($data, $subjectUnits) {
+                $load = Study_Load::create([
+                    'sl_id'          => (string) Str::uuid(),
+                    'sl_fac_id'      => $data['fac_id'],
+                    'sl_subj_id'     => $data['subj_id'],
+                    'sl_sec_id'      => $data['sec_id'],
+                    'sl_sem_id'      => $data['sem_id'],
+                    'sl_assigned_by' => Auth::id(),
+                    'sl_assigned_at' => now(),
+                ]);
+
+                // Keep workload table in sync (sum of study_load units)
+                $newTotal = Study_Load::where('sl_fac_id', $data['fac_id'])
+                    ->where('sl_sem_id', $data['sem_id'])
+                    ->get()
+                    ->sum(function ($sl) {
+                        $s = Subjects::find($sl->sl_subj_id);
+                        return $s
+                            ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                            : 0;
+                    });
+
+                $semester = Semester::find($data['sem_id']);
+
+                $wl = Workload::firstOrNew([
+                    'wl_fac_id' => $data['fac_id'],
+                    'wl_sem_id' => $data['sem_id'],
+                ]);
+
+                if (!$wl->exists) {
+                    $wl->wl_id = (string) Str::uuid();
+                }
+                // wl_ay_id is NOT NULL — take it from the semester's academic year
+                $wl->wl_ay_id = $semester?->sem_ay_id
+                    ?? AcademicYear::where('ay_is_active', true)->value('ay_id');
+                $wl->wl_total_hours = $newTotal;
+                $wl->wl_type = $wl->wl_type ?? 'regular';
+                $wl->save();
+
+                return $load;
+            });
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not save assignment: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Subject assigned (+{$subjectUnits}u).",
+            'load_id' => $load->sl_id,
+        ]);
+    }
+
+    public function unassign($id)
+    {
+        $load = Study_Load::findOrFail($id);
+
+        DB::transaction(function () use ($load) {
+            $facId = $load->sl_fac_id;
+            $semId = $load->sl_sem_id;
+
+            $load->delete();
+
+            $newTotal = Study_Load::where('sl_fac_id', $facId)
+                ->where('sl_sem_id', $semId)
+                ->get()
+                ->sum(function ($sl) {
+                    $s = Subjects::find($sl->sl_subj_id);
+                    return $s
+                        ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                        : 0;
+                });
+
+            Workload::where('wl_fac_id', $facId)
+                ->where('wl_sem_id', $semId)
+                ->update(['wl_total_hours' => $newTotal]);
+        });
+
+        return response()->json(['success' => true, 'message' => 'Subject unassigned.']);
     }
 }

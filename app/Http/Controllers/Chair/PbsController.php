@@ -3,373 +3,270 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
+use App\Models\AcademicYear;
+use App\Models\Dept_Chair;
 use App\Models\Faculty;
-use App\Models\PbsSchedule;
+use App\Models\Schedule;
 use App\Models\Section;
+use App\Models\Semester;
 use App\Models\Subjects;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class PbsController extends Controller
 {
+    public function __construct(private ScheduleAssignmentService $scheduler)
+    {
+    }
+
     /**
-     * Display the PBS schedule page.
+     * Resolve the logged-in department chair's assigned program.
+     * Each program (BSIS, BSIT, BSCE, …) has its own chair.
+     */
+    private function chairProgramId(): ?string
+    {
+        $user = Auth::user();
+        if (!$user) {
+            return null;
+        }
+
+        $chair = Dept_Chair::where('dc_usr_id', $user->usr_id)->first();
+
+        return $chair?->dc_prog_id;
+    }
+
+    /**
+     * Current (active) semester id, if any.
+     */
+    private function currentSemesterId(): ?string
+    {
+        return Semester::where('sem_is_active', true)
+            ->orderByDesc('sem_start_date')
+            ->value('sem_id');
+    }
+
+    /**
+     * PBS page — scoped to the chair's program only.
+     * BSIS chair sees only BSIS programs/sections (BSIS 1-A, BSIS 2-B, …).
+     * Semester defaults to the currently active semester.
      */
     public function index(Request $request)
     {
+        $progId = $this->chairProgramId();
+
+        if (!$progId) {
+            return view('chair.pbs', [
+                'schedules'     => collect(),
+                'subjects'      => collect(),
+                'faculty'       => collect(),
+                'sections'      => collect(),
+                'programs'      => collect(),
+                'academicYears' => collect(),
+                'semesters'     => collect(),
+                'rooms'         => collect(),
+                'filters'       => [],
+                'selectedDate'  => $request->query('date'),
+                'chairProgram'  => null,
+                'error'         => 'Your account is not linked to a program. Contact the system administrator.',
+            ]);
+        }
+
         $filters = $request->only([
-            'program',
-            'year',
             'section',
             'semester',
         ]);
+
+        // Program is locked to the chair's program — never from the query string
+        $filters['program'] = $progId;
+
+        // Default semester → currently active semester
+        if (empty($filters['semester'])) {
+            $currentSem = $this->currentSemesterId();
+            if ($currentSem) {
+                $filters['semester'] = $currentSem;
+            }
+        }
+
+        // Sections for this chair's program only.
+        // Year is already in the name (BSIS 1-A, BSIS IV-A) — no year-level filter.
+        // Do not filter by sec_ay_id; null values would empty the dropdown.
+        $sections = Section::query()
+            ->where('sec_prog_id', $progId)
+            ->orderBy('sec_name')
+            ->get();
 
         $schedules = collect();
-
-        /*
-         * Only load schedules when a section is selected.
-         */
         if (!empty($filters['section'])) {
-            $schedules = PbsSchedule::query()
-                ->where('pbs_sec_id', $filters['section'])
-                ->when(
-                    !empty($filters['semester']),
-                    fn($q) => $q->where(
-                        'pbs_sem_id',
-                        $filters['semester']
+            $sectionOk = $sections->contains('sec_id', $filters['section']);
+            if ($sectionOk) {
+                $schedules = Schedule::query()
+                    ->where('sch_sec_id', $filters['section'])
+                    ->when(
+                        !empty($filters['semester']),
+                        fn ($q) => $q->where('sch_sem_id', $filters['semester'])
                     )
-                )
-                ->where('pbs_is_active', true)
-                ->with([
-                    'subject',
-                    'faculty',
-                    'section',
-                    'room',
-                    'semester',
-                ])
-                ->orderBy('pbs_day')
-                ->orderBy('pbs_start_time')
-                ->get();
+                    ->where('sch_is_active', true)
+                    ->with(['subject', 'faculty', 'section', 'room', 'semester'])
+                    ->orderBy('sch_day')
+                    ->orderBy('sch_start_time')
+                    ->get();
+            }
         }
+
+        $programs = DB::table('program')
+            ->where('prog_id', $progId)
+            ->get();
+
+        $subjects = Subjects::query()
+            ->where('subj_is_active', true)
+            ->where('subj_prog_id', $progId)
+            ->orderBy('subj_code')
+            ->get();
+
+        $prog = DB::table('program')->where('prog_id', $progId)->first();
+        $faculty = Faculty::query()
+            ->where(function ($q) use ($progId, $prog) {
+                $q->where('fac_prog_id', $progId);
+                if ($prog?->prog_dept_id) {
+                    $q->orWhere('fac_dept_id', $prog->prog_dept_id);
+                }
+            })
+            ->orderBy('fac_last_name')
+            ->orderBy('fac_first_name')
+            ->get();
 
         return view('chair.pbs', [
-            'schedules' => $schedules,
-
-            // Subjects
-            'subjects' => Subjects::query()
-                ->where('subj_is_active', true)
-                ->orderBy('subj_code')
-                ->get(),
-
-            // Faculty
-            'faculty' => Faculty::query()
-                ->orderBy('fac_last_name')
-                ->orderBy('fac_first_name')
-                ->get(),
-
-            // Sections
-            'sections' => Section::query()
-                ->when(
-                    !empty($filters['program']),
-                    fn($q) => $q->where(
-                        'sec_prog_id',
-                        $filters['program']
-                    )
-                )
-                ->when(
-                    !empty($filters['year']),
-                    fn($q) => $q->where(
-                        'sec_year_level',
-                        $filters['year']
-                    )
-                )
-                ->orderBy('sec_name')
-                ->get(),
-
-            // Programs
-            'programs' => DB::table('program')
-                ->orderBy('prog_name')
-                ->get(),
-
-            // Semesters
-            'semesters' => DB::table('semester')
-                ->orderBy('sem_start_date', 'desc')
-                ->get(),
-
-            // Rooms
-            'rooms' => DB::table('room')
-                ->where('room_is_available', true)
-                ->orderBy('room_name')
-                ->get(),
-
-            'filters' => $filters,
-
-            'selectedDate' => $request->query('date'),
+            'schedules'     => $schedules,
+            'subjects'      => $subjects,
+            'faculty'       => $faculty,
+            'sections'      => $sections,
+            'programs'      => $programs,
+            'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),
+            // Labels like "2026-2027 1st Sem"
+            'semesters'     => DB::table('semester as s')
+                ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+                ->orderByDesc('s.sem_start_date')
+                ->select([
+                    's.sem_id',
+                    's.sem_name',
+                    's.sem_is_active',
+                    's.sem_start_date',
+                    's.sem_ay_id',
+                    'ay.ay_academic_year',
+                    'ay.ay_year_label',
+                ])
+                ->get()
+                ->map(function ($sem) {
+                    $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
+                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    if (!empty($sem->sem_is_active)) {
+                        $label .= ' (Current)';
+                    }
+                    $sem->label = $label !== '' ? $label : $sem->sem_name;
+                    return $sem;
+                }),
+            'rooms'         => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
+            'filters'       => $filters,
+            'selectedDate'  => $request->query('date'),
+            'chairProgram'  => $programs->first(),
         ]);
     }
 
-
-    /**
-     * Validate schedule input.
-     */
     private function validated(Request $request): array
     {
-        return $request->validate([
-            'subj_id' => [
-                'required',
-                'uuid',
-                'exists:subject,subj_id',
-            ],
-
-            'fac_id' => [
-                'required',
-                'uuid',
-                'exists:faculty,fac_id',
-            ],
-
-            'sec_id' => [
-                'required',
-                'uuid',
-                'exists:section,sec_id',
-            ],
-
-            'room_id' => [
-                'required',
-                'uuid',
-                'exists:room,room_id',
-            ],
-
-            'sem_id' => [
-                'required',
-                'uuid',
-                'exists:semester,sem_id',
-            ],
-
-            'day' => [
-                'required',
-                'string',
-                'max:15',
-            ],
-
-            'start_time' => [
-                'required',
-                'date_format:H:i',
-            ],
-
-            'end_time' => [
-                'required',
-                'date_format:H:i',
-                'after:start_time',
-            ],
-
-            'description' => [
-                'nullable',
-                'string',
-            ],
+        $data = $request->validate([
+            'subj_id'    => 'required|uuid|exists:subject,subj_id',
+            'fac_id'     => 'required|uuid|exists:faculty,fac_id',
+            'sec_id'     => 'required|uuid|exists:section,sec_id',
+            'room_id'    => 'required|uuid|exists:room,room_id',
+            'sem_id'     => 'required|uuid|exists:semester,sem_id',
+            'day'        => 'required|string|max:15',
+            'start_time' => 'required|date_format:H:i',
+            'end_time'   => 'required|date_format:H:i|after:start_time',
         ]);
+
+        $progId = $this->chairProgramId();
+        if ($progId) {
+            $ownsSection = Section::where('sec_id', $data['sec_id'])
+                ->where('sec_prog_id', $progId)
+                ->exists();
+
+            if (!$ownsSection) {
+                abort(403, 'You can only schedule sections under your assigned program.');
+            }
+        }
+
+        return $data;
     }
 
-
-    /**
-     * Create a PBS schedule.
-     */
     public function store(Request $request)
     {
-        $data = $this->validated($request);
+        $result = $this->scheduler->assign($this->validated($request));
 
-        /*
-         * Check for an existing schedule for the same:
-         * faculty + day + start time + semester.
-         *
-         * This matches the unique constraint in pbs_schedule.
-         */
-        $duplicate = PbsSchedule::query()
-            ->where('pbs_fac_id', $data['fac_id'])
-            ->where('pbs_day', $data['day'])
-            ->where('pbs_start_time', $data['start_time'])
-            ->where('pbs_sem_id', $data['sem_id'])
-            ->exists();
-
-        if ($duplicate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This faculty member already has a schedule at this time for this semester.',
-            ], 422);
-        }
-
-        /*
-         * Create directly in pbs_schedule.
-         */
-        $schedule = PbsSchedule::create([
-            'pbs_subj_id' => $data['subj_id'],
-            'pbs_fac_id' => $data['fac_id'],
-            'pbs_sec_id' => $data['sec_id'],
-            'pbs_room_id' => $data['room_id'],
-            'pbs_sem_id' => $data['sem_id'],
-
-            'pbs_created_by' => auth()->id(),
-
-            'pbs_day' => $data['day'],
-            'pbs_start_time' => $data['start_time'],
-            'pbs_end_time' => $data['end_time'],
-
-            'pbs_description' => $data['description'] ?? null,
-
-            'pbs_status' => 'draft',
-            'pbs_is_active' => true,
-        ]);
-
-        /*
-         * Load relationships for the response.
-         */
-        $schedule->load([
-            'subject',
-            'faculty',
-            'section',
-            'room',
-            'semester',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'PBS schedule created successfully.',
-            'schedule' => $schedule,
-        ], 201);
+        return response()->json($result, $result['success'] ? 201 : 422);
     }
 
-
-    /**
-     * Update a PBS schedule.
-     */
     public function update(Request $request, string $id)
     {
-        $data = $this->validated($request);
+        $result = $this->scheduler->update($id, $this->validated($request));
 
-        $schedule = PbsSchedule::find($id);
-
-        if (!$schedule) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PBS schedule not found.',
-            ], 404);
-        }
-
-        /*
-         * Check duplicate schedule, excluding the
-         * schedule currently being edited.
-         */
-        $duplicate = PbsSchedule::query()
-            ->where('pbs_fac_id', $data['fac_id'])
-            ->where('pbs_day', $data['day'])
-            ->where('pbs_start_time', $data['start_time'])
-            ->where('pbs_sem_id', $data['sem_id'])
-            ->where('pbs_id', '!=', $id)
-            ->exists();
-
-        if ($duplicate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This faculty member already has a schedule at this time for this semester.',
-            ], 422);
-        }
-
-        $schedule->update([
-            'pbs_subj_id' => $data['subj_id'],
-            'pbs_fac_id' => $data['fac_id'],
-            'pbs_sec_id' => $data['sec_id'],
-            'pbs_room_id' => $data['room_id'],
-            'pbs_sem_id' => $data['sem_id'],
-
-            'pbs_day' => $data['day'],
-            'pbs_start_time' => $data['start_time'],
-            'pbs_end_time' => $data['end_time'],
-
-            'pbs_description' => $data['description'] ?? null,
-        ]);
-
-        $schedule->load([
-            'subject',
-            'faculty',
-            'section',
-            'room',
-            'semester',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'PBS schedule updated successfully.',
-            'schedule' => $schedule,
-        ]);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-
-    /**
-     * Delete a PBS schedule.
-     */
     public function destroy(string $id)
     {
-        $schedule = PbsSchedule::find($id);
-
-        if (!$schedule) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PBS schedule not found.',
-            ], 404);
+        $progId = $this->chairProgramId();
+        if ($progId) {
+            $schedule = Schedule::with('section')->find($id);
+            if ($schedule && $schedule->section && $schedule->section->sec_prog_id !== $progId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only delete schedules under your assigned program.',
+                ], 403);
+            }
         }
 
-        $schedule->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'PBS schedule deleted successfully.',
-        ]);
+        return response()->json($this->scheduler->delete($id));
     }
 
-
-    /**
-     * Save draft.
-     *
-     * Schedules are already created with pbs_status = draft.
-     */
     public function saveDraft(Request $request)
     {
-        return response()->json([
-            'success' => true,
-            'message' => 'Draft saved successfully.',
-        ]);
+        return response()->json(['success' => true, 'message' => 'Draft saved.']);
     }
 
-
-    /**
-     * Clear all PBS schedules for a section.
-     */
     public function clear(Request $request)
     {
         $sectionId = $request->input('section');
-
         if (!$sectionId) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No section selected.',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'No section selected.']);
         }
 
-        $query = PbsSchedule::query()
-            ->where('pbs_sec_id', $sectionId);
+        $progId = $this->chairProgramId();
+        if ($progId) {
+            $owns = Section::where('sec_id', $sectionId)
+                ->where('sec_prog_id', $progId)
+                ->exists();
+            if (!$owns) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You can only clear schedules under your assigned program.',
+                ], 403);
+            }
+        }
 
-        if ($request->filled('semester')) {
-            $query->where(
-                'pbs_sem_id',
-                $request->input('semester')
+        $query = Schedule::where('sch_sec_id', $sectionId)
+            ->when(
+                $request->filled('semester'),
+                fn ($q) => $q->where('sch_sem_id', $request->input('semester'))
             );
-        }
 
-        $deleted = $query->delete();
+        $ids = $query->pluck('sch_load_id', 'sch_id');
 
-        return response()->json([
-            'success' => true,
-            'message' => 'PBS schedules cleared successfully.',
-            'deleted' => $deleted,
-        ]);
+        Schedule::whereIn('sch_id', $ids->keys())->delete();
+        \App\Models\Study_Load::whereIn('sl_id', $ids->values())->delete();
+
+        return response()->json(['success' => true, 'message' => 'Cleared.']);
     }
 }
