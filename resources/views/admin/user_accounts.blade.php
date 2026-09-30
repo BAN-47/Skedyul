@@ -391,12 +391,12 @@
             </div>
 
             <div>
-              <label class="field-label">Department</label>
-              <select name="dept_id" class="field-input">
-                <option value="">— Select department —</option>
-                @foreach($departments as $dept)
-                <option value="{{ $dept->dept_id }}">
-                  {{ $dept->dept_name }} ({{ $dept->dept_code }})
+              <label class="field-label">College</label>
+              <select name="college_id" class="field-input">
+                <option value="">— Select college —</option>
+                @foreach(($colleges ?? []) as $college)
+                <option value="{{ $college->college_id }}">
+                  {{ $college->college_name }} ({{ $college->college_code }})
                 </option>
                 @endforeach
               </select>
@@ -404,12 +404,12 @@
           </div>
 
           <div>
-            <label class="field-label">Program</label>
-            <select name="prog_id" class="field-input">
-              <option value="">— Select program —</option>
-              @foreach($programs as $prog)
-              <option value="{{ $prog->prog_id }}">
-                {{ $prog->prog_name }} ({{ $prog->prog_code }})
+            <label class="field-label">Department</label>
+            <select name="dept_id" class="field-input">
+              <option value="">— Select department —</option>
+              @foreach(($departments ?? []) as $dept)
+              <option value="{{ $dept->dept_id }}">
+                {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
             </select>
@@ -482,7 +482,6 @@
               <option value="faculty">Faculty</option>
               <option value="department_chair">Dept. Chair</option>
               <option value="dean">Dean</option>
-              <option value="system_admin">Technical Administrator</option>
             </select>
           </div>
         </div>
@@ -633,14 +632,13 @@
             </div>
 
             <div>
-              <label class="field-label">Department</label>
-              <select id="edit-department"
-                name="dept_id" class="field-input">
-                <option value="">— Select department —</option>
-
-                @foreach($departments as $dept)
-                <option value="{{ $dept->dept_id }}">
-                  {{ $dept->dept_name }} ({{ $dept->dept_code }})
+              <label class="field-label">College</label>
+              <select id="edit-college"
+                name="college_id" class="field-input">
+                <option value="">— Select college —</option>
+                @foreach(($colleges ?? []) as $college)
+                <option value="{{ $college->college_id }}">
+                  {{ $college->college_name }} ({{ $college->college_code }})
                 </option>
                 @endforeach
               </select>
@@ -648,14 +646,13 @@
           </div>
 
           <div>
-            <label class="field-label">Program</label>
-            <select id="edit-program"
-              name="prog_id" class="field-input">
-              <option value="">— Select program —</option>
-
-              @foreach($programs as $prog)
-              <option value="{{ $prog->prog_id }}">
-                {{ $prog->prog_name }} ({{ $prog->prog_code }})
+            <label class="field-label">Department</label>
+            <select id="edit-department"
+              name="dept_id" class="field-input">
+              <option value="">— Select department —</option>
+              @foreach(($departments ?? []) as $dept)
+              <option value="{{ $dept->dept_id }}">
+                {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
             </select>
@@ -1033,11 +1030,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('edit-address').value =
           data.role_address || '';
 
+        document.getElementById('edit-college').value =
+          data.college_id || '';
+
         document.getElementById('edit-department').value =
           data.dept_id || '';
-
-        document.getElementById('edit-program').value =
-          data.prog_id || '';
 
         document.getElementById('edit-about').value =
           data.usr_bio || '';
@@ -1139,10 +1136,10 @@ document.addEventListener('DOMContentLoaded', function() {
           data.usr_employee_id || 'Not provided';
 
         document.getElementById('profile-department').textContent =
-          data.dept_id ? getDepartmentName(data.dept_id) : 'Not provided';
+          data.college_id ? getCollegeName(data.college_id) : 'Not provided';
 
         document.getElementById('profile-program').textContent =
-          data.prog_id ? getProgramName(data.prog_id) : 'Not provided';
+          data.dept_id ? getDepartmentName(data.dept_id) : 'Not provided';
 
         const personal = [
           data.usr_gender,
@@ -1191,25 +1188,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
+    function getCollegeName(id) {
+      const option = document.querySelector(
+        `#edit-college option[value="${CSS.escape(String(id))}"]`
+      );
+      return option ? option.textContent.trim() : 'Not provided';
+    }
+
     function getDepartmentName(id) {
       const option = document.querySelector(
         `#edit-department option[value="${CSS.escape(String(id))}"]`
       );
-
-      return option ?
-        option.textContent.trim() :
-        'Not provided';
-    }
-
-
-    function getProgramName(id) {
-      const option = document.querySelector(
-        `#edit-program option[value="${CSS.escape(String(id))}"]`
-      );
-
-      return option ?
-        option.textContent.trim() :
-        'Not provided';
+      return option ? option.textContent.trim() : 'Not provided';
     }
 
 

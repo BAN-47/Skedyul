@@ -103,10 +103,10 @@ function applyFilters() {
     const params = new URLSearchParams(window.location.search);
 
     // Program locked server-side; semester label includes academic year.
+    // Semester is fixed by admin settings — do not put it in the URL
     const map = {
         program:       'filter-program',
         section:       'filter-section',
-        semester:      'filter-semester',
     };
 
     Object.entries(map).forEach(([key, id]) => {

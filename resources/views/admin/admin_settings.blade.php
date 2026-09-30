@@ -12,6 +12,7 @@
 <div class="app-shell">
 
   @include('partials.admin_sidebar')
+@php($authUser = auth()->user())
 
   <div class="app-main">
         @include('partials.admin_header', ['title' => 'Technical Admin settings'])
@@ -37,18 +38,18 @@
             <div class="card mb-4">
               <div class="card-header"><div><div class="card-title">Personal Information</div><div class="card-sub">Update your name, rank, and contact details</div></div></div>
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">First Name</label><input class="field-input" id="pi-firstname" value="{{ auth()->user()->usr_first_name }}"></div>
-                <div><label class="field-label">Last Name</label><input class="field-input" id="pi-lastname" value="{{ auth()->user()->usr_last_name }}"></div>
+                <div><label class="field-label">First Name</label><input class="field-input" id="pi-firstname" value="{{ ($authUser->usr_first_name ?? '') }}"></div>
+                <div><label class="field-label">Last Name</label><input class="field-input" id="pi-lastname" value="{{ ($authUser->usr_last_name ?? '') }}"></div>
               </div>
               <div class="grid grid-cols-2 gap-3 mb-1">
-                <div><label class="field-label">Middle Name</label><input class="field-input" id="pi-middlename" placeholder="Optional" value="{{ auth()->user()->usr_middle_name }}"></div>
+                <div><label class="field-label">Middle Name</label><input class="field-input" id="pi-middlename" placeholder="Optional" value="{{ ($authUser->usr_middle_name ?? '') }}"></div>
                 <div><label class="field-label">Suffix</label>
                   <select class="field-input" id="pi-suffix">
-                    <option value="" {{ !auth()->user()->usr_suffix ? 'selected' : '' }}>None</option>
-                    <option {{ auth()->user()->usr_suffix === 'Jr.' ? 'selected' : '' }}>Jr.</option>
-                    <option {{ auth()->user()->usr_suffix === 'Sr.' ? 'selected' : '' }}>Sr.</option>
-                    <option {{ auth()->user()->usr_suffix === 'II' ? 'selected' : '' }}>II</option>
-                    <option {{ auth()->user()->usr_suffix === 'III' ? 'selected' : '' }}>III</option>
+                    <option value="" {{ !($authUser->usr_suffix ?? null) ? 'selected' : '' }}>None</option>
+                    <option {{ ($authUser->usr_suffix ?? null) === 'Jr.' ? 'selected' : '' }}>Jr.</option>
+                    <option {{ ($authUser->usr_suffix ?? null) === 'Sr.' ? 'selected' : '' }}>Sr.</option>
+                    <option {{ ($authUser->usr_suffix ?? null) === 'II' ? 'selected' : '' }}>II</option>
+                    <option {{ ($authUser->usr_suffix ?? null) === 'III' ? 'selected' : '' }}>III</option>
                   </select>
                 </div>
               </div>
@@ -76,37 +77,89 @@
             </div>
           </div>
 
-          {{-- ACADEMIC YEAR --}}
+                    {{-- ACADEMIC YEAR: many years | SEMESTER: only 1st + 2nd --}}
           @php
-              $activeSemester = \App\Models\Semester::where('sem_is_active', true)->with('academicYear')->first();
-              $activeAY = $activeSemester?->academicYear;
+              $activeSemester = $activeSemester ?? null;
+              $activeYear     = $activeYear ?? null;
+              $academicYears  = $academicYears ?? collect();
+              $semesters      = $semesters ?? collect();
+              $ayStart        = $ayStart ?? '2026-08-01';
+              $ayEnd          = $ayEnd ?? '2026-12-20';
+              $periodLabel    = $periodLabel ?? null;
+              $periodNotice   = $periodNotice ?? null;
           @endphp
 
           <div id="settings-academic" style="display:none;">
             <div class="card mb-4">
-              <div class="card-header"><div><div class="card-title">Current Academic Year</div><div class="card-sub">Active semester configuration</div></div><span class="badge badge-green">Active</span></div>
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Current Academic Year</div>
+                  <div class="card-sub">Academic year + 1st/2nd semester — used on PBS, PBT, and Faculty Load</div>
+                </div>
+                @if(!empty($activeSemester) && !empty($activeYear))
+                  <span class="badge badge-green">{{ $periodLabel }}</span>
+                @else
+                  <span class="badge" style="background:#fef3c7;color:#92400e;">Not set</span>
+                @endif
+              </div>
+
+              @if(!empty($periodNotice))
+                <div class="mb-3 p-3 rounded-lg text-[12px]" style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;">
+                  {{ $periodNotice }}
+                </div>
+              @endif
+
+              @if(empty($activeSemester) || empty($activeYear))
+                <div class="mb-3 p-3 rounded-lg text-[12px]" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;">
+                  No active period. Choose or type an academic year, pick 1st or 2nd semester, set dates, then Save.
+                </div>
+              @endif
+
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">Academic Year</label><input class="field-input" id="ay-year" value="{{ $activeAY->ay_academic_year ?? '2025–2026' }}"></div>
+                <div>
+                  <label class="field-label">Academic Year</label>
+                  <input class="field-input" id="ay-year" list="ay-year-list"
+                    value="{{ $activeYear->ay_academic_year ?? '' }}"
+                    placeholder="2027-2028">
+                  <datalist id="ay-year-list">
+                    @foreach($academicYears as $ay)
+                      <option value="{{ $ay->ay_academic_year }}"></option>
+                    @endforeach
+                  </datalist>
+                  <p class="text-[11px] text-slate-400 mt-1">Type a new year (e.g. 2027-2028) to register it.</p>
+                </div>
                 <div>
                   <label class="field-label">Semester</label>
                   <select class="field-input" id="ay-semester">
-                    <option {{ ($activeSemester->sem_name ?? '') === '1st Semester' ? 'selected' : '' }}>1st Semester</option>
-                    <option {{ ($activeSemester->sem_name ?? '') === '2nd Semester' ? 'selected' : '' }}>2nd Semester</option>
-                    <option {{ ($activeSemester->sem_name ?? '') === 'Summer' ? 'selected' : '' }}>Summer</option>
+                    <option value="1st Semester" @selected(($activeSemester->sem_name ?? '') === '1st Semester')>1st Semester</option>
+                    <option value="2nd Semester" @selected(($activeSemester->sem_name ?? '') === '2nd Semester')>2nd Semester</option>
                   </select>
+                  <p class="text-[11px] text-slate-400 mt-1">Only two semesters exist in the system.</p>
                 </div>
               </div>
+
               <div class="grid grid-cols-2 gap-3 mb-1">
-                <div><label class="field-label">Start Date</label><input class="field-input" id="ay-start" type="date" value="{{ $activeSemester->sem_start_date?->format('Y-m-d') ?? '2025-08-11' }}"></div>
-                <div><label class="field-label">End Date</label><input class="field-input" id="ay-end" type="date" value="{{ $activeSemester->sem_end_date?->format('Y-m-d') ?? '2025-12-20' }}"></div>
+                <div>
+                  <label class="field-label">Start Date</label>
+                  <input class="field-input" id="ay-start" type="date" value="{{ $ayStart }}">
+                </div>
+                <div>
+                  <label class="field-label">End Date</label>
+                  <input class="field-input" id="ay-end" type="date" value="{{ $ayEnd }}">
+                </div>
               </div>
+              <p class="text-[11px] text-slate-400 mt-1 mb-2">
+                When the 1st semester end date passes, the system switches to 2nd semester.
+                When the 2nd semester ends, admin is prompted to set the next academic year.
+              </p>
+
               <div class="flex justify-end mt-1">
-                <button class="btn btn-primary" onclick="saveAcademicYear()">Save Changes</button>
+                <button type="button" class="btn btn-primary" onclick="saveAcademicYear()">Save Changes</button>
               </div>
             </div>
           </div>
 
-          {{-- NOTIFICATIONS --}}
+{{-- NOTIFICATIONS --}}
           <div id="settings-notifications" style="display:none;">
             <div class="card">
               <div class="card-header"><div><div class="card-title">Notification Preferences</div><div class="card-sub">Choose what alerts you receive</div></div></div>
@@ -115,28 +168,28 @@
                   <div><div class="text-[13px] font-semibold text-slate-900">New User Registration</div><div class="text-xs text-slate-400 mt-0.5">Alert when a new account is created or pending approval</div></div>
                   <label class="toggle-switch">
                     <input type="checkbox" data-field="notif_new_user_registration" {{ (bool) \App\Models\SystemSetting::get('notif_new_user_registration', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ auth()->user()->notif_new_user_registration ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-track {{ ($authUser->notif_new_user_registration ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">Faculty Overload</div><div class="text-xs text-slate-400 mt-0.5">Notify when a faculty member exceeds their max load</div></div>
                   <label class="toggle-switch">
                     <input type="checkbox" data-field="notif_faculty_overload" {{ (bool) \App\Models\SystemSetting::get('notif_faculty_overload', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ auth()->user()->notif_faculty_overload ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-track {{ ($authUser->notif_faculty_overload ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">System Backups</div><div class="text-xs text-slate-400 mt-0.5">Receive confirmation after each automatic backup</div></div>
                   <label class="toggle-switch">
                     <input type="checkbox" data-field="notif_system_backups" {{ (bool) \App\Models\SystemSetting::get('notif_system_backups', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ auth()->user()->notif_system_backups ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-track {{ ($authUser->notif_system_backups ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
                 <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
                   <div><div class="text-[13px] font-semibold text-slate-900">Login Activity</div><div class="text-xs text-slate-400 mt-0.5">Notify on new logins from unrecognized devices</div></div>
                   <label class="toggle-switch">
                     <input type="checkbox" data-field="notif_login_activity" {{ (bool) \App\Models\SystemSetting::get('notif_login_activity', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                    <span class="toggle-track {{ auth()->user()->notif_login_activity ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-track {{ ($authUser->notif_login_activity ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                 </div>
               </div>
@@ -348,14 +401,20 @@ function saveInstitution() {
 
 function saveAcademicYear() {
   const payload = {
-    ay_academic_year: document.getElementById('ay-year').value.trim(),
-    sem_name: document.getElementById('ay-semester').value,
-    sem_start_date: document.getElementById('ay-start').value,
-    sem_end_date: document.getElementById('ay-end').value,
+    ay_academic_year: (document.getElementById('ay-year')?.value || '').trim(),
+    sem_name: (document.getElementById('ay-semester')?.value || '').trim(),
+    sem_start_date: document.getElementById('ay-start')?.value || '',
+    sem_end_date: document.getElementById('ay-end')?.value || '',
   };
 
-  if (!payload.ay_academic_year || !payload.sem_start_date || !payload.sem_end_date) {
-    showToast('Please fill academic year, start date, and end date.');
+  if (!payload.ay_academic_year || !payload.sem_name || !payload.sem_start_date || !payload.sem_end_date) {
+    showToast('Please fill academic year, semester, start date, and end date.');
+    return;
+  }
+
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+  if (!csrf) {
+    showToast('Missing CSRF token. Refresh the page and try again.');
     return;
   }
 
@@ -364,22 +423,29 @@ function saveAcademicYear() {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'X-CSRF-TOKEN': csrf,
+      'X-Requested-With': 'XMLHttpRequest',
     },
+    credentials: 'same-origin',
     body: JSON.stringify(payload),
   })
     .then(async res => {
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        showToast(data.message || 'Failed to save academic year settings');
+      if (res.status === 401 || res.status === 419) {
+        showToast('Session expired. Please log in again.');
         return;
       }
-      showToast(data.message || 'Academic year settings saved!');
-      // Reload so the form reflects the newly active period
+      if (!res.ok || !data.success) {
+        showToast(data.message || ('Failed to save (HTTP ' + res.status + ')'));
+        return;
+      }
+      showToast(data.message || 'Saved!');
       setTimeout(() => window.location.reload(), 700);
     })
-    .catch(() => showToast('Something went wrong saving.'));
+    .catch(() => showToast('Network error while saving academic year.'));
 }
+
+
 
 function saveNotificationPreferences() {
   const payload = {

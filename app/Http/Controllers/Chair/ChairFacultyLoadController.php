@@ -36,24 +36,24 @@ class ChairFacultyLoadController extends Controller
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
 
         $department   = College::find($deptChair->dc_college_id);
-        $program      = Departments::find($deptChair->dc_prog_id);
+        $program      = Departments::find($deptChair->dc_dept_id);
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
         $faculty = Faculty::where('fac_college_id', $deptChair->dc_college_id)
-            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('fac_dept_id', $deptChair->dc_prog_id))
+            ->when($deptChair->dc_dept_id, fn ($q) => $q->where('fac_dept_id', $deptChair->dc_dept_id))
             ->orderBy('fac_first_name')
             ->get();
 
         $facultyIds = $faculty->pluck('fac_id');
 
         $subjects = Course::where('course_college_id', $deptChair->dc_college_id)
-            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('course_dept_id', $deptChair->dc_prog_id))
+            ->when($deptChair->dc_dept_id, fn ($q) => $q->where('course_dept_id', $deptChair->dc_dept_id))
             ->where('course_is_active', true)
             ->orderBy('course_code')
             ->get();
 
-        $subjectsById = $subjects->keyBy('subj_id');
+        $subjectsById = $subjects->keyBy('course_id');
 
         $studyLoads = Study_Load::whereIn('sl_fac_id', $facultyIds)
             ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))

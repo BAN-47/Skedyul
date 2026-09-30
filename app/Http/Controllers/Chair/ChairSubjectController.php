@@ -21,7 +21,7 @@ class ChairSubjectController extends Controller {
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
-        $subjects = Course::with(['department', 'program'])
+        $subjects = Course::with(['college', 'department'])
             ->where('course_is_active', true)
             ->get();
 
@@ -48,8 +48,8 @@ class ChairSubjectController extends Controller {
             return $subject;
         });
 
-        $departments = College::orderBy('college_name')->get();
-        $programs = Departments::orderBy('dept_name')->get();
+        $colleges    = College::orderBy('college_name')->get();
+        $departments = Departments::orderBy('dept_name')->get();
         $section = Section::orderBy('sec_name')->get();
         // Join to academic_year so the dropdown can show "2026-2027 1st Sem"
         // instead of just "First Semester" with no year context.
@@ -87,8 +87,8 @@ class ChairSubjectController extends Controller {
 
             $faculty = $facultyRecords->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
                 $totalUnits = $studyLoads->get($f->fac_id, collect())->sum(function ($sl) use ($subjectsById) {
-                    $s = $subjectsById->get($sl->sl_subj_id);
-                    return $s ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours) : 0;
+                    $s = $subjectsById->get($sl->sl_course_id);
+                    return $s ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours) : 0;
                 });
 
                 return [
@@ -99,67 +99,95 @@ class ChairSubjectController extends Controller {
             });
         }
 
-        return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section', 'faculty', 'semesters'));
+        return view('chair.subjects', compact('subjects', 'colleges', 'departments', 'section', 'faculty', 'semesters'));
     }
 
-    public function store(Request $request) {
-        $validated = $request->validate([
-              'subj_dept_id' => 'required|exists:college,college_id',
-              'subj_prog_id' => 'required|exists:department,dept_id',
-              'subj_code' => 'required|string|unique:course,course_code',
-            'subj_name' => 'required|string',
-            'subj_lecture_hours' => 'required|numeric|min:0',
-            'subj_lab_hours' => 'required|numeric|min:0',
+    public function store(Request $request)
+    {
+        // Prefer course_* names; also accept legacy subj_* from older blades
+        $request->merge([
+            'course_college_id'    => $request->input('course_college_id', $request->input('subj_dept_id')),
+            'course_dept_id'       => $request->input('course_dept_id', $request->input('subj_prog_id')),
+            'course_code'          => $request->input('course_code', $request->input('subj_code')),
+            'course_name'          => $request->input('course_name', $request->input('subj_name')),
+            'course_lecture_hours' => $request->input('course_lecture_hours', $request->input('subj_lecture_hours')),
+            'course_lab_hours'     => $request->input('course_lab_hours', $request->input('subj_lab_hours')),
+        ]);
+
+        $data = $request->validate([
+            'course_college_id'    => 'required|uuid|exists:college,college_id',
+            'course_dept_id'       => 'required|uuid|exists:department,dept_id',
+            'course_code'          => 'required|string|unique:course,course_code',
+            'course_name'          => 'required|string',
+            'course_lecture_hours' => 'required|numeric|min:0',
+            'course_lab_hours'     => 'required|numeric|min:0',
         ]);
 
         try {
-            Course::create($validated);
+            Course::create(array_merge($data, ['course_is_active' => true]));
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to add the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to add the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject added successfully.');
+            ->with('success', 'Course added successfully.');
     }
 
-    public function update(Request $request, string $id) {
-        $subject = Course::findOrFail($id);
+    public function update(Request $request, string $id)
+    {
+        $course = Course::findOrFail($id);
 
-        $validated = $request->validate([
-            'subj_dept_id' => 'required|exists:college,college_id',
-            'subj_code' => [
+        $request->merge([
+            'course_college_id'    => $request->input('course_college_id', $request->input('subj_dept_id')),
+            'course_dept_id'       => $request->input('course_dept_id', $request->input('subj_prog_id', $course->course_dept_id)),
+            'course_code'          => $request->input('course_code', $request->input('subj_code')),
+            'course_name'          => $request->input('course_name', $request->input('subj_name')),
+            'course_lecture_hours' => $request->input('course_lecture_hours', $request->input('subj_lecture_hours')),
+            'course_lab_hours'     => $request->input('course_lab_hours', $request->input('subj_lab_hours')),
+        ]);
+
+        $data = $request->validate([
+            'course_college_id'    => 'required|uuid|exists:college,college_id',
+            'course_dept_id'       => 'nullable|uuid|exists:department,dept_id',
+            'course_code'          => [
                 'required',
                 'string',
-                    Rule::unique('course', 'course_code')->ignore($subject->course_id, 'course_id'),
+                Rule::unique('course', 'course_code')->ignore($course->course_id, 'course_id'),
             ],
-            'subj_name' => 'required|string',
-            'subj_lecture_hours' => 'required|numeric|min:0',
-            'subj_lab_hours' => 'required|numeric|min:0',
+            'course_name'          => 'required|string',
+            'course_lecture_hours' => 'required|numeric|min:0',
+            'course_lab_hours'     => 'required|numeric|min:0',
         ]);
 
         try {
-            $subject->update($validated);
+            $course->update($data);
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to update the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to update the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject updated successfully.');
-
+            ->with('success', 'Course updated successfully.');
     }
 
     public function destroy(string $id)
     {
-        $subject = Course::findOrFail($id);
+        $course = Course::findOrFail($id);
 
         try {
-            $subject->update(['subj_is_active' => false]);
+            $course->update(['course_is_active' => false]);
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to deactivate the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to deactivate the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject deactivated successfully.');
+            ->with('success', 'Course deactivated successfully.');
+    }
+
+
+    private function redirectWithDbError(\Throwable $e, string $fallback)
+    {
+        report($e);
+        return redirect()->back()->with('error', $fallback);
     }
 
 }

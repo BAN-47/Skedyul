@@ -22,6 +22,7 @@
   $programs  = $programs  ?? collect();
   $semesters = $semesters ?? collect();
   $filters   = $filters   ?? [];
+  $activeSemester  = $activeSemester  ?? null;
   $selectedFaculty = $selectedFaculty ?? null; // the Faculty (or Dean) model currently being viewed, or null
   $loadStats = $loadStats ?? [
       'preparations' => null,
@@ -180,14 +181,10 @@
               @endforeach
             </select>
 
-            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter">
-              <option value="">SEMESTER</option>
-              @foreach($semesters as $sem)
-                <option value="{{ $sem->sem_id }}" @selected(($filters['semester'] ?? '') === $sem->sem_id)>
-                  {{ $sem->label ?? $sem->sem_name }}
-                </option>
-              @endforeach
-            </select>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
+              {{ optional($activeSemester)->label ?? 'No active semester' }}
+            </span>
+            <input type="hidden" id="filter-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
 
             <div class="flex rounded-md overflow-hidden border border-slate-300">
               <button type="button" id="shift-day" onclick="setShift('day')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
@@ -354,12 +351,10 @@
 
       <div class="mb-3">
         <label class="field-label">Semester</label>
-        <select id="add-semester" class="field-input">
-          <option value="">-- Select Semester --</option>
-          @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
-          @endforeach
-        </select>
+        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+          {{ optional($activeSemester)->label ?? 'No active semester' }}
+        </div>
+        <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
       </div>
 
       <div class="mb-3">
@@ -453,12 +448,10 @@
 
       <div class="mb-3">
         <label class="field-label">Semester</label>
-        <select id="edit-semester" class="field-input">
-          <option value="">-- Select Semester --</option>
-          @foreach($semesters as $sem)
-            <option value="{{ $sem->sem_id }}">{{ $sem->label ?? $sem->sem_name }}</option>
-          @endforeach
-        </select>
+        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+          {{ optional($activeSemester)->label ?? 'No active semester' }}
+        </div>
+        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
       </div>
 
       <div class="mb-3">

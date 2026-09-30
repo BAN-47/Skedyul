@@ -11,6 +11,7 @@ use App\Models\Course;
 use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
+use App\Models\Semester;
 use Illuminate\Support\Facades\DB;
 
 class PbtController extends Controller
@@ -21,7 +22,15 @@ class PbtController extends Controller
 
     public function index(Request $request)
     {
-        $filters   = $request->only(['program', 'semester']);
+        $filters   = $request->only(['program']);
+
+        $activeSem = DB::table('semester')->where('sem_is_active', true)->first();
+        $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
+        if ($activeSem) {
+            $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
+            $activeSem->label = trim($year . ($year !== '' ? ' · ' : '') . ($activeSem->sem_name ?? ''));
+        }
+        $filters['semester'] = $activeSem->sem_id ?? null;
         $facultyId = $request->query('faculty');
 
         $selectedFaculty = $facultyId ? Faculty::find($facultyId) : null;
@@ -76,6 +85,7 @@ class PbtController extends Controller
             'selectedFaculty'  => $selectedFaculty,
             'selectedDate'     => $request->query('date'),
             'loadStats'        => $this->loadStatsFor($selectedFaculty, $filters['semester'] ?? null),
+            'activeSemester'   => $activeSem ?? null,
         ]);
     }
 
@@ -93,7 +103,7 @@ class PbtController extends Controller
             ->with('subject', 'schedule')
             ->get();
 
-        $units = $loads->sum(fn ($l) => ($l->subject->subj_lecture_hours ?? 0) + ($l->subject->subj_lab_hours ?? 0));
+        $units = $loads->sum(fn ($l) => ($l->course->course_lecture_hours ?? $l->subject->course_lecture_hours ?? 0) + ($l->course->course_lab_hours ?? $l->subject->course_lab_hours ?? 0));
 
         $hoursPerWeek = $loads->sum(function ($l) {
             if (!$l->schedule) return 0;
@@ -103,7 +113,7 @@ class PbtController extends Controller
         });
 
         return [
-            'preparations' => $loads->pluck('sl_subj_id')->unique()->count(),
+            'preparations' => $loads->pluck('sl_course_id')->unique()->count(),
             'units'        => $units ?: null,
             'hours_week'   => $hoursPerWeek ?: null,
             'designation'  => $faculty->fac_rank,
@@ -113,12 +123,20 @@ class PbtController extends Controller
         ];
     }
 
+
+    private function currentSemesterId(): ?string
+    {
+        return \App\Models\Semester::where('sem_is_active', true)
+            ->orderByDesc('sem_start_date')
+            ->value('sem_id');
+    }
+
     private function validated(Request $request): array
     {
         return $request->validate([
             'subj_id'    => 'required|uuid|exists:course,course_id',
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
-            'sem_id'     => 'required|uuid|exists:semester,sem_id',
+            'sem_id'     => 'nullable|uuid|exists:semester,sem_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
             'day'        => 'required|string|max:15',
@@ -129,13 +147,29 @@ class PbtController extends Controller
 
     public function store(Request $request)
     {
-        $result = $this->scheduler->assign($this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->assign($data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function update(Request $request, string $id)
     {
-        $result = $this->scheduler->update($id, $this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->update($id, $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 

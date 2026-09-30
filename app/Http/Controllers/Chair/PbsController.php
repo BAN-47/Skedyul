@@ -48,6 +48,22 @@ class PbsController extends Controller
             ->value('sem_id');
     }
 
+    /** Active semester row + display label from Admin Settings (sem_is_active). */
+    private function activeSemester(): ?object
+    {
+        // Semester table has only 1st/2nd rows; year comes from active academic_year
+        $sem = DB::table('semester')->where('sem_is_active', true)->first();
+        if (!$sem) {
+            return null;
+        }
+
+        $ay = DB::table('academic_year')->where('ay_is_active', true)->first();
+        $year = $ay->ay_academic_year ?? $ay->ay_year_label ?? '';
+        $sem->label = trim($year . ($year !== '' ? ' · ' : '') . ($sem->sem_name ?? ''));
+        $sem->ay_academic_year = $year;
+        return $sem;
+    }
+
     /**
      * PBS page — scoped to the chair's program only.
      * BSIS chair sees only BSIS programs/sections (BSIS 1-A, BSIS 2-B, …).
@@ -67,28 +83,22 @@ class PbsController extends Controller
                 'academicYears' => collect(),
                 'semesters'     => collect(),
                 'rooms'         => collect(),
-                'filters'       => [],
-                'selectedDate'  => $request->query('date'),
-                'chairProgram'  => null,
-                'error'         => 'Your account is not linked to a program. Contact the system administrator.',
+                'filters'        => [],
+                'selectedDate'   => $request->query('date'),
+                'chairProgram'   => null,
+                'activeSemester' => $this->activeSemester(),
+                'error'          => 'Your account is not linked to a program. Contact the system administrator.',
             ]);
         }
 
-        $filters = $request->only([
-            'section',
-            'semester',
-        ]);
+        $filters = $request->only(['section']);
 
         // Program is locked to the chair's program — never from the query string
         $filters['program'] = $progId;
 
-        // Default semester → currently active semester
-        if (empty($filters['semester'])) {
-            $currentSem = $this->currentSemesterId();
-            if ($currentSem) {
-                $filters['semester'] = $currentSem;
-            }
-        }
+        // Semester is FIXED from Admin → Academic Year settings (not user-selectable)
+        $activeSem = $this->activeSemester();
+        $filters['semester'] = $activeSem->sem_id ?? null;
 
         // Sections for this chair's program only.
         // Year is already in the name (BSIS 1-A, BSIS IV-A) — no year-level filter.
@@ -170,6 +180,7 @@ class PbsController extends Controller
             'filters'       => $filters,
             'selectedDate'  => $request->query('date'),
             'chairProgram'  => $programs->first(),
+            'activeSemester'=> $activeSem ?? $this->activeSemester(),
         ]);
     }
 
@@ -202,14 +213,30 @@ class PbsController extends Controller
 
     public function store(Request $request)
     {
-        $result = $this->scheduler->assign($this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->assign($data);
 
         return response()->json($result, $result['success'] ? 201 : 422);
     }
 
     public function update(Request $request, string $id)
     {
-        $result = $this->scheduler->update($id, $this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->update($id, $data);
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
