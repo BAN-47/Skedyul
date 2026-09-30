@@ -40,7 +40,7 @@ class Schedule_Submission extends Model
 
     public function department()
     {
-        return $this->belongsTo(Department::class, 'schsub_dept_id', 'dept_id');
+        return $this->belongsTo(College::class, 'schsub_dept_id', 'college_id');
     }
 
     public function semester()
@@ -62,7 +62,7 @@ class Schedule_Submission extends Model
     public function schedules()
     {
         return Schedule::where('sch_sem_id', $this->schsub_sem_id)
-            ->whereHas('faculty', fn($q) => $q->where('fac_dept_id', $this->schsub_dept_id))
+            ->whereHas('faculty', fn($q) => $q->where('fac_college_id', $this->schsub_dept_id))
             ->get();
     }
 }

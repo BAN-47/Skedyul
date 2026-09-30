@@ -19,10 +19,15 @@ class Dean extends Model
 
     public $timestamps = false;
 
+    protected array $legacyAttributeAliases = [
+        'dean_prog_id' => 'dean_dept_id',
+    ];
+
     protected $fillable = [
         'dean_usr_id',
 
         // Department / Program
+        'dean_college_id',
         'dean_dept_id',
         'dean_prog_id',
 
@@ -71,18 +76,28 @@ class Dean extends Model
     public function department()
     {
         return $this->belongsTo(
-            Department::class,
-            'dean_dept_id',
-            'dept_id'
+            College::class,
+            'dean_college_id',
+            'college_id'
         );
     }
 
     public function program()
     {
         return $this->belongsTo(
-            Program::class,
-            'dean_prog_id',
-            'prog_id'
+            Departments::class,
+            'dean_dept_id',
+            'dept_id'
         );
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

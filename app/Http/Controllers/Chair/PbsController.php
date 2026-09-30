@@ -9,7 +9,8 @@ use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Semester;
-use App\Models\Subjects;
+use App\Models\Course;
+use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,7 @@ class PbsController extends Controller
 
         $chair = Dept_Chair::where('dc_usr_id', $user->usr_id)->first();
 
-        return $chair?->dc_prog_id;
+        return $chair?->dc_dept_id;
     }
 
     /**
@@ -93,7 +94,7 @@ class PbsController extends Controller
         // Year is already in the name (BSIS 1-A, BSIS IV-A) — no year-level filter.
         // Do not filter by sec_ay_id; null values would empty the dropdown.
         $sections = Section::query()
-            ->where('sec_prog_id', $progId)
+            ->where('sec_dept_id', $progId)
             ->orderBy('sec_name')
             ->get();
 
@@ -115,22 +116,20 @@ class PbsController extends Controller
             }
         }
 
-        $programs = DB::table('program')
-            ->where('prog_id', $progId)
+        $programs = Departments::where('dept_id', $progId)->get();
+
+        $subjects = Course::query()
+            ->where('course_is_active', true)
+            ->where('course_dept_id', $progId)
+            ->orderBy('course_code')
             ->get();
 
-        $subjects = Subjects::query()
-            ->where('subj_is_active', true)
-            ->where('subj_prog_id', $progId)
-            ->orderBy('subj_code')
-            ->get();
-
-        $prog = DB::table('program')->where('prog_id', $progId)->first();
+        $prog = $programs->first();
         $faculty = Faculty::query()
             ->where(function ($q) use ($progId, $prog) {
-                $q->where('fac_prog_id', $progId);
-                if ($prog?->prog_dept_id) {
-                    $q->orWhere('fac_dept_id', $prog->prog_dept_id);
+                $q->where('fac_dept_id', $progId);
+                if ($prog?->dept_college_id) {
+                    $q->orWhere('fac_college_id', $prog->dept_college_id);
                 }
             })
             ->orderBy('fac_last_name')
@@ -177,7 +176,7 @@ class PbsController extends Controller
     private function validated(Request $request): array
     {
         $data = $request->validate([
-            'subj_id'    => 'required|uuid|exists:subject,subj_id',
+            'subj_id'    => 'required|uuid|exists:course,course_id',
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
@@ -190,7 +189,7 @@ class PbsController extends Controller
         $progId = $this->chairProgramId();
         if ($progId) {
             $ownsSection = Section::where('sec_id', $data['sec_id'])
-                ->where('sec_prog_id', $progId)
+                ->where('sec_dept_id', $progId)
                 ->exists();
 
             if (!$ownsSection) {
@@ -220,7 +219,7 @@ class PbsController extends Controller
         $progId = $this->chairProgramId();
         if ($progId) {
             $schedule = Schedule::with('section')->find($id);
-            if ($schedule && $schedule->section && $schedule->section->sec_prog_id !== $progId) {
+            if ($schedule && $schedule->section && $schedule->section->sec_dept_id !== $progId) {
                 return response()->json([
                     'success' => false,
                     'message' => 'You can only delete schedules under your assigned program.',
@@ -246,7 +245,7 @@ class PbsController extends Controller
         $progId = $this->chairProgramId();
         if ($progId) {
             $owns = Section::where('sec_id', $sectionId)
-                ->where('sec_prog_id', $progId)
+                ->where('sec_dept_id', $progId)
                 ->exists();
             if (!$owns) {
                 return response()->json([

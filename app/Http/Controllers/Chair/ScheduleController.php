@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Section;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\Room;
 use App\Models\AcademicYear;
 use App\Models\Semester;
@@ -23,7 +23,7 @@ class ScheduleController extends Controller
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
         abort_if(!$deptChair, 403, 'Your account is not assigned as a department chair.');
-        return $deptChair->dc_dept_id;
+        return $deptChair->dc_college_id;
     }
 
     // Time-slot generator — 7:00 AM to 9:00 PM, hourly.
@@ -50,9 +50,9 @@ class ScheduleController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        $faculty  = Faculty::with('user')->where('fac_dept_id', $deptId)->get();
-        $subjects = Subjects::where('subj_dept_id', $deptId)->where('subj_is_active', true)->get();
-        $sections = Section::whereHas('program', fn ($q) => $q->where('prog_dept_id', $deptId))
+        $faculty  = Faculty::with('user')->where('fac_college_id', $deptId)->get();
+        $subjects = Course::where('course_college_id', $deptId)->where('course_is_active', true)->get();
+        $sections = Section::whereHas('program', fn ($q) => $q->where('dept_college_id', $deptId))
             ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))
             ->when($semester, fn ($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->get();
@@ -63,7 +63,7 @@ class ScheduleController extends Controller
             $schedules = Schedule::with(['faculty.user', 'subject', 'section', 'room'])
                 ->where('sch_sem_id', $semester->sem_id)
                 ->where('sch_is_active', true)
-                ->whereHas('faculty', fn ($q) => $q->where('fac_dept_id', $deptId))
+                ->whereHas('faculty', fn ($q) => $q->where('fac_college_id', $deptId))
                 ->get();
         }
 
@@ -94,7 +94,7 @@ class ScheduleController extends Controller
         abort_if(!$semester, 422, 'No active semester is set.');
 
         $faculty = Faculty::with('user')->findOrFail($data['fac_id']);
-        $subject = Subjects::findOrFail($data['subj_id']);
+        $subject = Course::findOrFail($data['subj_id']);
 
         // ---------- HARD CONFLICT CHECK (true time-overlap, not just exact match) ----------
         $overlapBase = fn ($q) => $q->where('sch_sem_id', $semester->sem_id)
@@ -126,8 +126,8 @@ class ScheduleController extends Controller
 
         $existingHours = Study_Load::where('sl_fac_id', $data['fac_id'])
             ->where('sl_sem_id', $semester->sem_id)
-            ->join('subject', 'subject.subj_id', '=', 'study_load.sl_subj_id')
-            ->sum(DB::raw('subject.subj_lecture_hours + subject.subj_lab_hours'));
+            ->join('course', 'course.course_id', '=', 'study_load.sl_course_id')
+            ->sum(DB::raw('course.course_lecture_hours + course.course_lab_hours'));
 
         $newTotal = $existingHours + $subjectHours;
 

@@ -16,10 +16,15 @@ class Faculty extends Model
     const CREATED_AT = 'fac_created_at';
     const UPDATED_AT = 'fac_updated_at';
 
+    protected array $legacyAttributeAliases = [
+        'fac_prog_id' => 'fac_dept_id',
+    ];
+
        protected $fillable = [
         'fac_usr_id',
 
         // Department / Program
+        'fac_college_id',
         'fac_dept_id',
         'fac_prog_id',
 
@@ -55,11 +60,11 @@ class Faculty extends Model
 
     public function department()
     {
-        return $this->belongsTo(Department::class, 'fac_dept_id', 'dept_id');
+        return $this->belongsTo(College::class, 'fac_college_id', 'college_id');
     }
     public function program()
     {
-        return $this->belongsTo(Program::class, 'fac_prog_id', 'prog_id');
+        return $this->belongsTo(Departments::class, 'fac_dept_id', 'dept_id');
     }
     public function workloads()
     {
@@ -85,5 +90,15 @@ class Faculty extends Model
             $this->fac_suffix,
         ]);
         return implode(' ', $parts);
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

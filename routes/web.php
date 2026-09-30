@@ -21,9 +21,7 @@ use App\Http\Controllers\Admin\AcademicYearController;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Section;
-use App\Models\Program;
 use App\Models\Schedule;
-use App\Models\Subjects;
 
 /*
 |--------------------------------------------------------------------------

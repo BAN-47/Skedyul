@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Section_Subject extends Model {
 
-    protected $table = 'section_subject';
+    protected $table = 'section_course';
     protected $primaryKey = 'ssub_id';
     public $incrementing = false;
     protected $keyType = 'string';

@@ -36,7 +36,7 @@ class ScheduleAssignmentService
                 $studyLoad = Study_Load::firstOrCreate(
                     [
                         'sl_fac_id'  => $data['fac_id'],
-                        'sl_subj_id' => $data['subj_id'],
+                        'sl_course_id' => $data['subj_id'],
                         'sl_sec_id'  => $data['sec_id'],
                         'sl_sem_id'  => $data['sem_id'],
                     ],
@@ -53,7 +53,7 @@ class ScheduleAssignmentService
                 $schedule = Schedule::create([
                     'sch_load_id'    => $studyLoad->sl_id,
                     'sch_fac_id'     => $data['fac_id'],
-                    'sch_subj_id'    => $data['subj_id'],
+                    'sch_course_id'  => $data['subj_id'],
                     'sch_sec_id'     => $data['sec_id'],
                     'sch_room_id'    => $data['room_id'],
                     'sch_sem_id'     => $data['sem_id'],
@@ -94,7 +94,7 @@ class ScheduleAssignmentService
 
         $schedule->update([
             'sch_fac_id'     => $data['fac_id'],
-            'sch_subj_id'    => $data['subj_id'],
+            'sch_course_id'  => $data['subj_id'],
             'sch_sec_id'     => $data['sec_id'],
             'sch_room_id'    => $data['room_id'],
             'sch_sem_id'     => $data['sem_id'],

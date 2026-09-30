@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
+use App\Models\College;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Study_Load;
-use App\Models\Subjects;
-use App\Models\Program;
+use App\Models\Course;
+use App\Models\Departments;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,11 +21,11 @@ class ChairSubjectController extends Controller {
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
-        $subjects = Subjects::with(['department', 'program'])
-            ->where('subj_is_active', true)
+        $subjects = Course::with(['department', 'program'])
+            ->where('course_is_active', true)
             ->get();
 
-        $subjectIds = $subjects->pluck('subj_id');
+        $subjectIds = $subjects->pluck('course_id');
 
         /*
          * "Assigned" now means a Study_Load exists for the subject (faculty
@@ -34,12 +34,12 @@ class ChairSubjectController extends Controller {
          * the day/time/room now happens on PBS, not here.
          */
         $assignedLoads = Study_Load::with('faculty.user')
-            ->whereIn('sl_subj_id', $subjectIds)
+            ->whereIn('sl_course_id', $subjectIds)
             ->get()
-            ->groupBy('sl_subj_id');
+            ->groupBy('sl_course_id');
 
         $subjects = $subjects->map(function ($subject) use ($assignedLoads) {
-            $load = $assignedLoads->get($subject->subj_id)?->first();
+            $load = $assignedLoads->get($subject->course_id)?->first();
 
             $subject->assignedFaculty = $load && $load->faculty
                 ? ($load->faculty->user->usr_name ?? $load->faculty->full_name ?? 'Assigned')
@@ -48,8 +48,8 @@ class ChairSubjectController extends Controller {
             return $subject;
         });
 
-        $departments = Department::orderBy('dept_name')->get();
-        $programs = Program::orderBy('prog_name')->get();
+        $departments = College::orderBy('college_name')->get();
+        $programs = Departments::orderBy('dept_name')->get();
         $section = Section::orderBy('sec_name')->get();
         // Join to academic_year so the dropdown can show "2026-2027 1st Sem"
         // instead of just "First Semester" with no year context.
@@ -76,14 +76,14 @@ class ChairSubjectController extends Controller {
         // accidentally assign a subject to faculty from another department.
         $faculty = collect();
         if ($deptChair) {
-            $facultyRecords = Faculty::where('fac_dept_id', $deptChair->dc_dept_id)
+            $facultyRecords = Faculty::where('fac_college_id', $deptChair->dc_college_id)
                 ->orderBy('fac_first_name')
                 ->get();
 
             $facultyIds = $facultyRecords->pluck('fac_id');
 
             $studyLoads = Study_Load::whereIn('sl_fac_id', $facultyIds)->get()->groupBy('sl_fac_id');
-            $subjectsById = $subjects->keyBy('subj_id');
+            $subjectsById = $subjects->keyBy('course_id');
 
             $faculty = $facultyRecords->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
                 $totalUnits = $studyLoads->get($f->fac_id, collect())->sum(function ($sl) use ($subjectsById) {
@@ -104,16 +104,16 @@ class ChairSubjectController extends Controller {
 
     public function store(Request $request) {
         $validated = $request->validate([
-            'subj_dept_id' => 'required|exists:department,dept_id',
-            'subj_prog_id' => 'required|exists:program,prog_id',
-            'subj_code' => 'required|string|unique:subject,subj_code',
+              'subj_dept_id' => 'required|exists:college,college_id',
+              'subj_prog_id' => 'required|exists:department,dept_id',
+              'subj_code' => 'required|string|unique:course,course_code',
             'subj_name' => 'required|string',
             'subj_lecture_hours' => 'required|numeric|min:0',
             'subj_lab_hours' => 'required|numeric|min:0',
         ]);
 
         try {
-            Subjects::create($validated);
+            Course::create($validated);
         } catch (\Throwable $e) {
             return $this->redirectWithDbError($e, 'Unable to add the subject right now. Please try again.');
         }
@@ -123,14 +123,14 @@ class ChairSubjectController extends Controller {
     }
 
     public function update(Request $request, string $id) {
-        $subject = Subjects::findOrFail($id);
+        $subject = Course::findOrFail($id);
 
         $validated = $request->validate([
-            'subj_dept_id' => 'required|exists:department,dept_id',
+            'subj_dept_id' => 'required|exists:college,college_id',
             'subj_code' => [
                 'required',
                 'string',
-                Rule::unique('subject', 'subj_code')->ignore($subject->subj_id, 'subj_id'),
+                    Rule::unique('course', 'course_code')->ignore($subject->course_id, 'course_id'),
             ],
             'subj_name' => 'required|string',
             'subj_lecture_hours' => 'required|numeric|min:0',
@@ -150,7 +150,7 @@ class ChairSubjectController extends Controller {
 
     public function destroy(string $id)
     {
-        $subject = Subjects::findOrFail($id);
+        $subject = Course::findOrFail($id);
 
         try {
             $subject->update(['subj_is_active' => false]);

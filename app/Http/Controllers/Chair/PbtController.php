@@ -7,7 +7,8 @@ use App\Models\Dean;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Study_Load;
-use App\Models\Subjects;
+use App\Models\Course;
+use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +38,7 @@ class PbtController extends Controller
 
         return view('chair.pbt', [
             'schedules'        => $schedules,
-            'subjects'         => Subjects::where('subj_is_active', true)->orderBy('subj_code')->get(),
+            'subjects'         => Course::where('course_is_active', true)->orderBy('course_code')->get(),
             'facultyFullTime'  => Faculty::where('fac_employment_type', 'full_time')->orderBy('fac_last_name')->get(),
             'facultyPartTime'  => Faculty::where('fac_employment_type', 'part_time')->orderBy('fac_last_name')->get(),
             // schedule.sch_fac_id has a foreign key to faculty(fac_id) only —
@@ -47,7 +48,7 @@ class PbtController extends Controller
             // appear, since there'd be no valid fac_id to schedule against.
             'deans'            => Faculty::whereIn('fac_usr_id', Dean::pluck('dean_usr_id'))->orderBy('fac_last_name')->get(),
             'sections'         => DB::table('section')->orderBy('sec_name')->get(),
-            'programs'         => DB::table('program')->orderBy('prog_name')->get(),
+            'programs'         => Departments::orderBy('dept_name')->get(),
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->orderByDesc('s.sem_start_date')
@@ -115,7 +116,7 @@ class PbtController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'subj_id'    => 'required|uuid|exists:subject,subj_id',
+            'subj_id'    => 'required|uuid|exists:course,course_id',
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
             'sem_id'     => 'required|uuid|exists:semester,sem_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',

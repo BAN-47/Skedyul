@@ -14,10 +14,15 @@ class Dept_Chair extends Model
     protected $keyType = 'string';
     public $timestamps = false; // only dc_assigned_at exists
 
+    protected array $legacyAttributeAliases = [
+        'dc_prog_id' => 'dc_dept_id',
+    ];
+
     protected $fillable = [
         'dc_usr_id',
 
         // Department / Program
+        'dc_college_id',
         'dc_dept_id',
         'dc_prog_id',
 
@@ -48,17 +53,27 @@ class Dept_Chair extends Model
 
     public function department()
     {
-        return $this->belongsTo(Department::class, 'dc_dept_id', 'dept_id');
+        return $this->belongsTo(College::class, 'dc_college_id', 'college_id');
     }
 
     public function program()
     {
-        return $this->belongsTo(Program::class, 'dc_prog_id', 'prog_id');
+        return $this->belongsTo(Departments::class, 'dc_dept_id', 'dept_id');
     }
 
     public function getFullNameAttribute(): string
     {
         $parts = array_filter([$this->dc_first_name, $this->dc_middle_name, $this->dc_last_name, $this->dc_suffix]);
         return implode(' ', $parts);
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

@@ -13,6 +13,10 @@ class Study_Load extends Model
     protected $keyType    = 'string';
     public    $timestamps = false;
 
+    protected array $legacyAttributeAliases = [
+        'sl_subj_id' => 'sl_course_id',
+    ];
+
     protected static function boot()
     {
         parent::boot();
@@ -22,6 +26,7 @@ class Study_Load extends Model
     protected $fillable = [
         'sl_id',
         'sl_fac_id',
+        'sl_course_id',
         'sl_subj_id',
         'sl_sec_id',
         'sl_sem_id',
@@ -42,7 +47,7 @@ class Study_Load extends Model
 
     public function subject()
     {
-        return $this->belongsTo(Subjects::class, 'sl_subj_id', 'subj_id');
+        return $this->belongsTo(Course::class, 'sl_course_id', 'course_id');
     }
 
     public function section()
@@ -63,5 +68,15 @@ class Study_Load extends Model
     public function schedule()
     {
         return $this->hasOne(Schedule::class, 'sch_load_id', 'sl_id');
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

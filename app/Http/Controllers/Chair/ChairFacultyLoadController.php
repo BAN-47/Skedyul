@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
-use App\Models\Department;
-use App\Models\Program;
+use App\Models\College;
+use App\Models\Departments;
 use App\Models\Faculty;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\Section;
 use App\Models\Study_Load;
 use App\Models\Semester;
@@ -35,22 +35,22 @@ class ChairFacultyLoadController extends Controller
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
 
-        $department   = Department::find($deptChair->dc_dept_id);
-        $program      = Program::find($deptChair->dc_prog_id);
+        $department   = College::find($deptChair->dc_college_id);
+        $program      = Departments::find($deptChair->dc_prog_id);
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::where('fac_dept_id', $deptChair->dc_dept_id)
-            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
+        $faculty = Faculty::where('fac_college_id', $deptChair->dc_college_id)
+            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('fac_dept_id', $deptChair->dc_prog_id))
             ->orderBy('fac_first_name')
             ->get();
 
         $facultyIds = $faculty->pluck('fac_id');
 
-        $subjects = Subjects::where('subj_dept_id', $deptChair->dc_dept_id)
-            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
-            ->where('subj_is_active', true)
-            ->orderBy('subj_code')
+        $subjects = Course::where('course_college_id', $deptChair->dc_college_id)
+            ->when($deptChair->dc_prog_id, fn ($q) => $q->where('course_dept_id', $deptChair->dc_prog_id))
+            ->where('course_is_active', true)
+            ->orderBy('course_code')
             ->get();
 
         $subjectsById = $subjects->keyBy('subj_id');
@@ -64,13 +64,13 @@ class ChairFacultyLoadController extends Controller
             $loads = $studyLoads->get($f->fac_id, collect());
 
             $totalUnits = $loads->sum(function ($sl) use ($subjectsById) {
-                $subj = $subjectsById->get($sl->sl_subj_id);
+                $subj = $subjectsById->get($sl->sl_course_id);
                 return $subj
-                    ? ((float) $subj->subj_lecture_hours + (float) $subj->subj_lab_hours)
+                    ? ((float) $subj->course_lecture_hours + (float) $subj->course_lab_hours)
                     : 0;
             });
 
-            $subjectCodes = $loads->map(fn ($sl) => optional($subjectsById->get($sl->sl_subj_id))->subj_code)
+            $subjectCodes = $loads->map(fn ($sl) => optional($subjectsById->get($sl->sl_course_id))->course_code)
                 ->filter()
                 ->implode(', ');
 
@@ -123,7 +123,7 @@ class ChairFacultyLoadController extends Controller
         });
 
         // Sections for this chair's program only (no AY/sem filter — names carry year)
-        $sections = Section::where('sec_prog_id', $deptChair->dc_prog_id)
+        $sections = Section::where('sec_dept_id', $deptChair->dc_dept_id)
             ->orderBy('sec_name')
             ->get();
 
@@ -148,16 +148,16 @@ class ChairFacultyLoadController extends Controller
     public function assign(Request $request)
     {
         $data = $request->validate([
-            'subj_id' => 'required|uuid|exists:subject,subj_id',
+                'subj_id' => 'required|uuid|exists:course,course_id',
             'fac_id'  => 'required|uuid|exists:faculty,fac_id',
             'sec_id'  => 'required|uuid|exists:section,sec_id',
             'sem_id'  => 'required|uuid|exists:semester,sem_id',
         ]);
 
         $faculty = Faculty::findOrFail($data['fac_id']);
-        $subject = Subjects::findOrFail($data['subj_id']);
+        $subject = Course::findOrFail($data['subj_id']);
 
-        $subjectUnits = (float) $subject->subj_lecture_hours + (float) $subject->subj_lab_hours;
+        $subjectUnits = (float) $subject->course_lecture_hours + (float) $subject->course_lab_hours;
         if ($subjectUnits <= 0) {
             $subjectUnits = 3; // fallback if hours not set
         }
@@ -170,9 +170,9 @@ class ChairFacultyLoadController extends Controller
             ->where('sl_sem_id', $data['sem_id'])
             ->get()
             ->sum(function ($sl) {
-                $s = Subjects::find($sl->sl_subj_id);
+                $s = Course::find($sl->sl_course_id);
                 return $s
-                    ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                    ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
                     : 0;
             });
 
@@ -189,7 +189,7 @@ class ChairFacultyLoadController extends Controller
         // Already assigned this exact subject+section+semester?
         $exists = Study_Load::where([
             'sl_fac_id'  => $data['fac_id'],
-            'sl_subj_id' => $data['subj_id'],
+            'sl_course_id' => $data['subj_id'],
             'sl_sec_id'  => $data['sec_id'],
             'sl_sem_id'  => $data['sem_id'],
         ])->exists();
@@ -206,7 +206,7 @@ class ChairFacultyLoadController extends Controller
                 $load = Study_Load::create([
                     'sl_id'          => (string) Str::uuid(),
                     'sl_fac_id'      => $data['fac_id'],
-                    'sl_subj_id'     => $data['subj_id'],
+                    'sl_course_id'   => $data['subj_id'],
                     'sl_sec_id'      => $data['sec_id'],
                     'sl_sem_id'      => $data['sem_id'],
                     'sl_assigned_by' => Auth::id(),
@@ -218,9 +218,9 @@ class ChairFacultyLoadController extends Controller
                     ->where('sl_sem_id', $data['sem_id'])
                     ->get()
                     ->sum(function ($sl) {
-                        $s = Subjects::find($sl->sl_subj_id);
+                        $s = Course::find($sl->sl_course_id);
                         return $s
-                            ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                            ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
                             : 0;
                     });
 
@@ -271,9 +271,9 @@ class ChairFacultyLoadController extends Controller
                 ->where('sl_sem_id', $semId)
                 ->get()
                 ->sum(function ($sl) {
-                    $s = Subjects::find($sl->sl_subj_id);
+                    $s = Course::find($sl->sl_course_id);
                     return $s
-                        ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)
+                        ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
                         : 0;
                 });
 

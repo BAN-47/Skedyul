@@ -14,16 +14,39 @@ use Illuminate\Database\Eloquent\Model;
 
 class Subject extends Model
 {
-    protected $table = 'subject';
-    protected $primaryKey = 'subj_id';
+    protected $table = 'course';
+    protected $primaryKey = 'course_id';
     public $incrementing = false;
     protected $keyType = 'string';
     public $timestamps = false;
 
+    protected array $legacyAttributeAliases = [
+        'subj_id' => 'course_id',
+        'subj_dept_id' => 'course_college_id',
+        'subj_prog_id' => 'course_dept_id',
+        'subj_code' => 'course_code',
+        'subj_name' => 'course_name',
+        'subj_lecture_hours' => 'course_lecture_hours',
+        'subj_lab_hours' => 'course_lab_hours',
+        'subj_is_active' => 'course_is_active',
+    ];
+
     protected $fillable = [
+        'course_college_id', 'course_dept_id', 'course_code', 'course_name',
+        'course_lecture_hours', 'course_lab_hours', 'course_is_active',
         'subj_dept_id', 'subj_prog_id', 'subj_code', 'subj_name',
         'subj_lecture_hours', 'subj_lab_hours', 'subj_is_active',
     ];
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
+    }
 }
 
 class Section extends Model

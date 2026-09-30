@@ -49,7 +49,7 @@ class ScheduleReportsController extends Controller
     {
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $facultyRecords = Faculty::where('fac_dept_id', $deptId)->get();
+        $facultyRecords = Faculty::where('fac_college_id', $deptId)->get();
         $facultyIds = $facultyRecords->pluck('fac_id');
 
         $workloadTotals = Workload::whereIn('wl_fac_id', $facultyIds)
@@ -69,7 +69,7 @@ class ScheduleReportsController extends Controller
             ];
         });
 
-        $sections = Section::whereHas('program', fn($q) => $q->where('prog_dept_id', $deptId))->get();
+        $sections = Section::whereHas('program', fn($q) => $q->where('dept_college_id', $deptId))->get();
 
         return response()->json([
             'faculty'  => $faculty,

@@ -7,6 +7,8 @@ use App\Models\User;
 use App\Models\Faculty;
 use App\Models\Dean;
 use App\Models\Dept_Chair;
+use App\Models\College;
+use App\Models\Departments;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -44,13 +46,9 @@ class UserController extends Controller
             ->orderBy('usr_middle_name', 'asc')
             ->get();
 
-        $departments = DB::table('department')
-            ->orderBy('dept_name')
-            ->get();
+        $departments = College::orderBy('college_name')->get();
 
-        $programs = DB::table('program')
-            ->orderBy('prog_name')
-            ->get();
+        $programs = Departments::orderBy('dept_name')->get();
 
         return view('admin.user_accounts', compact(
             'users',
@@ -83,13 +81,13 @@ class UserController extends Controller
             $rules['role_phone_number'] = ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'];
             // Email is only USER.usr_email — no fac_gmail / dean_gmail / dc_gmail
             $rules['role_address'] = 'nullable|string|max:255';
-            $rules['prog_id'] = 'required|uuid|exists:program,prog_id';
+            $rules['prog_id'] = 'required|uuid|exists:department,dept_id';
         }
 
         if (in_array($role, ['faculty', 'department_chair'])) {
-            $rules['dept_id'] = 'required|uuid|exists:department,dept_id';
+            $rules['dept_id'] = 'required|uuid|exists:college,college_id';
         } elseif ($role === 'dean') {
-            $rules['dept_id'] = 'nullable|uuid|exists:department,dept_id';
+            $rules['dept_id'] = 'nullable|uuid|exists:college,college_id';
         }
 
         if ($role === 'faculty') {
@@ -133,8 +131,8 @@ class UserController extends Controller
                 Faculty::updateOrCreate(
                     ['fac_usr_id' => $user->usr_id],
                     [
-                        'fac_dept_id' => $request->dept_id,
-                        'fac_prog_id' => $request->prog_id,
+                        'fac_college_id' => $request->dept_id,
+                        'fac_dept_id' => $request->prog_id,
                         'fac_first_name' => $data['usr_first_name'],
                         'fac_middle_name' => $data['usr_middle_name'] ?? null,
                         'fac_last_name' => $data['usr_last_name'],
@@ -157,8 +155,8 @@ class UserController extends Controller
                 Dean::updateOrCreate(
                     ['dean_usr_id' => $user->usr_id],
                     [
-                        'dean_dept_id' => $request->dept_id,
-                        'dean_prog_id' => $request->prog_id,
+                        'dean_college_id' => $request->dept_id,
+                        'dean_dept_id' => $request->prog_id,
                         'dean_first_name' => $data['usr_first_name'],
                         'dean_middle_name' => $data['usr_middle_name'] ?? null,
                         'dean_last_name' => $data['usr_last_name'],
@@ -179,8 +177,8 @@ class UserController extends Controller
                 Dept_Chair::updateOrCreate(
                     ['dc_usr_id' => $user->usr_id],
                     [
-                        'dc_dept_id' => $request->dept_id,
-                        'dc_prog_id' => $request->prog_id,
+                        'dc_college_id' => $request->dept_id,
+                        'dc_dept_id' => $request->prog_id,
                         'dc_first_name' => $data['usr_first_name'],
                         'dc_middle_name' => $data['usr_middle_name'] ?? null,
                         'dc_last_name' => $data['usr_last_name'],
@@ -243,11 +241,10 @@ class UserController extends Controller
 
         // One department chair per program (e.g. only one BSIS chair)
         if (($data['usr_role'] ?? '') === 'department_chair' && $request->filled('prog_id')) {
-            $existingChair = Dept_Chair::where('dc_prog_id', $request->prog_id)->first();
+            $existingChair = Dept_Chair::where('dc_dept_id', $request->prog_id)->first();
             if ($existingChair) {
-                $progLabel = DB::table('program')
-                    ->where('prog_id', $request->prog_id)
-                    ->value('prog_code')
+                $progLabel = Departments::where('dept_id', $request->prog_id)
+                    ->value('dept_code')
                     ?? 'this program';
 
                 return redirect()->route('admin.users')
@@ -337,8 +334,8 @@ class UserController extends Controller
                 'usr_nationality' => $profile->fac_nationality ?? null,
                 'role_phone_number' => $profile->fac_phone_number ?? null,
                 'role_address' => $profile->fac_address ?? null,
-                'dept_id' => $profile->fac_dept_id ?? null,
-                'prog_id' => $profile->fac_prog_id ?? null,
+                'dept_id' => $profile->fac_college_id ?? null,
+                'prog_id' => $profile->fac_dept_id ?? null,
                 'employment_type' => $profile->fac_employment_type ?? null,
                 'usr_bio' => $profile->fac_bio ?? null,
             ],
@@ -356,8 +353,8 @@ class UserController extends Controller
                 'usr_nationality' => $profile->dean_nationality ?? null,
                 'role_phone_number' => $profile->dean_phone_number ?? null,
                 'role_address' => $profile->dean_address ?? null,
-                'dept_id' => $profile->dean_dept_id ?? null,
-                'prog_id' => $profile->dean_prog_id ?? null,
+                'dept_id' => $profile->dean_college_id ?? null,
+                'prog_id' => $profile->dean_dept_id ?? null,
                 'employment_type' => null,
                 'usr_bio' => $profile->dean_bio ?? null,
             ],
@@ -375,8 +372,8 @@ class UserController extends Controller
                 'usr_nationality' => $profile->dc_nationality ?? null,
                 'role_phone_number' => $profile->dc_phone_number ?? null,
                 'role_address' => $profile->dc_address ?? null,
-                'dept_id' => $profile->dc_dept_id ?? null,
-                'prog_id' => $profile->dc_prog_id ?? null,
+                'dept_id' => $profile->dc_college_id ?? null,
+                'prog_id' => $profile->dc_dept_id ?? null,
                 'employment_type' => null,
                 'usr_bio' => $profile->dc_bio ?? null,
             ],
@@ -561,9 +558,9 @@ class UserController extends Controller
         if (str_contains($detail, 'phone')) {
             return 'This phone number is already in use.';
         }
-        // UNIQUE on department_chair.dc_prog_id → one chair per program
+        // UNIQUE on department_chair.dc_dept_id → one chair per department
         if (
-            str_contains($detail, 'dc_prog_id')
+            str_contains($detail, 'dc_dept_id')
             || str_contains($detail, 'department_chair')
             || (str_contains($detail, 'prog') && str_contains($detail, 'chair'))
         ) {

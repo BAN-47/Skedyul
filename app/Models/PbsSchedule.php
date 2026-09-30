@@ -38,9 +38,9 @@ class PbsSchedule extends Model
     public function subject()
     {
         return $this->belongsTo(
-            Subject::class,
+            Course::class,
             'pbs_subj_id',
-            'subj_id'
+            'course_id'
         );
     }
 

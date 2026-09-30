@@ -7,9 +7,8 @@ use App\Models\Schedule_Submission;
 use App\Models\Schedule;
 use App\Models\Faculty;
 use App\Models\Semester;
-use App\Models\Department;
 use App\Models\Dean;
-use App\Models\DepartmentChair;
+use App\Models\Dept_Chair;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -32,13 +31,13 @@ class PendingApprovalsController extends Controller
         // Deans only see their assigned department
         if ($user->usr_role === 'dean') {
             $dean = Dean::where('dean_usr_id', $user->usr_id)->first();
-            return $dean?->dean_dept_id;
+            return $dean?->dean_college_id;
         }
 
         // Department Chairs only see their assigned department
         if ($user->usr_role === 'department_chair') {
-            $chair = DepartmentChair::where('dc_usr_id', $user->usr_id)->first();
-            return $chair?->dc_dept_id;
+            $chair = Dept_Chair::where('dc_usr_id', $user->usr_id)->first();
+            return $chair?->dc_college_id;
         }
 
         // Faculty and other roles have no access here
@@ -68,11 +67,11 @@ class PendingApprovalsController extends Controller
             ->orderBy('schsub_submitted_at', 'desc')
             ->get()
             ->map(function ($sub) {
-                $sub->faculty_count = Faculty::where('fac_dept_id', $sub->schsub_dept_id)->count();
+                $sub->faculty_count = Faculty::where('fac_college_id', $sub->schsub_dept_id)->count();
 
                 $sub->conflict_count = Schedule::where('sch_sem_id', $sub->schsub_sem_id)
                     ->whereHas('faculty', fn($q) =>
-                        $q->where('fac_dept_id', $sub->schsub_dept_id)
+                        $q->where('fac_college_id', $sub->schsub_dept_id)
                     )
                     ->where('sch_is_active', true)
                     ->whereExists(function ($q) {
@@ -129,7 +128,7 @@ class PendingApprovalsController extends Controller
             ])
             ->where('sch_sem_id', $submission->schsub_sem_id)
             ->whereHas('faculty', fn($q) =>
-                $q->where('fac_dept_id', $submission->schsub_dept_id)
+                $q->where('fac_college_id', $submission->schsub_dept_id)
             )
             ->where('sch_is_active', true)
             ->orderBy('sch_day')
@@ -177,7 +176,7 @@ class PendingApprovalsController extends Controller
 
         $hasConflicts = Schedule::where('sch_sem_id', $submission->schsub_sem_id)
             ->whereHas('faculty', fn($q) =>
-                $q->where('fac_dept_id', $submission->schsub_dept_id)
+                $q->where('fac_college_id', $submission->schsub_dept_id)
             )
             ->where('sch_is_active', true)
             ->whereExists(function ($q) {

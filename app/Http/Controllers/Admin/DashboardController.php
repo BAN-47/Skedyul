@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Section;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\Room;
 use App\Models\Notification;
 use App\Models\AcademicYear;
@@ -63,7 +63,7 @@ class DashboardController extends Controller
             ->values();
 
         // ---------- SUBJECTS ----------
-        $subject = Subjects::with(['department', 'program'])->get();
+        $subject = Course::with(['department', 'program'])->get();
         $subjectsOffered    = $subject->count();
         $scheduleConflicts  = $subject->where('subj_is_active', false)->count();
 

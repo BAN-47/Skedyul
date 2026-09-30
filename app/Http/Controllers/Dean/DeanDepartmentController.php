@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
-use App\Models\Department;
-use App\Models\Program;
+use App\Models\College;
+use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\Workload;
 use App\Models\Section;
@@ -36,7 +36,7 @@ class DeanDepartmentController extends Controller
         $deanAssignment = Dean::where('dean_usr_id', auth()->id())->first();
 
         $departments = $deanAssignment
-            ? Department::where('dept_id', $deanAssignment->dean_dept_id)->get()
+            ? College::where('college_id', $deanAssignment->dean_college_id)->get()
             : collect(); // Dean has no department assigned yet — show nothing rather than everything
 
         // Latest workload (total hours) per faculty for the active semester.
@@ -51,7 +51,7 @@ class DeanDepartmentController extends Controller
         $deptData = [];
 
         foreach ($departments as $index => $dept) {
-            $facultyList = Faculty::where('fac_dept_id', $dept->dept_id)->get();
+            $facultyList = Faculty::where('fac_college_id', $dept->college_id)->get();
 
             $facultyCount = $facultyList->count();
 
@@ -69,19 +69,19 @@ class DeanDepartmentController extends Controller
             // A faculty member "belongs" to whichever program(s) they're
             // currently assigned subjects for this semester (via Study_Load),
             // since Faculty itself is only tagged at the Department level.
-            $programs = Program::where('prog_dept_id', $dept->dept_id)->orderBy('prog_code')->get();
+            $programs = Departments::where('dept_college_id', $dept->college_id)->orderBy('dept_code')->get();
 
             $programsData = [];
 
             foreach ($programs as $progIndex => $prog) {
-                $facultyIds = Study_Load::whereHas('subject', fn($q) => $q->where('subj_prog_id', $prog->prog_id))
+                $facultyIds = Study_Load::whereHas('subject', fn($q) => $q->where('course_dept_id', $prog->dept_id))
                     ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
                     ->pluck('sl_fac_id')
                     ->unique();
 
                 // Faculty statically assigned to this program (fac_prog_id), even
                 // with no study_load record yet this semester
-                $staticFacultyIds = Faculty::where('fac_prog_id', $prog->prog_id)->pluck('fac_id');
+                $staticFacultyIds = Faculty::where('fac_dept_id', $prog->dept_id)->pluck('fac_id');
 
                 $facultyIds = $facultyIds->merge($staticFacultyIds)->unique();
 
@@ -110,7 +110,7 @@ class DeanDepartmentController extends Controller
                     : 0;
                 $progLoadPct = min(100, round(($progAvgLoad / self::MAX_LOAD_HOURS) * 100));
 
-                $progSectionCount = Section::where('sec_prog_id', $prog->prog_id)
+                $progSectionCount = Section::where('sec_dept_id', $prog->dept_id)
                     ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
                     ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                     ->count();
@@ -130,12 +130,12 @@ class DeanDepartmentController extends Controller
                 ];
             }
 
-            $sectionCount = Section::whereHas('program', fn($q) => $q->where('prog_dept_id', $dept->dept_id))
+            $sectionCount = Section::whereHas('program', fn($q) => $q->where('dept_college_id', $dept->college_id))
                 ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
                 ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
                 ->count();
 
-            $submission = Schedule_Submission::where('schsub_dept_id', $dept->dept_id)
+            $submission = Schedule_Submission::where('schsub_dept_id', $dept->college_id)
                 ->when($semester, fn($q) => $q->where('schsub_sem_id', $semester->sem_id))
                 ->orderByDesc('schsub_submitted_at')
                 ->first();
@@ -168,7 +168,7 @@ class DeanDepartmentController extends Controller
      */
     private function resolveProgramChairName(string $progId): string
     {
-        $chairRecord = Dept_Chair::where('dc_prog_id', $progId)->first();
+        $chairRecord = Dept_Chair::where('dc_dept_id', $progId)->first();
         if (!$chairRecord) {
             return '—';
         }

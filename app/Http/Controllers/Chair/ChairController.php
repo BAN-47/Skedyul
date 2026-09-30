@@ -8,7 +8,7 @@ use App\Models\Schedule;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Section;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Study_Load;
@@ -32,7 +32,7 @@ class ChairController extends Controller
             abort(403, 'Your account is not assigned as a department chair.');
         }
 
-        $deptId = $deptChair->dc_dept_id;
+        $deptId = $deptChair->dc_college_id;
 
         // ---------- ACADEMIC CONTEXT ----------
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
@@ -44,8 +44,8 @@ class ChairController extends Controller
         // program, not the whole department (same pattern used everywhere
         // else a chair is program-specific).
         $faculty = Faculty::with('user')
-            ->where('fac_dept_id', $deptId)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_prog_id', $deptChair->dc_prog_id))
+            ->where('fac_college_id', $deptId)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_dept_id', $deptChair->dc_prog_id))
             ->get();
 
         $totalFaculty = $faculty->count();
@@ -82,8 +82,8 @@ class ChairController extends Controller
         // Also narrowed to the chair's specific program when they have one,
         // same reasoning as $faculty above.
         $section = Section::with('program')
-            ->whereHas('program', fn($q) => $q->where('prog_dept_id', $deptId))
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('sec_prog_id', $deptChair->dc_prog_id))
+            ->whereHas('program', fn($q) => $q->where('dept_college_id', $deptId))
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('sec_dept_id', $deptChair->dc_prog_id))
             ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
             ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->get();
@@ -92,16 +92,16 @@ class ChairController extends Controller
 
         // ---------- SUBJECTS FOR THIS DEPARTMENT ----------
         // Same fix again: subj_prog_id narrows this to the chair's program.
-        $subject = Subjects::where('subj_dept_id', $deptId)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
+        $subject = Course::where('course_college_id', $deptId)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('course_dept_id', $deptChair->dc_prog_id))
             ->get();
         $totalSubjects = $subject->count();
 
         $plottedSubjIds = $semester
             ? Study_Load::where('sl_sem_id', $semester->sem_id)
-            ->whereIn('sl_subj_id', $subject->pluck('subj_id'))
+            ->whereIn('sl_course_id', $subject->pluck('course_id'))
             ->distinct()
-            ->pluck('sl_subj_id')
+            ->pluck('sl_course_id')
             : collect();
 
         $subjectsPlotted = $plottedSubjIds->count();
