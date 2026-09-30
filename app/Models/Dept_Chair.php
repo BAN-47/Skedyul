@@ -34,7 +34,6 @@ class Dept_Chair extends Model
 
         // Contact Information
         'dc_phone_number',
-        'dc_gmail',
         'dc_address',
 
         // Profile

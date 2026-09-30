@@ -362,18 +362,25 @@
             Role Details
           </div>
 
-          <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label class="field-label">Phone Number</label>
-              <input name="role_phone_number"
-                placeholder="0912 345 6789" class="field-input">
+          <div class="mb-3">
+            <label class="field-label">Phone Number</label>
+            <div class="flex gap-2">
+              <select id="add-phone-cc" class="field-input w-[120px] shrink-0" onchange="syncPhoneField('add')">
+                <option value="+63" selected>PH +63</option>
+                <option value="+1">US +1</option>
+                <option value="+44">UK +44</option>
+                <option value="+81">JP +81</option>
+                <option value="+82">KR +82</option>
+                <option value="+65">SG +65</option>
+                <option value="+60">MY +60</option>
+                <option value="+62">ID +62</option>
+              </select>
+              <input id="add-phone-local" type="tel" inputmode="numeric" maxlength="10"
+                placeholder="9123456789" class="field-input flex-1"
+                oninput="onPhoneLocalInput(this, 'add')">
             </div>
-
-            <div>
-              <label class="field-label">Gmail</label>
-              <input name="role_gmail" type="email"
-                placeholder="name@gmail.com" class="field-input">
-            </div>
+            <p class="text-[11px] text-slate-400 mt-1">Country code replaces the leading 0. Enter up to 10 digits (e.g. 9123456789).</p>
+            <input type="hidden" name="role_phone_number" id="add-phone-full" value="">
           </div>
 
           <div class="grid grid-cols-2 gap-3 mb-3">
@@ -597,18 +604,25 @@
             Role Details
           </div>
 
-          <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label class="field-label">Phone Number</label>
-              <input id="edit-phone"
-                name="role_phone_number" class="field-input">
+          <div class="mb-3">
+            <label class="field-label">Phone Number</label>
+            <div class="flex gap-2">
+              <select id="edit-phone-cc" class="field-input w-[120px] shrink-0" onchange="syncPhoneField('edit')">
+                <option value="+63" selected>PH +63</option>
+                <option value="+1">US +1</option>
+                <option value="+44">UK +44</option>
+                <option value="+81">JP +81</option>
+                <option value="+82">KR +82</option>
+                <option value="+65">SG +65</option>
+                <option value="+60">MY +60</option>
+                <option value="+62">ID +62</option>
+              </select>
+              <input id="edit-phone-local" type="tel" inputmode="numeric" maxlength="10"
+                placeholder="9123456789" class="field-input flex-1"
+                oninput="onPhoneLocalInput(this, 'edit')">
             </div>
-
-            <div>
-              <label class="field-label">Gmail</label>
-              <input id="edit-gmail"
-                name="role_gmail" type="email" class="field-input">
-            </div>
+            <p class="text-[11px] text-slate-400 mt-1">Country code replaces the leading 0. Enter up to 10 digits (e.g. 9123456789).</p>
+            <input type="hidden" name="role_phone_number" id="edit-phone-full" value="">
           </div>
 
           <div class="grid grid-cols-2 gap-3 mb-3">
@@ -892,6 +906,74 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
+
+    // ── Phone: country code + up to 10 local digits ───────────────────────
+    function onPhoneLocalInput(el, which) {
+      // digits only, max 10; drop a single leading 0 (0 → country code)
+      let v = (el.value || '').replace(/\D/g, '');
+      if (v.startsWith('0')) v = v.replace(/^0+/, '');
+      if (v.length > 10) v = v.slice(0, 10);
+      el.value = v;
+      syncPhoneField(which);
+    }
+
+    function syncPhoneField(which) {
+      const cc = document.getElementById(which + '-phone-cc');
+      const local = document.getElementById(which + '-phone-local');
+      const full = document.getElementById(which + '-phone-full');
+      if (!cc || !local || !full) return;
+      const digits = (local.value || '').replace(/\D/g, '').slice(0, 10);
+      full.value = digits ? (cc.value + digits) : '';
+    }
+
+    function setPhoneFromStored(which, stored) {
+      const ccEl = document.getElementById(which + '-phone-cc');
+      const localEl = document.getElementById(which + '-phone-local');
+      const fullEl = document.getElementById(which + '-phone-full');
+      if (!ccEl || !localEl || !fullEl) return;
+
+      stored = (stored || '').trim();
+      let cc = '+63';
+      let local = '';
+
+      if (stored.startsWith('+')) {
+        // Match longest known country code from the select options
+        const codes = Array.from(ccEl.options).map(o => o.value).sort((a, b) => b.length - a.length);
+        const match = codes.find(c => stored.startsWith(c));
+        if (match) {
+          cc = match;
+          local = stored.slice(match.length).replace(/\D/g, '').slice(0, 10);
+        } else {
+          local = stored.replace(/\D/g, '').slice(0, 10);
+        }
+      } else {
+        // Legacy local formats like 09123456789
+        local = stored.replace(/\D/g, '');
+        if (local.startsWith('0')) local = local.replace(/^0+/, '');
+        local = local.slice(0, 10);
+      }
+
+      ccEl.value = cc;
+      localEl.value = local;
+      fullEl.value = local ? (cc + local) : '';
+    }
+
+    // Keep hidden full number in sync before submit
+    document.addEventListener('DOMContentLoaded', function () {
+      const addForm = document.getElementById('form-add-user');
+      if (addForm) {
+        addForm.addEventListener('submit', function () {
+          syncPhoneField('add');
+        });
+      }
+      const editForm = document.getElementById('form-edit-user');
+      if (editForm) {
+        editForm.addEventListener('submit', function () {
+          syncPhoneField('edit');
+        });
+      }
+    });
+
     async function openEditModal(userId) {
       try {
         const url = EDIT_URL_TEMPLATE.replace('__ID__', encodeURIComponent(userId));
@@ -946,11 +1028,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('edit-employment').value =
           data.employment_type || 'full_time';
 
-        document.getElementById('edit-phone').value =
-          data.role_phone_number || '';
-
-        document.getElementById('edit-gmail').value =
-          data.role_gmail || '';
+        setPhoneFromStored('edit', data.role_phone_number || '');
 
         document.getElementById('edit-address').value =
           data.role_address || '';
@@ -1080,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const contact = [
           data.role_phone_number,
-          data.role_gmail
+          data.usr_email
         ].filter(Boolean);
 
         document.getElementById('profile-contact').textContent =

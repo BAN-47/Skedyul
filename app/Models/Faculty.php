@@ -36,7 +36,6 @@ class Faculty extends Model
 
         // Contact Information
         'fac_phone_number',
-        'fac_gmail',
         'fac_address',
 
         // Faculty-only information

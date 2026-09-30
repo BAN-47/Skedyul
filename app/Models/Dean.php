@@ -39,7 +39,6 @@ class Dean extends Model
 
         // Contact Information
         'dean_phone_number',
-        'dean_gmail',
         'dean_address',
 
         // Profile

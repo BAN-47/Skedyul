@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -27,14 +28,28 @@ class User extends Authenticatable
         'usr_password_hash',
         'usr_role',
         'usr_is_active',
-        'usr_bio',
-        'usr_first_name',
-        'usr_last_name',
-        'usr_middle_name',
-        'usr_suffix',
-        'usr_failed_login_attempts',
-        'usr_locked_until',
+        'usr_employee_id',
+        'usr_rank_title',
+        'usr_gender',
+        'usr_civil_status',
+        'usr_dob',
+        'usr_nationality',
     ];
+
+    /**
+     * USER.usr_id is a UUID PK (non-incrementing). Generate it on create
+     * so role profiles (faculty.fac_usr_id, etc.) always get a real value.
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function (self $user) {
+            if (empty($user->usr_id)) {
+                $user->usr_id = (string) Str::uuid();
+            }
+        });
+    }
 
     protected $hidden = [
         'usr_password_hash',
@@ -42,7 +57,6 @@ class User extends Authenticatable
 
     protected $casts = [
         'usr_is_active' => 'boolean',
-        'usr_locked_until' => 'datetime',
     ];
 
     public function getAuthPassword()

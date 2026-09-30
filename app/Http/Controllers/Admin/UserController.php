@@ -80,8 +80,8 @@ class UserController extends Controller
         $rules = [];
 
         if (in_array($role, ['faculty', 'dean', 'department_chair'])) {
-            $rules['role_phone_number'] = 'required|string|max:20';
-            $rules['role_gmail'] = 'nullable|email|max:255';
+            $rules['role_phone_number'] = ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'];
+            // Email is only USER.usr_email — no fac_gmail / dean_gmail / dc_gmail
             $rules['role_address'] = 'nullable|string|max:255';
             $rules['prog_id'] = 'required|uuid|exists:program,prog_id';
         }
@@ -145,7 +145,6 @@ class UserController extends Controller
                         'fac_dob' => $data['usr_dob'] ?? null,
                         'fac_nationality' => $data['usr_nationality'] ?? null,
                         'fac_phone_number' => $request->role_phone_number,
-                        'fac_gmail' => $request->role_gmail,
                         'fac_address' => $request->role_address,
                         'fac_employment_type' => $request->employment_type,
                         'fac_rank' => $data['usr_rank_title'] ?? null,
@@ -170,7 +169,6 @@ class UserController extends Controller
                         'dean_dob' => $data['usr_dob'] ?? null,
                         'dean_nationality' => $data['usr_nationality'] ?? null,
                         'dean_phone_number' => $request->role_phone_number,
-                        'dean_gmail' => $request->role_gmail,
                         'dean_address' => $request->role_address,
                         'dean_bio' => $data['usr_bio'] ?? null,
                     ]
@@ -193,7 +191,6 @@ class UserController extends Controller
                         'dc_dob' => $data['usr_dob'] ?? null,
                         'dc_nationality' => $data['usr_nationality'] ?? null,
                         'dc_phone_number' => $request->role_phone_number,
-                        'dc_gmail' => $request->role_gmail,
                         'dc_address' => $request->role_address,
                         'dc_bio' => $data['usr_bio'] ?? null,
                     ]
@@ -231,7 +228,12 @@ class UserController extends Controller
             $request->input('usr_role', '')
         )));
 
-        if (User::where('usr_email', $data['usr_email'])->exists()) {
+        // Case-insensitive match (Postgres treats mixed-case emails as different
+        // under =, but users treat them as the same address).
+        $email = strtolower(trim($data['usr_email']));
+        $data['usr_email'] = $email;
+
+        if (User::whereRaw('LOWER(usr_email) = ?', [$email])->exists()) {
             return redirect()->route('admin.users')
                 ->with(
                     'error',
@@ -239,11 +241,31 @@ class UserController extends Controller
                 );
         }
 
+        // One department chair per program (e.g. only one BSIS chair)
+        if (($data['usr_role'] ?? '') === 'department_chair' && $request->filled('prog_id')) {
+            $existingChair = Dept_Chair::where('dc_prog_id', $request->prog_id)->first();
+            if ($existingChair) {
+                $progLabel = DB::table('program')
+                    ->where('prog_id', $request->prog_id)
+                    ->value('prog_code')
+                    ?? 'this program';
+
+                return redirect()->route('admin.users')
+                    ->with(
+                        'error',
+                        "A department chair is already assigned to {$progLabel}. "
+                        . 'Only one chair is allowed per program. '
+                        . 'Edit or remove the existing chair first, or pick another program.'
+                    );
+            }
+        }
+
         try {
             DB::transaction(function () use ($data, $request) {
-                // Bio lives on role profile tables (fac_bio / dc_bio / dean_bio).
-                // Only system_admin has no profile table, so keep usr_bio for that role.
-                $userPayload = [
+                // Bio lives on role profile tables only (fac_bio / dc_bio / dean_bio).
+                // Explicit usr_id so faculty.fac_usr_id is never null.
+                $user = User::create([
+                    'usr_id' => (string) \Illuminate\Support\Str::uuid(),
                     'usr_name' => $this->buildUserName($data),
                     'usr_first_name' => $data['usr_first_name'],
                     'usr_middle_name' => $data['usr_middle_name'] ?? null,
@@ -253,12 +275,7 @@ class UserController extends Controller
                     'usr_password_hash' => Hash::make($data['password']),
                     'usr_role' => $data['usr_role'],
                     'usr_is_active' => true,
-                ];
-                if (($data['usr_role'] ?? '') === 'system_admin') {
-                    $userPayload['usr_bio'] = $data['usr_bio'] ?? null;
-                }
-
-                $user = User::create($userPayload);
+                ]);
 
                 $this->syncRoleProfile(
                     $user,
@@ -273,7 +290,7 @@ class UserController extends Controller
 
             if ($sqlState === '23505') {
                 return redirect()->route('admin.users')
-                    ->with('error', 'That email is already registered.');
+                    ->with('error', $this->uniqueViolationMessage($e));
             }
 
             throw $e;
@@ -319,7 +336,6 @@ class UserController extends Controller
                 'usr_dob' => $profile->fac_dob ?? null,
                 'usr_nationality' => $profile->fac_nationality ?? null,
                 'role_phone_number' => $profile->fac_phone_number ?? null,
-                'role_gmail' => $profile->fac_gmail ?? null,
                 'role_address' => $profile->fac_address ?? null,
                 'dept_id' => $profile->fac_dept_id ?? null,
                 'prog_id' => $profile->fac_prog_id ?? null,
@@ -339,7 +355,6 @@ class UserController extends Controller
                 'usr_dob' => $profile->dean_dob ?? null,
                 'usr_nationality' => $profile->dean_nationality ?? null,
                 'role_phone_number' => $profile->dean_phone_number ?? null,
-                'role_gmail' => $profile->dean_gmail ?? null,
                 'role_address' => $profile->dean_address ?? null,
                 'dept_id' => $profile->dean_dept_id ?? null,
                 'prog_id' => $profile->dean_prog_id ?? null,
@@ -359,7 +374,6 @@ class UserController extends Controller
                 'usr_dob' => $profile->dc_dob ?? null,
                 'usr_nationality' => $profile->dc_nationality ?? null,
                 'role_phone_number' => $profile->dc_phone_number ?? null,
-                'role_gmail' => $profile->dc_gmail ?? null,
                 'role_address' => $profile->dc_address ?? null,
                 'dept_id' => $profile->dc_dept_id ?? null,
                 'prog_id' => $profile->dc_prog_id ?? null,
@@ -379,12 +393,11 @@ class UserController extends Controller
                 'usr_dob' => null,
                 'usr_nationality' => null,
                 'role_phone_number' => null,
-                'role_gmail' => null,
                 'role_address' => null,
                 'dept_id' => null,
                 'prog_id' => null,
                 'employment_type' => null,
-                'usr_bio' => $user->usr_bio,
+                'usr_bio' => null,
             ],
         };
 
@@ -435,10 +448,10 @@ class UserController extends Controller
             $request->input('usr_role', '')
         )));
 
-        $emailTaken = User::where(
-            'usr_email',
-            $data['usr_email']
-        )
+        $email = strtolower(trim($data['usr_email']));
+        $data['usr_email'] = $email;
+
+        $emailTaken = User::whereRaw('LOWER(usr_email) = ?', [$email])
             ->where('usr_id', '!=', $user->usr_id)
             ->exists();
 
@@ -457,7 +470,8 @@ class UserController extends Controller
                 $request,
                 $oldRole
             ) {
-                $userPayload = [
+                // Bio lives on role profile tables only (fac_bio / dc_bio / dean_bio).
+                $user->update([
                     'usr_name' => $this->buildUserName($data),
                     'usr_first_name' => $data['usr_first_name'],
                     'usr_middle_name' => $data['usr_middle_name'] ?? null,
@@ -466,13 +480,7 @@ class UserController extends Controller
                     'usr_email' => $data['usr_email'],
                     'usr_role' => $data['usr_role'],
                     'usr_is_active' => $data['usr_is_active'],
-                ];
-                // Bio on USER only for system_admin; other roles store bio on profile tables
-                if (($data['usr_role'] ?? '') === 'system_admin') {
-                    $userPayload['usr_bio'] = $data['usr_bio'] ?? null;
-                }
-
-                $user->update($userPayload);
+                ]);
 
                 $this->syncRoleProfile(
                     $user,
@@ -487,7 +495,7 @@ class UserController extends Controller
 
             if ($sqlState === '23505') {
                 return redirect()->route('admin.users')
-                    ->with('error', 'That email is already registered.');
+                    ->with('error', $this->uniqueViolationMessage($e));
             }
 
             throw $e;
@@ -534,4 +542,37 @@ class UserController extends Controller
 
         return back();
     }
+
+    /**
+     * Map Postgres unique_violation (23505) to a clear admin message.
+     * Previously every unique clash was reported as "email already registered",
+     * which was wrong when the clash was employee_id, phone, etc.
+     */
+    private function uniqueViolationMessage(\Illuminate\Database\QueryException $e): string
+    {
+        $detail = strtolower($e->getMessage());
+
+        if (str_contains($detail, 'usr_email') || str_contains($detail, 'email')) {
+            return 'This email is already registered. Please use a different email address.';
+        }
+        if (str_contains($detail, 'employee')) {
+            return 'This employee ID is already in use. Please use a different employee ID.';
+        }
+        if (str_contains($detail, 'phone')) {
+            return 'This phone number is already in use.';
+        }
+        // UNIQUE on department_chair.dc_prog_id → one chair per program
+        if (
+            str_contains($detail, 'dc_prog_id')
+            || str_contains($detail, 'department_chair')
+            || (str_contains($detail, 'prog') && str_contains($detail, 'chair'))
+        ) {
+            return 'A department chair is already assigned to that program. '
+                . 'Only one chair is allowed per department. '
+                . 'Edit or remove the existing chair first, or pick another program.';
+        }
+
+        return 'A record with the same unique value already exists. Check email, employee ID, phone, or program assignment.';
+    }
+
 }
