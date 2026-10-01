@@ -9,6 +9,7 @@ use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
+use App\Http\Controllers\Chair\ChairProfileController;
 
 
 /*
@@ -85,3 +86,15 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 Route::post('/schedule', function () {
     return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
 })->name('schedule.store');
+
+Route::prefix('chair')->group(function () {
+    Route::post('/profile/avatar', [ChairProfileController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
+    Route::delete('/profile/avatar', [ChairProfileController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
+    Route::put('/profile/personal-info', [ChairProfileController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
+    Route::put('/profile/contact', [ChairProfileController::class, 'updateContact'])->name('chair.profile.contact.update');
+    Route::put('/profile/password', [ChairProfileController::class, 'updatePassword'])->name('chair.profile.password.update');
+    Route::put('/profile/notification-preferences', [ChairProfileController::class, 'updateNotificationPreferences'])->name('chair.profile.notification-preferences.update');
+    Route::put('/security', [ChairProfileController::class, 'updateSecuritySettings'])->name('chair.security.update');
+});
+
+Route::get('/chair/settings', [ChairProfileController::class, 'settings'])->name('chair.settings');
