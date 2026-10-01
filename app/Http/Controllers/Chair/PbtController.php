@@ -22,7 +22,11 @@ class PbtController extends Controller
 
     public function index(Request $request)
     {
-        $filters   = $request->only(['program']);
+        $filters = $request->only(['program']);
+
+        // Same as PBS: chair only sees their department (BSIS chair → BSIS only)
+        $deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)
+            ->value('dc_dept_id');
 
         $activeSem = DB::table('semester')->where('sem_is_active', true)->first();
         $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
@@ -46,37 +50,77 @@ class PbtController extends Controller
                 ->get();
         }
 
+        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+        $semNum = null;
+        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+            $semNum = 2;
+        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+            $semNum = 1;
+        }
+
+        $chairDepartment = $deptId ? Departments::where('dept_id', $deptId)->first() : null;
+        $deptCollection = $chairDepartment
+            ? collect([$chairDepartment])
+            : collect();
+
+        // Build teacher groups (must be faculty rows for FK)
+        $allFaculty = Faculty::query()
+            ->orderBy('fac_last_name')
+            ->orderBy('fac_first_name')
+            ->get();
+
+        $chairUsrIds = \App\Models\Dept_Chair::pluck('dc_usr_id')->filter()->all();
+        $deanUsrIds  = Dean::pluck('dean_usr_id')->filter()->all();
+
+        $facultyChairs = $allFaculty->filter(
+            fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
+        )->values();
+
+        $deans = $allFaculty->filter(
+            fn ($f) => in_array($f->fac_usr_id, $deanUsrIds, true)
+        )->values();
+
+        $specialIds = $facultyChairs->pluck('fac_id')
+            ->merge($deans->pluck('fac_id'))
+            ->unique()
+            ->all();
+
+        $facultyFullTime = $allFaculty->filter(function ($f) use ($specialIds) {
+            if (in_array($f->fac_id, $specialIds, true)) {
+                return false;
+            }
+            $t = strtolower(str_replace([' ', '-'], '_', (string) ($f->fac_employment_type ?? '')));
+            return str_contains($t, 'full') || $t === '' || !str_contains($t, 'part');
+        })->values();
+
+        $facultyPartTime = $allFaculty->filter(function ($f) use ($specialIds) {
+            if (in_array($f->fac_id, $specialIds, true)) {
+                return false;
+            }
+            $t = strtolower(str_replace([' ', '-'], '_', (string) ($f->fac_employment_type ?? '')));
+            return str_contains($t, 'part');
+        })->values();
+
         return view('chair.pbt', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
-                ->when(
-                    ($deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)->value('dc_dept_id')),
-                    fn ($q) => $q->where('course_dept_id', $deptId)
-                )
-                ->when(true, function ($q) {
-                    $semName = strtolower((string) (\App\Models\Semester::where('sem_is_active', true)->value('sem_name') ?? ''));
-                    $semNum = null;
-                    if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
-                        $semNum = 2;
-                    } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
-                        $semNum = 1;
-                    }
-                    if ($semNum !== null) {
-                        $q->where('course_semester', $semNum);
-                    }
-                })
-                ->orderBy('course_code')->get(),
-            'facultyFullTime'  => Faculty::where('fac_employment_type', 'full_time')->orderBy('fac_last_name')->get(),
-            'facultyPartTime'  => Faculty::where('fac_employment_type', 'part_time')->orderBy('fac_last_name')->get(),
-            // schedule.sch_fac_id has a foreign key to faculty(fac_id) only —
-            // a Dean can be picked here ONLY if they also have their own row
-            // in `faculty` (the two tables share usr_id when one person holds
-            // both roles). Deans with no matching faculty row simply won't
-            // appear, since there'd be no valid fac_id to schedule against.
-            'deans'            => Faculty::whereIn('fac_usr_id', Dean::pluck('dean_usr_id'))->orderBy('fac_last_name')->get(),
-            'sections'         => DB::table('section')->orderBy('sec_name')->get(),
-            'programs'         => Departments::orderBy('dept_name')->get(),
-            'departments'      => Departments::orderBy('dept_name')->get(),
+                ->when($deptId, fn ($q) => $q->where('course_dept_id', $deptId))
+                ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum))
+                ->orderBy('course_code')
+                ->get(),
+            'facultyFullTime'  => $facultyFullTime,
+            'facultyPartTime'  => $facultyPartTime,
+            'facultyChairs'    => $facultyChairs,
+            'deans'            => $deans,
+
+            // BSIS chair → only BSIS sections; BSIT chair → only BSIT sections
+            'sections'         => DB::table('section')
+                ->when($deptId, fn ($q) => $q->where('sec_dept_id', $deptId))
+                ->orderBy('sec_name')
+                ->get(),
+            'programs'         => $deptCollection,
+            'departments'      => $deptCollection,
+            'chairDepartment'  => $chairDepartment,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->orderByDesc('s.sem_start_date')

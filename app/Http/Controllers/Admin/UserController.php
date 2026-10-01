@@ -170,6 +170,28 @@ class UserController extends Controller
                         'dean_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
+                // Also register as faculty so they can be plotted on PBS/PBT
+                Faculty::updateOrCreate(
+                    ['fac_usr_id' => $user->usr_id],
+                    [
+                        'fac_college_id' => $request->college_id,
+                        'fac_dept_id' => $request->dept_id,
+                        'fac_first_name' => $data['usr_first_name'],
+                        'fac_middle_name' => $data['usr_middle_name'] ?? null,
+                        'fac_last_name' => $data['usr_last_name'],
+                        'fac_suffix' => $data['usr_suffix'] ?? null,
+                        'fac_employee_id' => $data['usr_employee_id'] ?? null,
+                        'fac_gender' => $data['usr_gender'] ?? null,
+                        'fac_civil_status' => $data['usr_civil_status'] ?? null,
+                        'fac_dob' => $data['usr_dob'] ?? null,
+                        'fac_nationality' => $data['usr_nationality'] ?? null,
+                        'fac_phone_number' => $request->role_phone_number,
+                        'fac_address' => $request->role_address,
+                        'fac_employment_type' => $request->input('employment_type', 'full_time'),
+                        'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_bio' => $data['usr_bio'] ?? null,
+                    ]
+                );
                 break;
 
             case 'department_chair':
@@ -190,6 +212,28 @@ class UserController extends Controller
                         'dc_phone_number' => $request->role_phone_number,
                         'dc_address' => $request->role_address,
                         'dc_bio' => $data['usr_bio'] ?? null,
+                    ]
+                );
+                // Also register as faculty so they can be plotted on PBS/PBT
+                Faculty::updateOrCreate(
+                    ['fac_usr_id' => $user->usr_id],
+                    [
+                        'fac_college_id' => $request->college_id,
+                        'fac_dept_id' => $request->dept_id,
+                        'fac_first_name' => $data['usr_first_name'],
+                        'fac_middle_name' => $data['usr_middle_name'] ?? null,
+                        'fac_last_name' => $data['usr_last_name'],
+                        'fac_suffix' => $data['usr_suffix'] ?? null,
+                        'fac_employee_id' => $data['usr_employee_id'] ?? null,
+                        'fac_gender' => $data['usr_gender'] ?? null,
+                        'fac_civil_status' => $data['usr_civil_status'] ?? null,
+                        'fac_dob' => $data['usr_dob'] ?? null,
+                        'fac_nationality' => $data['usr_nationality'] ?? null,
+                        'fac_phone_number' => $request->role_phone_number,
+                        'fac_address' => $request->role_address,
+                        'fac_employment_type' => $request->input('employment_type', 'full_time'),
+                        'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
                 break;

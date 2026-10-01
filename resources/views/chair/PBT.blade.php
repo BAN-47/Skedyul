@@ -18,6 +18,7 @@
   $facultyFullTime = $facultyFullTime ?? collect();
   $facultyPartTime = $facultyPartTime ?? collect();
   $deans           = $deans           ?? collect();
+  $facultyChairs   = $facultyChairs   ?? collect();
   $sections  = $sections  ?? collect();
   $programs  = $programs  ?? collect();
   $semesters = $semesters ?? collect();
@@ -213,9 +214,10 @@
                 </div>
 
                 @foreach([
-                    'FULL-TIME' => $facultyFullTime,
-                    'PART-TIME' => $facultyPartTime,
-                    'DEAN'      => $deans,
+                    'FULL-TIME'  => $facultyFullTime,
+                    'PART-TIME'  => $facultyPartTime,
+                    'DEPT CHAIR' => $facultyChairs,
+                    'DEAN'       => $deans,
                 ] as $groupLabel => $groupList)
                   <div class="teacher-group" data-group="{{ $groupLabel }}">
                     <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-50">
@@ -240,14 +242,6 @@
               </div>
             </div>
 
-            <select id="filter-program" onchange="applyFilters()" class="pbs-filter">
-              <option value="">PROGRAM</option>
-              @foreach($programs as $p)
-                <option value="{{ $p->prog_id }}" @selected(($filters['program'] ?? '') === $p->prog_id)>
-                  {{ $p->prog_code }}
-                </option>
-              @endforeach
-            </select>
 
             <span class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
               {{ optional($activeSemester)->label ?? 'No active semester' }}

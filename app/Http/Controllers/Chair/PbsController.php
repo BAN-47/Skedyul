@@ -164,13 +164,9 @@ class PbsController extends Controller
         $subjects = $subjectsQuery->get();
 
         $prog = $programs->first();
+        // All teachers who can be assigned (faculty table only — needed for FK).
+        // Includes full-time, part-time, dept chairs, and deans who have a faculty row.
         $faculty = Faculty::query()
-            ->where(function ($q) use ($progId, $prog) {
-                $q->where('fac_dept_id', $progId);
-                if ($prog?->dept_college_id) {
-                    $q->orWhere('fac_college_id', $prog->dept_college_id);
-                }
-            })
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
