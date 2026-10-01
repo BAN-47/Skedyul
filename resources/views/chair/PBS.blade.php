@@ -22,9 +22,13 @@
   $rooms          = $rooms          ?? collect();
   $academicYears  = $academicYears  ?? collect();
   $years          = $years          ?? [1, 2, 3, 4]; // year levels (1–4)
-  $filters         = $filters         ?? [];
-  $chairProgram    = $chairProgram    ?? null;
-  $activeSemester  = $activeSemester  ?? null;
+  $filters          = $filters          ?? [];
+  $chairProgram     = $chairProgram     ?? null;
+  $chairDepartment  = $chairDepartment  ?? $chairProgram ?? null;
+  $departments      = $departments      ?? $programs ?? collect();
+  $programs         = $programs         ?? $departments ?? collect();
+  $activeSemester   = $activeSemester   ?? null;
+  $selectedSection  = $selectedSection  ?? null;
 
   $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -96,31 +100,61 @@
 
       <div class="grid grid-cols-1 xl:grid-cols-[200px_1fr] gap-4">
 
-        {{-- ══════════ SUMMARY ══════════ --}}
+                        {{-- ══════════ SUMMARY OF COURSES ══════════ --}}
         <aside class="card !p-0 overflow-hidden self-start">
-          <div class="bg-blue-600 text-white text-center text-[13px] font-extrabold px-4 py-2.5">
-            SUMMARY
+          <div class="bg-blue-600 text-white text-center text-[12px] font-extrabold px-3 py-2.5 tracking-wide">
+            SUMMARY OF COURSES
           </div>
-          <div class="p-3.5">
-            @forelse($schedules as $s)
-              <div class="border-b border-slate-100 pb-2 mb-2 last:border-0 last:mb-0">
-                <div class="text-[12px] font-bold text-slate-900">{{ $s->subject->subj_code ?? '—' }}</div>
-                <div class="text-[10.5px] text-slate-500 leading-snug">
-                  {{ $s->section->sec_name ?? '' }}
-                  @if($s->faculty)<br>Prof. {{ $s->faculty->fac_last_name }}@endif
-                  <br>{{ $s->sch_day }} ·
-                  {{ \Illuminate\Support\Carbon::parse($s->sch_start_time)->format('g:i A') }}
-                </div>
+          @php
+            $studentCount = optional($selectedSection)->sec_no_of_student
+                ?? optional($selectedSection)->sec_max_capacity
+                ?? null;
+            $courseSummary = $schedules
+              ->filter(fn ($s) => ($s->course ?? $s->subject))
+              ->unique(fn ($s) => $s->sch_course_id ?? $s->sch_subj_id ?? spl_object_id($s))
+              ->values();
+          @endphp
+          <div class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-200 bg-slate-50 text-[11px] items-center">
+            <div class="px-2 py-1.5 font-bold text-slate-600 uppercase leading-tight">No. of<br>Students</div>
+            <div class="px-2 py-1 border-l border-slate-200">
+              <input type="number" id="section-student-count" min="0" max="500" step="1"
+                     class="w-full max-w-[72px] rounded border border-slate-300 px-2 py-0.5 text-[12px] font-extrabold text-slate-900"
+                     placeholder="50"
+                     value="{{ $studentCount ?? '' }}"
+                     {{ empty($selectedSection) ? 'disabled' : '' }}
+                     title="{{ empty($selectedSection) ? 'Select a section first' : 'Saved with Save Draft for '.$selectedSection->sec_name }}">
+            </div>
+          </div>
+          <div class="grid grid-cols-[88px_1fr] gap-0 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase">
+            <div class="px-2 py-1.5">Course Code</div>
+            <div class="px-2 py-1.5 border-l border-slate-200">Descriptive Title</div>
+          </div>
+          <div class="p-0">
+            @forelse($courseSummary as $s)
+              @php
+                $course = $s->course ?? $s->subject;
+                $code = $course->course_code ?? $course->subj_code ?? '—';
+                $title = $course->course_name ?? $course->subj_name ?? '—';
+              @endphp
+              <div class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-100 text-[11px]">
+                <div class="px-2 py-1.5 font-bold text-slate-800">{{ $code }}</div>
+                <div class="px-2 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">{{ $title }}</div>
               </div>
             @empty
-              <div class="space-y-3 py-1">
-                @for($i = 0; $i < 9; $i++)
-                  <div class="h-px bg-slate-200"></div>
-                @endfor
+              <div class="p-3 text-center text-[11px] text-slate-400">
+                @if(empty($filters['section'] ?? null))
+                  Select a section to see its course summary.
+                @else
+                  No courses plotted yet for this section.
+                @endif
               </div>
-              <div class="text-center text-[11px] text-slate-400 pt-2">No schedules plotted yet.</div>
             @endforelse
           </div>
+          @if($selectedSection)
+            <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10.5px] text-slate-500">
+              Section: <span class="font-bold text-slate-700">{{ $selectedSection->sec_name }}</span>
+            </div>
+          @endif
         </aside>
 
         {{-- ══════════ PLOTTER ══════════ --}}
@@ -258,7 +292,7 @@
                   <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
                        style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
                        data-schedule-id="{{ $s->sch_id }}"
-                       data-subject="{{ $s->sch_subj_id }}"
+                       data-subject="{{ $s->sch_course_id ?? $s->sch_subj_id }}"
                        data-faculty="{{ $s->sch_fac_id }}"
                        data-section="{{ $s->sch_sec_id }}"
                        data-room="{{ $s->sch_room_id }}"
@@ -276,7 +310,7 @@
 
                     {{-- Vertically + horizontally centered content (matches wireframe) --}}
                     <div class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
-                      <div class="text-[13px] font-extrabold tracking-wide">{{ $s->subject->subj_code ?? '—' }}</div>
+                      <div class="text-[13px] font-extrabold tracking-wide">{{ $s->course->course_code ?? $s->subject->course_code ?? $s->subject->subj_code ?? '—' }}</div>
                       @if($s->faculty)
                         <div class="text-[11.5px] font-semibold mt-1">Prof. {{ $s->faculty->fac_last_name }}</div>
                       @endif
@@ -322,36 +356,6 @@
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
       <div class="mb-3">
-        <label class="field-label">Subject</label>
-        <select id="add-subject" class="field-input">
-          <option value="">-- Select Subject --</option>
-          @foreach($subjects as $sub)
-            <option value="{{ $sub->subj_id }}">{{ $sub->subj_code }} — {{ $sub->subj_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Professor</label>
-        <select id="add-faculty" class="field-input">
-          <option value="">-- Select Professor --</option>
-          @foreach($faculty as $f)
-            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Room</label>
-        <select id="add-room" class="field-input">
-          <option value="">-- Select Room --</option>
-          @foreach($rooms as $r)
-            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      <div class="mb-3">
         <label class="field-label">Semester</label>
         <div class="field-input bg-slate-100 font-semibold text-slate-700">
           {{ optional($activeSemester)->label ?? 'No active semester — set in Admin Settings' }}
@@ -378,15 +382,6 @@
 
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="field-label">Year Level</label>
-          <select id="add-year" class="field-input">
-            <option value="">-- Select Year --</option>
-            @foreach($years as $y)
-              <option value="{{ $y }}">Year {{ $y }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div>
           <label class="field-label">Section</label>
           <select id="add-section" class="field-input">
             <option value="">-- Select Section --</option>
@@ -396,6 +391,38 @@
           </select>
         </div>
       </div>
+
+      <div class="mb-3">
+        <label class="field-label">Subject</label>
+        <select id="add-subject" class="field-input">
+          <option value="">-- Select Subject --</option>
+          @foreach($subjects as $sub)
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="field-label">Professor</label>
+        <select id="add-faculty" class="field-input">
+          <option value="">-- Select Professor --</option>
+          @foreach($faculty as $f)
+            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="field-label">Room</label>
+        <select id="add-room" class="field-input">
+          <option value="">-- Select Room --</option>
+          @foreach($rooms as $r)
+            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      
 
       <div class="mb-3">
         <label class="field-label">Day</label>
@@ -450,7 +477,7 @@
         <select id="edit-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->subj_id }}">{{ $sub->subj_code }} — {{ $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
           @endforeach
         </select>
       </div>
@@ -501,15 +528,6 @@
       </div>
 
       <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="field-label">Year Level</label>
-          <select id="edit-year" class="field-input">
-            <option value="">-- Select Year --</option>
-            @foreach($years as $y)
-              <option value="{{ $y }}">Year {{ $y }}</option>
-            @endforeach
-          </select>
-        </div>
         <div>
           <label class="field-label">Section</label>
           <select id="edit-section" class="field-input">
@@ -613,6 +631,54 @@
   });
 </script>
 @endif
+
+
+<script>
+function saveSectionStudents() {
+  const sectionId = document.getElementById('filter-section')?.value || '';
+  const input = document.getElementById('section-student-count');
+  const count = input ? parseInt(input.value, 10) : NaN;
+
+  if (!sectionId) {
+    showToast('Select a section first.');
+    return;
+  }
+  if (Number.isNaN(count) || count < 0) {
+    showToast('Enter a valid number of students (0 or more).');
+    return;
+  }
+
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+  fetch('{{ route("chair.pbs.section.students") }}', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-CSRF-TOKEN': csrf,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    credentials: 'same-origin',
+    body: JSON.stringify({
+      sec_id: sectionId,
+      sec_no_of_student: count,
+    }),
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        showToast(data.message || 'Could not save student count');
+        return;
+      }
+      showToast(data.message || 'Student count saved');
+      if (input && data.sec_no_of_student != null) {
+        input.value = data.sec_no_of_student;
+      }
+    })
+    .catch(() => showToast('Network error saving student count'));
+}
+</script>
+
+
 
 </body>
 

@@ -44,6 +44,7 @@ Route::middleware('auth')->prefix('chair')->group(function () {
     Route::delete('/pbs/{id}', [PbsController::class, 'destroy'])->name('chair.pbs.destroy');
     Route::post('/pbs/save-draft', [PbsController::class, 'saveDraft'])->name('chair.pbs.save-draft');
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
+    Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
 
     // PBT — Program by Teacher
     // Same fix as PBS: flat 'chair.pbt' name, single /chair/pbt URL.

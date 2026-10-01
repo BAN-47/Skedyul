@@ -28,7 +28,8 @@ class PbtController extends Controller
         $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
         if ($activeSem) {
             $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
-            $activeSem->label = trim($year . ($year !== '' ? ' · ' : '') . ($activeSem->sem_name ?? ''));
+            $yearDisp = $year !== '' ? str_replace('-', '-', $year) : '';
+            $activeSem->label = trim(($activeSem->sem_name ?? '') . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
         }
         $filters['semester'] = $activeSem->sem_id ?? null;
         $facultyId = $request->query('faculty');
@@ -58,6 +59,7 @@ class PbtController extends Controller
             'deans'            => Faculty::whereIn('fac_usr_id', Dean::pluck('dean_usr_id'))->orderBy('fac_last_name')->get(),
             'sections'         => DB::table('section')->orderBy('sec_name')->get(),
             'programs'         => Departments::orderBy('dept_name')->get(),
+            'departments'      => Departments::orderBy('dept_name')->get(),
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->orderByDesc('s.sem_start_date')
