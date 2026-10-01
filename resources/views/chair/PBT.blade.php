@@ -18,11 +18,16 @@
   $facultyFullTime = $facultyFullTime ?? collect();
   $facultyPartTime = $facultyPartTime ?? collect();
   $deans           = $deans           ?? collect();
+  $facultyChairs   = $facultyChairs   ?? collect();
   $sections  = $sections  ?? collect();
   $programs  = $programs  ?? collect();
   $semesters = $semesters ?? collect();
   $filters   = $filters   ?? [];
   $activeSemester  = $activeSemester  ?? null;
+  $departments      = $departments      ?? $programs ?? collect();
+  $programs         = $programs         ?? $departments ?? collect();
+  $chairDepartment  = $chairDepartment  ?? null;
+  $chairProgram     = $chairProgram     ?? $chairDepartment ?? null;
   $selectedFaculty = $selectedFaculty ?? null; // the Faculty (or Dean) model currently being viewed, or null
   $loadStats = $loadStats ?? [
       'preparations' => null,
@@ -97,30 +102,94 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-[200px_1fr] gap-4">
+      <div class="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4">
 
-        {{-- ══════════ SUMMARY (teacher load stats, not a schedule list) ══════════ --}}
-        <aside class="card !p-0 overflow-hidden self-start">
-          <div class="bg-blue-600 text-white text-center text-[13px] font-extrabold px-4 py-2.5">
-            SUMMARY
+        {{-- ══════════ SUMMARY OF COURSES (per teacher) ══════════ --}}
+        <aside class="card !p-0 overflow-hidden self-start min-w-[240px]">
+          <div class="bg-blue-600 text-white text-center text-[12px] font-extrabold px-3 py-2.5 tracking-wide">
+            Summary of Courses
           </div>
-          <div class="p-3.5 text-[12px] text-slate-700 space-y-1.5">
-            <div><span class="font-bold">No. of Preparations:</span> {{ $loadStats['preparations'] ?? '—' }}</div>
-            <div><span class="font-bold">No. of Units:</span> {{ $loadStats['units'] ?? '—' }}</div>
-            <div><span class="font-bold">No. of Hours/Week:</span> {{ $loadStats['hours_week'] ?? '—' }}</div>
-            <div><span class="font-bold">Administrative Designation:</span> {{ $loadStats['designation'] ?? '—' }}</div>
 
-            <div class="border-t border-slate-100 my-2"></div>
+          @php
+            // One row per course+section assignment for the selected teacher
+            $pbtCourseRows = $schedules
+              ->filter(fn ($s) => ($s->course ?? $s->subject))
+              ->unique(fn ($s) => ($s->sch_course_id ?? $s->sch_subj_id ?? '') . '|' . ($s->sch_sec_id ?? ''))
+              ->values();
+          @endphp
 
-            <div><span class="font-bold">Production:</span> {{ $loadStats['production'] ?? '—' }}</div>
-            <div><span class="font-bold">Extension:</span> {{ $loadStats['extension'] ?? '—' }}</div>
-            <div><span class="font-bold">Research:</span> {{ $loadStats['research'] ?? '—' }}</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[10px] border-collapse">
+              <thead>
+                <tr class="bg-slate-100 text-slate-600 uppercase font-bold">
+                  <th class="px-1.5 py-1.5 text-left border-b border-slate-200">Course Code</th>
+                  <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Descriptive Title</th>
+                  <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Degree<br>Yr. &amp; Sec.</th>
+                  <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Total<br>No. of Students</th>
+                </tr>
+              </thead>
+              <tbody>
+                @forelse($pbtCourseRows as $s)
+                  @php
+                    $course = $s->course ?? $s->subject;
+                    $code  = $course->course_code ?? $course->subj_code ?? '—';
+                    $title = $course->course_name ?? $course->subj_name ?? '—';
+                    $secName = optional($s->section)->sec_name ?? '—';
+                    $studs = optional($s->section)->sec_no_of_student
+                        ?? optional($s->section)->sec_max_capacity
+                        ?? '—';
+                  @endphp
+                  <tr class="border-b border-slate-100 text-slate-700">
+                    <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">{{ $code }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 leading-snug">{{ $title }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 whitespace-nowrap">{{ $secName }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 text-center font-semibold">{{ $studs }}</td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="4" class="px-2 py-3 text-center text-slate-400 italic">
+                      @if(empty($selectedFaculty))
+                        Select a teacher to view their courses.
+                      @else
+                        No courses assigned yet.
+                      @endif
+                    </td>
+                  </tr>
+                @endforelse
+              </tbody>
+            </table>
+          </div>
 
-            @unless($selectedFaculty)
-              <div class="pt-3 text-center text-[11px] text-slate-400 italic">
-                Select a teacher to view their load.
-              </div>
-            @endunless
+          <div class="border-t border-slate-200 p-3 text-[11px] text-slate-700 space-y-1">
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">No. of Preparations:</span>
+              <span>{{ $loadStats['preparations'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">No. of Units:</span>
+              <span>{{ $loadStats['units'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">No. of Hours/Week:</span>
+              <span>{{ $loadStats['hours_week'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">Administrative Designation:</span>
+              <span class="text-right">{{ $loadStats['designation'] ?? '—' }}</span>
+            </div>
+            <div class="border-t border-slate-100 my-1.5"></div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">Production:</span>
+              <span>{{ $loadStats['production'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">Extension:</span>
+              <span>{{ $loadStats['extension'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">Research:</span>
+              <span>{{ $loadStats['research'] ?? '—' }}</span>
+            </div>
           </div>
         </aside>
 
@@ -145,9 +214,10 @@
                 </div>
 
                 @foreach([
-                    'FULL-TIME' => $facultyFullTime,
-                    'PART-TIME' => $facultyPartTime,
-                    'DEAN'      => $deans,
+                    'FULL-TIME'  => $facultyFullTime,
+                    'PART-TIME'  => $facultyPartTime,
+                    'DEPT CHAIR' => $facultyChairs,
+                    'DEAN'       => $deans,
                 ] as $groupLabel => $groupList)
                   <div class="teacher-group" data-group="{{ $groupLabel }}">
                     <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-50">
@@ -172,14 +242,6 @@
               </div>
             </div>
 
-            <select id="filter-program" onchange="applyFilters()" class="pbs-filter">
-              <option value="">PROGRAM</option>
-              @foreach($programs as $p)
-                <option value="{{ $p->prog_id }}" @selected(($filters['program'] ?? '') === $p->prog_id)>
-                  {{ $p->prog_code }}
-                </option>
-              @endforeach
-            </select>
 
             <span class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
               {{ optional($activeSemester)->label ?? 'No active semester' }}
@@ -335,6 +397,14 @@
     </div>
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
+      <div class="mb-3">
+        <label class="field-label">Semester</label>
+        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+          {{ optional($activeSemester)->label ?? 'No active semester' }}
+        </div>
+        <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
+      </div>
+
       <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
         Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : '—' }}</span>
       </div>
@@ -344,18 +414,12 @@
         <select id="add-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->subj_id }}">{{ $sub->subj_code }} — {{ $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
           @endforeach
         </select>
       </div>
 
-      <div class="mb-3">
-        <label class="field-label">Semester</label>
-        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-          {{ optional($activeSemester)->label ?? 'No active semester' }}
-        </div>
-        <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-      </div>
+      
 
       <div class="mb-3">
         <label class="field-label">Program</label>
@@ -373,7 +437,7 @@
           <select id="add-section" class="field-input">
             <option value="">-- Select Section --</option>
             @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
             @endforeach
           </select>
         </div>
@@ -434,18 +498,6 @@
     </div>
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
-      <input type="hidden" id="edit-id">
-
-      <div class="mb-3">
-        <label class="field-label">Subject</label>
-        <select id="edit-subject" class="field-input">
-          <option value="">-- Select Subject --</option>
-          @foreach($subjects as $sub)
-            <option value="{{ $sub->subj_id }}">{{ $sub->subj_code }} — {{ $sub->subj_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
       <div class="mb-3">
         <label class="field-label">Semester</label>
         <div class="field-input bg-slate-100 font-semibold text-slate-700">
@@ -453,6 +505,20 @@
         </div>
         <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
       </div>
+
+      <input type="hidden" id="edit-id">
+
+      <div class="mb-3">
+        <label class="field-label">Subject</label>
+        <select id="edit-subject" class="field-input">
+          <option value="">-- Select Subject --</option>
+          @foreach($subjects as $sub)
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      
 
       <div class="mb-3">
         <label class="field-label">Program</label>
@@ -470,7 +536,7 @@
           <select id="edit-section" class="field-input">
             <option value="">-- Select Section --</option>
             @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
             @endforeach
           </select>
         </div>

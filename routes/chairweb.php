@@ -9,7 +9,7 @@ use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
-use App\Http\Controllers\Chair\ChairSettingsController;
+use App\Http\Controllers\Chair\MisController;
 
 
 /*
@@ -45,6 +45,7 @@ Route::middleware('auth')->prefix('chair')->group(function () {
     Route::delete('/pbs/{id}', [PbsController::class, 'destroy'])->name('chair.pbs.destroy');
     Route::post('/pbs/save-draft', [PbsController::class, 'saveDraft'])->name('chair.pbs.save-draft');
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
+    Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
 
     // PBT — Program by Teacher
     // Same fix as PBS: flat 'chair.pbt' name, single /chair/pbt URL.
@@ -53,6 +54,12 @@ Route::middleware('auth')->prefix('chair')->group(function () {
     Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
     Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
     Route::post('/pbt/save-draft', [PbtController::class, 'saveDraft'])->name('chair.pbt.save-draft');
+
+    // MIS — Class Program for MIS
+    Route::get('/mis', [MisController::class, 'index'])->name('chair.mis');
+    Route::put('/mis/{id}/code', [MisController::class, 'updateMisCode'])->name('chair.mis.code');
+    Route::put('/mis/campus-director', [MisController::class, 'updateCampusDirector'])->name('chair.mis.campus-director');
+
     Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
 
     //Subject

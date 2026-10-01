@@ -59,7 +59,9 @@ class PbsController extends Controller
 
         $ay = DB::table('academic_year')->where('ay_is_active', true)->first();
         $year = $ay->ay_academic_year ?? $ay->ay_year_label ?? '';
-        $sem->label = trim($year . ($year !== '' ? ' · ' : '') . ($sem->sem_name ?? ''));
+        $semName = $sem->sem_name ?? '';
+        $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
+        $sem->label = trim($semName . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
         $sem->ay_academic_year = $year;
         return $sem;
     }
@@ -75,19 +77,22 @@ class PbsController extends Controller
 
         if (!$progId) {
             return view('chair.pbs', [
-                'schedules'     => collect(),
-                'subjects'      => collect(),
-                'faculty'       => collect(),
-                'sections'      => collect(),
-                'programs'      => collect(),
-                'academicYears' => collect(),
-                'semesters'     => collect(),
-                'rooms'         => collect(),
-                'filters'        => [],
-                'selectedDate'   => $request->query('date'),
-                'chairProgram'   => null,
-                'activeSemester' => $this->activeSemester(),
-                'error'          => 'Your account is not linked to a program. Contact the system administrator.',
+                'schedules'        => collect(),
+                'subjects'         => collect(),
+                'faculty'          => collect(),
+                'sections'         => collect(),
+                'programs'         => collect(),
+                'departments'      => collect(),
+                'academicYears'    => collect(),
+                'semesters'        => collect(),
+                'rooms'            => collect(),
+                'filters'          => [],
+                'selectedDate'     => $request->query('date'),
+                'chairProgram'     => null,
+                'chairDepartment'  => null,
+                'activeSemester'   => $this->activeSemester(),
+                'selectedSection'  => null,
+                'error'            => 'Your account is not linked to a department. Contact the system administrator.',
             ]);
         }
 
@@ -128,30 +133,51 @@ class PbsController extends Controller
 
         $programs = Departments::where('dept_id', $progId)->get();
 
-        $subjects = Course::query()
+        $selectedSection = null;
+        if (!empty($filters['section'])) {
+            $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
+        }
+
+        // Courses for this department, filtered by section year + active semester
+        // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
+        $subjectsQuery = Course::query()
             ->where('course_is_active', true)
             ->where('course_dept_id', $progId)
-            ->orderBy('course_code')
-            ->get();
+            ->orderBy('course_code');
+
+        if (!empty($selectedSection?->sec_year_level)) {
+            $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
+        }
+
+        // Map active semester name → 1 or 2
+        $semNum = null;
+        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+            $semNum = 2;
+        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+            $semNum = 1;
+        }
+        if ($semNum !== null) {
+            $subjectsQuery->where('course_semester', $semNum);
+        }
+
+        $subjects = $subjectsQuery->get();
 
         $prog = $programs->first();
+        // All teachers who can be assigned (faculty table only — needed for FK).
+        // Includes full-time, part-time, dept chairs, and deans who have a faculty row.
         $faculty = Faculty::query()
-            ->where(function ($q) use ($progId, $prog) {
-                $q->where('fac_dept_id', $progId);
-                if ($prog?->dept_college_id) {
-                    $q->orWhere('fac_college_id', $prog->dept_college_id);
-                }
-            })
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
 
         return view('chair.pbs', [
-            'schedules'     => $schedules,
-            'subjects'      => $subjects,
-            'faculty'       => $faculty,
-            'sections'      => $sections,
-            'programs'      => $programs,
+            'schedules'        => $schedules,
+            'subjects'         => $subjects,
+            'faculty'          => $faculty,
+            'sections'         => $sections,
+            'programs'         => $programs,
+            'departments'      => $programs, // same collection (department = old program)
             'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),
             // Labels like "2026-2027 1st Sem"
             'semesters'     => DB::table('semester as s')
@@ -169,7 +195,8 @@ class PbsController extends Controller
                 ->get()
                 ->map(function ($sem) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
-                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
+                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     }
@@ -179,8 +206,10 @@ class PbsController extends Controller
             'rooms'         => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
             'filters'       => $filters,
             'selectedDate'  => $request->query('date'),
-            'chairProgram'  => $programs->first(),
-            'activeSemester'=> $activeSem ?? $this->activeSemester(),
+            'chairProgram'     => $programs->first(),
+            'chairDepartment'  => $programs->first(),
+            'activeSemester'   => $activeSem ?? $this->activeSemester(),
+            'selectedSection'  => $selectedSection,
         ]);
     }
 
@@ -295,4 +324,40 @@ class PbsController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
     }
+
+    /**
+     * Save number of students for the selected section (sec_no_of_student).
+     * Chair may only update sections under their department.
+     */
+    public function updateStudents(Request $request)
+    {
+        $data = $request->validate([
+            'sec_id'            => 'required|uuid|exists:section,sec_id',
+            'sec_no_of_student' => 'required|integer|min:0|max:500',
+        ]);
+
+        $progId = $this->chairProgramId();
+        $section = Section::where('sec_id', $data['sec_id'])->first();
+
+        if (!$section) {
+            return response()->json(['success' => false, 'message' => 'Section not found.'], 404);
+        }
+
+        if ($progId && $section->sec_dept_id !== $progId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only update sections under your assigned department.',
+            ], 403);
+        }
+
+        $section->sec_no_of_student = $data['sec_no_of_student'];
+        $section->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Number of students saved for ' . ($section->sec_name ?? 'section') . '.',
+            'sec_no_of_student' => (int) $section->sec_no_of_student,
+        ]);
+    }
 }
+

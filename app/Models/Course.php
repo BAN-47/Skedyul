@@ -37,14 +37,9 @@ class Course extends Model
         'course_name',
         'course_lecture_hours',
         'course_lab_hours',
+        'course_year_level',
+        'course_semester',
         'course_is_active',
-        'subj_dept_id',
-        'subj_prog_id',
-        'subj_code',
-        'subj_name',
-        'subj_lecture_hours',
-        'subj_lab_hours',
-        'subj_is_active',
     ];
 
     public function department()

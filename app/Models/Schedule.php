@@ -21,7 +21,7 @@ class Schedule extends Model
     protected $fillable = [
         'sch_load_id', 'sch_fac_id', 'sch_course_id', 'sch_subj_id', 'sch_sec_id',
         'sch_room_id', 'sch_sem_id', 'sch_day', 'sch_start_time',
-        'sch_end_time', 'sch_time_range', 'sch_status', 'sch_is_active', 'sch_created_by',
+        'sch_end_time', 'sch_time_range', 'sch_status', 'sch_is_active', 'sch_created_by', 'sch_mis_code',
     ];
     
   protected $casts = [
@@ -43,6 +43,11 @@ class Schedule extends Model
     }
  
     public function subject()
+    {
+        return $this->belongsTo(Course::class, 'sch_course_id', 'course_id');
+    }
+
+    public function course()
     {
         return $this->belongsTo(Course::class, 'sch_course_id', 'course_id');
     }
