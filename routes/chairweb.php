@@ -9,7 +9,7 @@ use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
-use App\Http\Controllers\Chair\ChairProfileController;
+use App\Http\Controllers\Chair\ChairSettingsController;
 
 
 /*
@@ -87,13 +87,13 @@ Route::post('/schedule', function () {
 })->name('schedule.store');
 
 Route::prefix('chair')->group(function () {
-    Route::post('/profile/avatar', [ChairProfileController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
-    Route::delete('/profile/avatar', [ChairProfileController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
-    Route::put('/profile/personal-info', [ChairProfileController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
-    Route::put('/profile/contact', [ChairProfileController::class, 'updateContact'])->name('chair.profile.contact.update');
-    Route::put('/profile/password', [ChairProfileController::class, 'updatePassword'])->name('chair.profile.password.update');
-    Route::put('/profile/notification-preferences', [ChairProfileController::class, 'updateNotificationPreferences'])->name('chair.profile.notification-preferences.update');
-    Route::put('/security', [ChairProfileController::class, 'updateSecuritySettings'])->name('chair.security.update');
+    Route::post('/profile/avatar', [ChairSettingsController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
+    Route::delete('/profile/avatar', [ChairSettingsController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
+    Route::put('/profile/personal-info', [ChairSettingsController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
+    Route::put('/profile/contact', [ChairSettingsController::class, 'updateContact'])->name('chair.profile.contact.update');
+    Route::put('/profile/password', [ChairSettingsController::class, 'updatePassword'])->name('chair.profile.password.update');
+    Route::put('/profile/notification-preferences', [ChairSettingsController::class, 'updateNotificationPreferences'])->name('chair.profile.notification-preferences.update');
+    Route::put('/security', [ChairSettingsController::class, 'updateSecuritySettings'])->name('chair.security.update');
 });
 
-Route::get('/chair/settings', [ChairProfileController::class, 'settings'])->name('chair.settings');
+Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');

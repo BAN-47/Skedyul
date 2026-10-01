@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
-class ChairProfileController extends Controller
+class ChairSettingsController extends Controller
 {
     private function currentChair(): Dept_Chair
     {
