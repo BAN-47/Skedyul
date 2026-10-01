@@ -60,7 +60,7 @@ class PbsController extends Controller
         $ay = DB::table('academic_year')->where('ay_is_active', true)->first();
         $year = $ay->ay_academic_year ?? $ay->ay_year_label ?? '';
         $semName = $sem->sem_name ?? '';
-        $yearDisp = $year !== '' ? str_replace('-', '-', $year) : '';
+        $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
         $sem->label = trim($semName . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
         $sem->ay_academic_year = $year;
         return $sem;
@@ -133,11 +133,35 @@ class PbsController extends Controller
 
         $programs = Departments::where('dept_id', $progId)->get();
 
-        $subjects = Course::query()
+        $selectedSection = null;
+        if (!empty($filters['section'])) {
+            $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
+        }
+
+        // Courses for this department, filtered by section year + active semester
+        // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
+        $subjectsQuery = Course::query()
             ->where('course_is_active', true)
             ->where('course_dept_id', $progId)
-            ->orderBy('course_code')
-            ->get();
+            ->orderBy('course_code');
+
+        if (!empty($selectedSection?->sec_year_level)) {
+            $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
+        }
+
+        // Map active semester name → 1 or 2
+        $semNum = null;
+        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+            $semNum = 2;
+        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+            $semNum = 1;
+        }
+        if ($semNum !== null) {
+            $subjectsQuery->where('course_semester', $semNum);
+        }
+
+        $subjects = $subjectsQuery->get();
 
         $prog = $programs->first();
         $faculty = Faculty::query()
@@ -150,11 +174,6 @@ class PbsController extends Controller
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
-
-        $selectedSection = null;
-        if (!empty($filters['section'])) {
-            $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
-        }
 
         return view('chair.pbs', [
             'schedules'        => $schedules,
@@ -180,7 +199,8 @@ class PbsController extends Controller
                 ->get()
                 ->map(function ($sem) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
-                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
+                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     }

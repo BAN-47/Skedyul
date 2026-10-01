@@ -386,7 +386,7 @@
           <select id="add-section" class="field-input">
             <option value="">-- Select Section --</option>
             @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
             @endforeach
           </select>
         </div>
@@ -397,7 +397,7 @@
         <select id="add-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
           @endforeach
         </select>
       </div>
@@ -477,7 +477,7 @@
         <select id="edit-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
           @endforeach
         </select>
       </div>
@@ -533,7 +533,7 @@
           <select id="edit-section" class="field-input">
             <option value="">-- Select Section --</option>
             @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}">{{ $sec->sec_name }}</option>
+              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
             @endforeach
           </select>
         </div>

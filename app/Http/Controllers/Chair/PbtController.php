@@ -28,7 +28,7 @@ class PbtController extends Controller
         $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
         if ($activeSem) {
             $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
-            $yearDisp = $year !== '' ? str_replace('-', '-', $year) : '';
+            $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
             $activeSem->label = trim(($activeSem->sem_name ?? '') . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
         }
         $filters['semester'] = $activeSem->sem_id ?? null;
@@ -48,7 +48,24 @@ class PbtController extends Controller
 
         return view('chair.pbt', [
             'schedules'        => $schedules,
-            'subjects'         => Course::where('course_is_active', true)->orderBy('course_code')->get(),
+            'subjects'         => Course::where('course_is_active', true)
+                ->when(
+                    ($deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)->value('dc_dept_id')),
+                    fn ($q) => $q->where('course_dept_id', $deptId)
+                )
+                ->when(true, function ($q) {
+                    $semName = strtolower((string) (\App\Models\Semester::where('sem_is_active', true)->value('sem_name') ?? ''));
+                    $semNum = null;
+                    if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+                        $semNum = 2;
+                    } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+                        $semNum = 1;
+                    }
+                    if ($semNum !== null) {
+                        $q->where('course_semester', $semNum);
+                    }
+                })
+                ->orderBy('course_code')->get(),
             'facultyFullTime'  => Faculty::where('fac_employment_type', 'full_time')->orderBy('fac_last_name')->get(),
             'facultyPartTime'  => Faculty::where('fac_employment_type', 'part_time')->orderBy('fac_last_name')->get(),
             // schedule.sch_fac_id has a foreign key to faculty(fac_id) only —
@@ -75,7 +92,8 @@ class PbtController extends Controller
                 ->get()
                 ->map(function ($sem) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
-                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
+                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     }

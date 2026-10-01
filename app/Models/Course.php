@@ -37,6 +37,8 @@ class Course extends Model
         'course_name',
         'course_lecture_hours',
         'course_lab_hours',
+        'course_year_level',
+        'course_semester',
         'course_is_active',
         'subj_dept_id',
         'subj_prog_id',
