@@ -11,6 +11,7 @@ use App\Models\Course;
 use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
+use App\Models\Semester;
 use Illuminate\Support\Facades\DB;
 
 class PbtController extends Controller
@@ -21,7 +22,20 @@ class PbtController extends Controller
 
     public function index(Request $request)
     {
-        $filters   = $request->only(['program', 'semester']);
+        $filters = $request->only(['program']);
+
+        // Same as PBS: chair only sees their department (BSIS chair → BSIS only)
+        $deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)
+            ->value('dc_dept_id');
+
+        $activeSem = DB::table('semester')->where('sem_is_active', true)->first();
+        $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
+        if ($activeSem) {
+            $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
+            $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
+            $activeSem->label = trim(($activeSem->sem_name ?? '') . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
+        }
+        $filters['semester'] = $activeSem->sem_id ?? null;
         $facultyId = $request->query('faculty');
 
         $selectedFaculty = $facultyId ? Faculty::find($facultyId) : null;
@@ -36,19 +50,77 @@ class PbtController extends Controller
                 ->get();
         }
 
+        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+        $semNum = null;
+        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+            $semNum = 2;
+        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+            $semNum = 1;
+        }
+
+        $chairDepartment = $deptId ? Departments::where('dept_id', $deptId)->first() : null;
+        $deptCollection = $chairDepartment
+            ? collect([$chairDepartment])
+            : collect();
+
+        // Build teacher groups (must be faculty rows for FK)
+        $allFaculty = Faculty::query()
+            ->orderBy('fac_last_name')
+            ->orderBy('fac_first_name')
+            ->get();
+
+        $chairUsrIds = \App\Models\Dept_Chair::pluck('dc_usr_id')->filter()->all();
+        $deanUsrIds  = Dean::pluck('dean_usr_id')->filter()->all();
+
+        $facultyChairs = $allFaculty->filter(
+            fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
+        )->values();
+
+        $deans = $allFaculty->filter(
+            fn ($f) => in_array($f->fac_usr_id, $deanUsrIds, true)
+        )->values();
+
+        $specialIds = $facultyChairs->pluck('fac_id')
+            ->merge($deans->pluck('fac_id'))
+            ->unique()
+            ->all();
+
+        $facultyFullTime = $allFaculty->filter(function ($f) use ($specialIds) {
+            if (in_array($f->fac_id, $specialIds, true)) {
+                return false;
+            }
+            $t = strtolower(str_replace([' ', '-'], '_', (string) ($f->fac_employment_type ?? '')));
+            return str_contains($t, 'full') || $t === '' || !str_contains($t, 'part');
+        })->values();
+
+        $facultyPartTime = $allFaculty->filter(function ($f) use ($specialIds) {
+            if (in_array($f->fac_id, $specialIds, true)) {
+                return false;
+            }
+            $t = strtolower(str_replace([' ', '-'], '_', (string) ($f->fac_employment_type ?? '')));
+            return str_contains($t, 'part');
+        })->values();
+
         return view('chair.pbt', [
             'schedules'        => $schedules,
-            'subjects'         => Course::where('course_is_active', true)->orderBy('course_code')->get(),
-            'facultyFullTime'  => Faculty::where('fac_employment_type', 'full_time')->orderBy('fac_last_name')->get(),
-            'facultyPartTime'  => Faculty::where('fac_employment_type', 'part_time')->orderBy('fac_last_name')->get(),
-            // schedule.sch_fac_id has a foreign key to faculty(fac_id) only —
-            // a Dean can be picked here ONLY if they also have their own row
-            // in `faculty` (the two tables share usr_id when one person holds
-            // both roles). Deans with no matching faculty row simply won't
-            // appear, since there'd be no valid fac_id to schedule against.
-            'deans'            => Faculty::whereIn('fac_usr_id', Dean::pluck('dean_usr_id'))->orderBy('fac_last_name')->get(),
-            'sections'         => DB::table('section')->orderBy('sec_name')->get(),
-            'programs'         => Departments::orderBy('dept_name')->get(),
+            'subjects'         => Course::where('course_is_active', true)
+                ->when($deptId, fn ($q) => $q->where('course_dept_id', $deptId))
+                ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum))
+                ->orderBy('course_code')
+                ->get(),
+            'facultyFullTime'  => $facultyFullTime,
+            'facultyPartTime'  => $facultyPartTime,
+            'facultyChairs'    => $facultyChairs,
+            'deans'            => $deans,
+
+            // BSIS chair → only BSIS sections; BSIT chair → only BSIT sections
+            'sections'         => DB::table('section')
+                ->when($deptId, fn ($q) => $q->where('sec_dept_id', $deptId))
+                ->orderBy('sec_name')
+                ->get(),
+            'programs'         => $deptCollection,
+            'departments'      => $deptCollection,
+            'chairDepartment'  => $chairDepartment,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->orderByDesc('s.sem_start_date')
@@ -64,7 +136,8 @@ class PbtController extends Controller
                 ->get()
                 ->map(function ($sem) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
-                    $label = trim($ay . ($ay !== '' ? ' · ' : '') . $sem->sem_name);
+                    $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
+                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     }
@@ -76,6 +149,7 @@ class PbtController extends Controller
             'selectedFaculty'  => $selectedFaculty,
             'selectedDate'     => $request->query('date'),
             'loadStats'        => $this->loadStatsFor($selectedFaculty, $filters['semester'] ?? null),
+            'activeSemester'   => $activeSem ?? null,
         ]);
     }
 
@@ -93,7 +167,7 @@ class PbtController extends Controller
             ->with('subject', 'schedule')
             ->get();
 
-        $units = $loads->sum(fn ($l) => ($l->subject->subj_lecture_hours ?? 0) + ($l->subject->subj_lab_hours ?? 0));
+        $units = $loads->sum(fn ($l) => ($l->course->course_lecture_hours ?? $l->subject->course_lecture_hours ?? 0) + ($l->course->course_lab_hours ?? $l->subject->course_lab_hours ?? 0));
 
         $hoursPerWeek = $loads->sum(function ($l) {
             if (!$l->schedule) return 0;
@@ -103,7 +177,7 @@ class PbtController extends Controller
         });
 
         return [
-            'preparations' => $loads->pluck('sl_subj_id')->unique()->count(),
+            'preparations' => $loads->pluck('sl_course_id')->unique()->count(),
             'units'        => $units ?: null,
             'hours_week'   => $hoursPerWeek ?: null,
             'designation'  => $faculty->fac_rank,
@@ -113,12 +187,20 @@ class PbtController extends Controller
         ];
     }
 
+
+    private function currentSemesterId(): ?string
+    {
+        return \App\Models\Semester::where('sem_is_active', true)
+            ->orderByDesc('sem_start_date')
+            ->value('sem_id');
+    }
+
     private function validated(Request $request): array
     {
         return $request->validate([
             'subj_id'    => 'required|uuid|exists:course,course_id',
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
-            'sem_id'     => 'required|uuid|exists:semester,sem_id',
+            'sem_id'     => 'nullable|uuid|exists:semester,sem_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
             'day'        => 'required|string|max:15',
@@ -129,13 +211,29 @@ class PbtController extends Controller
 
     public function store(Request $request)
     {
-        $result = $this->scheduler->assign($this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->assign($data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     public function update(Request $request, string $id)
     {
-        $result = $this->scheduler->update($id, $this->validated($request));
+        $data = $this->validated($request);
+        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
+        if (empty($data['sem_id'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
+            ], 422);
+        }
+        $result = $this->scheduler->update($id, $data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 

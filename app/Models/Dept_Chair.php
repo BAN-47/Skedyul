@@ -46,6 +46,10 @@ class Dept_Chair extends Model
         'dc_bio',
     ];
 
+    protected $casts = [
+        'dc_dob' => 'date',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class, 'dc_usr_id', 'usr_id');

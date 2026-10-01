@@ -103,10 +103,10 @@ function applyFilters() {
     const params = new URLSearchParams(window.location.search);
 
     // Program locked server-side; semester label includes academic year.
+    // Semester is fixed by admin settings — do not put it in the URL
     const map = {
         program:       'filter-program',
         section:       'filter-section',
-        semester:      'filter-semester',
     };
 
     Object.entries(map).forEach(([key, id]) => {
@@ -372,16 +372,63 @@ function submitDelete() {
 }
 
 /* ── toolbar ── */
-function saveDraft() {
-    fetch('/chair/pbs/save-draft', {
-        method:  'POST',
-        headers: { 'X-CSRF-TOKEN': csrfToken(), 'Accept': 'application/json' },
-    })
-    .then(async res => {
+async function saveDraft() {
+    const sectionId = document.getElementById('filter-section')?.value || '';
+    const input = document.getElementById('section-student-count');
+    const countRaw = input ? String(input.value).trim() : '';
+    const count = countRaw === '' ? null : parseInt(countRaw, 10);
+
+    // Save section student count (summary) when a section is selected
+    if (sectionId && count !== null && !Number.isNaN(count) && count >= 0) {
+        try {
+            const res = await fetch('/chair/pbs/section/students', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    sec_id: sectionId,
+                    sec_no_of_student: count,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                showToast(data.message || 'Could not save student count.');
+                return;
+            }
+            if (input && data.sec_no_of_student != null) {
+                input.value = data.sec_no_of_student;
+            }
+        } catch (e) {
+            showToast('Network error saving student count.');
+            return;
+        }
+    }
+
+    // Save draft marker for schedules already on the grid (they save on Confirm)
+    try {
+        const res = await fetch('/chair/pbs/save-draft', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                section: sectionId,
+                semester: document.getElementById('filter-semester')?.value || '',
+            }),
+        });
         const data = await res.json().catch(() => ({}));
-        showToast(data.message || 'Draft saved.');
-    })
-    .catch(() => showToast('Could not save the draft.'));
+        showToast(data.message || 'Draft saved (summary + schedules).');
+    } catch (e) {
+        showToast('Could not save the draft.');
+    }
 }
 
 function clearAll() {

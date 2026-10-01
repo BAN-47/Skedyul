@@ -48,8 +48,6 @@ class Course extends Model
         'subj_name',
         'subj_lecture_hours',
         'subj_lab_hours',
-        'subj_year_level',
-        'subj_semester',
         'subj_is_active',
     ];
 

@@ -22,61 +22,8 @@ class ChairSubjectController extends Controller
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
-        // Scope to the logged-in chair's program (e.g. BSIS)
-        $collegeId = $deptChair?->dc_college_id;
-        $programId = $deptChair?->dc_dept_id ?? $deptChair?->dc_prog_id;
-
-        $program = $programId ? Departments::find($programId) : null;
-        $programName = $program?->dept_name ?? $program?->prog_name ?? 'Department';
-
-        // Collect every department id that represents this program.
-        // Seed may have attached courses to a matching dept row that differs
-        // from the chair's dc_dept_id (e.g. code/name match, different uuid).
-        $programDeptIds = collect([$programId])->filter();
-
-        if ($program) {
-            $related = Departments::query()
-                ->where(function ($q) use ($program, $collegeId) {
-                    $q->where('dept_id', $program->dept_id);
-
-                    if (! empty($program->dept_code)) {
-                        $q->orWhereRaw('upper(coalesce(dept_code, \'\')) = ?', [strtoupper($program->dept_code)]);
-                    }
-
-                    if (! empty($program->dept_name)) {
-                        $q->orWhere('dept_name', $program->dept_name);
-                        // BSIS / Information Systems name variants
-                        if (
-                            stripos($program->dept_name, 'Information Systems') !== false
-                            || stripos($program->dept_name, 'BSIS') !== false
-                        ) {
-                            $q->orWhere('dept_name', 'ilike', '%Information Systems%')
-                                ->orWhereRaw('upper(coalesce(dept_code, \'\')) = ?', ['BSIS']);
-                        }
-                    }
-                })
-                ->pluck('dept_id');
-
-            $programDeptIds = $programDeptIds->merge($related)->unique()->values();
-        }
-
-        // Prefer program-scoped courses. Do NOT also require course_college_id
-        // to match — seeded rows use the program's college, which can differ
-        // from department_chair.dc_college_id.
         $subjects = Course::with(['department', 'program'])
-            ->where(function ($q) {
-                $q->where('course_is_active', true)
-                    ->orWhereNull('course_is_active');
-            })
-            ->when($programDeptIds->isNotEmpty(), function ($q) use ($programDeptIds) {
-                $q->whereIn('course_dept_id', $programDeptIds->all());
-            }, function ($q) use ($collegeId) {
-                // Fallback: college only if no program ids resolved
-                if ($collegeId) {
-                    $q->where('course_college_id', $collegeId);
-                }
-            })
-            ->orderBy('course_code')
+            ->where('course_is_active', true)
             ->get();
 
         $subjectIds = $subjects->pluck('course_id');
@@ -102,20 +49,7 @@ class ChairSubjectController extends Controller
 
         $departments = College::orderBy('college_name')->get();
         $programs = Departments::orderBy('dept_name')->get();
-
-        // Sections for this program (same dept-id set used for subjects)
-        $section = Section::query()
-            ->when($programDeptIds->isNotEmpty(), function ($q) use ($programDeptIds) {
-                $q->whereIn('sec_dept_id', $programDeptIds->all());
-            }, function ($q) use ($programId, $collegeId) {
-                if ($programId) {
-                    $q->where('sec_dept_id', $programId);
-                }
-            })
-            ->orderBy('sec_year_level')
-            ->orderBy('sec_name')
-            ->get();
-
+        $section = Section::orderBy('sec_name')->get();
         // Join to academic_year so the dropdown can show "2026-2027 1st Sem"
         $semesters = DB::table('semester')
             ->join('academic_year', 'semester.sem_ay_id', '=', 'academic_year.ay_id')
@@ -151,7 +85,7 @@ class ChairSubjectController extends Controller
 
             $faculty = $facultyRecords->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
                 $totalUnits = $studyLoads->get($f->fac_id, collect())->sum(function ($sl) use ($subjectsById) {
-                    $s = $subjectsById->get($sl->sl_course_id);
+                    $s = $subjectsById->get($sl->sl_subj_id);
                     return $s ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours) : 0;
                 });
 
@@ -163,45 +97,7 @@ class ChairSubjectController extends Controller
             });
         }
 
-        $yearLevels = [
-            1 => '1st Year',
-            2 => '2nd Year',
-            3 => '3rd Year',
-            4 => '4th Year',
-        ];
-
-        // Plain array for JS — avoid multi-line @json + arrow fn in Blade (parse error)
-        // Read year/semester from raw attributes so legacy getAttribute aliases can't hide them.
-        $subjectsForJs = $subjects->map(function ($s) {
-            $attrs = $s->getAttributes();
-            $year  = $attrs['course_year_level'] ?? null;
-            $sem   = $attrs['course_semester'] ?? null;
-
-            return [
-                'id'         => $s->subj_id,
-                'code'       => $s->subj_code,
-                'name'       => $s->subj_name,
-                'lec'        => (float) $s->subj_lecture_hours,
-                'lab'        => (float) $s->subj_lab_hours,
-                'units'      => (float) $s->subj_lecture_hours + (float) $s->subj_lab_hours,
-                'faculty'    => $s->assignedFaculty,
-                'dept_id'    => $s->subj_dept_id,
-                'year_level' => $year !== null && $year !== '' ? (int) $year : null,
-                'semester'   => $sem !== null && $sem !== '' ? (int) $sem : null,
-            ];
-        })->values()->all();
-
-        return view('chair.subjects', compact(
-            'subjects',
-            'subjectsForJs',
-            'departments',
-            'programs',
-            'section',
-            'faculty',
-            'semesters',
-            'yearLevels',
-            'programName'
-        ));
+        return view('chair.subjects', compact('subjects', 'departments', 'programs', 'section', 'faculty', 'semesters'));
     }
 
     public function store(Request $request)
@@ -216,35 +112,45 @@ class ChairSubjectController extends Controller
         ]);
 
         try {
-            Course::create($validated);
+            Course::create(array_merge($data, ['course_is_active' => true]));
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to add the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to add the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject added successfully.');
+            ->with('success', 'Course added successfully.');
     }
 
     public function update(Request $request, string $id)
     {
         $subject = Course::findOrFail($id);
 
-        $validated = $request->validate([
-            'subj_dept_id' => 'required|exists:college,college_id',
-            'subj_code' => [
+        $request->merge([
+            'course_college_id'    => $request->input('course_college_id', $request->input('subj_dept_id')),
+            'course_dept_id'       => $request->input('course_dept_id', $request->input('subj_prog_id', $course->course_dept_id)),
+            'course_code'          => $request->input('course_code', $request->input('subj_code')),
+            'course_name'          => $request->input('course_name', $request->input('subj_name')),
+            'course_lecture_hours' => $request->input('course_lecture_hours', $request->input('subj_lecture_hours')),
+            'course_lab_hours'     => $request->input('course_lab_hours', $request->input('subj_lab_hours')),
+        ]);
+
+        $data = $request->validate([
+            'course_college_id'    => 'required|uuid|exists:college,college_id',
+            'course_dept_id'       => 'nullable|uuid|exists:department,dept_id',
+            'course_code'          => [
                 'required',
                 'string',
                 Rule::unique('course', 'course_code')->ignore($subject->course_id, 'course_id'),
             ],
-            'subj_name' => 'required|string',
-            'subj_lecture_hours' => 'required|numeric|min:0',
-            'subj_lab_hours' => 'required|numeric|min:0',
+            'course_name'          => 'required|string',
+            'course_lecture_hours' => 'required|numeric|min:0',
+            'course_lab_hours'     => 'required|numeric|min:0',
         ]);
 
         try {
-            $subject->update($validated);
+            $course->update($data);
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to update the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to update the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
@@ -253,15 +159,22 @@ class ChairSubjectController extends Controller
 
     public function destroy(string $id)
     {
-        $subject = Course::findOrFail($id);
+        $course = Course::findOrFail($id);
 
         try {
-            $subject->update(['subj_is_active' => false]);
+            $course->update(['course_is_active' => false]);
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to deactivate the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to deactivate the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject deactivated successfully.');
+            ->with('success', 'Course deactivated successfully.');
+    }
+
+
+    private function redirectWithDbError(\Throwable $e, string $fallback)
+    {
+        report($e);
+        return redirect()->back()->with('error', $fallback);
     }
 }
