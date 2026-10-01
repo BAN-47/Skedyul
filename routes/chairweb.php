@@ -7,6 +7,7 @@ use App\Http\Controllers\Chair\ScheduleController;
 use App\Http\Controllers\Chair\ChairSubjectController;
 use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
+use App\Http\Controllers\Chair\ChairSettingsController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
 use App\Http\Controllers\Chair\MisController;
