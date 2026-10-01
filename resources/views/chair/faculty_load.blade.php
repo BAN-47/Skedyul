@@ -60,7 +60,7 @@
                             {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_UNITS }}u
                         </div>
                     </div>
-                    <button type="button" onclick="openAssignModal()" class="btn btn-primary">+ Assign Subject</button>
+                    <button type="button" onclick="openAssignModal()" class="btn btn-primary">+ Assign Course</button>
                 </div>
 
                 <div class="card">

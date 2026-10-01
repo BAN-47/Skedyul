@@ -99,7 +99,7 @@ class SubjectController extends Controller
             ->with('success', 'Subject updated successfully.');
     }
 
-   public function destroy(string $id)
+    public function destroy(string $id)
     {
         $subject = Course::findOrFail($id);
 
