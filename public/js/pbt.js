@@ -145,14 +145,62 @@ function addMinutesToTime(hhmm, minutesToAdd) {
   return `${hh}:${mm}`;
 }
 
+/**
+ * Filter subject dropdown options by the year level of the selected section.
+ * e.g. Section "1-A" (year_level=1) → only show 1st-year subjects.
+ */
+function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
+  const secSel = document.getElementById(sectionSelectId);
+  const subSel = document.getElementById(subjectSelectId);
+  if (!secSel || !subSel) return;
+
+  const selectedOpt = secSel.options[secSel.selectedIndex];
+  const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+
+  Array.from(subSel.options).forEach(opt => {
+    if (!opt.value) {
+      opt.hidden = false;
+      opt.style.display = '';
+      return;
+    }
+    const subYear = opt.getAttribute('data-year-level') || '';
+    const match = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+    opt.hidden = !match;
+    opt.style.display = match ? '' : 'none';
+  });
+
+  // Reset subject if current selection is no longer visible
+  const current = subSel.options[subSel.selectedIndex];
+  if (current && current.hidden) {
+    subSel.value = '';
+  }
+}
+
+// Wire up section → subject filter for Add + Edit modals
+document.addEventListener('DOMContentLoaded', () => {
+  const addSec = document.getElementById('add-section');
+  if (addSec) {
+    addSec.addEventListener('change', () => filterSubjectsBySection('add-section', 'add-subject'));
+  }
+  const editSec = document.getElementById('edit-section');
+  if (editSec) {
+    editSec.addEventListener('change', () => filterSubjectsBySection('edit-section', 'edit-subject'));
+  }
+});
+
 function openAddModal(day, startTime) {
   if (!SELECTED_TEACHER) {
     showToast('Select a teacher first.');
     return;
   }
   clearInlineError('add-error');
-  ['add-subject','add-semester','add-program','add-section','add-room',
-   'add-description'].forEach(id => document.getElementById(id).value = '');
+  ['add-subject','add-section','add-room','add-description'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // Reset subject filter (show all until a section is chosen)
+  filterSubjectsBySection('add-section', 'add-subject');
 
   document.getElementById('add-day').value   = day || '';
   document.getElementById('add-start').value = startTime || '';
@@ -215,8 +263,10 @@ function submitAdd() {
 function openEditModal(block) {
   clearInlineError('edit-error');
   document.getElementById('edit-id').value      = block.dataset.scheduleId;
-  document.getElementById('edit-subject').value = block.dataset.subject || '';
   document.getElementById('edit-section').value = block.dataset.section || '';
+  // Filter subjects by the section's year level first, then set subject
+  filterSubjectsBySection('edit-section', 'edit-subject');
+  document.getElementById('edit-subject').value = block.dataset.subject || '';
   document.getElementById('edit-room').value    = block.dataset.room    || '';
   document.getElementById('edit-day').value     = block.dataset.day     || '';
   document.getElementById('edit-start').value   = block.dataset.start   || '';

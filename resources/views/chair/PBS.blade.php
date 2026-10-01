@@ -355,6 +355,7 @@
     </div>
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
+      {{-- ── FIXED FIELDS (top) ── --}}
       <div class="mb-3">
         <label class="field-label">Semester</label>
         <div class="field-input bg-slate-100 font-semibold text-slate-700">
@@ -364,40 +365,41 @@
       </div>
 
       <div class="mb-3">
-        <label class="field-label">Program</label>
-        @if(!empty($chairProgram))
+        <label class="field-label">Department</label>
+        @if(!empty($chairProgram) || !empty($chairDepartment))
+          @php $dept = $chairDepartment ?? $chairProgram; @endphp
           <div class="field-input bg-slate-100 font-semibold text-slate-700">
-            {{ $chairProgram->prog_code }} — {{ $chairProgram->prog_name }}
+            {{ $dept->dept_code ?? $dept->prog_code }} — {{ $dept->dept_name ?? $dept->prog_name }}
           </div>
-          <input type="hidden" id="add-program" value="{{ $chairProgram->prog_id }}">
+          <input type="hidden" id="add-program" value="{{ $dept->dept_id ?? $dept->prog_id }}">
         @else
-          <select id="add-program" class="field-input">
-            <option value="">-- Select Program --</option>
-            @foreach($programs as $p)
-              <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
-            @endforeach
-          </select>
+          <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
+          <input type="hidden" id="add-program" value="">
         @endif
       </div>
 
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="field-label">Section</label>
-          <select id="add-section" class="field-input">
-            <option value="">-- Select Section --</option>
-            @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
-            @endforeach
-          </select>
-        </div>
+      {{-- ── SECTION (triggers subject filter by year level) ── --}}
+      <div class="mb-3">
+        <label class="field-label">Section</label>
+        <select id="add-section" class="field-input">
+          <option value="">-- Select Section --</option>
+          @foreach($sections as $sec)
+            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
+          @endforeach
+        </select>
       </div>
 
+      {{-- ── SUBJECT (auto-filtered by section year level) ── --}}
       <div class="mb-3">
         <label class="field-label">Subject</label>
         <select id="add-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                    data-year-level="{{ $sub->course_year_level ?? '' }}"
+                    data-semester="{{ $sub->course_semester ?? '' }}">
+              {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+            </option>
           @endforeach
         </select>
       </div>
@@ -421,8 +423,6 @@
           @endforeach
         </select>
       </div>
-
-      
 
       <div class="mb-3">
         <label class="field-label">Day</label>
@@ -472,12 +472,51 @@
     <div class="max-h-[62vh] overflow-y-auto pr-1">
       <input type="hidden" id="edit-id">
 
+      {{-- FIXED FIELDS --}}
+      <div class="mb-3">
+        <label class="field-label">Semester</label>
+        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+          {{ optional($activeSemester)->label ?? 'No active semester' }}
+        </div>
+        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
+      </div>
+
+      <div class="mb-3">
+        <label class="field-label">Department</label>
+        @if(!empty($chairProgram) || !empty($chairDepartment))
+          @php $dept = $chairDepartment ?? $chairProgram; @endphp
+          <div class="field-input bg-slate-100 font-semibold text-slate-700">
+            {{ $dept->dept_code ?? $dept->prog_code }} — {{ $dept->dept_name ?? $dept->prog_name }}
+          </div>
+          <input type="hidden" id="edit-program" value="{{ $dept->dept_id ?? $dept->prog_id }}">
+        @else
+          <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
+          <input type="hidden" id="edit-program" value="">
+        @endif
+      </div>
+
+      {{-- SECTION (triggers subject filter) --}}
+      <div class="mb-3">
+        <label class="field-label">Section</label>
+        <select id="edit-section" class="field-input">
+          <option value="">-- Select Section --</option>
+          @foreach($sections as $sec)
+            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
+          @endforeach
+        </select>
+      </div>
+
+      {{-- SUBJECT (auto-filtered by section year level) --}}
       <div class="mb-3">
         <label class="field-label">Subject</label>
         <select id="edit-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}" data-year-level="{{ $sub->course_year_level ?? '' }}" data-semester="{{ $sub->course_semester ?? '' }}">{{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}</option>
+            <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                    data-year-level="{{ $sub->course_year_level ?? '' }}"
+                    data-semester="{{ $sub->course_semester ?? '' }}">
+              {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+            </option>
           @endforeach
         </select>
       </div>
@@ -500,43 +539,6 @@
             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
           @endforeach
         </select>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Semester</label>
-        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-          {{ optional($activeSemester)->label ?? 'No active semester' }}
-        </div>
-        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Program</label>
-        @if(!empty($chairProgram))
-          <div class="field-input bg-slate-100 font-semibold text-slate-700">
-            {{ $chairProgram->prog_code }} — {{ $chairProgram->prog_name }}
-          </div>
-          <input type="hidden" id="edit-program" value="{{ $chairProgram->prog_id }}">
-        @else
-          <select id="edit-program" class="field-input">
-            <option value="">-- Select Program --</option>
-            @foreach($programs as $p)
-              <option value="{{ $p->prog_id }}">{{ $p->prog_code }} — {{ $p->prog_name }}</option>
-            @endforeach
-          </select>
-        @endif
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="field-label">Section</label>
-          <select id="edit-section" class="field-input">
-            <option value="">-- Select Section --</option>
-            @foreach($sections as $sec)
-              <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
-            @endforeach
-          </select>
-        </div>
       </div>
 
       <div class="mb-3">

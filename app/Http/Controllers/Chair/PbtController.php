@@ -72,16 +72,29 @@ class PbtController extends Controller
         $chairUsrIds = \App\Models\Dept_Chair::pluck('dc_usr_id')->filter()->all();
         $deanUsrIds  = Dean::pluck('dean_usr_id')->filter()->all();
 
+        // Only the currently logged-in Dept. Chair can appear in the list
+        // (a chair may plot their own schedule, but not other chairs')
+        $currentChairUsrId = auth()->user()?->usr_id;
         $facultyChairs = $allFaculty->filter(
-            fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
+            fn ($f) => $f->fac_usr_id === $currentChairUsrId
+                && in_array($f->fac_usr_id, $chairUsrIds, true)
         )->values();
 
         $deans = $allFaculty->filter(
             fn ($f) => in_array($f->fac_usr_id, $deanUsrIds, true)
         )->values();
 
-        $specialIds = $facultyChairs->pluck('fac_id')
+        // Exclude other chairs + deans from full-time / part-time lists
+        // (logged-in chair is kept out of full/part so they only appear under DEPT CHAIR)
+        $otherChairIds = $allFaculty
+            ->filter(fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
+                && $f->fac_usr_id !== $currentChairUsrId)
+            ->pluck('fac_id')
+            ->all();
+
+        $specialIds = collect($otherChairIds)
             ->merge($deans->pluck('fac_id'))
+            ->merge($facultyChairs->pluck('fac_id'))
             ->unique()
             ->all();
 
