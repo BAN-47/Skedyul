@@ -1,621 +1,563 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SKEDYUL — Settings</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>SKEDYUL — Department Chair Settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="overflow-hidden bg-slate-50 font-sans text-slate-900 antialiased">
+<body class="font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden h-screen">
 
-<div class="flex h-screen overflow-hidden">
-  @include('partials.chair_sidebar')
+<div class="app-shell">
 
-  <main class="flex-1 overflow-hidden">
-    @include('partials.chair_header', ['title' => 'Settings', 'badgeText' => 'BSIS · AY 2025–26 · 1st Sem'])
+@include('partials.chair_sidebar')
+
+  <div class="app-main">
+    @include('partials.chair_header', ['title' => 'Department Chair Settings'])
 
     <div class="page-content">
-      <div class="mb-5">
-        <div class="text-[20px] font-extrabold text-slate-900">Settings</div>
-        <div class="mt-1 text-[13px] text-slate-500">Configure SKEDYUL for your department</div>
-      </div>
+      <div class="grid grid-cols-[220px_1fr] gap-6 items-start">
 
-      <div class="grid grid-cols-1 gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
-        <aside class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div class="mb-2 px-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">Settings</div>
-          <button class="w-full rounded-xl bg-blue-50 px-3 py-2 text-left text-sm font-semibold text-blue-700" onclick="showSection('general', this)">General</button>
-          <button class="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 hover:bg-slate-50" onclick="showSection('academic', this)">Academic Year</button>
-          <button class="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 hover:bg-slate-50" onclick="showSection('workload', this)">Workload Rules</button>
-          <button class="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 hover:bg-slate-50" onclick="showSection('notifications', this)">Notifications</button>
-          <button class="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 hover:bg-slate-50" onclick="showSection('security', this)">Security</button>
-          <button class="mt-2 w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-600 hover:bg-slate-50" onclick="showSection('system', this)">System Info</button>
-        </aside>
-
-        <div id="settings-content" class="space-y-5">
-          <div id="settings-general" class="space-y-5">
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="mb-4">
-                <div class="text-[15px] font-bold text-slate-900">Institution Details</div>
-                <div class="mt-1 text-[12px] text-slate-500">Basic information about your school</div>
-              </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Institution Name</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="Cebu Technological University">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Campus</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="Main Campus">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">College / Unit</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="College of Computing, Information and Communications Technology">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Abbreviation</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="CCICT">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Contact Email</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="email" value="ccict@ctu.edu.ph">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Phone</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="(032) 401-7777">
-                </div>
-              </div>
-              <div class="mt-4 flex justify-end">
-                <button class="rounded-xl bg-blue-600 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-blue-700" onclick="showToast('Institution details saved!')">Save Changes</button>
-              </div>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="mb-4">
-                <div class="text-[15px] font-bold text-slate-900">Appearance</div>
-                <div class="mt-1 text-[12px] text-slate-500">Theme, language, and display format preferences</div>
-              </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Theme</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>Light</option><option>Dark</option></select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Language</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>English</option><option>Filipino</option><option>Cebuano</option></select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Time Format</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>12-hour (AM/PM)</option><option>24-hour</option></select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Date Format</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option>MM/DD/YYYY</option><option selected>DD/MM/YYYY</option><option>YYYY-MM-DD</option></select>
-                </div>
-              </div>
-              <div class="mt-4 flex justify-end">
-                <button class="rounded-xl bg-blue-600 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-blue-700" onclick="showToast('Appearance settings saved!')">Save Changes</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="settings-academic" class="hidden space-y-5">
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <div class="text-[15px] font-bold text-slate-900">Current Academic Year</div>
-                  <div class="mt-1 text-[12px] text-slate-500">Active semester configuration</div>
-                </div>
-                <span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Active</span>
-              </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Academic Year</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" value="2025–2026">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Semester</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>1st Semester</option><option>2nd Semester</option><option>Summer</option></select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Start Date</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="date" value="2025-08-11">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">End Date</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="date" value="2025-12-20">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Schedule Submission Deadline</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="date" value="2025-07-25">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">School Days</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>Monday – Saturday</option><option>Monday – Friday</option></select>
-                </div>
-              </div>
-              <div class="mt-4 flex justify-end">
-                <button class="rounded-xl bg-blue-600 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-blue-700" onclick="showToast('Academic year settings saved!')">Save Changes</button>
-              </div>
-            </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div class="mb-4">
-                <div class="text-[15px] font-bold text-slate-900">Schedule Constraints</div>
-                <div class="mt-1 text-[12px] text-slate-500">Define scheduling rules for this semester</div>
-              </div>
-              <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Max Faculty Load (hrs / week)</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="number" value="30" min="1" max="60">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Min Faculty Load (hrs / week)</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="number" value="12" min="1" max="60">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Class Start Time</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="time" value="07:00">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Class End Time</label>
-                  <input class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500" type="time" value="21:00">
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Class Duration</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>90 minutes (1.5 hrs)</option><option>60 minutes</option><option>120 minutes</option></select>
-                </div>
-                <div>
-                  <label class="mb-1.5 block text-[12px] font-semibold text-slate-700">Conflict Detection</label>
-                  <select class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-blue-500"><option selected>Enabled (strict)</option><option>Enabled (warnings only)</option><option>Disabled</option></select>
-                </div>
-              </div>
-              <div class="mt-4 flex justify-end">
-                <button class="rounded-xl bg-blue-600 px-3.5 py-2 text-[12px] font-semibold text-white hover:bg-blue-700" onclick="showToast('Schedule constraints saved!')">Save Changes</button>
-              </div>
-            </div>
-          </div>
+        {{-- Left nav --}}
+        <div class="card py-3 px-0">
+          <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide px-5 pb-1">Settings</div>
+          <div class="settings-nav-item active" onclick="showChairSettingsSection('profile',this)">Personal Info</div>
+          <div class="settings-nav-item" onclick="showChairSettingsSection('general',this)">General</div>
+          <div class="settings-nav-item" onclick="showChairSettingsSection('academic',this)">Academic Year</div>
+          <div class="settings-nav-item" onclick="showChairSettingsSection('notifications',this)">Notifications</div>
+          <div class="settings-nav-item" onclick="showChairSettingsSection('security',this)">Security</div>
+          <div class="settings-nav-item" onclick="showChairSettingsSection('system',this)">System Info</div>
         </div>
+
+        {{-- Right content --}}
+        <div id="chair-settings-content">
+
+          {{-- PERSONAL INFO --}}
+          <div id="csec-profile">
+            <div class="card mb-4">
+              <div class="card-header">
+                <div><div class="card-title">Profile Picture</div><div class="card-sub">Upload a new profile photo</div></div>
+              </div>
+              <div class="flex items-center gap-6 py-2">
+                <div class="relative shrink-0">
+                  <div id="avatar-display"
+                      class="w-24 h-24 rounded-full bg-[--navy] flex items-center justify-center text-2xl font-extrabold text-white border-4 border-white shadow-sm overflow-hidden bg-cover bg-center"
+                      @if($chair->dc_profile_image) style="background-image:url('{{ $chair->dc_profile_image }}')" @endif>
+                    @unless($chair->dc_profile_image){{ strtoupper(substr($chair->dc_first_name, 0, 1)) }}@endunless
+                  </div>
+                  <div class="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer border-2 border-white text-sm font-bold text-white"
+                      onclick="document.getElementById('avatar-input').click()">+</div>
+                  <input type="file" id="avatar-input" accept="image/*" class="hidden" onchange="uploadAvatar(this)">
+                </div>
+                <div>
+                  <div class="text-[15px] font-bold text-slate-900">{{ $chair->dc_first_name }} {{ $chair->dc_middle_name }} {{ $chair->dc_last_name }}</div>
+                  <div class="text-xs text-slate-400 mt-0.5">Department Chair · {{ $departmentName }}</div>
+                  <div class="flex gap-2 mt-3">
+                    <button class="btn btn-primary text-xs px-3.5 py-1.5" onclick="document.getElementById('avatar-input').click()">Upload Photo</button>
+                    <button class="btn btn-secondary text-xs px-3.5 py-1.5" onclick="removeAvatar()">Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mb-4">
+              <div class="card-header"><div><div class="card-title">Personal Information</div><div class="card-sub">Update your personal details</div></div></div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">First Name</label><input class="field-input" id="pi-first" value="{{ $chair->dc_first_name }}"></div>
+                <div><label class="field-label">Last Name</label><input class="field-input" id="pi-last" value="{{ $chair->dc_last_name }}"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Middle Name</label><input class="field-input" id="pi-middle" placeholder="Optional" value="{{ $chair->dc_middle_name }}"></div>
+                <div>
+                  <label class="field-label">Suffix</label>
+                  <select class="field-input" id="pi-suffix">
+                    <option value="" {{ !$chair->dc_suffix ? 'selected' : '' }}>None</option>
+                    <option {{ $chair->dc_suffix === 'Jr.' ? 'selected' : '' }}>Jr.</option>
+                    <option {{ $chair->dc_suffix === 'Sr.' ? 'selected' : '' }}>Sr.</option>
+                    <option {{ $chair->dc_suffix === 'II' ? 'selected' : '' }}>II</option>
+                    <option {{ $chair->dc_suffix === 'III' ? 'selected' : '' }}>III</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Employee ID</label><input class="field-input" id="pi-empid" value="{{ $chair->dc_employee_id }}"></div>
+                <div>
+                  <label class="field-label">Gender</label>
+                  <select class="field-input" id="pi-gender">
+                    <option {{ $chair->dc_gender === 'Male' ? 'selected' : '' }}>Male</option>
+                    <option {{ $chair->dc_gender === 'Female' ? 'selected' : '' }}>Female</option>
+                    <option {{ $chair->dc_gender === 'Prefer not to say' ? 'selected' : '' }}>Prefer not to say</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label class="field-label">Civil Status</label>
+                  <select class="field-input" id="pi-civil">
+                    <option {{ $chair->dc_civil_status === 'Single' ? 'selected' : '' }}>Single</option>
+                    <option {{ $chair->dc_civil_status === 'Married' ? 'selected' : '' }}>Married</option>
+                    <option {{ $chair->dc_civil_status === 'Widowed' ? 'selected' : '' }}>Widowed</option>
+                    <option {{ $chair->dc_civil_status === 'Separated' ? 'selected' : '' }}>Separated</option>
+                  </select>
+                </div>
+                <div><label class="field-label">Nationality</label><input class="field-input" id="pi-nat" value="{{ $chair->dc_nationality }}"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-1">
+                <div><label class="field-label">Date of Birth</label><input class="field-input" type="date" id="pi-dob" value="{{ $chair->dc_dob?->format('Y-m-d') }}"></div>
+              </div>
+              <div class="flex justify-end mt-1">
+                <button class="btn btn-primary" onclick="savePersonalInfo()">Save Changes</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Contact & Office Details</div><div class="card-sub">How others can reach you</div></div></div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ $chair->dc_gmail }}"></div>
+                <div><label class="field-label">Phone Number</label><input class="field-input" id="pi-phone" value="{{ $chair->dc_phone_number }}"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Office Address</label><input class="field-input" id="pi-address" value="{{ $chair->dc_address }}"></div>
+                <div><label class="field-label">Department</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $departmentName }}" readonly></div>
+              </div>
+              <div class="mb-4">
+                <label class="field-label">Bio / About</label>
+                <textarea class="field-input resize-y" id="pi-bio" rows="3">{{ $chair->dc_bio }}</textarea>
+              </div>
+              <div class="flex justify-end">
+                <button class="btn btn-primary" onclick="saveContactInfo()">Save Changes</button>
+              </div>
+            </div>
+          </div>
+
+          {{-- GENERAL --}}
+          <div id="csec-general" style="display:none;">
+            @php
+                $institution = \App\Models\Institution::first();
+            @endphp
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">Institution Name</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_name ?? 'Cebu Technological University' }}" readonly></div>
+              <div><label class="field-label">Campus</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_branch_campus ?? 'Main Campus' }}" readonly></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_college ?? 'College of Computing, Information and Communications Technology' }}" readonly></div>
+              <div><label class="field-label">Abbreviation</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_abbreviation ?? 'CCICT' }}" readonly></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-1">
+              <div><label class="field-label">Contact Email</label><input class="field-input bg-slate-100 cursor-not-allowed" type="email" value="{{ $institution->inst_contact_email ?? 'ccict@ctu.edu.ph' }}" readonly></div>
+              <div><label class="field-label">Phone</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_phone ?? '(032) 401-7777' }}" readonly></div>
+            </div>
+          </div>
+
+          {{-- ACADEMIC YEAR --}}
+          <div id="csec-academic" style="display:none;">
+            <div class="card mb-4">
+              <div class="card-header">
+                <div><div class="card-title">Current Academic Year</div><div class="card-sub">Managed by the Technical Administrator</div></div>
+                @if($academicYear)
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600">Active</span>
+                @else
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500">Not Set</span>
+                @endif
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Academic Year</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $academicYear->ay_academic_year ?? 'Not configured' }}" readonly></div>
+                <div><label class="field-label">Semester</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester->sem_name ?? 'Not configured' }}" readonly></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Start Date</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester?->sem_start_date?->format('Y-m-d') ?? '—' }}" readonly></div>
+                <div><label class="field-label">End Date</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $activeSemester?->sem_end_date?->format('Y-m-d') ?? '—' }}" readonly></div>
+              </div>
+            </div>
+          </div>
+
+          {{-- NOTIFICATIONS --}}
+          <div id="csec-notifications" style="display:none;">
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Notification Preferences</div><div class="card-sub">Choose what alerts you receive as Department Chair</div></div></div>
+              <div class="flex flex-col gap-3 mt-1">
+                <div class="flex items-center justify-between p-3.5 bg-slate-50 rounded-lg">
+                  <div><div class="text-[13px] font-semibold text-slate-900">Faculty Overload Alert</div><div class="text-xs text-slate-400 mt-0.5">Notify when any faculty member exceeds their maximum unit load</div></div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" data-field="chair_notif_faculty_overload" {{ (bool) \App\Models\SystemSetting::get('chair_notif_faculty_overload', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                    <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('chair_notif_faculty_overload', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {{-- SECURITY --}}
+          <div id="csec-security" style="display:none;">
+            <div class="card mb-4">
+              <div class="card-header"><div><div class="card-title">Change Password</div><div class="card-sub">Update your Department Chair portal account password</div></div></div>
+              <div class="mb-3.5">
+                <label class="field-label">Current Password</label>
+                <div class="relative">
+                  <input class="field-input pr-10" type="password" placeholder="Enter your current password" id="pw-current">
+                  <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-current', this)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3 mb-1">
+                <div>
+                  <label class="field-label">New Password</label>
+                  <div class="relative">
+                    <input class="field-input pr-10" type="password" placeholder="Min. 8 characters" id="pw-new" oninput="checkPwStrength(this.value)">
+                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-new', this)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                  <div class="h-1 rounded bg-slate-200 mt-1.5 overflow-hidden">
+                    <div class="h-full rounded transition-all" id="pw-bar" style="width:0"></div>
+                  </div>
+                </div>
+                <div>
+                  <label class="field-label">Confirm New Password</label>
+                  <div class="relative">
+                    <input class="field-input pr-10" type="password" placeholder="Re-enter new password" id="pw-confirm">
+                    <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" onclick="togglePasswordVisibility('pw-confirm', this)">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="flex justify-end mt-1">
+                <button class="btn btn-primary" onclick="savePassword()">Update Password</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header"><div><div class="card-title">Session & Access</div><div class="card-sub">Manage login security and session behaviour</div></div></div>
+              <div class="grid grid-cols-2 gap-3 mb-1">
+                <div>
+                  <label class="field-label">Session Timeout</label>
+                  @php $timeout = (int) \App\Models\SystemSetting::get('usr_session_timeout_minutes', 30); @endphp
+                  <select class="field-input" id="sec-timeout">
+                    <option value="15" {{ $timeout === 15 ? 'selected' : '' }}>15 minutes</option>
+                    <option value="30" {{ $timeout === 30 ? 'selected' : '' }}>30 minutes</option>
+                    <option value="60" {{ $timeout === 60 ? 'selected' : '' }}>1 hour</option>
+                    <option value="999999" {{ $timeout === 999999 ? 'selected' : '' }}>Never</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="field-label">Max Login Attempts</label>
+                  @php $attempts = (int) \App\Models\SystemSetting::get('usr_max_login_attempts', 5); @endphp
+                  <select class="field-input" id="sec-attempts">
+                    <option value="3" {{ $attempts === 3 ? 'selected' : '' }}>3</option>
+                    <option value="5" {{ $attempts === 5 ? 'selected' : '' }}>5</option>
+                    <option value="10" {{ $attempts === 10 ? 'selected' : '' }}>10</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex justify-end mt-1">
+                <button class="btn btn-primary" onclick="saveSecuritySettings()">Save Changes</button>
+              </div>
+            </div>
+          </div>
+
+          {{-- SYSTEM INFO --}}
+          <div id="csec-system" style="display:none;">
+            <div class="card mb-4">
+              <div class="card-header">
+                <div><div class="card-title">System Information</div><div class="card-sub">Current environment and infrastructure details</div></div>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-600">All Systems Normal</span>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Application</div><div class="text-[13px] font-semibold text-slate-900">SKEDYUL v1.0.0</div></div>
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Host / Deploy</div><div class="text-[13px] font-semibold text-slate-900">Vercel (Production)</div></div>
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Database</div><div class="text-[13px] font-semibold text-slate-900">Supabase PostgreSQL</div></div>
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Authentication</div><div class="text-[13px] font-semibold text-slate-900">JWT + Laravel Sanctum</div></div>
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Frontend Stack</div><div class="text-[13px] font-semibold text-slate-900">Tailwind CSS + Vanilla JS</div></div>
+                <div class="bg-slate-50 rounded-lg p-3.5"><div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Mobile App</div><div class="text-[13px] font-semibold text-slate-900">React Native</div></div>
+                @php
+                    $latestBackup = \App\Models\SystemBackup::orderByDesc('bkp_ran_at')->first();
+
+                    $uptimeText = 'Unknown';
+                    try {
+                        $output = shell_exec('wmic process where "name=\'httpd.exe\'" get CreationDate /value');
+                        preg_match('/CreationDate=(\d{14})/', $output, $matches);
+                        if (isset($matches[1])) {
+                            $startTime = \Carbon\Carbon::createFromFormat('YmdHis', substr($matches[1], 0, 14));
+                            $uptimeText = $startTime->diffForHumans(now(), true) . ' (since ' . $startTime->format('M j, g:i A') . ')';
+                        }
+                    } catch (\Exception $e) {
+                        $uptimeText = 'Unable to determine';
+                    }
+                @endphp
+
+                <div class="bg-slate-50 rounded-lg p-3.5">
+                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Last Backup</div>
+                  @if($latestBackup)
+                    <div class="text-[13px] font-semibold {{ $latestBackup->bkp_status === 'success' ? 'text-green-600' : 'text-red-600' }}">
+                      {{ $latestBackup->bkp_ran_at->format('M j, Y, h:i A') }}
+                      {{ $latestBackup->bkp_status === 'success' ? '✓' : '✗' }}
+                    </div>
+                  @else
+                    <div class="text-[13px] font-semibold text-slate-400">No backups yet</div>
+                  @endif
+                </div>
+
+                <div class="bg-slate-50 rounded-lg p-3.5">
+                  <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">Server Uptime</div>
+                  <div class="text-[13px] font-semibold text-slate-900">{{ $uptimeText }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>{{-- /chair-settings-content --}}
       </div>
     </div>
-  </main>
+  </div>
 </div>
 
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-const CHAIR_NOTIFS = [
-  { dot: 'var(--red)', text: '<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time: 'Today, 08:30 AM', unread: true },
-  { dot: 'var(--amber)', text: '<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time: 'Today, 08:00 AM', unread: true },
-  { dot: 'var(--blue)', text: '<b>Reminder</b> — Schedule submission deadline is Friday.', time: 'Yesterday, 4:00 PM', unread: false },
-];
-
-function renderNotifList() {
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = CHAIR_NOTIFS.map(n => `
-    <div class="flex items-start gap-3 border-b border-slate-100 px-4 py-3 ${n.unread ? 'bg-slate-50' : ''}" onclick="markRead(this)">
-      <div class="mt-1.5 h-2.5 w-2.5 rounded-full" style="background:${n.dot};"></div>
-      <div class="min-w-0 flex-1">
-        <div class="text-[12.5px] leading-relaxed text-slate-600">${n.text}</div>
-        <div class="mt-1 text-[11px] text-slate-400">${n.time}</div>
-      </div>
-    </div>`).join('');
-  updateNotifCount();
-}
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  const dd = document.getElementById('notif-dropdown');
-  if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
-});
-function markRead(el) { el.classList.remove('bg-slate-50'); updateNotifCount(); }
-function markAllRead() { document.querySelectorAll('#notif-list > div').forEach(el => el.classList.remove('bg-slate-50')); updateNotifCount(); }
-function updateNotifCount() {
-  const unread = document.querySelectorAll('#notif-list > div.bg-slate-50').length;
-  const badge = document.getElementById('notif-dot');
-  if (badge) badge.style.display = unread > 0 ? 'inline-flex' : 'none';
-}
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
-}
-function showSection(id, button) {
-  document.querySelectorAll('[id^="settings-"]')
-    .forEach(el => {
-      if (el.id === 'settings-content') return;
-      el.classList.add('hidden');
-    });
-  const target = document.getElementById('settings-' + id);
-  if (target) target.classList.remove('hidden');
-  document.querySelectorAll('aside button').forEach(btn => {
-    btn.classList.remove('bg-blue-50', 'text-blue-700');
-    btn.classList.add('text-slate-600');
+function showChairSettingsSection(section, el) {
+  ['profile','general','academic','notifications','security','system'].forEach(s => {
+    const p = document.getElementById('csec-' + s); if (p) p.style.display = 'none';
   });
-  button.classList.add('bg-blue-50', 'text-blue-700');
-  button.classList.remove('text-slate-600');
-}
-renderNotifList();
-</script>
-</body>
-</html>
-                  <input class="field-input" type="number" value="12">
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">Max Faculty Load (units/week) — Part-time</label>
-                  <input class="field-input" type="number" value="18">
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Near-Max Warning Threshold</label>
-                  <select class="field-select"><option selected>3 units before max</option><option>6 units before max</option><option>9 units before max</option></select>
-                </div>
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-                <button class="topbar-btn btn-primary" onclick="showToast('Load limits saved!')">Save Changes</button>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Conflict Detection Rules</div>
-                  <div class="card-sub">Control how scheduling conflicts are enforced</div>
-                </div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px;">
-                <div class="toggle-row">
-                  <div>
-                    <div class="toggle-row-title">Block Faculty Double-Booking</div>
-                    <div class="toggle-row-sub">Prevent assigning one faculty to two subjects at the same time</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="toggle-row">
-                  <div>
-                    <div class="toggle-row-title">Block Room Double-Booking</div>
-                    <div class="toggle-row-sub">Prevent same room from being assigned to two classes simultaneously</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="toggle-row">
-                  <div>
-                    <div class="toggle-row-title">Block Overload Assignments</div>
-                    <div class="toggle-row-sub">Disable save button when assignment would exceed maximum units</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="toggle-row">
-                  <div>
-                    <div class="toggle-row-title">Require Conflict Resolution Before Submission</div>
-                    <div class="toggle-row-sub">Block Dean submission if any unresolved conflicts exist</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-                <button class="topbar-btn btn-primary" onclick="showToast('Conflict rules saved!')">Save Changes</button>
-              </div>
-            </div>
-
-          </div><!-- end settings-workload -->
-
-          <!-- ── NOTIFICATIONS ── -->
-          <div id="settings-notifications" style="display:none;">
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Notification Preferences</div>
-                  <div class="card-sub">Choose what alerts you receive</div>
-                </div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Schedule Conflicts</div>
-                    <div class="notif-row-sub">Get notified when a scheduling conflict is detected</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Faculty Overload</div>
-                    <div class="notif-row-sub">Notify when a faculty member exceeds their max load</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Faculty Near-Max Load</div>
-                    <div class="notif-row-sub">Warn when a faculty is within 3 units of their maximum</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Dean Approval Status</div>
-                    <div class="notif-row-sub">Notify when the Dean approves or returns the schedule</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Submission Deadline Reminder</div>
-                    <div class="notif-row-sub">Remind 3 days before the schedule submission deadline</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Email on Faculty Assignment</div>
-                    <div class="notif-row-sub">Send email to faculty when a subject is assigned to them</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
-                </div>
-                <div class="notif-row">
-                  <div>
-                    <div class="notif-row-title">Login Activity</div>
-                    <div class="notif-row-sub">Notify on new logins from unrecognized devices</div>
-                  </div>
-                  <label class="toggle-switch"><input type="checkbox" onchange="toggleSwitch(this)"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
-                </div>
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-                <button class="topbar-btn btn-primary" onclick="showToast('Notification settings saved!')">Save Preferences</button>
-              </div>
-            </div>
-
-          </div><!-- end settings-notifications -->
-
-          <!-- ── SECURITY ── -->
-          <div id="settings-security" style="display:none;">
-
-            <div class="card" style="margin-bottom:16px;">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Personal Information</div>
-                  <div class="card-sub">Your professional profile — read-only</div>
-                </div>
-                <span class="badge badge-grey">Read-only</span>
-              </div>
-              <div class="profile-banner">
-                <div class="profile-banner-avatar">RT</div>
-                <div>
-                  <div class="profile-banner-name">Rodrigo Tan</div>
-                  <div class="profile-banner-role">Department Chair · BSIS · CCICT</div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">Full Name</label>
-                  <div class="field-readonly">Rodrigo Tan</div>
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Employee ID</label>
-                  <div class="field-readonly">CTU-2019-0042</div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">Email Address</label>
-                  <div class="field-readonly">r.tan@ctu.edu.ph</div>
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Contact Number</label>
-                  <div class="field-readonly">(032) 401-1111</div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">Office Location</label>
-                  <div class="field-readonly">Room 301, ICT Building</div>
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Role</label>
-                  <div class="field-readonly">Department Chair</div>
-                </div>
-              </div>
-              <div class="info-note">
-                Professional information is managed by the Technical Administrator. Contact the system administrator to request changes.
-              </div>
-            </div>
-
-            <div class="card" style="margin-bottom:16px;">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Change Password</div>
-                  <div class="card-sub">Update your account password</div>
-                </div>
-              </div>
-              <div class="field-group">
-                <label class="field-label">Current Password</label>
-                <input class="field-input" type="password" placeholder="Enter your current password">
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">New Password</label>
-                  <input class="field-input" type="password" placeholder="Min. 8 characters">
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Confirm New Password</label>
-                  <input class="field-input" type="password" placeholder="Re-enter new password">
-                </div>
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-                <button class="topbar-btn btn-primary" onclick="showToast('Password updated successfully!')">Update Password</button>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Session &amp; Access</div>
-                  <div class="card-sub">Manage login security settings</div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="field-group">
-                  <label class="field-label">Session Timeout</label>
-                  <select class="field-select"><option>15 minutes</option><option selected>30 minutes</option><option>1 hour</option><option>Never</option></select>
-                </div>
-                <div class="field-group">
-                  <label class="field-label">Max Login Attempts</label>
-                  <select class="field-select"><option>3</option><option selected>5</option><option>10</option></select>
-                </div>
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:4px;">
-                <button class="topbar-btn btn-primary" onclick="showToast('Security settings saved!')">Save Changes</button>
-              </div>
-            </div>
-
-          </div><!-- end settings-security -->
-
-          <!-- ── SYSTEM INFO ── -->
-          <div id="settings-system" style="display:none;">
-
-            <div class="card" style="margin-bottom:16px;">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">System Information</div>
-                  <div class="card-sub">Current environment details</div>
-                </div>
-                <span class="badge badge-green">All Systems Normal</span>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div class="env-cell"><div class="env-cell-label">Application</div><div class="env-cell-val">SKEDYUL v1.0.0</div></div>
-                <div class="env-cell"><div class="env-cell-label">Host / Deploy</div><div class="env-cell-val">Vercel (Production)</div></div>
-                <div class="env-cell"><div class="env-cell-label">Database</div><div class="env-cell-val">Supabase PostgreSQL</div></div>
-                <div class="env-cell"><div class="env-cell-label">Authentication</div><div class="env-cell-val">JWT + Laravel Sanctum</div></div>
-                <div class="env-cell"><div class="env-cell-label">Frontend Stack</div><div class="env-cell-val">Tailwind CSS 4 + Vanilla JS</div></div>
-                <div class="env-cell"><div class="env-cell-label">Mobile App</div><div class="env-cell-val">React Native</div></div>
-                <div class="env-cell"><div class="env-cell-label">Last Backup</div><div class="env-cell-val" style="color:var(--green);">Today, 06:00 AM</div></div>
-                <div class="env-cell"><div class="env-cell-label">Uptime (30 days)</div><div class="env-cell-val" style="color:var(--green);">99.98%</div></div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title" style="color:var(--red);">Danger Zone</div>
-                  <div class="card-sub">Irreversible actions — proceed with caution</div>
-                </div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:10px;">
-                <div class="danger-row">
-                  <div>
-                    <div class="danger-row-title">Clear All Schedules</div>
-                    <div class="danger-row-sub">Removes all schedule assignments for the current semester</div>
-                  </div>
-                  <button class="btn-danger-sm" onclick="showToast('Action cancelled — confirmation required.')">Clear</button>
-                </div>
-                <div class="danger-row">
-                  <div>
-                    <div class="danger-row-title">Reset System Data</div>
-                    <div class="danger-row-sub">Wipes all records and resets to factory state</div>
-                  </div>
-                  <button class="btn-danger-sm" onclick="showToast('Action cancelled — confirmation required.')">Reset</button>
-                </div>
-              </div>
-            </div>
-
-          </div><!-- end settings-system -->
-
-        </div><!-- end settings-content -->
-      </div><!-- end settings-layout -->
-
-    </div><!-- end page-content -->
-  </div><!-- end main -->
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"><span id="toast-msg"></span></div>
-
-<script>
-// ── NOTIFICATIONS ─────────────────────────────────────────────────────────────
-const CHAIR_NOTIFS = [
-  { dot:'var(--red)',   text:'<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time:'Today, 08:00 AM', unread:true },
-  { dot:'var(--blue)',  text:'<b>Reminder</b> — Schedule submission deadline is Friday.', time:'Yesterday, 4:00 PM', unread:false },
-];
-
-function renderNotifList() {
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = CHAIR_NOTIFS.map(n => `
-    <div class="notif-drop-item ${n.unread ? 'unread' : ''}" onclick="markRead(this)">
-      <div class="notif-drop-dot" style="background:${n.dot};"></div>
-      <div>
-        <div class="notif-drop-text">${n.text}</div>
-        <div class="notif-drop-time">${n.time}</div>
-      </div>
-    </div>`).join('');
-  updateNotifCount();
-}
-
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  document.getElementById('notif-dropdown').classList.toggle('open', notifOpen);
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    document.getElementById('notif-dropdown').classList.remove('open');
-  }
-});
-function markRead(el) { el.classList.remove('unread'); updateNotifCount(); }
-function markAllRead() {
-  document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
-  updateNotifCount();
-}
-function updateNotifCount() {
-  const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-  const dot = document.getElementById('notif-dot');
-  if (dot) dot.style.display = unread > 0 ? 'block' : 'none';
-}
-renderNotifList();
-
-// ── SETTINGS NAV ──────────────────────────────────────────────────────────────
-const SECTIONS = ['general','academic','workload','notifications','security','system'];
-
-function showSection(id, el) {
-  SECTIONS.forEach(s => {
-    const elem = document.getElementById('settings-' + s);
-    if (elem) elem.style.display = 'none';
-  });
-  const target = document.getElementById('settings-' + id);
-  if (target) target.style.display = 'block';
-  document.querySelectorAll('.settings-navitem').forEach(i => i.classList.remove('active'));
+  const t = document.getElementById('csec-' + section); if (t) t.style.display = 'block';
+  document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
 }
 
-// ── TOGGLE SWITCHES ───────────────────────────────────────────────────────────
 function toggleSwitch(input) {
   const track = input.nextElementSibling;
-  if (track) {
-    if (input.checked) { track.classList.add('on'); }
-    else               { track.classList.remove('on'); }
-  }
+  if (input.checked) { track.classList.add('on'); }
+  else { track.classList.remove('on'); }
+
+  const field = input.dataset.field;
+  if (!field) return;
+
+  fetch('{{ route("chair.profile.notification-preferences.update") }}', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+    },
+    body: JSON.stringify({ [field]: input.checked }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) { showToast('❌ Failed to update preference'); return; }
+      showToast('Preference updated!');
+    })
+    .catch(() => showToast('❌ Something went wrong saving.'));
 }
 
-// ── TOAST ──────────────────────────────────────────────────────────────────────
+function checkPwStrength(val) {
+  const bar = document.getElementById('pw-bar'); if (!bar) return;
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const colors = ['#dc2626', '#d97706', '#16a34a', '#0891b2'];
+  const widths = ['25%', '50%', '75%', '100%'];
+  bar.style.width = val.length ? (widths[score - 1] || '10%') : '0';
+  bar.style.background = val.length ? (colors[score - 1] || '#dc2626') : 'transparent';
+}
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
+  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('avatar', file);
+
+  fetch("{{ route('chair.profile.avatar.update') }}", {
+    method: 'POST',
+    headers: {
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: formData,
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ data }) => {
+      if (data.success) {
+        const display = document.getElementById('avatar-display');
+        display.style.backgroundImage = `url('${data.url}')`;
+        display.textContent = '';
+        showToast('Profile photo updated!');
+      } else {
+        showToast(data.message || 'Upload failed. Please try again.');
+      }
+    })
+    .catch(() => showToast('Upload failed. Please try again.'));
+}
+
+function removeAvatar() {
+  fetch("{{ route('chair.profile.avatar.remove') }}", {
+    method: 'DELETE',
+    headers: {
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const display = document.getElementById('avatar-display');
+        display.style.backgroundImage = '';
+        display.textContent = '{{ strtoupper(substr($chair->dc_first_name, 0, 1)) }}';
+        showToast('Profile photo removed.');
+      } else {
+        showToast('Remove failed. Please try again.');
+      }
+    })
+    .catch(() => showToast('Remove failed. Please try again.'));
+}
+
+function savePersonalInfo() {
+  const payload = {
+    dc_first_name: document.getElementById('pi-first').value,
+    dc_last_name: document.getElementById('pi-last').value,
+    dc_middle_name: document.getElementById('pi-middle').value,
+    dc_suffix: document.getElementById('pi-suffix').value,
+    dc_employee_id: document.getElementById('pi-empid').value,
+    dc_gender: document.getElementById('pi-gender').value,
+    dc_civil_status: document.getElementById('pi-civil').value,
+    dc_dob: document.getElementById('pi-dob').value || null,
+    dc_nationality: document.getElementById('pi-nat').value,
+  };
+
+  fetch("{{ route('chair.profile.personal-info.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ data }) => {
+      if (data.success) {
+        showToast('Personal information saved!');
+      } else {
+        const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
+        showToast(firstError);
+      }
+    })
+    .catch(() => showToast('Save failed. Please try again.'));
+}
+
+function saveContactInfo() {
+  const payload = {
+    dc_gmail: document.getElementById('pi-gmail').value,
+    dc_phone_number: document.getElementById('pi-phone').value,
+    dc_address: document.getElementById('pi-address').value,
+    dc_bio: document.getElementById('pi-bio').value,
+  };
+
+  fetch("{{ route('chair.profile.contact.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ data }) => {
+      if (data.success) {
+        showToast('Contact details saved successfully!');
+      } else {
+        const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
+        showToast(firstError);
+      }
+    })
+    .catch(() => showToast('Save failed. Please try again.'));
+}
+
+function savePassword() {
+  const current = document.getElementById('pw-current').value;
+  const newPw = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+
+  if (!current) { showToast('Please enter your current password.'); return; }
+  if (newPw.length < 8) { showToast('New password must be at least 8 characters.'); return; }
+  if (newPw !== confirm) { showToast('New passwords do not match.'); return; }
+
+  fetch("{{ route('chair.profile.password.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      current_password: current,
+      new_password: newPw,
+      new_password_confirmation: confirm,
+    }),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ data }) => {
+      if (data.success) {
+        document.getElementById('pw-current').value = '';
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-confirm').value = '';
+        document.getElementById('pw-bar').style.width = '0';
+        showToast('Password updated successfully!');
+      } else {
+        showToast(data.message || 'Update failed. Please check your inputs.');
+      }
+    })
+    .catch(() => showToast('Update failed. Please try again.'));
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  btn.innerHTML = isHidden
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.6 21.6 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.6 21.6 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+
+function saveSecuritySettings() {
+  const payload = {
+    usr_session_timeout_minutes: parseInt(document.getElementById('sec-timeout').value, 10),
+    usr_max_login_attempts: parseInt(document.getElementById('sec-attempts').value, 10),
+  };
+
+  fetch("{{ route('chair.security.update') }}", {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+    .then(res => res.json().then(data => ({ status: res.status, data })))
+    .then(({ data }) => {
+      if (data.success) {
+        showToast('Security settings saved!');
+      } else {
+        const firstError = data.errors ? Object.values(data.errors)[0][0] : 'Save failed. Please check your inputs.';
+        showToast(firstError);
+      }
+    })
+    .catch(() => showToast('Save failed. Please try again.'));
 }
 </script>
 </body>
