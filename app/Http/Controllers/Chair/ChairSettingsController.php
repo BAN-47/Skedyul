@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -141,5 +142,15 @@ class ChairSettingsController extends Controller
             'academicYear' => \App\Models\AcademicYear::where('ay_is_active', true)->first(),
             'activeSemester' => \App\Models\Semester::where('sem_is_active', true)->first(),
         ]);
+    }
+
+    public function notificationsList(Request $request)
+    {
+        $notifications = Notification::where('notif_usr_id', Auth::id())
+            ->orderByDesc('notif_created_at')
+            ->take(10)
+            ->get();
+
+        return response()->json($notifications);
     }
 }

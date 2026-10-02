@@ -105,3 +105,9 @@ Route::prefix('chair')->group(function () {
 });
 
 Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');
+
+Route::prefix('chair')->group(function () {
+    Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
+    Route::post('/notifications/{notification}/read', [ChairSettingsController::class, 'markNotificationRead'])->name('chair.notifications.read');
+    Route::post('/notifications/read-all', [ChairSettingsController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');
+});

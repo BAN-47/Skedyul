@@ -126,8 +126,8 @@
             </div>
           </div>
           <div class="grid grid-cols-[88px_1fr] gap-0 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase">
-            <div class="px-2 py-1.5">Course Code</div>
-            <div class="px-2 py-1.5 border-l border-slate-200">Descriptive Title</div>
+            <div class="px-2 py-1.5" style="text-align: center;"><strong>Course Code</strong></div>
+            <div class="px-2 py-1.5 border-l border-slate-200" style="text-align: center;"><strong>Descriptive <br>Title</strong></div>
           </div>
           <div class="p-0">
             @forelse($courseSummary as $s)
