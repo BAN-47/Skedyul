@@ -30,6 +30,12 @@
             opacity: 1;
             transform: translateY(0);
         }
+
+        /* Scroll fix: the content area scrolls, not the body */
+        #page-subjects {
+            padding-bottom: 32px;
+            scrollbar-gutter: stable;
+        }
     </style>
 </head>
 
@@ -38,13 +44,14 @@
     <div class="flex h-screen overflow-hidden">
         @include('partials.chair_sidebar')
 
-        <main class="flex-1 overflow-hidden">
+        {{-- main = flex column; header keeps natural height, content fills the rest and scrolls --}}
+        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
             @include('partials.chair_header', [
                 'title' => 'Subject Management',
                 'badgeText' => ($programName ?? 'BSIS') . ' Department',
             ])
 
-            <div id="page-subjects" class="page-content">
+            <div id="page-subjects" class="page-content min-h-0 flex-1 overflow-y-auto">
                 <div class="mb-5 flex items-center justify-between gap-3">
                     <div>
                         <div class="text-[20px] font-extrabold text-slate-900">Subject Management</div>
@@ -135,9 +142,9 @@
 
     {{-- ADD SUBJECT MODAL --}}
     <div class="fixed inset-0 z-40 hidden bg-slate-900/40" id="modal-add-subject-backdrop"></div>
-    <div class="fixed inset-0 z-50 hidden items-center justify-center p-4" id="modal-add-subject">
+    <div class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4" id="modal-add-subject">
         <div
-            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
+            class="my-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
             <form action="{{ route('chair.subject.store') }}" method="POST">
                 @csrf
                 <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
@@ -235,9 +242,9 @@
 
     {{-- EDIT SUBJECT MODAL --}}
     <div class="fixed inset-0 z-40 hidden bg-slate-900/40" id="modal-edit-subject-backdrop"></div>
-    <div class="fixed inset-0 z-50 hidden items-center justify-center p-4" id="modal-edit-subject">
+    <div class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4" id="modal-edit-subject">
         <div
-            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
+            class="my-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
             <form id="edit-subj-form" method="POST">
                 @csrf
                 @method('PUT')
@@ -295,9 +302,9 @@
     Day/Time/Room stay on PBS.
 --}}
     <div class="fixed inset-0 z-40 hidden bg-slate-900/40" id="modal-assign-backdrop"></div>
-    <div class="fixed inset-0 z-50 hidden items-center justify-center p-4" id="modal-assign">
+    <div class="fixed inset-0 z-50 hidden items-center justify-center overflow-y-auto p-4" id="modal-assign">
         <div
-            class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
+            class="my-auto w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <div>
                     <div class="text-lg font-bold text-slate-900">Assign Faculty</div>
@@ -447,8 +454,8 @@
                     escapeHtml(s.faculty) :
                     '<span class="text-red-600">Unassigned</span>';
                 const statusBadge = s.faculty ?
-                    '<span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Assigned</span>' :
-                    '<span class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-600">No Faculty</span>';
+                    '<span class="inline-flex whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">Assigned</span>' :
+                    '<span class="inline-flex whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-600">No Faculty</span>';
                 const actionBtn = s.faculty ?
                     `<button class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50"
            onclick="openEditSubject('${s.id}','${escapeAttr(s.code)}','${escapeAttr(s.name)}','${s.lec}','${s.lab}','${s.dept_id || ''}')">Edit</button>` :
@@ -464,7 +471,7 @@
         <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${s.lab}</td>
         <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${facultyCell}</td>
         <td class="border-b border-slate-100 px-3 py-3">${statusBadge}</td>
-        <td class="border-b border-slate-100 px-3 py-3">
+        <td class="whitespace-nowrap border-b border-slate-100 px-3 py-3">
           ${actionBtn}
           <form action="${SUBJECT_DESTROY_URL_TEMPLATE.replace('__ID__', s.id)}" method="POST" class="inline" onsubmit="return confirm('Deactivate ${escapeAttr(s.code)}? It will be hidden from active lists but kept for historical records.');">
             <input type="hidden" name="_token" value="${CSRF_TOKEN}">
