@@ -339,11 +339,24 @@
 
         <div class="role-field" data-roles="faculty" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label class="field-label">Rank / Title</label>
-              <input name="usr_rank_title"
-                placeholder="e.g. Instructor I" class="field-input">
-            </div>
+<div>
+  <label class="field-label">Rank / Title</label>
+  <select name="usr_rank_title" class="field-input">
+    <option value="">-- Select Rank --</option>
+    <option value="Instructor I">Instructor I</option>
+    <option value="Instructor II">Instructor II</option>
+    <option value="Instructor III">Instructor III</option>
+    <option value="Assistant Professor I">Assistant Professor I</option>
+    <option value="Assistant Professor II">Assistant Professor II</option>
+    <option value="Assistant Professor III">Assistant Professor III</option>
+    <option value="Assistant Professor IV">Assistant Professor IV</option>
+    <option value="Associate Professor I">Associate Professor I</option>
+    <option value="Associate Professor II">Associate Professor II</option>
+    <option value="Associate Professor III">Associate Professor III</option>
+    <option value="Associate Professor IV">Associate Professor IV</option>
+    <option value="Associate Professor V">Associate Professor V</option>
+  </select>
+</div>
 
             <div>
               <label class="field-label">Employment Type</label>
@@ -576,11 +589,24 @@
 
         <div class="role-field" data-roles="faculty" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label class="field-label">Rank / Title</label>
-              <input id="edit-rank-title"
-                name="usr_rank_title" class="field-input">
-            </div>
+<div>
+  <label class="field-label">Rank / Title</label>
+  <select id="edit-rank-title" name="usr_rank_title" class="field-input">
+    <option value="">-- Select Rank --</option>
+    <option value="Instructor I">Instructor I</option>
+    <option value="Instructor II">Instructor II</option>
+    <option value="Instructor III">Instructor III</option>
+    <option value="Assistant Professor I">Assistant Professor I</option>
+    <option value="Assistant Professor II">Assistant Professor II</option>
+    <option value="Assistant Professor III">Assistant Professor III</option>
+    <option value="Assistant Professor IV">Assistant Professor IV</option>
+    <option value="Associate Professor I">Associate Professor I</option>
+    <option value="Associate Professor II">Associate Professor II</option>
+    <option value="Associate Professor III">Associate Professor III</option>
+    <option value="Associate Professor IV">Associate Professor IV</option>
+    <option value="Associate Professor V">Associate Professor V</option>
+  </select>
+</div>
 
             <div>
               <label class="field-label">Employment Type</label>
