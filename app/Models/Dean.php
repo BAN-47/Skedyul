@@ -9,75 +9,95 @@ class Dean extends Model
 {
     use HasFactory;
 
-    /**
-     * The table associated with the model.
-     * PostgreSQL converts unquoted table names to lowercase, so we use 'dean'.
-     *
-     * @var string
-     */
     protected $table = 'dean';
 
-    /**
-     * The primary key for the model.
-     *
-     * @var string
-     */
     protected $primaryKey = 'dean_id';
 
-    /**
-     * Indicates if the model's ID is auto-incrementing.
-     *
-     * @var bool
-     */
     public $incrementing = false;
 
-    /**
-     * The data type of the primary key ID.
-     *
-     * @var string
-     */
     protected $keyType = 'string';
 
-    /**
-     * Indicates if the model should be timestamped.
-     *
-     * @var bool
-     */
     public $timestamps = false;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
+    protected array $legacyAttributeAliases = [
+        'dean_prog_id' => 'dean_dept_id',
+    ];
+
     protected $fillable = [
         'dean_usr_id',
+
+        // Department / Program
+        'dean_college_id',
         'dean_dept_id',
+        'dean_prog_id',
+
+        // Personal Information
         'dean_first_name',
         'dean_middle_name',
         'dean_last_name',
         'dean_suffix',
+        'dean_employee_id',
+        'dean_gender',
+        'dean_civil_status',
+        'dean_dob',
+        'dean_nationality',
+
+        // Contact Information
         'dean_phone_number',
-        'dean_gmail',
         'dean_address',
+
+        // Profile
         'dean_profile_image',
+
+        // Assignment
         'dean_assigned_at',
+        'dean_employee_id',
+        'dean_gender',
+        'dean_civil_status',
+        'dean_dob',
+        'dean_nationality',
+        'dean_bio',
     ];
 
-    /**
-     * Get the user account associated with the Dean.
-     */
+    protected $casts = [
+        'dean_dob' => 'date',
+        'dean_assigned_at' => 'datetime',
+    ];
+
     public function user()
     {
-        // Foreign keys must also be lowercase to match PostgreSQL's storage
-        return $this->belongsTo(User::class, 'dean_usr_id', 'usr_id');
+        return $this->belongsTo(
+            User::class,
+            'dean_usr_id',
+            'usr_id'
+        );
     }
 
-    /**
-     * Get the department overseen by the Dean.
-     */
     public function department()
     {
-        return $this->belongsTo(Department::class, 'dean_dept_id', 'dept_id');
+        return $this->belongsTo(
+            College::class,
+            'dean_college_id',
+            'college_id'
+        );
+    }
+
+    public function program()
+    {
+        return $this->belongsTo(
+            Departments::class,
+            'dean_dept_id',
+            'dept_id'
+        );
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

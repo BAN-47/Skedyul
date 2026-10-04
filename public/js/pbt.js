@@ -24,7 +24,7 @@ function showToast(msg) {
   if (!t || !m) return;
   m.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
+  setTimeout(() => t.classList.remove('show'), 4200);
 }
 
 function showInlineError(boxId, msg) {
@@ -34,6 +34,19 @@ function showInlineError(boxId, msg) {
 }
 function clearInlineError(boxId) {
   document.getElementById(boxId).classList.add('hidden');
+}
+
+/*
+  Same contract as pbs.js: { success, conflict, message }.
+  conflict === true -> double-booking, nothing saved, shown as the
+  bottom-right toast (modal stays open). Anything else stays inline.
+*/
+function handleScheduleError(data, inlineBoxId) {
+  if (data.conflict) {
+    showToast(data.message || 'Conflict: that slot is already taken.');
+  } else {
+    showInlineError(inlineBoxId, data.message || 'Something went wrong.');
+  }
 }
 
 /* ── clock ── */
@@ -72,7 +85,6 @@ function filterTeacherList(query) {
   document.querySelectorAll('.teacher-option').forEach(opt => {
     opt.style.display = opt.dataset.name.includes(q) ? '' : 'none';
   });
-  // Hide a group header entirely if every option inside it is filtered out
   document.querySelectorAll('.teacher-group').forEach(group => {
     const visible = Array.from(group.querySelectorAll('.teacher-option'))
       .some(opt => opt.style.display !== 'none');
@@ -133,14 +145,62 @@ function addMinutesToTime(hhmm, minutesToAdd) {
   return `${hh}:${mm}`;
 }
 
+/**
+ * Filter subject dropdown options by the year level of the selected section.
+ * e.g. Section "1-A" (year_level=1) → only show 1st-year subjects.
+ */
+function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
+  const secSel = document.getElementById(sectionSelectId);
+  const subSel = document.getElementById(subjectSelectId);
+  if (!secSel || !subSel) return;
+
+  const selectedOpt = secSel.options[secSel.selectedIndex];
+  const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+
+  Array.from(subSel.options).forEach(opt => {
+    if (!opt.value) {
+      opt.hidden = false;
+      opt.style.display = '';
+      return;
+    }
+    const subYear = opt.getAttribute('data-year-level') || '';
+    const match = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+    opt.hidden = !match;
+    opt.style.display = match ? '' : 'none';
+  });
+
+  // Reset subject if current selection is no longer visible
+  const current = subSel.options[subSel.selectedIndex];
+  if (current && current.hidden) {
+    subSel.value = '';
+  }
+}
+
+// Wire up section → subject filter for Add + Edit modals
+document.addEventListener('DOMContentLoaded', () => {
+  const addSec = document.getElementById('add-section');
+  if (addSec) {
+    addSec.addEventListener('change', () => filterSubjectsBySection('add-section', 'add-subject'));
+  }
+  const editSec = document.getElementById('edit-section');
+  if (editSec) {
+    editSec.addEventListener('change', () => filterSubjectsBySection('edit-section', 'edit-subject'));
+  }
+});
+
 function openAddModal(day, startTime) {
   if (!SELECTED_TEACHER) {
     showToast('Select a teacher first.');
     return;
   }
   clearInlineError('add-error');
-  ['add-subject','add-semester','add-program','add-section','add-room',
-   'add-description'].forEach(id => document.getElementById(id).value = '');
+  ['add-subject','add-section','add-room','add-description'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  // Reset subject filter (show all until a section is chosen)
+  filterSubjectsBySection('add-section', 'add-subject');
 
   document.getElementById('add-day').value   = day || '';
   document.getElementById('add-start').value = startTime || '';
@@ -165,8 +225,8 @@ function submitAdd() {
     description: document.getElementById('add-description').value,
   };
 
-  if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.day || !payload.start_time || !payload.end_time) {
-    showInlineError('add-error', 'Please fill in subject, section, day, and both times.');
+  if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id || !payload.day || !payload.start_time || !payload.end_time) {
+    showInlineError('add-error', 'Please fill in subject, section, room, day, and both times.');
     return;
   }
   if (payload.end_time <= payload.start_time) {
@@ -189,8 +249,7 @@ function submitAdd() {
       showToast(data.message || 'Schedule added.');
       setTimeout(() => location.reload(), 800);
     } else {
-      // Conflict stays in the modal so nothing is lost and nothing is inserted
-      showInlineError('add-error', data.message || 'Could not save this schedule.');
+      handleScheduleError(data, 'add-error');
       btn.disabled = false;
     }
   })
@@ -204,8 +263,10 @@ function submitAdd() {
 function openEditModal(block) {
   clearInlineError('edit-error');
   document.getElementById('edit-id').value      = block.dataset.scheduleId;
-  document.getElementById('edit-subject').value = block.dataset.subject || '';
   document.getElementById('edit-section').value = block.dataset.section || '';
+  // Filter subjects by the section's year level first, then set subject
+  filterSubjectsBySection('edit-section', 'edit-subject');
+  document.getElementById('edit-subject').value = block.dataset.subject || '';
   document.getElementById('edit-room').value    = block.dataset.room    || '';
   document.getElementById('edit-day').value     = block.dataset.day     || '';
   document.getElementById('edit-start').value   = block.dataset.start   || '';
@@ -251,7 +312,7 @@ function submitEdit() {
       showToast(data.message || 'Schedule updated.');
       setTimeout(() => location.reload(), 800);
     } else {
-      showInlineError('edit-error', data.message || 'Could not update this schedule.');
+      handleScheduleError(data, 'edit-error');
       btn.disabled = false;
     }
   })

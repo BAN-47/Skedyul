@@ -14,14 +14,14 @@ use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\AdminProfileController;
+use App\Http\Controllers\Admin\InstitutionController;
+use App\Http\Controllers\Admin\AcademicYearController;
 
 // Models
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Section;
-use App\Models\Program;
 use App\Models\Schedule;
-use App\Models\Subjects;
 
 /*
 |--------------------------------------------------------------------------
@@ -106,7 +106,7 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin')->group(function () {
+Route::prefix('admin')->middleware('auth')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -147,11 +147,61 @@ Route::prefix('admin')->group(function () {
     */
 
     Route::get('/settings', function () {
-        return view('admin.admin_settings');
+        $periodNotice = \App\Http\Controllers\Admin\AcademicYearController::autoAdvanceIfNeeded();
+
+        $activeSemester = \App\Models\Semester::query()->where('sem_is_active', true)->first();
+        $activeYear = \App\Models\AcademicYear::query()->where('ay_is_active', true)->first();
+        // Fallback: latest year if none active
+        if (!$activeYear) {
+            $activeYear = \App\Models\AcademicYear::query()->orderByDesc('ay_academic_year')->first();
+        }
+
+        $academicYears = \App\Models\AcademicYear::query()->orderByDesc('ay_academic_year')->get();
+        $semesters = \App\Models\Semester::query()->orderBy('sem_name')->get();
+
+        $ayStart = $activeSemester && $activeSemester->sem_start_date
+            ? \Illuminate\Support\Carbon::parse($activeSemester->sem_start_date)->format('Y-m-d')
+            : '2026-08-01';
+        $ayEnd = $activeSemester && $activeSemester->sem_end_date
+            ? \Illuminate\Support\Carbon::parse($activeSemester->sem_end_date)->format('Y-m-d')
+            : '2026-12-20';
+
+        $periodLabel = null;
+        if ($activeYear && $activeSemester) {
+            $periodLabel = trim(($activeYear->ay_academic_year ?? '') . ' · ' . ($activeSemester->sem_name ?? ''));
+        }
+
+        return view('admin.admin_settings', [
+            'activeSemester' => $activeSemester,
+            'activeYear'     => $activeYear,
+            'academicYears'  => $academicYears,
+            'semesters'      => $semesters,
+            'ayStart'        => $ayStart,
+            'ayEnd'          => $ayEnd,
+            'periodLabel'    => $periodLabel,
+            'periodNotice'   => $periodNotice,
+        ]);
     })->name('admin.settings');
 
-});
+    Route::put('/academic-year', [AcademicYearController::class, 'update'])
+        ->name('admin.academic-year.update');
 
+    Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
+        ->name('admin.profile.personal-info.update');
+
+    Route::put('/profile/notification-preferences', [AdminProfileController::class, 'updateNotificationPreferences'])
+        ->name('admin.profile.notification-preferences.update');
+
+    Route::put('/profile/password', [AdminProfileController::class, 'updatePassword'])
+        ->name('admin.profile.password.update');
+
+    Route::put('/profile/security-settings', [AdminProfileController::class, 'updateSecuritySettings'])
+        ->name('admin.profile.security-settings.update');
+
+    Route::put('/institution', [InstitutionController::class, 'update'])
+        ->name('admin.institution.update');
+
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -213,26 +263,4 @@ Route::get('/programs', [ProgramController::class, 'index'])
 Route::get('/departments', [DepartmentController::class, 'index'])
     ->name('admin.departments');
 
-/*
-|--------------------------------------------------------------------------
-| SETTINGS
-|--------------------------------------------------------------------------
-*/
-
-    Route::get('/settings', function () {
-        return view('admin.admin_settings');
-    })->name('admin.settings');
-
-    Route::post('/profile/picture', [AdminProfileController::class, 'updateProfilePicture'])
-        ->name('admin.profile.picture.update');
-
-    Route::delete('/profile/picture', [AdminProfileController::class, 'removeProfilePicture'])
-        ->name('admin.profile.picture.remove');
-
-    Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
-        ->name('admin.profile.personal-info.update');
-
-    Route::put('/admin/profile/appearance', [AdminProfileController::class, 'updateAppearance'])
-        ->name('admin.profile.appearance.update');
-
-        
+/* Settings routes are inside admin+auth group above. */

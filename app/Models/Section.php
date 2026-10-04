@@ -17,7 +17,12 @@ class Section extends Model
     const CREATED_AT = 'sec_created_at';
     const UPDATED_AT = 'sec_updated_at';
 
+    protected array $legacyAttributeAliases = [
+        'sec_prog_id' => 'sec_dept_id',
+    ];
+
     protected $fillable = [
+        'sec_dept_id',
         'sec_prog_id',
         'sec_ay_id',
         'sec_sem_id',
@@ -30,7 +35,7 @@ class Section extends Model
 
     public function program()
     {
-        return $this->belongsTo(Program::class, 'sec_prog_id', 'prog_id');
+        return $this->belongsTo(Departments::class, 'sec_dept_id', 'dept_id');
     }
 
     public function academicYear()
@@ -51,5 +56,15 @@ class Section extends Model
     public function schedules()
     {
         return $this->hasMany(Schedule::class, 'sch_sec_id', 'sec_id');
+    }
+
+    public function getAttribute($key)
+    {
+        return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);
+    }
+
+    public function setAttribute($key, $value)
+    {
+        return parent::setAttribute($this->legacyAttributeAliases[$key] ?? $key, $value);
     }
 }

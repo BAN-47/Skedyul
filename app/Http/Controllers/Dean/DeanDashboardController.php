@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Dean;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Faculty;
-use App\Models\Department;
-use App\Models\Program;
+use App\Models\College;
 use App\Models\Workload;
 use App\Models\Schedule_Submission;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use Illuminate\Support\Facades\Auth;
@@ -65,12 +64,12 @@ class DeanDashboardController extends Controller
 
         // ---------- DEPARTMENT SUMMARY ----------
         // Note: grouped by actual Department (dept_name), not by Program (BSIS/BSIT/BIT-CT).
-        // Faculty links to fac_dept_id directly — there's no faculty-to-program link in the schema yet.
-        $departments = Department::all();
+        // Faculty is grouped by its assigned college.
+        $departments = College::all();
 
         $deptSummary = $departments->map(function ($dept) use ($facultyLoads) {
             $deptFacultyLoads = $facultyLoads->filter(
-                fn($fl) => $fl['faculty']->fac_dept_id === $dept->dept_id
+                fn($fl) => $fl['faculty']->fac_college_id === $dept->college_id
             );
 
             $count = $deptFacultyLoads->count();
@@ -93,8 +92,8 @@ class DeanDashboardController extends Controller
         })->values();
 
         // ---------- SUBJECTS PLOTTED ----------
-        $subjectsTotal   = Subjects::count();
-        $subjectsPlotted = Subjects::whereHas('studyLoads')->count(); // subjects with at least one assigned study load
+        $subjectsTotal   = Course::count();
+        $subjectsPlotted = Course::whereHas('studyLoads')->count(); // courses with at least one assigned study load
 
         // ---------- SCHEDULE SUBMISSIONS / APPROVALS ----------
         $pendingApprovals = Schedule_Submission::with('department')

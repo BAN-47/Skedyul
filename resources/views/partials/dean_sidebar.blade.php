@@ -6,11 +6,11 @@
 
     <div class="sidebar-user">
         <div class="sidebar-avatar">
-            {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
+            {{ strtoupper(substr(Auth::user()->dean->dean_first_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_middle_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_last_name ?? '', 0, 1)) }}
         </div>
         <div class="overflow-hidden">
-            <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
-                <div class="sidebar-user-role">Dean, CCICT</div>
+            <div class="sidebar-user-name">{{ Auth::user()->dean->dean_first_name ?? '' }} {{ Auth::user()->dean->dean_middle_name ?? '' }} {{ Auth::user()->dean->dean_last_name ?? '' }}</div>
+            <div class="sidebar-user-role">Dean, CCICT</div>
         </div>
     </div>
 
@@ -20,10 +20,7 @@
             class="nav-item {{ request()->routeIs('dean.dashboard') ? 'active' : '' }}">
             <span class="nav-icon"></span> Dashboard
         </a>
-        <a href="{{ route('dean.faculty_workload') }}"
-            class="nav-item {{ request()->routeIs('dean.faculty_workload') ? 'active' : '' }}">
-            <span class="nav-icon"></span> Faculty Workload
-        </a>
+
         <a href="{{ route('dean.departments') }}"
             class="nav-item {{ request()->routeIs('dean.departments') ? 'active' : '' }}">
             <span class="nav-icon"></span> Departments
@@ -33,7 +30,7 @@
         <a href="{{ route('dean.pending_approvals') }}"
             class="nav-item {{ request()->routeIs('dean.pending_approvals') ? 'active' : '' }}">
             <span class="nav-icon"></span> Pending Approvals
-            @if(($pendingApprovalsCount ?? 0) > 0)
+            @if (($pendingApprovalsCount ?? 0) > 0)
                 <span class="nav-badge">{{ $pendingApprovalsCount }}</span>
             @endif
         </a>

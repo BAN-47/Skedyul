@@ -30,12 +30,12 @@ class ReportsController extends Controller
         if (!$semester) return collect();
 
         return DB::table('section')
-            ->join('program', 'section.sec_prog_id', '=', 'program.prog_id')
+            ->join('department', 'section.sec_dept_id', '=', 'department.dept_id')
             ->leftJoin('schedule', 'schedule.sch_sec_id', '=', 'section.sec_id')
             ->leftJoin('study_load', 'schedule.sch_load_id', '=', 'study_load.sl_id')
             ->leftJoin('faculty', 'schedule.sch_fac_id', '=', 'faculty.fac_id')
             ->leftJoin(DB::raw('"USER"'), DB::raw('"USER".usr_id'), '=', 'faculty.fac_usr_id')
-            ->leftJoin('subject', 'schedule.sch_subj_id', '=', 'subject.subj_id')
+            ->leftJoin('course', 'schedule.sch_course_id', '=', 'course.course_id')
             ->leftJoin('room', 'schedule.sch_room_id', '=', 'room.room_id')
             ->where(function ($q) use ($semester) {
                 $q->where('schedule.sch_sem_id', $semester->sem_id)
@@ -46,10 +46,10 @@ class ReportsController extends Controller
                 'section.sec_id',
                 'section.sec_name',
                 'section.sec_year_level',
-                'program.prog_code',
+                'department.dept_code as prog_code',
                 DB::raw('"USER".usr_name as faculty_name'),
-                'subject.subj_code',
-                'subject.subj_name',
+                'course.course_code as subj_code',
+                'course.course_name as subj_name',
                 'room.room_name',
                 'schedule.sch_day        as day',
                 'schedule.sch_start_time as start_time',
@@ -69,9 +69,9 @@ class ReportsController extends Controller
 
         return DB::table('faculty')
             ->join(DB::raw('"USER"'), DB::raw('"USER".usr_id'), '=', 'faculty.fac_usr_id')
-            ->join('department', 'faculty.fac_dept_id', '=', 'department.dept_id')
+            ->join('college', 'faculty.fac_college_id', '=', 'college.college_id')
             ->leftJoin('schedule', 'schedule.sch_fac_id', '=', 'faculty.fac_id')
-            ->leftJoin('subject', 'schedule.sch_subj_id', '=', 'subject.subj_id')
+            ->leftJoin('course', 'schedule.sch_course_id', '=', 'course.course_id')
             ->leftJoin('section', 'schedule.sch_sec_id', '=', 'section.sec_id')
             ->leftJoin('room', 'schedule.sch_room_id', '=', 'room.room_id')
             ->leftJoin('workload', function ($join) use ($semester) {
@@ -90,9 +90,9 @@ class ReportsController extends Controller
                 'faculty.fac_id',
                 DB::raw('"USER".usr_name as faculty_name'),
                 'faculty.fac_employment_type',
-                'department.dept_code',
-                'subject.subj_code',
-                'subject.subj_name',
+                'college.college_code as dept_code',
+                'course.course_code as subj_code',
+                'course.course_name as subj_name',
                 'section.sec_name',
                 'room.room_name',
                 'schedule.sch_day        as day',
@@ -120,7 +120,7 @@ class ReportsController extends Controller
             })
             ->leftJoin('faculty', 'schedule.sch_fac_id', '=', 'faculty.fac_id')
             ->leftJoin(DB::raw('"USER"'), DB::raw('"USER".usr_id'), '=', 'faculty.fac_usr_id')
-            ->leftJoin('subject', 'schedule.sch_subj_id', '=', 'subject.subj_id')
+            ->leftJoin('course', 'schedule.sch_course_id', '=', 'course.course_id')
             ->leftJoin('section', 'schedule.sch_sec_id', '=', 'section.sec_id')
             ->select(
                 'room.room_id',
@@ -129,8 +129,8 @@ class ReportsController extends Controller
                 'room.room_capacity',
                 'room.room_is_available',
                 DB::raw('"USER".usr_name as faculty_name'),
-                'subject.subj_code',
-                'subject.subj_name',
+                'course.course_code as subj_code',
+                'course.course_name as subj_name',
                 'section.sec_name',
                 'schedule.sch_day        as day',
                 'schedule.sch_start_time as start_time',

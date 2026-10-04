@@ -28,61 +28,123 @@
 </div>
 
 <script>
-const CHAIR_HEADER_NOTIFS = [
-    { dot:'#dc2626', text:'<b>Conflict Detected</b> — GE002 Room 205 double-booked Wed 1PM.', time:'Today, 08:30 AM', unread:true },
-    { dot:'#d97706', text:'<b>Faculty Overload</b> — Carlo Mendoza at 31h/30h max load.', time:'Today, 08:00 AM', unread:true },
-    { dot:'#2563eb', text:'<b>Schedule Reminder</b> — Deadline for submission is Friday 5:00 PM.', time:'Yesterday, 4:00 PM', unread:false },
-];
-
-function renderChairHeaderNotifList() {
-    const list = document.getElementById('notif-list');
-    if (!list) return;
-    list.innerHTML = CHAIR_HEADER_NOTIFS.map((n) => `
-        <div class="notif-drop-item ${n.unread ? 'unread' : ''}" onclick="chairHeaderMarkRead(this)">
-            <div class="notif-drop-dot" style="background:${n.dot};"></div>
-            <div><div class="notif-drop-text">${n.text}</div><div class="notif-drop-time">${n.time}</div></div>
-        </div>`).join('');
-    updateChairHeaderNotifCount();
-}
+let chairHeaderNotifOpen = false;
 
 function chairHeaderToggleNotifDropdown() {
+    chairHeaderNotifOpen = !chairHeaderNotifOpen;
     const dd = document.getElementById('notif-dropdown');
-    if (!dd) return;
-    const isHidden = dd.style.display === 'none';
-    dd.style.display = isHidden ? 'block' : 'none';
+    if (dd) dd.style.display = chairHeaderNotifOpen ? 'block' : 'none';
+    if (chairHeaderNotifOpen) loadChairHeaderNotifications();
 }
 
 document.addEventListener('click', function (e) {
     const bell = document.getElementById('topbar-notif-bell');
     if (bell && !bell.contains(e.target)) {
+        chairHeaderNotifOpen = false;
         const dd = document.getElementById('notif-dropdown');
         if (dd) dd.style.display = 'none';
     }
 });
 
-function chairHeaderMarkRead(el) {
-    if (!el) return;
-    el.classList.remove('unread');
-    updateChairHeaderNotifCount();
+function loadChairHeaderNotifications() {
+    fetch('{{ route("chair.notifications.index") }}', {
+        headers: { 'Accept': 'application/json' },
+    })
+        .then(res => res.json())
+        .then(notifications => renderChairHeaderNotifList(notifications))
+        .catch(() => {
+            const list = document.getElementById('notif-list');
+            if (list) list.innerHTML = '<div class="p-4 text-sm text-slate-400 text-center">Failed to load notifications.</div>';
+        });
+}
+
+function renderChairHeaderNotifList(notifications) {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+
+    if (!notifications.length) {
+        list.innerHTML = '<div class="p-4 text-sm text-slate-400 text-center">No notifications yet.</div>';
+        return;
+    }
+
+    const dotColors = {
+        conflict: '#dc2626',
+        overload: '#d97706',
+        reminder: '#2563eb',
+        info: '#2563eb',
+    };
+
+    list.innerHTML = notifications.map(n => `
+        <div class="notif-drop-item ${!n.notif_is_read ? 'unread' : ''}" onclick="chairHeaderMarkRead('${n.notif_id}', this)">
+            <div class="notif-drop-dot" style="background:${dotColors[n.notif_type] || '#94a3b8'};"></div>
+            <div><div class="notif-drop-text"><b>${n.notif_title}</b> — ${n.notif_message}</div><div class="notif-drop-time">${chairHeaderFormatTime(n.notif_created_at)}</div></div>
+        </div>`).join('');
+}
+
+function chairHeaderFormatTime(isoString) {
+    const date = new Date(isoString);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
+    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    if (isToday) return `Today, ${timeStr}`;
+    if (isYesterday) return `Yesterday, ${timeStr}`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
+}
+
+function chairHeaderMarkRead(id, el) {
+    if (!el.classList.contains('unread')) return;
+
+    fetch(`/chair/notifications/${id}/read`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                el.classList.remove('unread');
+                updateChairHeaderNotifCount();
+            }
+        });
 }
 
 function chairHeaderMarkAllRead() {
-    document.querySelectorAll('.notif-drop-item.unread').forEach((el) => el.classList.remove('unread'));
-    updateChairHeaderNotifCount();
+    fetch('{{ route("chair.notifications.read-all") }}', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
+                updateChairHeaderNotifCount();
+            }
+        });
 }
 
 function updateChairHeaderNotifCount() {
-    const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-    const badge = document.getElementById('notif-count');
-    if (badge) {
-        badge.textContent = unread;
-        badge.style.display = unread > 0 ? 'inline' : 'none';
-    }
+    fetch('{{ route("chair.notifications.index") }}', {
+        headers: { 'Accept': 'application/json' },
+    })
+        .then(res => res.json())
+        .then(notifications => {
+            const unread = notifications.filter(n => !n.notif_is_read).length;
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                badge.textContent = unread;
+                badge.style.display = unread > 0 ? 'inline' : 'none';
+            }
+        });
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderChairHeaderNotifList);
-} else {
-    renderChairHeaderNotifList();
-}
+updateChairHeaderNotifCount();
+setInterval(updateChairHeaderNotifCount, 30000);
 </script>

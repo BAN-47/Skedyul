@@ -176,40 +176,6 @@ function setActiveNav(el) {
   el.classList.add('active');
 }
 
-function toggleNotifPanel() {
-  document.getElementById('notif-panel').classList.toggle('hidden');
-}
-document.addEventListener('click', function(e) {
-  const panel = document.getElementById('notif-panel');
-  const btn   = document.getElementById('notif-btn');
-  if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
-    panel.classList.add('hidden');
-  }
-});
-
-function markAllNotificationsRead() {
-  const csrf = document.querySelector('meta[name="csrf-token"]').content;
-
-  fetch('{{ route("chair.notifications.readAll") }}', {
-    method: 'POST',
-    headers: {
-      'X-CSRF-TOKEN': csrf,
-      'Accept': 'application/json',
-    },
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      document.querySelectorAll('.notif-item').forEach(el => el.classList.add('opacity-50'));
-      document.getElementById('notif-dot').classList.add('hidden');
-      document.getElementById('notif-count-badge').textContent = '0 new';
-      document.getElementById('notif-count-badge').className = 'badge badge-grey';
-      showToast('All notifications marked as read.');
-    }
-  })
-  .catch(() => showToast('Could not update notifications. Try again.'));
-}
-
 function showToast(msg) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;

@@ -9,7 +9,7 @@ use App\Models\Semester;
 use App\Models\room as Room;
 use App\Models\Schedule;
 use App\Models\Faculty;
-use App\Models\Subjects;
+use App\Models\Course;
 use App\Models\Section;
 use App\Models\Study_Load;
 use App\Services\ScheduleAssignmentService;
@@ -55,15 +55,15 @@ class ChairRoomController extends Controller
         $availableCount = $totalRooms - $inUseCount;
 
         // ---------- Data the Assign / Edit Schedule modals need ----------
-        $subjects = Subjects::where('subj_dept_id', $deptChair->dc_dept_id)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('subj_prog_id', $deptChair->dc_prog_id))
-            ->where('subj_is_active', true)
-            ->orderBy('subj_code')
+        $subjects = Course::where('course_college_id', $deptChair->dc_college_id)
+            ->when($deptChair->dc_prog_id, fn($q) => $q->where('course_dept_id', $deptChair->dc_prog_id))
+            ->where('course_is_active', true)
+            ->orderBy('course_code')
             ->get();
 
         $subjectsById = $subjects->keyBy('subj_id');
 
-        $facultyRecords = Faculty::where('fac_dept_id', $deptChair->dc_dept_id)
+        $facultyRecords = Faculty::where('fac_college_id', $deptChair->dc_college_id)
             ->orderBy('fac_first_name')
             ->get();
 
@@ -82,7 +82,7 @@ class ChairRoomController extends Controller
             ];
         });
 
-        $sections = Section::when($deptChair->dc_prog_id, fn($q) => $q->where('sec_prog_id', $deptChair->dc_prog_id))
+        $sections = Section::when($deptChair->dc_prog_id, fn($q) => $q->where('sec_dept_id', $deptChair->dc_prog_id))
             ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
             ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->orderBy('sec_name')
@@ -109,7 +109,7 @@ class ChairRoomController extends Controller
     public function assignSchedule(Request $request)
     {
         $validated = $request->validate([
-            'subj_id'        => 'required|uuid|exists:subject,subj_id',
+            'subj_id'        => 'required|uuid|exists:course,course_id',
             'fac_id'         => 'required|uuid|exists:faculty,fac_id',
             'sec_id'         => 'required|uuid|exists:section,sec_id',
             'room_id'        => 'required|uuid|exists:room,room_id',
@@ -130,7 +130,7 @@ class ChairRoomController extends Controller
         $scheduleModel = Schedule::findOrFail($schedule);
 
         $validated = $request->validate([
-            'subj_id'        => 'required|uuid|exists:subject,subj_id',
+            'subj_id'        => 'required|uuid|exists:course,course_id',
             'fac_id'         => 'required|uuid|exists:faculty,fac_id',
             'sec_id'         => 'required|uuid|exists:section,sec_id',
             'room_id'        => 'required|uuid|exists:room,room_id',
