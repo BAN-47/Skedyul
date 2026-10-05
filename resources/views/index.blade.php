@@ -44,7 +44,7 @@
       <div class="pointer-events-none absolute bottom-48 left-8 h-20 w-20 rounded-full border border-white/[.07] bg-white/[.04]"></div>
 
       {{-- Content --}}
-      <div class="relative z-10 flex flex-col items-center text-center">
+      <div class="relative z-10 flex flex-col items-center text-center -mt-3">
 
         {{-- Logo --}}
         <div class="mb-1 text-5xl font-extrabold tracking-tight text-white leading-none">
@@ -58,7 +58,7 @@
 
         {{-- Description --}}
         <p class="mb-11 max-w-sm text-center text-[17px] leading-relaxed text-white/70">
-          A <b class="font-bold text-white">smart, centralized platform</b> built for CCICT faculty —
+          A <b class="font-bold text-white">smart, centralized platform</b> built for all college departments —
           effortlessly manage class schedules, plot subjects,
           detect conflicts, and balance workloads all in one place.
         </p>

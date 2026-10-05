@@ -5,7 +5,11 @@
 
   <div class="sidebar-user">
     <div class="sidebar-avatar">
-      {{ strtoupper(substr(auth()->user()->faculty->fac_first_name ?? 'U', 0, 1) . substr(auth()->user()->faculty->fac_last_name ?? '', 0, 1)) }}
+      @if (auth()->user()->faculty?->fac_profile_image)
+        <img src="{{ asset('images/faculty_profile/' . auth()->user()->faculty->fac_profile_image) }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
+      @else
+        {{ strtoupper(substr(auth()->user()->faculty->fac_first_name ?? 'U', 0, 1) . substr(auth()->user()->faculty->fac_last_name ?? '', 0, 1)) }}
+      @endif
     </div>
     <div class="overflow-hidden">
       <div class="sidebar-user-name">{{ auth()->user()->faculty->full_name ?? auth()->user()->usr_name }}</div>
