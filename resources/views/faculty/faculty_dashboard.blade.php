@@ -16,30 +16,50 @@
 
   <!-- Main -->
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">My Dashboard</div>
-    </div>
+
+    @php
+      // Flatten $todaySchedule into the shape faculty_header.blade.php expects
+      // for its "Today's Schedule" notification feed.
+      $scheduleForJs = [];
+      $todayName = $today ?? \Carbon\Carbon::now()->format('l');
+      foreach (($todaySchedule ?? collect()) as $sch) {
+          $scheduleForJs[] = [
+              'code'  => $sch->subject->subj_code ?? 'N/A',
+              'room'  => $sch->room->room_name ?? 'N/A',
+              'day'   => $todayName,
+              'start' => \Carbon\Carbon::parse($sch->sch_start_time)->format('H:i'),
+              'end'   => \Carbon\Carbon::parse($sch->sch_end_time)->format('H:i'),
+          ];
+      }
+    @endphp
+
+    @include('partials.faculty_header', [
+        'title' => 'My Dashboard',
+        'scheduleFeed' => $scheduleForJs,
+        'announcements' => $announcements ?? null,
+    ])
 
     <!-- FACULTY DASHBOARD PAGE -->
     <div id="page-faculty-dashboard" class="page active">
-      <!-- Welcome Banner with rotating quote -->
-      <div class="quote-banner mb-6">
-        <div class="quote-banner-grid"></div>
+
+      <!-- Welcome Banner with rotating quote (Tailwind) -->
+      <div class="relative overflow-hidden rounded-2xl mb-6 px-7 py-6 bg-gradient-to-br from-slate-900 via-blue-900 to-[#1a2d5a]">
+        <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:28px_28px]"></div>
         <div class="relative z-10 flex items-start justify-between gap-6">
-          <div class="min-w-0 flex-1">
-            <div class="mb-1.5 text-[11px] font-bold uppercase tracking-[1.5px] text-white/40">Welcome back, {{ $faculty->full_name }}</div>
-            <div class="mb-2.5 text-xl font-bold italic leading-[1.35] text-white transition-opacity duration-500" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
-            <div class="text-xs font-semibold text-white/40 transition-opacity duration-500" id="fac-quote-author">— Mark Van Doren</div>
-            <div class="mt-3.5 flex items-center gap-2">
-              <button type="button" aria-label="Previous quote" onclick="prevFacQuote()" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white/10 text-[13px] text-white">&#8249;</button>
+          <div class="flex-1">
+            <div class="text-[11px] font-bold text-white/40 uppercase tracking-[1.5px] mb-1.5">Welcome back, {{ $faculty->full_name }}</div>
+            <div class="text-xl leading-snug font-bold text-white mb-2.5 italic" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
+            <div class="text-xs text-white/40 font-semibold" id="fac-quote-author">— Mark Van Doren</div>
+            <div class="flex items-center gap-2 mt-3.5">
+              <button onclick="prevFacQuote()" class="w-7 h-7 rounded-full bg-white/10 border-none text-white cursor-pointer text-[13px]">&#8249;</button>
               <div id="fac-quote-dots" class="flex gap-1.5"></div>
-              <button type="button" aria-label="Next quote" onclick="nextFacQuote()" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white/10 text-[13px] text-white">&#8250;</button>
+              <button onclick="nextFacQuote()" class="w-7 h-7 rounded-full bg-white/10 border-none text-white cursor-pointer text-[13px]">&#8250;</button>
             </div>
           </div>
-          <div class="hidden shrink-0 text-right sm:block">
-            <div class="mb-2.5 text-[44px] leading-none opacity-[.12]">"</div>
+          <div class="text-right shrink-0">
+            <div class="text-[44px] opacity-10 leading-none mb-2.5">"</div>
             <div class="text-[11px] text-white/30">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Dept</div>
-            <div class="mt-0.5 text-[11px] text-white/30">
+            <div class="text-[11px] text-white/30 mt-0.5">
               @if ($faculty->department)
                 AY {{ now()->year }}–{{ now()->year + 1 }}
               @endif
@@ -48,105 +68,184 @@
         </div>
       </div>
 
-      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-blue-600"></div><div class="stat-label">Teaching Load</div><div class="stat-value">{{ $totalHours }}h</div><div class="stat-sub">of 30h max</div></div>
-        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-green-600"></div><div class="stat-label">My Subjects</div><div class="stat-value">{{ $mySubjects->count() }}</div><div class="stat-sub">This semester</div></div>
-        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-amber-600"></div><div class="stat-label">My Sections</div><div class="stat-value">{{ $mySections->count() }}</div><div class="stat-sub">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div></div>
+      <!-- STAT CARDS (Tailwind) -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+          <div class="absolute top-0 left-0 right-0 h-1 bg-blue-600"></div>
+          <div class="text-xs text-gray-500 font-semibold mb-1">Teaching Load</div>
+          <div class="text-2xl font-extrabold text-gray-900">{{ $totalHours }}h</div>
+          <div class="text-[11px] text-gray-400 mt-0.5">of 30h max</div>
+        </div>
+        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+          <div class="absolute top-0 left-0 right-0 h-1 bg-green-600"></div>
+          <div class="text-xs text-gray-500 font-semibold mb-1">My Subjects</div>
+          <div class="text-2xl font-extrabold text-gray-900">{{ $mySubjects->count() }}</div>
+          <div class="text-[11px] text-gray-400 mt-0.5">This semester</div>
+        </div>
+        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+          <div class="absolute top-0 left-0 right-0 h-1 bg-amber-600"></div>
+          <div class="text-xs text-gray-500 font-semibold mb-1">My Sections</div>
+          <div class="text-2xl font-extrabold text-gray-900">{{ $mySections->count() }}</div>
+          <div class="text-[11px] text-gray-400 mt-0.5">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div class="min-w-0">
-          <div class="card">
-            <div class="card-header"><div><div class="card-title">Today's Schedule — {{ $today }}</div><div class="card-sub">Current Semester</div></div></div>
-            <div class="overflow-x-auto"><table class="w-full border-collapse">
-              <thead><tr><th>Time</th><th>Subject</th><th>Room</th><th>Section</th><th>Status</th></tr></thead>
-              <tbody>
-                @forelse ($todaySchedule as $sch)
-                  <tr class="sched-row" data-start="{{ $sch->sch_start_time }}" data-end="{{ $sch->sch_end_time }}">
-                    <td class="whitespace-nowrap font-mono text-xs text-slate-400">{{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}</td>
-                    <td><b>{{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? 'N/A' }}</b></td>
-                    <td>{{ $sch->room->room_name ?? 'N/A' }}</td>
-                    <td>{{ $sch->section->sec_name ?? 'N/A' }}</td>
-                    <td class="sched-status"><span class="badge badge-grey">—</span></td>
+      <div class="flex gap-5 items-start flex-wrap">
+
+        <!-- TODAY'S SCHEDULE -->
+        <div class="flex-1 min-w-[420px]">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div class="mb-4">
+              <div class="text-base font-bold text-gray-900">Today's Schedule — {{ $today }}</div>
+              <div class="text-xs text-gray-500 mt-0.5">Current Semester</div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm border-collapse">
+                <thead>
+                  <tr>
+                    <th class="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 px-3 py-2 border-b border-gray-200">Time</th>
+                    <th class="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 px-3 py-2 border-b border-gray-200">Subject</th>
+                    <th class="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 px-3 py-2 border-b border-gray-200">Room</th>
+                    <th class="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 px-3 py-2 border-b border-gray-200">Section</th>
+                    <th class="text-left text-[11px] font-bold uppercase tracking-wide text-gray-500 px-3 py-2 border-b border-gray-200">Status</th>
                   </tr>
-                @empty
-                  <tr><td colspan="5" class="py-8 text-center text-slate-400">No classes scheduled today.</td></tr>
-                @endforelse
-              </tbody>
-            </table></div>
-          </div>
-        </div>
-        <div class="min-w-0">
-          <div class="card">
-            <div class="card-header"><div class="card-title">My Subjects</div></div>
-            @forelse ($mySubjects as $i => $subj)
-              @php $colors = [['text-blue-600', 'bg-blue-600'], ['text-amber-600', 'bg-amber-600'], ['text-green-600', 'bg-green-600'], ['text-violet-600', 'bg-violet-600'], ['text-cyan-600', 'bg-cyan-600']]; $color = $colors[$i % count($colors)]; @endphp
-              <div class="mb-3.5">
-                <div class="mb-1 flex items-center justify-between gap-2">
-                  <div class="min-w-0 truncate text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $subj->subj_code }} — {{ $subj->subj_name }}</div>
-                  <div class="shrink-0 font-mono text-xs font-bold {{ $color[0] }}">{{ $subj->subj_units ?? '' }}u</div>
-                </div>
-                <div class="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div class="h-full w-full rounded-full transition-all duration-700 {{ $color[1] }}"></div></div>
-              </div>
-            @empty
-              <div class="p-3 text-center text-[13px] text-slate-400">No subjects assigned.</div>
-            @endforelse
-            <div class="mt-3 flex justify-between border-t border-slate-200 pt-3 text-xs dark:border-slate-800">
-              <div><div class="text-slate-400">Total Load</div><div class="text-lg font-extrabold text-slate-900 dark:text-slate-100">{{ $totalHours }}h</div></div>
-              <div class="text-right"><div class="text-slate-400">Max Load</div><div class="text-lg font-extrabold text-green-600">30h</div></div>
+                </thead>
+                <tbody>
+                  @forelse ($todaySchedule as $sch)
+                    <tr class="sched-row border-b border-gray-100" data-start="{{ $sch->sch_start_time }}" data-end="{{ $sch->sch_end_time }}">
+                      <td class="px-3 py-2.5 font-mono text-xs text-gray-400 whitespace-nowrap">{{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}</td>
+                      <td class="px-3 py-2.5"><b class="text-gray-900">{{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? 'N/A' }}</b></td>
+                      <td class="px-3 py-2.5 text-gray-700">{{ $sch->room->room_name ?? 'N/A' }}</td>
+                      <td class="px-3 py-2.5 text-gray-700">{{ $sch->section->sec_name ?? 'N/A' }}</td>
+                      <td class="px-3 py-2.5 sched-status">
+                        <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">—</span>
+                      </td>
+                    </tr>
+                  @empty
+                    <tr><td colspan="5" class="text-center text-gray-400 text-sm py-8">No classes scheduled today.</td></tr>
+                  @endforelse
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
+
+        <!-- MY SUBJECTS -->
+        <div class="w-full sm:w-[280px] shrink-0">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div class="text-base font-bold text-gray-900 mb-4">My Subjects</div>
+            @forelse ($mySubjects as $i => $subj)
+              @php
+                $colors = ['#2563eb', '#d97706', '#16a34a', '#7c3aed', '#0d9488'];
+                $wc = $colors[$i % count($colors)];
+              @endphp
+              <div class="mb-3 last:mb-0">
+                <div class="flex items-center justify-between mb-1">
+                  <div class="text-xs font-semibold text-gray-700">{{ $subj->subj_code }} — {{ $subj->subj_name }}</div>
+                  <div class="text-xs font-bold" style="color:{{ $wc }};">{{ $subj->subj_units ?? '' }}u</div>
+                </div>
+                <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full rounded-full" style="width:100%;background:{{ $wc }};"></div>
+                </div>
+              </div>
+            @empty
+              <div class="text-sm text-gray-400 text-center py-3">No subjects assigned.</div>
+            @endforelse
+            <div class="mt-3 pt-3 border-t border-gray-200 flex justify-between text-xs">
+              <div>
+                <div class="text-gray-400">Total Load</div>
+                <div class="font-extrabold text-lg text-gray-900">{{ $totalHours }}h</div>
+              </div>
+              <div class="text-right">
+                <div class="text-gray-400">Max Load</div>
+                <div class="font-extrabold text-lg text-green-600">30h</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
   </div><!-- end .main -->
 </div><!-- end #screen-app -->
 
-<!-- MODALS (unchanged structure — kept as-is, static UI shells) -->
-<div class="modal-overlay" id="modal-assign">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Assign Subject to Schedule</div>
-      <button class="modal-close" onclick="closeModal('modal-assign')">✕</button>
+<!-- ASSIGN SUBJECT MODAL (Tailwind) -->
+<div class="modal-overlay fixed inset-0 z-[200] hidden items-center justify-center bg-black/40 backdrop-blur-sm [&.open]:flex" id="modal-assign">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] max-h-[90vh] overflow-y-auto p-6">
+    <div class="flex items-center justify-between mb-5">
+      <div class="text-lg font-bold text-gray-900">Assign Subject to Schedule</div>
+      <button class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center text-sm" onclick="closeModal('modal-assign')">✕</button>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Faculty Member</label><select class="field-select"><option>{{ $faculty->full_name }}</option></select></div>
-      <div class="field-group"><label class="field-label">Subject</label>
-        <select class="field-select">
+
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Faculty Member</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
+          <option>{{ $faculty->full_name }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Subject</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
           @foreach ($mySubjects as $subj)
             <option>{{ $subj->subj_code }} — {{ $subj->subj_name }}</option>
           @endforeach
         </select>
       </div>
     </div>
-    <div class="form-row">
-      <div class="field-group"><label class="field-label">Section</label>
-        <select class="field-select">
+
+    <div class="grid grid-cols-2 gap-3 mb-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Section</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
           @foreach ($mySections as $sec)
             <option>{{ $sec }}</option>
           @endforeach
         </select>
       </div>
-      <div class="field-group"><label class="field-label">Room</label><select class="field-select"><option>Room 301</option><option>Room 302</option><option>Lab 1</option><option>Lab 2</option></select></div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Room</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
+          <option>Room 301</option><option>Room 302</option><option>Lab 1</option><option>Lab 2</option>
+        </select>
+      </div>
     </div>
-    <div class="form-row three">
-      <div class="field-group"><label class="field-label">Day</label><select class="field-select"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option></select></div>
-      <div class="field-group"><label class="field-label">Start Time</label><select class="field-select"><option>7:00 AM</option><option>8:30 AM</option><option>10:00 AM</option><option>11:30 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>4:00 PM</option></select></div>
-      <div class="field-group"><label class="field-label">End Time</label><select class="field-select"><option>8:30 AM</option><option>10:00 AM</option><option>11:30 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>4:00 PM</option><option>5:30 PM</option></select></div>
+
+    <div class="grid grid-cols-3 gap-3 mb-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Day</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
+          <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Start Time</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
+          <option>7:00 AM</option><option>8:30 AM</option><option>10:00 AM</option><option>11:30 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>4:00 PM</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">End Time</label>
+        <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900">
+          <option>8:30 AM</option><option>10:00 AM</option><option>11:30 AM</option><option>1:00 PM</option><option>2:30 PM</option><option>4:00 PM</option><option>5:30 PM</option>
+        </select>
+      </div>
     </div>
-    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;">
+
+    <div class="bg-amber-50 border border-amber-300 rounded-lg px-3.5 py-2.5 text-xs text-amber-800">
       ⚡ System will automatically check for conflicts before saving.
     </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-assign')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-assign');showToast('Subject assigned! No conflicts detected ✓')">Check & Assign</button>
+
+    <div class="flex justify-end gap-2 mt-5">
+      <button class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="closeModal('modal-assign')">Cancel</button>
+      <button class="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700" onclick="closeModal('modal-assign');showToast('Subject assigned! No conflicts detected ✓')">Check & Assign</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+<!-- TOAST (Tailwind) -->
+<div class="toast fixed bottom-6 right-6 z-[300] bg-gray-900 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg opacity-0 translate-y-2 pointer-events-none transition-all duration-300 [&.show]:opacity-100 [&.show]:translate-y-0 [&.show]:pointer-events-auto" id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
 // ── SUBJECTS ───────────────────────────────────────────────────────────────
@@ -175,9 +274,12 @@ function saveAddSubject() {
   const tbody = document.querySelector('#subjects-table');
   if (tbody) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td><span style="font-family:var(--mono);font-weight:700">${code}</span></td>
+    tr.innerHTML = `<td><span class="font-mono font-bold text-xs text-gray-900">${code}</span></td>
       <td>${name}</td><td>${units}</td><td>${lec}</td><td>${lab}</td><td>${dept}</td>
-      <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;" onclick="openEditSubject('${code}','${name}','${units}','${lec}','${lab}','${dept}')">Edit</button><button class="topbar-btn" style="padding:4px 10px;font-size:11px;background:var(--red-light);color:var(--red);margin-left:4px;" onclick="deleteTableRow(this,'${code}')">Delete</button></td>`;
+      <td>
+        <button class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="openEditSubject('${code}','${name}','${units}','${lec}','${lab}','${dept}')">Edit</button>
+        <button class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-red-100 text-red-600 hover:bg-red-200 ml-1" onclick="deleteTableRow(this,'${code}')">Delete</button>
+      </td>`;
     tbody.appendChild(tr);
   }
   ['add-subj-code','add-subj-name','add-subj-units','add-subj-lec','add-subj-lab','add-subj-desc'].forEach(id => document.getElementById(id).value = '');
@@ -197,8 +299,8 @@ function saveAddRoom() {
   if (tbody) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td><b>${name}</b></td><td>${type}</td><td>${capacity}</td>
-      <td><span class="badge badge-green">Available</span></td>
-      <td><button class="topbar-btn btn-secondary" style="padding:4px 10px;font-size:11px;"
+      <td><span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600">Available</span></td>
+      <td><button class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200"
         onclick="openViewRoom('${name}','${type}','${capacity}','Available','—','—','${location}','${facilities}')">View</button></td>`;
     tbody.appendChild(tr);
   }
@@ -215,8 +317,8 @@ function openViewRoom(name, type, capacity, status, assignment, faculty, locatio
   document.getElementById('vr-assignment').textContent = assignment;
   document.getElementById('vr-faculty').textContent  = faculty !== '—' ? 'Faculty: ' + faculty : '';
   document.getElementById('vr-facilities').textContent = facilities;
-  const colors = { 'Available':'badge-green', 'In Use':'badge-amber', 'Under Maintenance':'badge-red' };
-  document.getElementById('vr-status-badge').innerHTML = `<span class="badge ${colors[status]||'badge-grey'}">${status}</span>`;
+  const colors = { 'Available':'bg-green-100 text-green-600', 'In Use':'bg-amber-100 text-amber-600', 'Under Maintenance':'bg-red-100 text-red-600' };
+  document.getElementById('vr-status-badge').innerHTML = `<span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${colors[status]||'bg-gray-100 text-gray-500'}">${status}</span>`;
   openModal('modal-view-room');
 }
 
@@ -278,8 +380,8 @@ function openUserProfile(name, role, dept, email, employment, status, avatar, co
   document.getElementById('profile-about').textContent = about;
   document.getElementById('profile-office').textContent = office;
   document.getElementById('profile-contact').textContent = contact;
-  const statusColors = { Active:'badge-green', Pending:'badge-amber', Inactive:'badge-red' };
-  document.getElementById('profile-status-badge').innerHTML = `<span class="badge ${statusColors[status]||'badge-grey'}">${status}</span>`;
+  const statusColors = { Active:'bg-green-100 text-green-600', Pending:'bg-amber-100 text-amber-600', Inactive:'bg-red-100 text-red-600' };
+  document.getElementById('profile-status-badge').innerHTML = `<span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full ${statusColors[status]||'bg-gray-100 text-gray-500'}">${status}</span>`;
   openModal('modal-user-profile');
 }
 
@@ -314,8 +416,8 @@ function renderPage() {
     for (let p = 1; p <= totalPages; p++) {
       const btn = document.createElement('button');
       btn.textContent = p;
-      btn.className = 'topbar-btn ' + (p === currentPage ? 'btn-primary' : 'btn-secondary');
-      btn.style.cssText = 'padding:6px 11px;font-size:13px;min-width:36px;';
+      btn.className = 'px-2.5 py-1.5 rounded-lg text-[13px] font-semibold min-w-[36px] ' +
+        (p === currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200');
       btn.onclick = () => { currentPage = p; renderPage(); };
       container.appendChild(btn);
     }
@@ -334,32 +436,6 @@ function filterUsers(query) {
   all.forEach(r => r.style.display = 'none');
   currentPage = 1;
   renderPage();
-}
-
-// ── NOTIFICATIONS (bell dropdown) ───────────────────────────────────────────
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  const dd = document.getElementById('notif-dropdown');
-  if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
-});
-function markRead(el) { el.classList.remove('unread'); updateNotifCount(); }
-function markAllRead() {
-  document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
-  updateNotifCount();
-}
-function updateNotifCount() {
-  const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-  const badge = document.getElementById('notif-count');
-  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline' : 'none'; }
 }
 
 // ── DAY TABS (faculty schedule page) ────────────────────────────────────────
@@ -537,12 +613,7 @@ document.querySelectorAll('.tab-bar').forEach(bar => {
   });
 });
 
-// ── INIT ──────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initFacQuotes();
-});
-
-// ── LIVE CLASS COUNTDOWN ────────────────────────────────────────────────
+// ── LIVE CLASS COUNTDOWN (Today's Schedule table) ───────────────────────
 function parseTimeToday(timeStr) {
   // Expects "HH:MM" or "HH:MM:SS" (24hr, matches your sch_start_time/sch_end_time format)
   const [h, m, s] = timeStr.split(':').map(Number);
@@ -553,6 +624,8 @@ function parseTimeToday(timeStr) {
 
 function updateScheduleStatuses() {
   const now = new Date();
+  const badgeBase = 'inline-block text-[11px] font-bold px-2 py-0.5 rounded-full';
+
   document.querySelectorAll('.sched-row').forEach(row => {
     const start = parseTimeToday(row.dataset.start);
     const end = parseTimeToday(row.dataset.end);
@@ -561,7 +634,7 @@ function updateScheduleStatuses() {
 
     if (now < start) {
       const mins = Math.ceil((start - now) / 60000);
-      statusCell.innerHTML = `<span class="badge badge-blue">Starts in ${mins}m</span>`;
+      statusCell.innerHTML = `<span class="${badgeBase} bg-blue-100 text-blue-600">Starts in ${mins}m</span>`;
     } else if (now >= start && now <= end) {
       const remaining = end - now;
       const mins = Math.floor(remaining / 60000);
@@ -578,11 +651,12 @@ function updateScheduleStatuses() {
           </div>
         </div>`;
     } else {
-      statusCell.innerHTML = `<span class="badge badge-grey">Ended</span>`;
+      statusCell.innerHTML = `<span class="${badgeBase} bg-gray-100 text-gray-500">Ended</span>`;
     }
   });
 }
 
+// ── INIT ──────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initFacQuotes();
   updateScheduleStatuses();

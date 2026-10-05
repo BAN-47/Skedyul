@@ -15,23 +15,146 @@
 
   <!-- Main -->
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">My Subjects</div>
-    </div>
+
+    @php
+      // ── Build the weekly grid from the flat $subjects collection ─────────
+      $gridDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+      // Rotating palette so each subject keeps a consistent color across the grid
+      $palette = ['#e07a5f','#81b29a','#6fa8dc','#3d5a80','#f2a154','#a8d5a2','#c65b7c','#4a90a4'];
+      $subjColors = [];
+      $colorIdx = 0;
+
+      // day => [ hour => block ]   (block placed only on its start hour; rowspan covers the rest)
+      $dayBlocks = [];
+      $hasNightSched = false; // true once any class starts at/after 4:30 PM (16:30)
+
+      // Left-side "Summary of Subjects" panel — one row per unique subject code
+      $summaryRows = [];
+
+      // Flat list (not keyed by hour) — used both by the header's "today's schedule"
+      // feed and, further below, to build the grid.
+      $scheduleForJs = [];
+
+      // Messages from the chair/dean — wire this to a real announcements query
+      // (e.g. $announcements = Announcement::forFaculty($faculty->id)->latest()->get())
+      // once that table/relationship exists; this sample array is just a placeholder.
+      $announcements = $announcements ?? [
+          ['from' => 'Chair Rodrigo Tan', 'role' => 'BSIS Chair', 'initials' => 'RT', 'color' => '#d97706',
+           'message' => 'Please submit your consultation hours schedule by Friday.', 'time' => '2h ago'],
+          ['from' => 'Dean Villaceran', 'role' => 'Dean, CCICT', 'initials' => 'DV', 'color' => '#0891b2',
+           'message' => 'IS102 will be under maintenance next Monday — classes moved to IS201.', 'time' => 'Yesterday'],
+      ];
+
+      // Guard: keep Summary + grid renderable even when controller passes null/empty
+      $subjects = $subjects ?? collect();
+
+      foreach ($subjects as $entry) {
+          $subj = $entry['subject'];
+          $code = $subj->subj_code ?? 'N/A';
+
+          if (!isset($subjColors[$code])) {
+              $subjColors[$code] = $palette[$colorIdx % count($palette)];
+              $colorIdx++;
+          }
+
+          if (!isset($summaryRows[$code])) {
+              $summaryRows[$code] = [
+                  'code'     => $code,
+                  'name'     => $subj->subj_name ?? 'N/A',
+                  // wire this to a real enrollment count (e.g. $entry['total_students'])
+                  // once that figure is available from the controller
+                  'students' => $entry['total_students'] ?? '—',
+                  'color'    => $subjColors[$code],
+              ];
+          }
+
+          foreach ($entry['schedules'] as $sched) {
+              $startTs = \Carbon\Carbon::parse($sched['start']);
+              $endTs   = \Carbon\Carbon::parse($sched['end']);
+
+              $startHour = (int) $startTs->format('H');
+              $endHour   = (int) $endTs->format('H');
+              if ((int) $endTs->format('i') > 0) {
+                  $endHour++; // round a partial hour up so the block still gets a row
+              }
+              $duration = max(1, $endHour - $startHour);
+
+              // Night table starts at 4:30 PM — treat 16:30+ (and any 16:xx class) as night
+              if ($startHour > 16 || ($startHour === 16 && (int) $startTs->format('i') >= 30)) {
+                  $hasNightSched = true;
+              }
+              // Classes that begin in the 4 PM hour land on the night grid (hour key 16)
+              if ($startHour === 16) {
+                  // keep startHour = 16 for night row placement
+              }
+
+              $scheduleForJs[] = [
+                  'code'  => $code,
+                  'room'  => $entry['room'],
+                  'day'   => $sched['day'],
+                  'start' => $startTs->format('H:i'),
+                  'end'   => $endTs->format('H:i'),
+              ];
+
+              $dayBlocks[$sched['day']][$startHour] = [
+                  'code'      => $code,
+                  'name'      => $subj->subj_name ?? 'N/A',
+                  'units'     => $subj->subj_units ?? '—',
+                  'lec'       => $subj->subj_lec_hours ?? 0,
+                  'lab'       => $subj->subj_lab_hours ?? 0,
+                  'room'      => $entry['room'],
+                  'section'   => $entry['sections'],
+                  'start'     => $startTs->format('g:i A'),
+                  'end'       => $endTs->format('g:i A'),
+                  'start_raw' => $startTs->format('H:i'),
+                  'end_raw'   => $endTs->format('H:i'),
+                  'duration'  => $duration,
+                  'color'     => $subjColors[$code],
+              ];
+          }
+      }
+
+      // Track, per day, which hours are already "consumed" by a rowspan above them
+      $skipUntil = array_fill_keys($gridDays, 0);
+
+      $dayRange   = range(7, 15);  // 7AM – 4PM (last row: 3–4 PM)
+      $nightRange = range(16, 21); // Night table: 4:30 PM – 10PM
+    @endphp
+
+    @include('partials.faculty_header', [
+        'title' => 'My Subjects',
+        'scheduleFeed' => $scheduleForJs,
+        'announcements' => $announcements,
+    ])
 
     <!-- FACULTY SUBJECTS PAGE -->
     <div id="page-faculty-subjects" class="page active">
-      <div class="card">
-        <div class="card-header">
+
+      <!-- CARD WRAPPER (Tailwind) -->
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <div>
-            <div class="card-title">My Subjects</div>
-            <div class="card-sub">
+            <div class="text-base font-bold text-gray-900">My Subjects</div>
+            <div class="text-xs text-gray-500 mt-0.5">
               @if ($activeSemester)
                 Assigned subjects for {{ $activeSemester->sem_name }}
               @else
                 No active semester set
               @endif
             </div>
+          </div>
+
+          <!-- DAY / NIGHT TOGGLE -->
+          <div class="inline-flex items-center bg-gray-100 rounded-lg p-1 gap-1 shrink-0">
+            <button id="btn-view-day" type="button" onclick="switchScheduleView('day')"
+                    class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-white text-gray-900 shadow-sm">
+              Day
+            </button>
+            <button id="btn-view-night" type="button" onclick="switchScheduleView('night')"
+                    class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 text-gray-500">
+              Night
+            </button>
           </div>
         </div>
         <div class="overflow-x-auto"><table class="w-full border-collapse">
@@ -124,14 +247,17 @@
       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
       <div class="mt-0.5 text-[11px] text-slate-400">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
     </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-web-subject-detail')">Close</button>
+
+    <div class="flex justify-end gap-2 mt-2">
+      <button class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200"
+              onclick="closeModal('modal-web-subject-detail')">Close</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+<!-- TOAST (Tailwind) -->
+<div class="toast fixed bottom-6 right-6 z-[300] bg-gray-900 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg opacity-0 translate-y-2 pointer-events-none transition-all duration-300 [&.show]:opacity-100 [&.show]:translate-y-0 [&.show]:pointer-events-auto"
+     id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
 function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, schedule, color) {
@@ -144,6 +270,33 @@ function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, 
   document.getElementById('wsd-section').textContent = section;
   document.getElementById('wsd-schedule').textContent = schedule;
   openModal('modal-web-subject-detail');
+}
+
+// ── DAY / NIGHT SCHEDULE TOGGLE ─────────────────────────────────────────
+function switchScheduleView(view) {
+  const dayBtn   = document.getElementById('btn-view-day');
+  const nightBtn = document.getElementById('btn-view-night');
+  const dayGrid  = document.getElementById('view-day-grid');
+  const nightGrid = document.getElementById('view-night-grid');
+  if (!dayBtn || !nightBtn || !dayGrid || !nightGrid) return;
+
+  const activeClasses   = ['bg-white', 'text-gray-900', 'shadow-sm'];
+  const inactiveClasses = ['text-gray-500'];
+
+  const activate = (btn) => { btn.classList.add(...activeClasses); btn.classList.remove(...inactiveClasses); };
+  const deactivate = (btn) => { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); };
+
+  if (view === 'night') {
+    dayGrid.classList.add('hidden');
+    nightGrid.classList.remove('hidden');
+    activate(nightBtn);
+    deactivate(dayBtn);
+  } else {
+    nightGrid.classList.add('hidden');
+    dayGrid.classList.remove('hidden');
+    activate(dayBtn);
+    deactivate(nightBtn);
+  }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -159,7 +312,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── LIVE STATUS PER SCHEDULE ROW (matches dashboard countdown pattern) ────
+// ── LIVE STATUS BADGE, pinned to the right edge of each block's code line ──
 function parseTimeToday(timeStr) {
   const [h, m, s] = timeStr.split(':').map(Number);
   const d = new Date();
@@ -173,17 +326,19 @@ function updateSubjectScheduleStatuses() {
   const now = new Date();
   const todayName = DAY_NAMES[now.getDay()];
 
-  document.querySelectorAll('.sched-row').forEach(row => {
-    const statusEl = row.querySelector('.sched-status-inline');
+  document.querySelectorAll('.subj-block').forEach(cell => {
+    const statusEl = cell.querySelector('.sched-status-inline');
     if (!statusEl) return;
 
-    if (row.dataset.day !== todayName) {
+    if (cell.dataset.day !== todayName) {
       statusEl.innerHTML = '';
       return;
     }
 
-    const start = parseTimeToday(row.dataset.start);
-    const end = parseTimeToday(row.dataset.end);
+    const start = parseTimeToday(cell.dataset.start);
+    const end = parseTimeToday(cell.dataset.end);
+
+    const badgeBase = 'text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap tracking-wide leading-tight';
 
     if (now < start) {
       statusEl.innerHTML = ` <span class="badge badge-blue text-[10px]">Today</span>`;
@@ -199,7 +354,13 @@ function updateSubjectScheduleStatuses() {
 
 document.addEventListener('DOMContentLoaded', () => {
   updateSubjectScheduleStatuses();
-  setInterval(updateSubjectScheduleStatuses, 30000); // update every 30s, no need for per-second here
+  setInterval(updateSubjectScheduleStatuses, 30000); // refresh every 30s
+
+  // Default view: Night if it's currently 4:30 PM or later, otherwise Day.
+  // The buttons always let the user override this manually.
+  const now = new Date();
+  const isNightHours = now.getHours() > 16 || (now.getHours() === 16 && now.getMinutes() >= 30);
+  switchScheduleView(isNightHours ? 'night' : 'day');
 });
 </script>
 </body>

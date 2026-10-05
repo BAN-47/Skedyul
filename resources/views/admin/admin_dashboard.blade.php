@@ -177,6 +177,27 @@
                             </tbody>
                         </table>
                     </div>
+                    @if(method_exists($users, 'total'))
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 px-1">
+                        <div class="text-[12px] text-slate-400">
+                            Showing {{ $users->firstItem() ?? 0 }}–{{ $users->lastItem() ?? 0 }}
+                            of {{ $users->total() }}
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <a href="{{ $users->previousPageUrl() ?? '#' }}"
+                               class="btn btn-secondary text-[12px] {{ $users->onFirstPage() ? 'opacity-40 pointer-events-none' : '' }}">
+                                ← Prev
+                            </a>
+                            <span class="text-[12px] text-slate-500 px-1">
+                                {{ $users->currentPage() }} / {{ max(1, $users->lastPage()) }}
+                            </span>
+                            <a href="{{ $users->nextPageUrl() ?? '#' }}"
+                               class="btn btn-secondary text-[12px] {{ !$users->hasMorePages() ? 'opacity-40 pointer-events-none' : '' }}">
+                                Next →
+                            </a>
+                        </div>
+                    </div>
+                    @endif
                 </div>
 
                 {{-- System Info + Role Distribution --}}
@@ -232,10 +253,10 @@
                                 AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
                             </div>
                         </div>
-                        <span class="badge badge-blue">{{ $section->count() }} Total</span>
+                        <span class="badge badge-blue">{{ $totalSections }} Total</span>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="data-table">
+                        <table class="data-table" id="dash-sections-table">
                             <thead>
                                 <tr>
                                     @foreach(['Section','Program','Year','Students','Subjects','Status'] as $h)
@@ -245,9 +266,9 @@
                             </thead>
                             <tbody>
                                 @forelse($section as $sec)
-                                <tr>
+                                <tr class="dash-sec-row">
                                     <td class="font-semibold">{{ $sec->sec_name }}</td>
-                                    <td>{{ $sec->program->prog_code ?? 'N/A' }}</td>
+                                    <td>{{ $sec->program->dept_code ?? $sec->program->prog_code ?? 'N/A' }}</td>
                                     <td>{{ $sec->sec_year_level }}</td>
                                     <td>{{ $sec->sec_no_of_student }}</td>
                                     <td>—</td>
@@ -258,10 +279,18 @@
                                     </td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="6" class="text-center py-6 text-slate-400">No sections found.</td></tr>
+                                <tr class="dash-sec-empty"><td colspan="6" class="text-center py-6 text-slate-400">No sections found.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 px-1">
+                        <div id="dash-sec-page-info" class="text-[12px] text-slate-400"></div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" id="dash-sec-prev" onclick="dashPage('sec', -1)" class="btn btn-secondary text-[12px]">← Prev</button>
+                            <div id="dash-sec-nums" class="flex gap-1"></div>
+                            <button type="button" id="dash-sec-next" onclick="dashPage('sec', 1)" class="btn btn-secondary text-[12px]">Next →</button>
+                        </div>
                     </div>
                 </div>
 
@@ -329,7 +358,7 @@
                             <div class="card-title">Subjects Offered</div>
                             <div class="card-sub">Current semester — all programs</div>
                         </div>
-                        <span class="badge badge-blue">{{ $subject->count() }} Subjects</span>
+                        <span class="badge badge-blue">{{ $subjectsOffered }} Total</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="data-table">
@@ -342,23 +371,31 @@
                             </thead>
                             <tbody>
                                 @forelse($subject as $subjects)
-                                <tr>
-                                    <td><span class="font-mono text-[12px] text-slate-600">{{ $subjects->subj_code }}</span></td>
-                                    <td class="font-semibold">{{ $subjects->subj_name }}</td>
-                                    <td>{{ $subjects->subj_lecture_hours + $subjects->subj_lab_hours }}</td>
-                                    <td>{{ $subjects->program->prog_name ?? 'N/A' }}</td>
+                                <tr class="dash-subj-row">
+                                    <td><span class="font-mono text-[12px] text-slate-600">{{ $subjects->course_code ?? $subjects->subj_code }}</span></td>
+                                    <td class="font-semibold">{{ $subjects->course_name ?? $subjects->subj_name }}</td>
+                                    <td>{{ ($subjects->course_lecture_hours ?? $subjects->subj_lecture_hours ?? 0) + ($subjects->course_lab_hours ?? $subjects->subj_lab_hours ?? 0) }}</td>
+                                    <td>{{ $subjects->program->dept_name ?? $subjects->program->prog_name ?? $subjects->department->dept_name ?? 'N/A' }}</td>
                                     <td class="text-red-500">Unassigned</td>
                                     <td>
-                                        <span class="badge {{ $subjects->subj_is_active ? 'badge-green' : 'badge-red' }}">
-                                            {{ $subjects->subj_is_active ? 'Active' : 'Inactive' }}
+                                        <span class="badge {{ ($subjects->course_is_active ?? $subjects->subj_is_active ?? true) ? 'badge-green' : 'badge-red' }}">
+                                            {{ ($subjects->course_is_active ?? $subjects->subj_is_active ?? true) ? 'Active' : 'Inactive' }}
                                         </span>
                                     </td>
                                 </tr>
                                 @empty
-                                <tr><td colspan="6" class="text-center py-6 text-slate-400">No subjects found.</td></tr>
+                                <tr class="dash-subj-empty"><td colspan="6" class="text-center py-6 text-slate-400">No subjects found.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 px-1">
+                        <div id="dash-subj-page-info" class="text-[12px] text-slate-400"></div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" id="dash-subj-prev" onclick="dashPage('subj', -1)" class="btn btn-secondary text-[12px]">← Prev</button>
+                            <div id="dash-subj-nums" class="flex gap-1"></div>
+                            <button type="button" id="dash-subj-next" onclick="dashPage('subj', 1)" class="btn btn-secondary text-[12px]">Next →</button>
+                        </div>
                     </div>
                 </div>
 
@@ -529,6 +566,76 @@
     prevBtn.addEventListener('click', () => { current = (current - 1 + quotes.length) % quotes.length; renderQuote(); });
     nextBtn.addEventListener('click', () => { current = (current + 1) % quotes.length; renderQuote(); });
     renderQuote();
+})();
+</script>
+
+
+<script>
+(function () {
+  const PER = 8;
+  const state = { sec: 1, subj: 1 };
+
+  function rows(kind) {
+    const sel = kind === 'sec' ? 'tr.dash-sec-row' : 'tr.dash-subj-row';
+    return Array.from(document.querySelectorAll(sel));
+  }
+
+  function render(kind) {
+    const list = rows(kind);
+    const total = list.length;
+    const pages = Math.max(1, Math.ceil(total / PER));
+    if (state[kind] > pages) state[kind] = pages;
+    if (state[kind] < 1) state[kind] = 1;
+    const start = (state[kind] - 1) * PER;
+    const end = start + PER;
+    list.forEach((row, i) => {
+      row.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+    const from = total === 0 ? 0 : start + 1;
+    const to = Math.min(end, total);
+    const info = document.getElementById(kind === 'sec' ? 'dash-sec-page-info' : 'dash-subj-page-info');
+    if (info) {
+      info.textContent = total === 0
+        ? 'No records'
+        : ('Showing ' + from + '–' + to + ' of ' + total + ' (page ' + state[kind] + '/' + pages + ')');
+    }
+    const prev = document.getElementById(kind === 'sec' ? 'dash-sec-prev' : 'dash-subj-prev');
+    const next = document.getElementById(kind === 'sec' ? 'dash-sec-next' : 'dash-subj-next');
+    if (prev) {
+      prev.disabled = state[kind] <= 1;
+      prev.classList.toggle('opacity-40', state[kind] <= 1);
+      prev.classList.toggle('pointer-events-none', state[kind] <= 1);
+    }
+    if (next) {
+      next.disabled = state[kind] >= pages;
+      next.classList.toggle('opacity-40', state[kind] >= pages);
+      next.classList.toggle('pointer-events-none', state[kind] >= pages);
+    }
+    const nums = document.getElementById(kind === 'sec' ? 'dash-sec-nums' : 'dash-subj-nums');
+    if (nums) {
+      nums.innerHTML = '';
+      const a = Math.max(1, state[kind] - 2);
+      const b = Math.min(pages, state[kind] + 2);
+      for (let p = a; p <= b; p++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = String(p);
+        btn.className = 'btn text-[12px] min-w-[32px] ' + (p === state[kind] ? 'btn-primary' : 'btn-secondary');
+        btn.addEventListener('click', function () { state[kind] = p; render(kind); });
+        nums.appendChild(btn);
+      }
+    }
+  }
+
+  window.dashPage = function (kind, dir) {
+    state[kind] += dir;
+    render(kind);
+  };
+
+  document.addEventListener('DOMContentLoaded', function () {
+    render('sec');
+    render('subj');
+  });
 })();
 </script>
 

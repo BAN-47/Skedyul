@@ -15,9 +15,27 @@
 
   <!-- Main -->
   <div class="main">
-    <div class="topbar">
-      <div class="topbar-title" id="topbar-title">My Schedule</div>
-    </div>
+
+    @php
+      // Flatten $schedules into the shape faculty_header.blade.php expects
+      // for its "Today's Schedule" notification feed.
+      $scheduleForJs = [];
+      foreach (($schedules ?? collect()) as $sch) {
+        $scheduleForJs[] = [
+          'code'  => $sch->subject->subj_code ?? 'N/A',
+          'room'  => $sch->room->room_name ?? 'N/A',
+          'day'   => $sch->sch_day ?? '',
+          'start' => \Carbon\Carbon::parse($sch->sch_start_time)->format('H:i'),
+          'end'   => \Carbon\Carbon::parse($sch->sch_end_time)->format('H:i'),
+        ];
+      }
+    @endphp
+
+    @include('partials.faculty_header', [
+        'title' => 'My Schedule',
+        'scheduleFeed' => $scheduleForJs,
+        'announcements' => $announcements ?? null,
+    ])
 
     <!-- FACULTY SCHEDULE PAGE -->
     <div id="page-faculty-schedule" class="page active">
@@ -61,6 +79,7 @@
             <div><div class="text-[13px] font-bold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div><div class="text-[11px] text-slate-400">Assigned Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div></div>
             <span class="badge badge-green ml-auto">Active</span>
           </div>
+
           @if ($nextInRoom)
             <div class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
               <div class="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Next Class in this Room</div>
@@ -76,12 +95,10 @@
       </div>
 
       <!-- Weekly Overview with clickable events -->
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Weekly Overview</div>
-            <div class="card-sub">{{ $activeSemester->sem_name ?? 'Current Semester' }} · Click any subject to view details</div>
-          </div>
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div class="mb-4">
+          <div class="text-base font-bold text-gray-900">Weekly Overview</div>
+          <div class="text-xs text-gray-500 mt-0.5">{{ $activeSemester->sem_name ?? 'Current Semester' }} · Click any subject to view details</div>
         </div>
         <div class="overflow-auto">
           <div class="grid min-w-[700px] grid-cols-[80px_repeat(6,minmax(0,1fr))] gap-px overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-700">
@@ -89,13 +106,6 @@
             @foreach ($weekDays as $day)
               <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">{{ $day }}</div>
             @endforeach
-
-            @php
-              $allTimes = $schedules->pluck('sch_start_time')->unique()->sort()->values();
-              $colorCycle = ['blue', 'amber', 'green', 'teal', 'purple'];
-              $subjectColors = [];
-              $colorIndex = 0;
-            @endphp
 
             @forelse ($allTimes as $time)
               <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">{{ \Carbon\Carbon::createFromTimeString($time)->format('g:i') }}</div>
@@ -146,6 +156,7 @@
             @endforelse
           </div>
         </div>
+
         <!-- Legend -->
         <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3.5 dark:border-slate-800">
           @foreach ($schedules->unique('sch_subj_id') as $sch)
@@ -200,14 +211,15 @@
       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
       <div class="mt-0.5 text-[11px] text-slate-400">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
     </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-web-subject-detail')">Close</button>
+
+    <div class="flex justify-end gap-2 mt-2">
+      <button class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="closeModal('modal-web-subject-detail')">Close</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toast">✅ <span id="toast-msg"></span></div>
+<!-- TOAST (Tailwind) -->
+<div class="toast fixed bottom-6 right-6 z-[300] bg-gray-900 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg opacity-0 translate-y-2 pointer-events-none transition-all duration-300 [&.show]:opacity-100 [&.show]:translate-y-0 [&.show]:pointer-events-auto" id="toast">✅ <span id="toast-msg"></span></div>
 
 <script>
 function openModal(id) { document.getElementById(id).classList.add('open'); }
