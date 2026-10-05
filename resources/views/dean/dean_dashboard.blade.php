@@ -4,102 +4,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SKEDYUL — Dean Dashboard</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
+    @php
+        $colorMap = [
+            'green' => ['text' => 'text-green-600', 'bar' => 'bg-green-600'],
+            'amber' => ['text' => 'text-amber-600', 'bar' => 'bg-amber-600'],
+            'cyan' => ['text' => 'text-cyan-600', 'bar' => 'bg-cyan-600'],
+            'blue' => ['text' => 'text-blue-600', 'bar' => 'bg-blue-600'],
+            'slate' => ['text' => 'text-slate-500', 'bar' => 'bg-slate-400'],
+            'red' => ['text' => 'text-red-600', 'bar' => 'bg-red-600'],
+        ];
+        $statusBadge = [
+            'Overload' => 'badge badge-red',
+            'Near Max' => 'badge badge-amber',
+            'Available' => 'badge badge-blue',
+            'No Load' => 'badge badge-slate',
+        ];
+    @endphp
+
     <div class="app-shell">
+        @include('partials.dean_sidebar')
 
-        <!-- ══════════ MAIN ══════════ -->
         <div class="app-main">
+            {{-- Topbar only (not the full dean_header layout) --}}
+            <div class="topbar">
+                <div class="topbar-title">Dean Dashboard</div>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('dean.schedule_reports') }}" class="btn btn-primary">Export Report</a>
+                    <a href="{{ route('dean.pending_approvals') }}" class="btn btn-secondary flex items-center gap-1.5">
+                        Notifications
+                        @if (($pendingDeptCount ?? 0) > 0)
+                            <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {{ $pendingDeptCount }}
+                            </span>
+                        @endif
+                    </a>
+                </div>
+            </div>
 
-            @include('partials.dean_header', ['title' => 'Dean Dashboard'])
+            <div class="page-content overflow-y-auto" style="max-height: calc(100vh - 64px); padding-bottom: 32px;">
 
-            <!-- ══════════ DASHBOARD PAGE ══════════ -->
-            <div class="page-content">
-
-                <!-- Page heading -->
                 <div class="flex items-center gap-3 mb-6">
                     <div class="flex-1">
-                        <div class="text-[22px] font-extrabold">Good morning, Dean Villaceran</div>
-                        <div class="text-[13px] text-slate-400 mt-0.5">AY 2025–2026 · 1st Semester · CCICT Overview</div>
+                        <div class="text-[22px] font-extrabold">{{ $greeting ?? 'Hello' }},
+                            {{ $greetingName ?? 'Dean' }}</div>
+                        <div class="text-[13px] text-slate-400 mt-0.5">
+                            AY {{ $ayLabel ?? '—' }} · {{ $semLabel ?? '—' }} · CCICT Overview
+                        </div>
                     </div>
                     <span class="badge badge-teal">Scheduling Active</span>
                 </div>
 
-                <!-- Stat Cards -->
                 <div class="stat-grid">
                     <div class="stat-card">
                         <div class="stat-card-bar bg-cyan-600"></div>
                         <div class="stat-label">Total Faculty</div>
-                        <div class="stat-value">19</div>
-                        <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
+                        <div class="stat-value">{{ $totalFaculty ?? 0 }}</div>
+                        <div class="stat-sub">{{ $programLabels ?? 'BSIS · BSIT · BIT-CT' }}</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-bar bg-amber-600"></div>
                         <div class="stat-label">Subjects Plotted</div>
-                        <div class="stat-value">54</div>
-                        <div class="stat-sub">of 58 total</div>
+                        <div class="stat-value">{{ $subjectsPlotted ?? 0 }}</div>
+                        <div class="stat-sub">of {{ $subjectsTotal ?? 0 }} total</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-bar bg-red-600"></div>
                         <div class="stat-label">Avg. Faculty Load</div>
-                        <div class="stat-value">21h</div>
+                        <div class="stat-value">{{ $avgFacultyLoad ?? 0 }}h</div>
                         <div class="stat-sub">of 30h max</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-bar bg-green-600"></div>
                         <div class="stat-label">Schedules Approved</div>
-                        <div class="stat-value">3</div>
-                        <div class="stat-sub">Pending: 3 depts</div>
+                        <div class="stat-value">{{ $scheduledApprovedCount ?? 0 }}</div>
+                        <div class="stat-sub">Pending: {{ $pendingDeptCount ?? 0 }}
+                            dept{{ ($pendingDeptCount ?? 0) === 1 ? '' : 's' }}</div>
                     </div>
                 </div>
 
-                <!-- Department Summary + Pending Approvals -->
                 <div class="two-col">
                     <div class="card">
                         <div class="card-header">
                             <div>
                                 <div class="card-title">Department Summary</div>
-                                <div class="card-sub">Faculty load status per department</div>
+                                <div class="card-sub">Faculty load status per program</div>
                             </div>
                         </div>
-                        <div class="workload-item">
-                            <div class="workload-header">
-                                <div class="workload-name">BSIS — 8 Faculty</div>
-                                <div class="workload-val text-green-600">87%</div>
+
+                        @forelse($deptSummary ?? [] as $dept)
+                            @php $c = $colorMap[$dept['color'] ?? 'slate'] ?? $colorMap['slate']; @endphp
+                            <div class="workload-item">
+                                <div class="workload-header">
+                                    <div class="workload-name">{{ $dept['name'] }} — {{ $dept['count'] }} Faculty
+                                    </div>
+                                    <div class="workload-val {{ $c['text'] }}">{{ $dept['percent'] }}%</div>
+                                </div>
+                                <div class="workload-bar">
+                                    <div class="workload-fill {{ $c['bar'] }}"
+                                        style="width:{{ $dept['percent'] }}%"></div>
+                                </div>
                             </div>
-                            <div class="workload-bar">
-                                <div class="workload-fill bg-green-600" style="width:87%"></div>
-                            </div>
-                        </div>
-                        <div class="workload-item">
-                            <div class="workload-header">
-                                <div class="workload-name">BSIT — 7 Faculty</div>
-                                <div class="workload-val text-amber-600">72%</div>
-                            </div>
-                            <div class="workload-bar">
-                                <div class="workload-fill bg-amber-600" style="width:72%"></div>
-                            </div>
-                        </div>
-                        <div class="workload-item">
-                            <div class="workload-header">
-                                <div class="workload-name">BIT-CT — 4 Faculty</div>
-                                <div class="workload-val text-cyan-600">60%</div>
-                            </div>
-                            <div class="workload-bar">
-                                <div class="workload-fill bg-cyan-600" style="width:60%"></div>
-                            </div>
-                        </div>
+                        @empty
+                            <div class="px-1 py-4 text-sm text-slate-400">No program data yet.</div>
+                        @endforelse
+
                         <div class="workload-item">
                             <div class="workload-header">
                                 <div class="workload-name">Overloaded Faculty</div>
-                                <div class="workload-val text-red-600">2</div>
+                                <div class="workload-val text-red-600">{{ $overloadCount ?? 0 }}</div>
                             </div>
                             <div class="workload-bar">
-                                <div class="workload-fill bg-red-600" style="width:11%"></div>
+                                <div class="workload-fill bg-red-600"
+                                    style="width:{{ min(100, ($overloadCount ?? 0) * 10) }}%"></div>
                             </div>
                         </div>
                     </div>
@@ -110,162 +133,101 @@
                                 <div class="card-title">Pending Approvals</div>
                                 <div class="card-sub">Awaiting Dean's signature</div>
                             </div>
+                            <a href="{{ route('dean.pending_approvals') }}"
+                                class="text-[12px] font-semibold text-blue-600 hover:underline">View all</a>
                         </div>
-                        <div class="approval-item">
-                            <div class="approval-avatar" style="background:#d97706;">RT</div>
-                            <div class="approval-content">
-                                <div class="approval-name">BSIS Schedule — 1st Sem AY 2025–26</div>
-                                <div class="approval-detail">Submitted by Chair Rodrigo Tan · 8 faculty · 23 sections ·
-                                    0 conflicts</div>
-                                <div class="approval-actions">
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                                        onclick="showToast('BSIS Schedule approved!')">Approve</button>
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                        onclick="openModal('modal-review')">Review</button>
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-red-100 text-red-600 hover:bg-red-200"
-                                        onclick="showToast('Returned.')">Return</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="approval-item">
-                            <div class="approval-avatar" style="background:#7c3aed;">MC</div>
-                            <div class="approval-content">
-                                <div class="approval-name">BSIT Schedule — 1st Sem AY 2025–26</div>
-                                <div class="approval-detail">Submitted by Chair Maria Cruz · 7 faculty · 19 sections ·
-                                    1 conflict flagged</div>
-                                <div class="approval-actions">
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                        onclick="openModal('modal-review')">Review</button>
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-red-100 text-red-600 hover:bg-red-200"
-                                        onclick="showToast('Returned.')">Return</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="approval-item">
-                            <div class="approval-avatar" style="background:#0891b2;">JL</div>
-                            <div class="approval-content">
-                                <div class="approval-name">BIT-CT Schedule — 1st Sem AY 2025–26</div>
-                                <div class="approval-detail">Submitted by Chair Jose Lim · 4 faculty · 10 sections · 0
-                                    conflicts</div>
-                                <div class="approval-actions">
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                                        onclick="showToast('BIT-CT approved!')">Approve</button>
-                                    <button class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                        onclick="openModal('modal-review')">Review</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Overload Alerts + Quick Actions -->
-                <div class="two-col">
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">Overload / Underload Alerts</div>
+                        @forelse($pendingApprovals ?? [] as $item)
+                            <div class="approval-item">
+                                <div class="approval-avatar" style="background:{{ $item['color'] ?? '#64748b' }};">
+                                    {{ $item['initials'] ?? 'CH' }}</div>
+                                <div class="approval-content">
+                                    <div class="approval-name">{{ $item['title'] ?? 'Schedule' }}</div>
+                                    <div class="approval-detail">{{ $item['detail'] ?? '' }}</div>
+                                    <div class="approval-actions">
+                                        <button type="button"
+                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700"
+                                            onclick="approveSubmission('{{ $item['id'] }}', this)">Approve</button>
+                                        <a href="{{ route('dean.pending_approvals.review', $item['id']) }}"
+                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 inline-block">Review</a>
+                                        <button type="button"
+                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-red-100 text-red-600 hover:bg-red-200"
+                                            onclick="returnSubmission('{{ $item['id'] }}', this)">Return</button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Faculty</th>
-                                    <th>Dept</th>
-                                    <th>Load</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><b>Carlo Mendoza</b></td>
-                                    <td>BSIT</td>
-                                    <td><span class="font-mono font-bold text-red-600">31h</span></td>
-                                    <td><span class="badge badge-red">Overload</span></td>
-                                </tr>
-                                <tr>
-                                    <td><b>Ana Reyes</b></td>
-                                    <td>BSIT</td>
-                                    <td><span class="font-mono font-bold text-amber-600">27h</span></td>
-                                    <td><span class="badge badge-amber">Near Max</span></td>
-                                </tr>
-                                <tr>
-                                    <td><b>Maria Santos</b></td>
-                                    <td>BSIS</td>
-                                    <td><span class="font-mono font-bold text-blue-600">18h</span></td>
-                                    <td><span class="badge badge-blue">Available</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <div>
-                                <div class="card-title">Quick Actions</div>
+                        @empty
+                            <div class="px-1 py-6 text-sm text-slate-400 text-center">
+                                No pending schedule submissions.
                             </div>
-                        </div>
-                        <div class="quick-actions">
-                            <div class="quick-btn" onclick="openModal('modal-export')">
-                                <div class="quick-btn-label">Export Master Schedule</div>
-                            </div>
-                            <a href="" class="quick-btn">
-                                <div class="quick-btn-label">Faculty Overview</div>
-                            </a>
-                            <a href="" class="quick-btn">
-                                <div class="quick-btn-label">Approve Schedules</div>
-                            </a>
-                            <div class="quick-btn" onclick="openModal('modal-export')">
-                                <div class="quick-btn-label">Workload Report</div>
-                            </div>
-                            <a href="" class="quick-btn">
-                                <div class="quick-btn-label">Deployment Report</div>
-                            </a>
-                            <div class="quick-btn" onclick="openModal('modal-notify')">
-                                <div class="quick-btn-label">Notify All Chairs</div>
-                            </div>
-                        </div>
+                        @endforelse
                     </div>
                 </div>
 
             </div>
-            <!-- ══ END DASHBOARD ══ -->
+        </div>
+    </div>
 
-        </div><!-- end app-main -->
-    </div><!-- end app-shell -->
-
-    <!-- TOAST -->
     <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
     <script>
-        /* ── MODALS ──
-                       modal-export, modal-notify, and modal-review are defined on their
-                       respective pages (Reports / Notify Chairs / Approvals) and are not
-                       part of this dashboard extract. Wire them up if you include those
-                       modal partials on this page too. */
-        function openModal(id) {
-            const m = document.getElementById(id);
-            if (m) m.classList.add('open');
-            if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
-        }
+        const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
-        function closeModal(id) {
-            const m = document.getElementById(id);
-            if (m) m.classList.remove('open');
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.modal-overlay').forEach(m => {
-                m.addEventListener('click', e => {
-                    if (e.target === m) m.classList.remove('open');
-                });
-            });
-        });
-
-        /* ── TOAST ── */
         function showToast(msg) {
             const t = document.getElementById('toast');
             document.getElementById('toast-msg').textContent = msg;
             t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3200);
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        async function approveSubmission(id, btn) {
+            if (!confirm('Approve this schedule submission?')) return;
+            btn.disabled = true;
+            try {
+                const res = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': CSRF,
+                        'Accept': 'application/json'
+                    },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(data.message || 'Failed to approve.');
+                    btn.disabled = false;
+                    return;
+                }
+                showToast(data.message || 'Schedule approved.');
+                setTimeout(() => location.reload(), 500);
+            } catch (e) {
+                showToast('Failed to approve.');
+                btn.disabled = false;
+            }
+        }
+
+        async function returnSubmission(id, btn) {
+            if (!confirm('Return this schedule to the chair?')) return;
+            btn.disabled = true;
+            try {
+                const res = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/return`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': CSRF,
+                        'Accept': 'application/json'
+                    },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(data.message || 'Failed to return.');
+                    btn.disabled = false;
+                    return;
+                }
+                showToast(data.message || 'Returned to chair.');
+                setTimeout(() => location.reload(), 500);
+            } catch (e) {
+                showToast('Failed to return.');
+                btn.disabled = false;
+            }
         }
     </script>
 </body>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
 use App\Models\Faculty;
+use App\Models\College;
 use App\Models\Workload;
 use App\Models\Semester;
 use App\Models\Dept_Chair;
@@ -16,22 +17,51 @@ class FacultyDeploymentController extends Controller
     {
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::with(['department', 'studyLoads.subject'])
+        // Only faculty under CCICT college
+        $ccict = College::where('college_code', 'CCICT')->first();
+
+        $facultyQuery = Faculty::with(['department', 'program', 'studyLoads.subject']);
+
+        if ($ccict) {
+            $facultyQuery->where('fac_college_id', $ccict->college_id);
+        }
+
+        $programOrder = ['BSIS' => 1, 'BSIT' => 2, 'BIT-CT' => 3];
+
+        $faculty = $facultyQuery
             ->get()
             ->map(function ($fac) use ($activeSemester) {
-                $subjects = $fac->studyLoads->pluck('subject.subj_code')->filter()->unique()->implode(', ');
+                $subjects = $fac->studyLoads
+                    ->pluck('subject.subj_code')
+                    ->filter()
+                    ->unique()
+                    ->implode(', ');
 
                 $hours = Workload::where('wl_fac_id', $fac->fac_id)
-                    ->when($activeSemester, fn ($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
+                    ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
                     ->sum('wl_total_hours');
+
+                $programCode = $fac->program->dept_code
+                    ?? $fac->program->prog_code
+                    ?? '—';
 
                 return [
                     'name'       => $fac->full_name,
-                    'department' => $fac->department->dept_code ?? 'N/A',
+                    'department' => $programCode, // BSIS / BSIT / BIT-CT
                     'subjects'   => $subjects ?: '—',
                     'hours'      => $hours,
                     'employment' => $fac->fac_employment_type,
+                    '_sort'      => $programCode,
                 ];
+            })
+            ->sortBy([
+                fn($a, $b) => ($programOrder[$a['_sort']] ?? 99) <=> ($programOrder[$b['_sort']] ?? 99),
+                fn($a, $b) => strcasecmp($a['name'], $b['name']),
+            ])
+            ->values()
+            ->map(function ($row) {
+                unset($row['_sort']);
+                return $row;
             });
 
         $chairs = Dept_Chair::with('department')->get();

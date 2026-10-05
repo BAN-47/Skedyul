@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>SKEDYUL — My Subjects</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 @vite(['resources/css/app.css', 'resources/js/app.js'])
+<title>SKEDYUL — My Subjects</title>
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-<div id="screen-app" class="screen active" style="flex-direction:row;">
+<div id="screen-app" class="screen active flex-row">
 
   @include('partials.facultyMember_sidebar')
 
@@ -158,237 +157,95 @@
             </button>
           </div>
         </div>
-
-        {{-- Always show Summary + Schedule grid (empty cells when no data) --}}
-          <div class="flex gap-5 items-start flex-wrap">
-
-            <!-- LEFT: SUMMARY OF SUBJECTS ─────────────────────────────────── -->
-            <div class="w-full sm:w-64 shrink-0 border border-gray-200 rounded-lg overflow-hidden font-sans self-start">
-              <div class="bg-blue-600 text-white font-bold text-sm uppercase tracking-wide text-center py-3">
-                Summary
-              </div>
-              <table class="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <th class="text-left text-[10px] font-bold uppercase tracking-wide text-gray-500 px-2.5 py-2 border-b border-gray-200">Code</th>
-                    <th class="text-left text-[10px] font-bold uppercase tracking-wide text-gray-500 px-2.5 py-2 border-b border-gray-200">Descriptive Title</th>
-                    <th class="text-left text-[10px] font-bold uppercase tracking-wide text-gray-500 px-2.5 py-2 border-b border-gray-200">Students</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @forelse ($summaryRows as $row)
-                    <tr>
-                      <td class="px-2.5 py-2 {{ $loop->last ? '' : 'border-b border-gray-200' }} text-gray-900 align-top">
-                        <span class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style="background:{{ $row['color'] }};"></span>{{ $row['code'] }}
-                      </td>
-                      <td class="px-2.5 py-2 {{ $loop->last ? '' : 'border-b border-gray-200' }} text-gray-900 align-top">{{ $row['name'] }}</td>
-                      <td class="px-2.5 py-2 {{ $loop->last ? '' : 'border-b border-gray-200' }} text-gray-900 align-top">{{ $row['students'] }}</td>
-                    </tr>
-                  @empty
-                    <tr>
-                      <td colspan="3" class="px-2.5 py-6 text-center text-gray-400 text-[11px]">No subjects plotted yet.</td>
-                    </tr>
-                  @endforelse
-                </tbody>
-              </table>
-            </div>
-
-            <!-- DAY / NIGHT GRIDS (toggled via JS, right side of Summary) -->
-            <div class="flex-1 min-w-[480px]">
-
-            <!-- DAY GRID (7AM – 4PM) ─────────────────────────────────────── -->
-            <div id="view-day-grid" class="overflow-x-auto rounded-xl border border-gray-200">
-              <table class="border-collapse w-full min-w-[760px]">
-                <thead>
-                  <tr>
-                    <th class="w-24 border-b border-r border-gray-200 bg-blue-600 text-white font-sans font-bold text-[11px] uppercase tracking-wide px-1.5 py-3">Time</th>
-                    @foreach ($gridDays as $day)
-                      <th class="border-b border-r last:border-r-0 border-gray-200 bg-blue-600 text-white font-sans font-bold text-sm px-1.5 py-3">{{ $day }}</th>
-                    @endforeach
-                  </tr>
-                </thead>
-                <tbody>
-                  @foreach ($dayRange as $hour)
-
-                    {{-- Solid noon-break band, matching the plotter's style, when nothing is scheduled 12–1 --}}
-                    @if ($hour === 12 && collect($gridDays)->every(fn($d) => empty($dayBlocks[$d][12] ?? null)))
-                      <tr>
-                        <td class="border-b border-r border-gray-200 bg-white text-gray-700 font-bold text-xs px-1 py-4 whitespace-nowrap text-center align-middle">12–1 PM</td>
-                        <td colspan="{{ count($gridDays) }}"
-                            class="bg-gray-900 text-white font-bold text-xs tracking-[3px] text-center align-middle py-4">
-                          NOON BREAK
-                        </td>
-                      </tr>
-                      @continue
-                    @endif
-
-                    <tr>
-                      <td class="border-b border-r border-gray-200 bg-white text-gray-700 font-bold text-xs px-1 py-4 whitespace-nowrap text-center align-middle">{{ $hour > 12 ? $hour - 12 : $hour }}–{{ ($hour + 1) > 12 ? ($hour + 1) - 12 : $hour + 1 }} {{ $hour + 1 > 12 ? 'PM' : 'AM' }}</td>
-                      @foreach ($gridDays as $day)
-                        @if ($skipUntil[$day] > $hour)
-                          {{-- covered by a rowspan from an earlier row --}}
-                        @elseif ($block = $dayBlocks[$day][$hour] ?? null)
-                          @php $skipUntil[$day] = $hour + $block['duration']; @endphp
-                          <td class="subj-block border-b border-r last:border-r-0 border-gray-200 text-center align-middle cursor-pointer p-1.5 text-white font-sans transition duration-150 hover:brightness-110"
-                              rowspan="{{ $block['duration'] }}"
-                              style="background:{{ $block['color'] }};"
-                              data-day="{{ $day }}"
-                              data-start="{{ $block['start_raw'] }}"
-                              data-end="{{ $block['end_raw'] }}"
-                              onclick="openWebSubjectDetail(
-                                '{{ $block['code'] }}',
-                                '{{ addslashes($block['name']) }}',
-                                '{{ $block['units'] }}',
-                                '{{ $block['lec'] }}',
-                                '{{ $block['lab'] }}',
-                                '',
-                                '{{ addslashes($block['room']) }}',
-                                '{{ addslashes($block['section']) }}',
-                                '{{ $day }} {{ $block['start'] }}–{{ $block['end'] }}',
-                                '{{ $block['color'] }}'
-                              )">
-                            <div class="flex items-center justify-between gap-1.5">
-                              <span class="font-mono font-bold text-xs tracking-wide">{{ $block['code'] }}</span>
-                              <span class="sched-status-inline"></span>
-                            </div>
-                            <div class="text-[11px] opacity-90 mt-0.5">{{ $block['section'] }}</div>
-                            <div class="text-[11px] opacity-80 mt-0.5">{{ $block['room'] }}</div>
-                          </td>
-                        @else
-                          <td class="border-b border-r last:border-r-0 border-gray-200 bg-white h-14"></td>
-                        @endif
-                      @endforeach
-                    </tr>
+        <div class="overflow-x-auto"><table class="w-full border-collapse">
+          <thead>
+            <tr>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Code</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Subject Name</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Units</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Lec Hrs</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Lab Hrs</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Sections</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Room</th>
+              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Schedule</th>
+            </tr>
+          </thead>
+          <tbody>
+            @forelse ($subjects as $entry)
+              @php $subj = $entry['subject']; @endphp
+              <tr class="subject-row cursor-pointer transition-colors hover:[&>td]:bg-slate-50 dark:hover:[&>td]:bg-slate-800"
+                data-code="{{ $subj->subj_code ?? '' }}"
+                data-name="{{ $subj->subj_name ?? '' }}"
+                data-units="{{ $subj->subj_units ?? '' }}"
+                data-lec="{{ $subj->subj_lec_hours ?? 0 }}"
+                data-lab="{{ $subj->subj_lab_hours ?? 0 }}"
+                data-room="{{ $entry['room'] }}"
+                data-section="{{ $entry['sections'] }}"
+                data-schedule="{{ $entry['schedules']->map(fn($s) => $s['day'] . ' ' . $s['start'] . '–' . $s['end'])->implode(', ') }}">
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><span class="font-mono font-bold text-blue-600">{{ $subj->subj_code ?? 'N/A' }}</span></td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><b>{{ $subj->subj_name ?? 'N/A' }}</b></td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_units ?? '—' }}</td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_lec_hours ?? '—' }}</td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_lab_hours ?? '—' }}</td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $entry['sections'] ?: '—' }}</td>
+                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $entry['room'] }}</td>
+                <td class="subj-schedule border-b border-slate-100 px-3.5 py-3 text-xs text-slate-400 dark:border-slate-800">
+                  @foreach ($entry['schedules'] as $sched)
+                    <div class="sched-row" data-day="{{ $sched['day'] }}" data-start="{{ $sched['start'] }}" data-end="{{ $sched['end'] }}">
+                      {{ $sched['day'] }} {{ $sched['start'] }}–{{ $sched['end'] }}
+                      <span class="sched-status-inline"></span>
+                    </div>
                   @endforeach
-                </tbody>
-              </table>
-            </div><!-- end view-day-grid -->
-
-            <!-- NIGHT GRID (starts 4:30 PM) — toggled via JS -->
-            <div id="view-night-grid" class="hidden">
-              @php
-                // Labels for night rows: first slot is 4:30–5:30, then hourly
-                $nightLabels = [
-                  16 => '4:30–5:30 PM',
-                  17 => '5:30–6:30 PM',
-                  18 => '6:30–7:30 PM',
-                  19 => '7:30–8:30 PM',
-                  20 => '8:30–9:30 PM',
-                  21 => '9:30–10:30 PM',
-                ];
-              @endphp
-              <div class="flex items-center gap-2 mb-2.5 font-sans font-bold text-sm text-gray-900">
-                <span class="w-2 h-2 rounded-full bg-[#3d5a80]"></span> Night Schedule
-              </div>
-              <div class="overflow-x-auto rounded-xl border border-gray-200">
-                <table class="border-collapse w-full min-w-[760px]">
-                  <thead>
-                    <tr>
-                      <th class="w-24 border-b border-r border-gray-200 bg-blue-600 text-white font-sans font-bold text-[11px] uppercase tracking-wide px-1.5 py-3">Time</th>
-                      @foreach ($gridDays as $day)
-                        <th class="border-b border-r last:border-r-0 border-gray-200 bg-blue-600 text-white font-sans font-bold text-sm px-1.5 py-3">{{ $day }}</th>
-                      @endforeach
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @php $nightSkipUntil = array_fill_keys($gridDays, 0); @endphp
-                    @foreach ($nightRange as $hour)
-                      <tr>
-                        <td class="border-b border-r border-gray-200 bg-white text-gray-700 font-bold text-xs px-1 py-4 whitespace-nowrap text-center align-middle">{{ $nightLabels[$hour] ?? (($hour - 12) . '–' . ($hour + 1 - 12) . ' PM') }}</td>
-                        @foreach ($gridDays as $day)
-                          @if ($nightSkipUntil[$day] > $hour)
-                          @elseif ($block = $dayBlocks[$day][$hour] ?? null)
-                            @php $nightSkipUntil[$day] = $hour + $block['duration']; @endphp
-                            <td class="subj-block border-b border-r last:border-r-0 border-gray-200 text-center align-middle cursor-pointer p-1.5 text-white font-sans transition duration-150 hover:brightness-110"
-                                rowspan="{{ $block['duration'] }}"
-                                style="background:{{ $block['color'] }};"
-                                data-day="{{ $day }}"
-                                data-start="{{ $block['start_raw'] }}"
-                                data-end="{{ $block['end_raw'] }}"
-                                onclick="openWebSubjectDetail(
-                                  '{{ $block['code'] }}',
-                                  '{{ addslashes($block['name']) }}',
-                                  '{{ $block['units'] }}',
-                                  '{{ $block['lec'] }}',
-                                  '{{ $block['lab'] }}',
-                                  '',
-                                  '{{ addslashes($block['room']) }}',
-                                  '{{ addslashes($block['section']) }}',
-                                  '{{ $day }} {{ $block['start'] }}–{{ $block['end'] }}',
-                                  '{{ $block['color'] }}'
-                                )">
-                              <div class="flex items-center justify-between gap-1.5">
-                                <span class="font-mono font-bold text-xs tracking-wide">{{ $block['code'] }}</span>
-                                <span class="sched-status-inline"></span>
-                              </div>
-                              <div class="text-[11px] opacity-90 mt-0.5">{{ $block['section'] }}</div>
-                              <div class="text-[11px] opacity-80 mt-0.5">{{ $block['room'] }}</div>
-                            </td>
-                          @else
-                            <td class="border-b border-r last:border-r-0 border-gray-200 bg-white h-14"></td>
-                          @endif
-                        @endforeach
-                      </tr>
-                    @endforeach
-                  </tbody>
-                </table>
-              </div>
-            </div><!-- end view-night-grid -->
-
-            </div><!-- end flex-1 day/night column -->
-
-          </div><!-- end grid layout (Summary + Day/Night column) -->
-
+                </td>
+              </tr>
+            @empty
+              <tr><td colspan="8" class="px-3.5 py-8 text-center text-[13px] text-slate-400">No subjects assigned this semester.</td></tr>
+            @endforelse
+          </tbody>
+        </table></div>
       </div>
     </div>
 
   </div><!-- end .main -->
 </div><!-- end #screen-app -->
 
-<!-- FACULTY SUBJECT DETAIL MODAL (Tailwind) -->
-<div class="modal-overlay fixed inset-0 z-[200] hidden items-center justify-center bg-black/40 backdrop-blur-sm [&.open]:flex"
-     id="modal-web-subject-detail">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[480px] max-h-[90vh] overflow-y-auto p-6">
-
-    <div class="flex items-center justify-between mb-5">
-      <div class="text-lg font-bold text-gray-900">Subject Details</div>
-      <button class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center text-sm"
-              onclick="closeModal('modal-web-subject-detail')">✕</button>
+<!-- FACULTY SUBJECT DETAIL MODAL -->
+<div class="modal-overlay" id="modal-web-subject-detail">
+  <div class="modal w-[480px] max-w-[92vw] bg-white p-6 dark:bg-slate-900">
+    <div class="modal-header">
+      <div class="modal-title">Subject Details</div>
+      <button class="modal-close" onclick="closeModal('modal-web-subject-detail')">✕</button>
     </div>
-
-    <div id="wsd-header" class="px-[18px] py-4 rounded-xl mb-[18px]">
-      <div id="wsd-code" class="text-[11px] font-bold text-white/60 uppercase tracking-wide mb-1"></div>
+    <div id="wsd-header" class="mb-[18px] rounded-xl bg-gradient-to-br from-blue-600 to-slate-900 px-[18px] py-4">
+      <div id="wsd-code" class="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/60"></div>
       <div id="wsd-name" class="text-xl font-extrabold text-white"></div>
     </div>
-
-    <div class="grid grid-cols-2 gap-3 mb-3.5">
-      <div class="bg-gray-50 rounded-[10px] p-3.5">
-        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Units</div>
-        <div id="wsd-units" class="text-2xl font-extrabold text-gray-900"></div>
+    <div class="mb-3.5 grid grid-cols-2 gap-3">
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Units</div>
+        <div id="wsd-units" class="text-[26px] font-extrabold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div class="bg-gray-50 rounded-[10px] p-3.5">
-        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Hours</div>
-        <div id="wsd-hours" class="text-[13px] font-semibold text-gray-900 mt-1"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Hours</div>
+        <div id="wsd-hours" class="mt-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div class="bg-gray-50 rounded-[10px] p-3.5">
-        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Room</div>
-        <div id="wsd-room" class="text-base font-bold text-gray-900 mt-0.5"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Room</div>
+        <div id="wsd-room" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div class="bg-gray-50 rounded-[10px] p-3.5">
-        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Section</div>
-        <div id="wsd-section" class="text-base font-bold text-gray-900 mt-0.5"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Section</div>
+        <div id="wsd-section" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
       </div>
     </div>
-
-    <div class="bg-gray-50 rounded-[10px] p-3.5 mb-3">
-      <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Schedule</div>
-      <div id="wsd-schedule" class="text-[13px] font-semibold text-gray-900"></div>
+    <div class="mb-3 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Schedule</div>
+      <div id="wsd-schedule" class="text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
     </div>
-
-    <div class="bg-gray-50 rounded-[10px] p-3.5 mb-[18px]">
-      <div class="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-1">Faculty</div>
-      <div class="text-[13px] font-semibold text-gray-900">{{ $faculty->full_name }}</div>
-      <div class="text-[11px] text-gray-500 mt-0.5">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
+    <div class="mb-[18px] rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Faculty</div>
+      <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
+      <div class="mt-0.5 text-[11px] text-slate-400">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
     </div>
 
     <div class="flex justify-end gap-2 mt-2">
@@ -484,14 +341,13 @@ function updateSubjectScheduleStatuses() {
     const badgeBase = 'text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap tracking-wide leading-tight';
 
     if (now < start) {
-      statusEl.innerHTML = `<span class="${badgeBase} bg-white/30 text-white">Today</span>`;
+      statusEl.innerHTML = ` <span class="badge badge-blue text-[10px]">Today</span>`;
     } else if (now >= start && now <= end) {
       const mins = Math.floor((end - now) / 60000);
       const urgent = mins < 5;
-      const variant = urgent ? 'bg-red-500 text-white' : 'bg-green-500 text-green-950';
-      statusEl.innerHTML = `<span class="${badgeBase} ${variant}">${mins}m left</span>`;
+      statusEl.innerHTML = ` <span class="badge ${urgent ? 'badge-red' : 'badge-green'} text-[10px]">${mins}m left</span>`;
     } else {
-      statusEl.innerHTML = `<span class="${badgeBase} bg-black/30 text-white">Ended</span>`;
+      statusEl.innerHTML = ` <span class="badge badge-grey text-[10px]">Ended</span>`;
     }
   });
 }

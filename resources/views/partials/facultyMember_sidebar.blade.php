@@ -15,16 +15,16 @@
 
   <div class="sidebar-nav">
     <div class="nav-section-label">Main</div>
-    <a href="{{ route('faculty.dashboard') }}" class="nav-item {{ request()->routeIs('faculty.dashboard') ? 'active' : '' }}">
+    <a href="{{ route('faculty.dashboard') }}" class="nav-item {{ request()->routeIs('faculty.dashboard') ? 'active' : '' }}" style="text-decoration:none !important;">
       <span class="nav-icon"></span> My Dashboard
     </a>
-    <a href="{{ route('faculty.subjects') }}" class="nav-item {{ request()->routeIs('faculty.subjects') ? 'active' : '' }}">
+    <a href="{{ route('faculty.subjects') }}" class="nav-item {{ request()->routeIs('faculty.subjects') ? 'active' : '' }}" style="text-decoration:none !important;">
       <span class="nav-icon"></span> My Subjects
     </a>
-    <a href="{{ route('faculty.schedule') }}" class="nav-item {{ request()->routeIs('faculty.schedule') ? 'active' : '' }}">
+    <a href="{{ route('faculty.schedule') }}" class="nav-item {{ request()->routeIs('faculty.schedule') ? 'active' : '' }}" style="text-decoration:none !important;">
       <span class="nav-icon"></span> My Schedule
     </a>
-    <a href="{{ route('faculty.faculty_settings') }}" class="nav-item {{ request()->routeIs('faculty.faculty_settings') ? 'active' : '' }}">
+    <a href="{{ route('faculty.faculty_settings') }}" class="nav-item {{ request()->routeIs('faculty.faculty_settings') ? 'active' : '' }}" style="text-decoration:none !important;">
       <span class="nav-icon"></span> Settings
     </a>
   </div>

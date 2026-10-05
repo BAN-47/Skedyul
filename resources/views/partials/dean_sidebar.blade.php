@@ -9,7 +9,8 @@
             {{ strtoupper(substr(Auth::user()->dean->dean_first_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_middle_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_last_name ?? '', 0, 1)) }}
         </div>
         <div class="overflow-hidden">
-            <div class="sidebar-user-name">{{ Auth::user()->dean->dean_first_name ?? '' }} {{ Auth::user()->dean->dean_middle_name ?? '' }} {{ Auth::user()->dean->dean_last_name ?? '' }}</div>
+            <div class="sidebar-user-name">{{ Auth::user()->dean->dean_first_name ?? '' }}
+                {{ Auth::user()->dean->dean_middle_name ?? '' }} {{ Auth::user()->dean->dean_last_name ?? '' }}</div>
             <div class="sidebar-user-role">Dean, CCICT</div>
         </div>
     </div>
@@ -39,10 +40,6 @@
         <a href="{{ route('dean.schedule_reports') }}"
             class="nav-item {{ request()->routeIs('dean.schedule_reports') ? 'active' : '' }}">
             <span class="nav-icon"></span> Schedule Reports
-        </a>
-        <a href="{{ route('dean.faculty_deployment') }}"
-            class="nav-item {{ request()->routeIs('dean.faculty_deployment') ? 'active' : '' }}">
-            <span class="nav-icon"></span> Faculty Deployment
         </a>
 
         <div class="nav-section-label">System</div>

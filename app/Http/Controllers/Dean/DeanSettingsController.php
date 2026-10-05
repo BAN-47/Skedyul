@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Auth;
 
-class DeanProfileController extends Controller
+class DeanSettingsController extends Controller
 {
     public function settings()
     {
@@ -23,7 +23,7 @@ class DeanProfileController extends Controller
 
         $activeSemester = $academicYear?->semesters->first();
 
-        return view('dean.settings', [
+        return view('dean.dean_settings', [
             'dean' => $this->currentDean(),
             'academicYear' => $academicYear,
             'activeSemester' => $activeSemester,
@@ -46,41 +46,33 @@ class DeanProfileController extends Controller
 
         $dean = $this->currentDean();
 
-        if ($dean->dean_profile_image_public_id) {
-            Cloudinary::uploadApi()->destroy($dean->dean_profile_image_public_id);
+        if ($dean->dean_profile_image) {
+            $oldPath = public_path('images/dean_profile/' . $dean->dean_profile_image);
+            if (file_exists($oldPath)) {
+                unlink($oldPath);
+            }
         }
 
-        $result = Cloudinary::uploadApi()->upload($request->file('avatar')->getRealPath(), [
-            'folder' => 'skedyul/dean-avatars',
-            'public_id' => 'dean_' . $dean->dean_id,
-            'overwrite' => true,
-            'transformation' => [
-                'width' => 300,
-                'height' => 300,
-                'crop' => 'fill',
-                'gravity' => 'face',
-            ],
-        ]);
+        $filename = $dean->dean_id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
+        $request->file('avatar')->move(public_path('images/dean_profile'), $filename);
+        $dean->update(['dean_profile_image' => $filename]);
 
-        $dean->update([
-            'dean_profile_image' => $result['secure_url'],
-            'dean_profile_image_public_id' => $result['public_id'],
-        ]);
-
-        return response()->json(['success' => true, 'url' => $result['secure_url']]);
+        return response()->json(['success' => true, 'url' => asset('images/chair_profile/' . $filename)]);
     }
 
     public function removeAvatar()
     {
         $dean = $this->currentDean();
 
-        if ($dean->dean_profile_image_public_id) {
-            Cloudinary::uploadApi()->destroy($dean->dean_profile_image_public_id);
+        if ($dean->dean_profile_image) {
+            $oldPath = public_path('images/dean_profile/' . $dean->dean_profile_image);
+            if (file_exists($oldPath)) {
+                unlink($oldPath);
+            }
         }
 
         $dean->update([
             'dean_profile_image' => null,
-            'dean_profile_image_public_id' => null,
         ]);
 
         return response()->json(['success' => true]);

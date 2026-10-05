@@ -9,7 +9,7 @@ use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
 use App\Http\Controllers\Dean\NotificationController;
 use App\Http\Controllers\Dean\ScheduleReportsController;
-use App\Http\Controllers\Dean\DeanProfileController;
+use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Admin\AdminProfileController;
 
 /*
@@ -44,12 +44,12 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     Route::get('/faculty-deployment', [FacultyDeploymentController::class, 'index'])->name('faculty_deployment');
     Route::post('/faculty-deployment/notify', [FacultyDeploymentController::class, 'sendNotification'])->name('faculty_deployment.notify');
 
-    Route::get('/settings', [DeanProfileController::class, 'settings'])->name('settings');
-    Route::post('/profile/avatar', [DeanProfileController::class, 'updateAvatar'])->name('profile.avatar.update');
-    Route::delete('/profile/avatar', [DeanProfileController::class, 'removeAvatar'])->name('profile.avatar.remove');
-    Route::put('/profile/personal-info', [DeanProfileController::class, 'updatePersonalInfo'])->name('profile.personal-info.update');
-    Route::put('/profile/contact', [DeanProfileController::class, 'updateContact'])->name('profile.contact.update');
-    Route::put('/profile/password', [DeanProfileController::class, 'updatePassword'])->name('profile.password.update');
+    Route::get('/settings', [DeanSettingsController::class, 'settings'])->name('settings');
+    Route::post('/profile/avatar', [DeanSettingsController::class, 'updateAvatar'])->name('profile.avatar.update');
+    Route::delete('/profile/avatar', [DeanSettingsController::class, 'removeAvatar'])->name('profile.avatar.remove');
+    Route::put('/profile/personal-info', [DeanSettingsController::class, 'updatePersonalInfo'])->name('profile.personal-info.update');
+    Route::put('/profile/contact', [DeanSettingsController::class, 'updateContact'])->name('profile.contact.update');
+    Route::put('/profile/password', [DeanSettingsController::class, 'updatePassword'])->name('profile.password.update');
 
     Route::put('/security', [AdminProfileController::class, 'updateSecuritySettings'])->name('security.update');
 
@@ -58,11 +58,11 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     Route::get('/notifications/unread', [NotificationController::class, 'unreadCount'])->name('notifications.unread');
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
-    Route::put('/institution', [DeanProfileController::class, 'updateInstitution'])->name('institution.update');
+    Route::put('/institution', [DeanSettingsController::class, 'updateInstitution'])->name('institution.update');
     });
 
-Route::put('/dean/profile/notification-preferences', [App\Http\Controllers\Dean\DeanProfileController::class, 'updateNotificationPreferences'])
+Route::put('/dean/profile/notification-preferences', [App\Http\Controllers\Dean\DeanSettingsController::class, 'updateNotificationPreferences'])
             ->name('dean.profile.notification-preferences.update');
 
-Route::get('/notifications/pending-count', [DeanProfileController::class, 'pendingCount'])
+Route::get('/notifications/pending-count', [DeanSettingsController::class, 'pendingCount'])
     ->name('dean.notifications.pending-count');
