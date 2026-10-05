@@ -65,9 +65,9 @@ class Study_Load extends Model
         return $this->belongsTo(User::class, 'sl_assigned_by', 'usr_id');
     }
 
-    public function schedule()
+    public function schedules()
     {
-        return $this->hasOne(Schedule::class, 'sch_load_id', 'sl_id');
+        return $this->hasMany(Schedule::class, 'sch_load_id', 'sl_id');
     }
 
     public function getAttribute($key)

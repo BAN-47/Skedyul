@@ -177,16 +177,17 @@ class PbtController extends Controller
 
         $loads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($semId, fn ($q) => $q->where('sl_sem_id', $semId))
-            ->with('subject', 'schedule')
+            ->with('subject', 'schedules')
             ->get();
 
         $units = $loads->sum(fn ($l) => ($l->course->course_lecture_hours ?? $l->subject->course_lecture_hours ?? 0) + ($l->course->course_lab_hours ?? $l->subject->course_lab_hours ?? 0));
 
-        $hoursPerWeek = $loads->sum(function ($l) {
-            if (!$l->schedule) return 0;
-            $start = \Illuminate\Support\Carbon::parse($l->schedule->sch_start_time);
-            $end   = \Illuminate\Support\Carbon::parse($l->schedule->sch_end_time);
-            return $end->diffInMinutes($start) / 60;
+        $hoursPerWeek = $loads->sum(function ($load) {
+            return $load->schedules->sum(function ($schedule) {
+                $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                return $start->diffInMinutes($end) / 60;
+            });
         });
 
         return [
@@ -267,12 +268,14 @@ class PbtController extends Controller
             return response()->json(['success' => false, 'message' => 'No teacher selected.']);
         }
 
-        $ids = Schedule::where('sch_fac_id', $facultyId)
+        $schedules = Schedule::where('sch_fac_id', $facultyId)
             ->when($request->filled('semester'), fn ($q) => $q->where('sch_sem_id', $request->input('semester')))
-            ->pluck('sch_load_id', 'sch_id');
+            ->get(['sch_id', 'sch_load_id', 'sch_fac_id', 'sch_sem_id']);
 
-        Schedule::whereIn('sch_id', $ids->keys())->delete();
-        Study_Load::whereIn('sl_id', $ids->values())->delete();
+        Schedule::whereIn('sch_id', $schedules->pluck('sch_id'))->delete();
+        Study_Load::whereIn('sl_id', $schedules->pluck('sch_load_id'))->delete();
+        $schedules->unique(fn ($schedule) => $schedule->sch_fac_id.'|'.$schedule->sch_sem_id)
+            ->each(fn ($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
     }

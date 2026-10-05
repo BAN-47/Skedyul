@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\College;
 use Illuminate\Http\Request;
 
 class RoomController extends Controller
@@ -14,7 +15,9 @@ class RoomController extends Controller
     public function index()
     {
         $rooms = Room::orderBy('room_name')->get();
-        return view('admin.rooms', compact('rooms'));
+        $colleges = College::orderBy('college_name')->get();
+        $collegeNames = $colleges->pluck('college_name', 'college_id');
+        return view('admin.rooms', compact('rooms', 'colleges', 'collegeNames'));
     }
 
     /**
@@ -33,6 +36,7 @@ class RoomController extends Controller
     {
         $validated = $request->validate([
             'room_name'         => 'required|string|max:100',
+            'room_college_id'   => 'required|uuid|exists:college,college_id',
             'room_type'         => 'required|string|max:100',
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',
@@ -88,6 +92,7 @@ class RoomController extends Controller
 
         $validated = $request->validate([
             'room_name'         => 'required|string|max:100',
+            'room_college_id'   => 'required|uuid|exists:college,college_id',
             'room_type'         => 'required|string|max:100',
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',

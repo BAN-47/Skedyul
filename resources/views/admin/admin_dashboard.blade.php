@@ -259,7 +259,7 @@
                         <table class="data-table" id="dash-sections-table">
                             <thead>
                                 <tr>
-                                    @foreach(['Section','Program','Year','Students','Subjects','Status'] as $h)
+                                    @foreach(['Section','Program','Year','Students','Department Assigned','Status'] as $h)
                                     <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
@@ -271,10 +271,17 @@
                                     <td>{{ $sec->program->dept_code ?? $sec->program->prog_code ?? 'N/A' }}</td>
                                     <td>{{ $sec->sec_year_level }}</td>
                                     <td>{{ $sec->sec_no_of_student }}</td>
-                                    <td>—</td>
+                                    <td>{{ $sec->program->dept_name ?? $sec->program->prog_name ?? 'Not assigned' }}</td>
                                     <td>
-                                        <span class="badge {{ $sec->sec_status === 'active' ? 'badge-green' : 'badge-amber' }}">
-                                            {{ ucfirst($sec->sec_status) }}
+                                        @php
+                                            $scheduleStatusBadge = match($sec->schedule_progress_status) {
+                                                'Fully Scheduled' => 'badge-green',
+                                                'In Progress' => 'badge-amber',
+                                                default => 'badge-red',
+                                            };
+                                        @endphp
+                                        <span class="badge {{ $scheduleStatusBadge }}" title="{{ $sec->schedule_load_plotted }} of {{ $sec->schedule_load_total }} assigned courses scheduled">
+                                            {{ $sec->schedule_progress_status }}
                                         </span>
                                     </td>
                                 </tr>
@@ -297,7 +304,7 @@
                 {{-- Schedule Completion --}}
                 <div class="col-span-4 card">
                     <div class="card-title mb-0.5">Schedule Completion</div>
-                    <div class="card-sub mb-4">By program</div>
+                    <div class="card-sub mb-4">Percent of assigned courses with an active schedule</div>
 
                     @foreach($program as $programs)
                     @php
@@ -364,7 +371,7 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    @foreach(['Code','Subject','Units','Program','Assigned Faculty','Status'] as $h)
+                                    @foreach(['Code','Subject','Units','Program','Status'] as $h)
                                     <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
@@ -376,7 +383,6 @@
                                     <td class="font-semibold">{{ $subjects->course_name ?? $subjects->subj_name }}</td>
                                     <td>{{ ($subjects->course_lecture_hours ?? $subjects->subj_lecture_hours ?? 0) + ($subjects->course_lab_hours ?? $subjects->subj_lab_hours ?? 0) }}</td>
                                     <td>{{ $subjects->program->dept_name ?? $subjects->program->prog_name ?? $subjects->department->dept_name ?? 'N/A' }}</td>
-                                    <td class="text-red-500">Unassigned</td>
                                     <td>
                                         <span class="badge {{ ($subjects->course_is_active ?? $subjects->subj_is_active ?? true) ? 'badge-green' : 'badge-red' }}">
                                             {{ ($subjects->course_is_active ?? $subjects->subj_is_active ?? true) ? 'Active' : 'Inactive' }}
@@ -384,7 +390,7 @@
                                     </td>
                                 </tr>
                                 @empty
-                                <tr class="dash-subj-empty"><td colspan="6" class="text-center py-6 text-slate-400">No subjects found.</td></tr>
+                                <tr class="dash-subj-empty"><td colspan="5" class="text-center py-6 text-slate-400">No subjects found.</td></tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -458,50 +464,6 @@
                 </div>
             </div>
 
-            {{-- ══ RECENT ACTIVITY ══ --}}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">Recent System Activity</div>
-                        <div class="card-sub">Latest actions across all users</div>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                @foreach(['Time','User','Action','Details','Status'] as $h)
-                                <th>{{ $h }}</th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($audit_log as $log)
-                            <tr>
-                                <td class="font-mono text-[11px] text-slate-400">{{ $log->created_at->format('h:i A') }}</td>
-                                <td class="font-semibold">{{ $log->user_name }}</td>
-                                <td>{{ $log->action }}</td>
-                                <td class="text-slate-500">{{ $log->details }}</td>
-                                <td>
-                                    @php
-                                        $logBadgeClass = match($log->status) {
-                                            'Success' => 'badge-green',
-                                            'Info'    => 'badge-blue',
-                                            'Warning' => 'badge-red',
-                                            default   => 'badge-grey',
-                                        };
-                                    @endphp
-                                    <span class="badge {{ $logBadgeClass }}">{{ $log->status }}</span>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr><td colspan="5" class="text-center py-6 text-slate-400">No recent activity.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
         </div>{{-- end page-content --}}
     </div>{{-- end app-main --}}
 </div>{{-- end app-shell --}}
@@ -568,7 +530,6 @@
     renderQuote();
 })();
 </script>
-
 
 <script>
 (function () {

@@ -26,7 +26,7 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.authentica
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 
-Route::middleware('auth')->prefix('chair')->group(function () {
+Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
 // Chair dashboard index 
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
     Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.readAll');
@@ -34,6 +34,7 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 
 // Chair Faculty Load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
+    // Used by the Subject Management page to pre-assign faculty before plotting.
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
 
     // PBS — Program by Section
@@ -94,7 +95,7 @@ Route::post('/schedule', function () {
     return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
 })->name('schedule.store');
 
-Route::prefix('chair')->group(function () {
+Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
     Route::post('/profile/avatar', [ChairSettingsController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
     Route::delete('/profile/avatar', [ChairSettingsController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
     Route::put('/profile/personal-info', [ChairSettingsController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
@@ -106,7 +107,7 @@ Route::prefix('chair')->group(function () {
 
 Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');
 
-Route::prefix('chair')->group(function () {
+Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
     Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
     Route::post('/notifications/{notification}/read', [ChairSettingsController::class, 'markNotificationRead'])->name('chair.notifications.read');
     Route::post('/notifications/read-all', [ChairSettingsController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');

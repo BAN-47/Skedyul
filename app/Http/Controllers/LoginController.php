@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\SystemSetting;
+use App\Services\AuditActivityLogger;
 use Carbon\Carbon;
 
 class LoginController extends Controller
@@ -54,6 +55,13 @@ class LoginController extends Controller
         }
 
         Auth::login($user);
+        AuditActivityLogger::record(
+            $user,
+            'Logged in',
+            'session',
+            'Successful login; role: ' . ($user->usr_role ?? 'user'),
+            $request->ip()
+        );
 
         switch ($user->usr_role) {
             case 'system_admin':
@@ -72,6 +80,15 @@ class LoginController extends Controller
 
    public function logout()
     {
+        if ($user = Auth::user()) {
+            AuditActivityLogger::record(
+                $user,
+                'Logged out',
+                'session',
+                'User logged out; role: ' . ($user->usr_role ?? 'user'),
+                request()->ip()
+            );
+        }
 
         Auth::logout();
 

@@ -50,13 +50,14 @@
         <div class="overflow-x-auto">
           <table class="data-table" id="rooms-table">
             <tr>
-              @foreach(['Room','Type','Capacity','Status','Actions'] as $h)
+              @foreach(['Room','College','Type','Capacity','Status','Actions'] as $h)
               <th>{{ $h }}</th>
               @endforeach
             </tr>
             @foreach ($rooms as $room)
             <tr data-room-id="{{ $room->room_id }}">
               <td class="cell-name font-semibold">{{ $room->room_name }}</td>
+              <td class="cell-college">{{ $collegeNames[$room->room_college_id] ?? 'Unassigned' }}</td>
               <td class="cell-type">{{ $room->room_type }}</td>
               <td class="cell-capacity">{{ $room->room_capacity }}</td>
               <td class="cell-status">
@@ -100,6 +101,16 @@
           <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option>
         </select>
       </div>
+    </div>
+    <div class="mb-3">
+      <label class="field-label">Assigned College <span class="text-red-500">*</span></label>
+      <select id="add-room-college" class="field-input" required>
+        <option value="">Select a college</option>
+        @foreach($colleges as $college)
+          <option value="{{ $college->college_id }}">{{ $college->college_name }} ({{ $college->college_code }})</option>
+        @endforeach
+      </select>
+      <p class="text-[11px] text-slate-400 mt-1">This room will be assigned to the selected college.</p>
     </div>
     <div class="grid grid-cols-2 gap-3 mb-3">
       <div>
@@ -147,6 +158,10 @@
         <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Building</div>
         <div id="vr-building" class="text-[13px] font-semibold text-slate-900">—</div>
       </div>
+    </div>
+    <div class="bg-slate-50 rounded-lg p-3.5 mb-3.5">
+      <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Assigned College</div>
+      <div id="vr-college" class="text-[13px] font-semibold text-slate-900">—</div>
     </div>
     <div class="bg-slate-50 rounded-lg p-3.5 mb-5">
       <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Location / Floor</div>
@@ -205,6 +220,15 @@
         <input id="edit-room-location" placeholder="e.g. 2nd Floor" class="field-input">
       </div>
     </div>
+    <div class="mb-3">
+      <label class="field-label">Assigned College <span class="text-red-500">*</span></label>
+      <select id="edit-room-college" class="field-input" required>
+        <option value="">Select a college</option>
+        @foreach($colleges as $college)
+          <option value="{{ $college->college_id }}">{{ $college->college_name }} ({{ $college->college_code }})</option>
+        @endforeach
+      </select>
+    </div>
     <div class="bg-amber-100 border border-amber-300 rounded-lg px-3.5 py-2.5 text-[12px] text-amber-800 mb-1">
       ⚠️ Changes will be reflected immediately in the room directory.
     </div>
@@ -240,6 +264,8 @@ const ROOMS_DATA = {
   @foreach ($rooms as $room)
   "{{ $room->room_id }}": {
     name: @json($room->room_name),
+    collegeId: @json($room->room_college_id),
+    collegeName: @json($collegeNames[$room->room_college_id] ?? 'Unassigned'),
     type: @json($room->room_type),
     capacity: {{ $room->room_capacity }},
     available: {{ $room->room_is_available ? 'true' : 'false' }},
@@ -295,8 +321,10 @@ async function saveAddRoom() {
   const capacity   = document.getElementById('add-room-capacity').value;
   const building   = document.getElementById('add-room-building').value.trim();
   const location   = document.getElementById('add-room-location').value.trim();
+  const collegeId  = document.getElementById('add-room-college').value;
 
   if (!capacity) { showErrorModal('Please enter a capacity.'); return; }
+  if (!collegeId) { showErrorModal('Please assign this room to a college.'); return; }
 
   try {
     const res = await fetch("{{ route('admin.rooms.store') }}", {
@@ -308,6 +336,7 @@ async function saveAddRoom() {
       },
       body: JSON.stringify({
         room_name: name,
+        room_college_id: collegeId,
         room_type: type,
         room_capacity: capacity,
         room_is_available: true,
@@ -327,6 +356,8 @@ async function saveAddRoom() {
 
     ROOMS_DATA[room.room_id] = {
       name: room.room_name,
+      collegeId: room.room_college_id,
+      collegeName: document.querySelector(`#add-room-college option[value="${room.room_college_id}"]`)?.textContent.trim() || 'Assigned',
       type: room.room_type,
       capacity: room.room_capacity,
       available: room.room_is_available,
@@ -340,6 +371,7 @@ async function saveAddRoom() {
     tr.style.opacity = '0';
     tr.innerHTML = `
       <td class="cell-name font-semibold">${room.room_name}</td>
+      <td class="cell-college">${ROOMS_DATA[room.room_id].collegeName}</td>
       <td class="cell-type">${room.room_type}</td>
       <td class="cell-capacity">${room.room_capacity}</td>
       <td class="cell-status"><span class="badge badge-green">Available</span></td>
@@ -355,7 +387,7 @@ async function saveAddRoom() {
 
     refreshStats();
     closeModal('modal-add-room');
-    ['add-room-name','add-room-capacity','add-room-building','add-room-location'].forEach(id => {
+    ['add-room-name','add-room-capacity','add-room-building','add-room-location','add-room-college'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -375,6 +407,7 @@ function openViewRoom(roomId) {
   document.getElementById('vr-name').textContent     = room.name;
   document.getElementById('vr-type').textContent     = room.type;
   document.getElementById('vr-capacity').textContent = room.capacity;
+  document.getElementById('vr-college').textContent = room.collegeName || 'Unassigned';
   document.getElementById('vr-building').textContent = room.building || '—';
   document.getElementById('vr-location').textContent = room.location || '—';
   const status = room.available ? 'Available' : 'In Use';
@@ -394,6 +427,7 @@ function openEditRoom(roomId) {
   document.getElementById('edit-room-capacity').value   = room.capacity;
   document.getElementById('edit-room-building').value   = room.building || '';
   document.getElementById('edit-room-location').value   = room.location || '';
+  document.getElementById('edit-room-college').value    = room.collegeId || '';
   setSelectValue('edit-room-type', room.type);
   setSelectValue('edit-room-status', room.available ? '1' : '0');
   openModal('modal-edit-room');
@@ -406,8 +440,10 @@ async function saveEditRoom() {
   const available = document.getElementById('edit-room-status').value === '1';
   const building = document.getElementById('edit-room-building').value.trim();
   const location = document.getElementById('edit-room-location').value.trim();
+  const collegeId = document.getElementById('edit-room-college').value;
 
   if (!name || !capacity) { showErrorModal('Please fill in all required fields.'); return; }
+  if (!collegeId) { showErrorModal('Please assign this room to a college.'); return; }
 
   try {
     const res = await fetch(`/rooms/${currentRoomId}`, {
@@ -419,6 +455,7 @@ async function saveEditRoom() {
       },
       body: JSON.stringify({
         room_name: name,
+        room_college_id: collegeId,
         room_type: type,
         room_capacity: capacity,
         room_is_available: available,
@@ -438,6 +475,8 @@ async function saveEditRoom() {
 
     ROOMS_DATA[room.room_id] = {
       name: room.room_name,
+      collegeId: room.room_college_id,
+      collegeName: document.querySelector(`#edit-room-college option[value="${room.room_college_id}"]`)?.textContent.trim() || 'Assigned',
       type: room.room_type,
       capacity: room.room_capacity,
       available: room.room_is_available,
@@ -448,6 +487,7 @@ async function saveEditRoom() {
     const row = document.querySelector(`tr[data-room-id="${room.room_id}"]`);
     if (row) {
       row.querySelector('.cell-name').textContent = room.room_name;
+      row.querySelector('.cell-college').textContent = ROOMS_DATA[room.room_id].collegeName;
       row.querySelector('.cell-type').textContent = room.room_type;
       row.querySelector('.cell-capacity').textContent = room.room_capacity;
       row.querySelector('.cell-status').innerHTML = room.room_is_available

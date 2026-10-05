@@ -201,17 +201,25 @@
 
             {{-- TEACHER picker: button opens a searchable, grouped popover --}}
             <div class="relative">
-              <button type="button" id="teacher-picker-btn" onclick="toggleTeacherPicker()" class="pbs-filter min-w-[130px] text-left">
-                {{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : 'Select Teacher...' }}
+              <button type="button" id="teacher-picker-btn" onclick="toggleTeacherPicker()" aria-haspopup="listbox" aria-expanded="false"
+                      class="inline-flex min-w-[230px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-indigo-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">{{ $selectedFaculty ? strtoupper(substr($selectedFaculty->fac_first_name, 0, 1).substr($selectedFaculty->fac_last_name, 0, 1)) : '👤' }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing schedule for</span>
+                  <span class="block truncate text-[13px] font-semibold text-slate-800">{{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : 'Choose a teacher' }}</span>
+                </span>
+                <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
               </button>
 
               <div id="teacher-picker-panel"
-                   class="hidden absolute left-0 top-[calc(100%+4px)] w-[260px] max-h-[360px] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.15)] z-50">
-                <div class="p-2 border-b border-slate-100">
+                   class="hidden absolute left-0 top-[calc(100%+8px)] z-50 w-[min(340px,calc(100vw-32px))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+                <div class="border-b border-slate-100 bg-slate-50 p-3">
+                  <div class="mb-2 text-sm font-bold text-slate-800">Select a teacher</div>
                   <input type="text" id="teacher-search" oninput="filterTeacherList(this.value)"
-                         placeholder="Search professor..." autocomplete="off"
-                         class="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[12px] outline-none focus:border-blue-500">
+                         placeholder="Search by name..." autocomplete="off" aria-label="Search teachers"
+                         class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
                 </div>
+                <div class="max-h-[300px] overflow-y-auto p-2" role="listbox" aria-label="Teachers">
 
                 @foreach([
                     'FULL-TIME'  => $facultyFullTime,
@@ -222,8 +230,8 @@
                   @if($groupList->isEmpty() && $groupLabel === 'DEPT CHAIR')
                     @continue
                   @endif
-                  <div class="teacher-group" data-group="{{ $groupLabel }}">
-                    <div class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-50">
+                  <div class="teacher-group mb-2 last:mb-0" data-group="{{ $groupLabel }}">
+                    <div class="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       {{ $groupLabel }}
                     </div>
                     @forelse($groupList as $person)
@@ -232,16 +240,21 @@
                         $pname = trim(($person->fac_first_name ?? $person->dean_first_name ?? '') . ' ' . ($person->fac_last_name ?? $person->dean_last_name ?? ''));
                       @endphp
                       <button type="button"
-                              class="teacher-option w-full text-left px-3 py-2 text-[12.5px] text-slate-700 hover:bg-blue-50"
-                              data-name="{{ strtolower($pname) }}"
+                              class="teacher-option flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none {{ ($selectedFaculty->fac_id ?? null) === $pid ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-100' : '' }}"
+                              role="option" aria-selected="{{ ($selectedFaculty->fac_id ?? null) === $pid ? 'true' : 'false' }}"
+                              data-name="{{ strtolower($pname) }}" data-role="{{ $groupLabel }}"
                               onclick="selectTeacher('{{ $pid }}')">
-                        {{ $pname }}
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{{ strtoupper(substr($pname, 0, 1)) }}</span>
+                        <span class="min-w-0 flex-1"><span class="block truncate text-[13px] font-semibold text-slate-800">{{ $pname }}</span><span class="block text-[11px] text-slate-500">{{ ucwords(strtolower($groupLabel)) }}</span></span>
+                        @if(($selectedFaculty->fac_id ?? null) === $pid)<span class="text-sm font-bold text-indigo-600" aria-label="Selected">✓</span>@endif
                       </button>
                     @empty
                       <div class="px-3 py-2 text-[11.5px] text-slate-400 italic">None</div>
                     @endforelse
                   </div>
                 @endforeach
+                <div id="teacher-no-results" class="hidden rounded-xl px-3 py-6 text-center text-[13px] text-slate-500">No teachers match that search.</div>
+                </div>
               </div>
             </div>
 
@@ -494,6 +507,7 @@
 
     <div class="modal-footer">
       <button type="button" onclick="closeModal('modal-add-schedule')" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="add-another-submit" onclick="submitAdd(true)" class="btn btn-secondary">Save &amp; Add Another</button>
       <button type="button" id="add-submit" onclick="submitAdd()" class="btn btn-primary">Confirm Schedule</button>
     </div>
   </div>

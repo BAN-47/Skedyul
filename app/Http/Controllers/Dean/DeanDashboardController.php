@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Faculty;
 use App\Models\College;
+use App\Models\Departments;
 use App\Models\Workload;
 use App\Models\Schedule_Submission;
 use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
+use App\Models\Audit_Log;
 use Illuminate\Support\Facades\Auth;
 
 class DeanDashboardController extends Controller
@@ -63,18 +65,25 @@ class DeanDashboardController extends Controller
             ->values();
 
         // ---------- DEPARTMENT SUMMARY ----------
-        // Note: grouped by actual Department (dept_name), not by Program (BSIS/BSIT/BIT-CT).
-        // Faculty is grouped by its assigned college.
-        $departments = College::all();
+        // CCICT programs only: BSIS, BSIT, BIT-CT
+        $ccict = College::where('college_code', 'CCICT')->first();
 
-        $deptSummary = $departments->map(function ($dept) use ($facultyLoads) {
-            $deptFacultyLoads = $facultyLoads->filter(
-                fn($fl) => $fl['faculty']->fac_college_id === $dept->college_id
+        $programOrder = ['BSIS' => 1, 'BSIT' => 2, 'BIT-CT' => 3];
+
+        $programs = $ccict
+            ? Departments::where('dept_college_id', $ccict->college_id)->get()
+            ->sortBy(fn($p) => $programOrder[$p->dept_code] ?? 99)
+            ->values()
+            : collect();
+
+        $deptSummary = $programs->map(function ($prog) use ($facultyLoads) {
+            $progFacultyLoads = $facultyLoads->filter(
+                fn($fl) => $fl['faculty']->fac_dept_id === $prog->dept_id
             );
 
-            $count = $deptFacultyLoads->count();
+            $count = $progFacultyLoads->count();
             $avgPercent = $count > 0
-                ? round($deptFacultyLoads->avg('hours') / self::MAX_LOAD_HOURS * 100)
+                ? round($progFacultyLoads->avg('hours') / self::MAX_LOAD_HOURS * 100)
                 : 0;
 
             $color = match (true) {
@@ -83,8 +92,12 @@ class DeanDashboardController extends Controller
                 default           => 'red',
             };
 
+            $label = $prog->dept_code
+                ? "{$prog->dept_code} — {$prog->dept_name}"
+                : $prog->dept_name;
+
             return [
-                'name'    => $dept->dept_name,
+                'name'    => $label,
                 'count'   => $count,
                 'percent' => min(100, $avgPercent),
                 'color'   => $color,
@@ -119,6 +132,10 @@ class DeanDashboardController extends Controller
             ->count();
 
         $pendingDeptCount = $pendingApprovals->count();
+        $recentActivity = Audit_Log::where('al_usr_id', Auth::id())
+            ->orderByDesc('al_created_at')
+            ->limit(8)
+            ->get();
 
         return view('dean.dean_dashboard', compact(
             'academicYear',
@@ -132,7 +149,8 @@ class DeanDashboardController extends Controller
             'subjectsPlotted',
             'pendingApprovals',
             'scheduledApprovedCount',
-            'pendingDeptCount'
+            'pendingDeptCount',
+            'recentActivity'
         ));
     }
 

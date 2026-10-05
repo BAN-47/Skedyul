@@ -36,6 +36,29 @@ function clearInlineError(boxId) {
   document.getElementById(boxId).classList.add('hidden');
 }
 
+function setButtonLoading(button, loading, label = 'Saving...') {
+  if (!button) return;
+  if (!button.dataset.idleHtml) button.dataset.idleHtml = button.innerHTML;
+  button.disabled = loading;
+  button.setAttribute('aria-busy', String(loading));
+  button.innerHTML = loading
+    ? `<span class="inline-flex items-center gap-2"><span aria-hidden="true" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>${label}</span>`
+    : button.dataset.idleHtml;
+}
+
+function setAddButtonsLoading(loading, keepOpen = false) {
+  const confirm = document.getElementById('add-submit');
+  const another = document.getElementById('add-another-submit');
+  if (!loading) {
+    setButtonLoading(confirm, false);
+    setButtonLoading(another, false);
+    return;
+  }
+  setButtonLoading(confirm, !keepOpen, 'Saving schedule...');
+  setButtonLoading(another, keepOpen, 'Saving & preparing next...');
+  (keepOpen ? confirm : another).disabled = true;
+}
+
 /*
   Same contract as pbs.js: { success, conflict, message }.
   conflict === true -> double-booking, nothing saved, shown as the
@@ -64,7 +87,9 @@ setInterval(tickClock, 30000);
 /* ── TEACHER picker popover ── */
 function toggleTeacherPicker() {
   const panel = document.getElementById('teacher-picker-panel');
+  const button = document.getElementById('teacher-picker-btn');
   panel.classList.toggle('hidden');
+  button.setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
   if (!panel.classList.contains('hidden')) {
     const search = document.getElementById('teacher-search');
     search.value = '';
@@ -77,19 +102,22 @@ document.addEventListener('click', e => {
   const btn   = document.getElementById('teacher-picker-btn');
   if (panel && btn && !panel.contains(e.target) && !btn.contains(e.target)) {
     panel.classList.add('hidden');
+    btn.setAttribute('aria-expanded', 'false');
   }
 });
 
 function filterTeacherList(query) {
   const q = query.trim().toLowerCase();
   document.querySelectorAll('.teacher-option').forEach(opt => {
-    opt.style.display = opt.dataset.name.includes(q) ? '' : 'none';
+    opt.style.display = (opt.dataset.name.includes(q) || opt.dataset.role.toLowerCase().includes(q)) ? '' : 'none';
   });
   document.querySelectorAll('.teacher-group').forEach(group => {
     const visible = Array.from(group.querySelectorAll('.teacher-option'))
       .some(opt => opt.style.display !== 'none');
     group.style.display = visible ? '' : 'none';
   });
+  const noResults = document.getElementById('teacher-no-results');
+  if (noResults) noResults.classList.toggle('hidden', Array.from(document.querySelectorAll('.teacher-option')).some(opt => opt.style.display !== 'none'));
 }
 
 function selectTeacher(facultyId) {
@@ -206,11 +234,11 @@ function openAddModal(day, startTime) {
   document.getElementById('add-start').value = startTime || '';
   document.getElementById('add-end').value   = startTime ? addMinutesToTime(startTime, 60) : '';
 
-  document.getElementById('add-submit').disabled = false;
+  setAddButtonsLoading(false);
   openModal('modal-add-schedule');
 }
 
-function submitAdd() {
+function submitAdd(keepOpen = false) {
   clearInlineError('add-error');
   const payload = {
     subj_id:     document.getElementById('add-subject').value,
@@ -234,8 +262,7 @@ function submitAdd() {
     return;
   }
 
-  const btn = document.getElementById('add-submit');
-  btn.disabled = true;
+  setAddButtonsLoading(true, keepOpen);
 
   fetch('/chair/pbt', {
     method: 'POST',
@@ -245,17 +272,25 @@ function submitAdd() {
   .then(async res => {
     const data = await res.json().catch(() => ({}));
     if (data.success) {
-      closeModal('modal-add-schedule');
       showToast(data.message || 'Schedule added.');
-      setTimeout(() => location.reload(), 800);
+      if (keepOpen) {
+        document.getElementById('add-day').value = '';
+        document.getElementById('add-start').value = '';
+        document.getElementById('add-end').value = '';
+        document.getElementById('add-description').value = '';
+        setAddButtonsLoading(false);
+      } else {
+        closeModal('modal-add-schedule');
+        setTimeout(() => location.reload(), 800);
+      }
     } else {
       handleScheduleError(data, 'add-error');
-      btn.disabled = false;
+      setAddButtonsLoading(false);
     }
   })
   .catch(() => {
     showInlineError('add-error', 'Something went wrong. Please try again.');
-    btn.disabled = false;
+    setAddButtonsLoading(false);
   });
 }
 
@@ -271,7 +306,7 @@ function openEditModal(block) {
   document.getElementById('edit-day').value     = block.dataset.day     || '';
   document.getElementById('edit-start').value   = block.dataset.start   || '';
   document.getElementById('edit-end').value     = block.dataset.end     || '';
-  document.getElementById('edit-submit').disabled = false;
+  setButtonLoading(document.getElementById('edit-submit'), false);
   openModal('modal-edit-schedule');
 }
 
@@ -298,7 +333,7 @@ function submitEdit() {
   }
 
   const btn = document.getElementById('edit-submit');
-  btn.disabled = true;
+  setButtonLoading(btn, true, 'Saving changes...');
 
   fetch(`/chair/pbt/${id}`, {
     method: 'POST',
@@ -313,12 +348,12 @@ function submitEdit() {
       setTimeout(() => location.reload(), 800);
     } else {
       handleScheduleError(data, 'edit-error');
-      btn.disabled = false;
+      setButtonLoading(btn, false);
     }
   })
   .catch(() => {
     showInlineError('edit-error', 'Something went wrong. Please try again.');
-    btn.disabled = false;
+    setButtonLoading(btn, false);
   });
 }
 
