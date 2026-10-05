@@ -46,12 +46,22 @@ class UserController extends Controller
             ->orderBy('usr_middle_name', 'asc')
             ->get();
 
+        // Stats (full list — JS paginates the table only)
+        $stats = [
+            'total'    => $users->count(),
+            'faculty'  => $users->where('usr_role', 'faculty')->count(),
+            'chairs'   => $users->where('usr_role', 'department_chair')->count(),
+            'active'   => $users->where('usr_is_active', true)->count(),
+            'inactive' => $users->where('usr_is_active', false)->count(),
+        ];
+
         $colleges    = College::orderBy('college_name')->get();
         $departments = Departments::orderBy('dept_name')->get();
 
         return view('admin.user_accounts', compact(
             'users',
             'search',
+            'stats',
             'colleges',
             'departments'
         ));

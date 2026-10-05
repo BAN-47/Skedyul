@@ -16,10 +16,10 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
-        // ---------- USERS ----------
-        $users = User::orderBy('usr_name')->take(5)->get();
+        // ---------- USERS (paginated, 10 per page) ----------
+        $users = User::orderBy('usr_name')->paginate(10)->withQueryString();
 
         $roleCounts = [
             'faculty'          => User::where('usr_role', 'faculty')->count(),
@@ -35,17 +35,21 @@ class DashboardController extends Controller
         $semester     = Semester::where('sem_is_active', true)->first();
 
         // ---------- SECTIONS ----------
-        $section = Section::with('program')
+        $sectionAll = Section::with('program')
             ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
             ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
+            ->orderBy('sec_name')
             ->get();
 
-        $totalSections    = $section->count();
-        $scheduledCount   = $section->where('sec_status', 'Scheduled')->count();
-        $inProgressCount  = $section->where('sec_status', 'In Progress')->count();
-        $unscheduledCount = $section->where('sec_status', 'Unscheduled')->count();
+        $totalSections    = $sectionAll->count();
+        $scheduledCount   = $sectionAll->where('sec_status', 'Scheduled')->count();
+        $inProgressCount  = $sectionAll->where('sec_status', 'In Progress')->count();
+        $unscheduledCount = $sectionAll->where('sec_status', 'Unscheduled')->count();
 
-        $program = $section
+        // Full list for client-side JS pagination (8 per page)
+        $section = $sectionAll;
+
+        $program = $sectionAll
             ->groupBy(fn($s) => $s->program->prog_name ?? 'Unknown')
             ->map(function ($group, $programName) {
                 $total     = $group->count();
@@ -63,9 +67,16 @@ class DashboardController extends Controller
             ->values();
 
         // ---------- SUBJECTS ----------
-        $subject = Course::with(['department', 'program'])->get();
-        $subjectsOffered    = $subject->count();
-        $scheduleConflicts  = $subject->where('subj_is_active', false)->count();
+        $subjectAll = Course::with(['department', 'program'])
+            ->orderBy('course_code')
+            ->get();
+        $subjectsOffered   = $subjectAll->count();
+        $scheduleConflicts = $subjectAll->filter(function ($c) {
+            $active = $c->course_is_active ?? $c->subj_is_active ?? true;
+            return !$active;
+        })->count();
+        // Full list for client-side JS pagination (8 per page)
+        $subject = $subjectAll;
 
         // ---------- ROOMS ----------
         $allRooms = Room::all();
