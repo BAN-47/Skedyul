@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->appendToGroup('web', \App\Http\Middleware\PreventBackHistory::class);
         $middleware->alias([
             'audit.activity' => \App\Http\Middleware\AuditActivityMiddleware::class,
         ]);

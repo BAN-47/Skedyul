@@ -59,6 +59,16 @@ Route::get('/test-db', function () {
 */
 
 Route::get('/login', function () {
+    if (auth()->check()) {
+        return match (auth()->user()->usr_role) {
+            'system_admin' => redirect()->route('admin.dashboard'),
+            'department_chair' => redirect()->route('chair.dashboard'),
+            'dean' => redirect()->route('dean.dashboard'),
+            'faculty' => redirect()->route('faculty.dashboard'),
+            default => abort(403),
+        };
+    }
+
     return view('index');
 })->name('login');
 
