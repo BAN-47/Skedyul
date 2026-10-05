@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>SKEDYUL — My Settings</title>
   @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -42,13 +43,13 @@
                 </div>
                 <div class="flex items-center gap-6 py-2">
                   <div class="relative shrink-0">
-                    <div id="fac-pic-preview" class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-slate-200 bg-slate-100 text-[28px] font-extrabold text-green-600 dark:border-slate-700 dark:bg-slate-800">JB</div>
+                    <div id="fac-pic-preview" data-initials="{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}" data-avatar-url="{{ $faculty->fac_profile_image ? asset('images/faculty_profile/' . $faculty->fac_profile_image) : '' }}" class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-slate-200 bg-slate-100 text-[28px] font-extrabold text-green-600 dark:border-slate-700 dark:bg-slate-800">@if ($faculty->fac_profile_image)<img src="{{ asset('images/faculty_profile/' . $faculty->fac_profile_image) }}" class="h-full w-full object-cover" alt="Profile photo">@else{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}@endif</div>
                     <button type="button" aria-label="Choose profile photo" onclick="document.getElementById('fac-pic-upload').click()" class="absolute bottom-0 right-0 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full border-2 border-white bg-blue-600 text-[13px] text-white dark:border-slate-900">+</button>
                     <input type="file" id="fac-pic-upload" accept="image/*" class="hidden" onchange="facPreviewPic(this)">
                   </div>
                   <div>
-                    <div class="text-[15px] font-bold text-slate-900 dark:text-slate-100">Jerome Bautista</div>
-                    <div class="mt-0.5 text-xs text-slate-400">Faculty · BSIS Department</div>
+                    <div class="text-[15px] font-bold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
+                    <div class="mt-0.5 text-xs text-slate-400">Faculty · {{ $faculty->program->dept_name ?? $faculty->department->college_name ?? 'Department not assigned' }}</div>
                     <div class="mt-3 flex gap-2">
                       <button type="button" class="rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-blue-700" onclick="document.getElementById('fac-pic-upload').click()">Upload Photo</button>
                       <button type="button" class="rounded-lg bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700" onclick="facResetPic()">Remove</button>
@@ -64,31 +65,36 @@
                   </div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">First Name</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="Jerome"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Last Name</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="Bautista"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">First Name</label><input id="fac-first-name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_first_name }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Last Name</label><input id="fac-last-name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_last_name }}"></div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Middle Name</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" placeholder="Optional"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Employee ID</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="CTU-2022-045"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Middle Name</label><input id="fac-middle-name" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" placeholder="Optional" value="{{ $faculty->fac_middle_name }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Employee ID</label><input id="fac-employee-id" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_employee_id }}"></div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Gender</label><select class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
-                      <option selected>Male</option>
-                      <option>Female</option>
-                      <option>Prefer not to say</option>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Suffix</label><input id="fac-suffix" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" placeholder="Optional" value="{{ $faculty->fac_suffix }}"></div>
+                </div>
+                <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Gender</label><select id="fac-gender" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
+                      <option value="">Select gender</option>
+                      <option value="Male" @selected($faculty->fac_gender === 'Male')>Male</option>
+                      <option value="Female" @selected($faculty->fac_gender === 'Female')>Female</option>
+                      <option value="Prefer not to say" @selected($faculty->fac_gender === 'Prefer not to say')>Prefer not to say</option>
                     </select></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Civil Status</label><select class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
-                      <option selected>Single</option>
-                      <option>Married</option>
-                      <option>Widowed</option>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Civil Status</label><select id="fac-civil-status" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
+                      <option value="">Select status</option>
+                      <option value="Single" @selected($faculty->fac_civil_status === 'Single')>Single</option>
+                      <option value="Married" @selected($faculty->fac_civil_status === 'Married')>Married</option>
+                      <option value="Widowed" @selected($faculty->fac_civil_status === 'Widowed')>Widowed</option>
                     </select></div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Date of Birth</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="date" value="1990-05-15"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Nationality</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="Filipino"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Date of Birth</label><input id="fac-dob" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="date" value="{{ $faculty->fac_dob ? \Carbon\Carbon::parse($faculty->fac_dob)->format('Y-m-d') : '' }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Nationality</label><input id="fac-nationality" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_nationality }}"></div>
                 </div>
                 <div class="mt-1 flex justify-end">
-                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="showToast('Personal info saved successfully!')">Save Changes</button>
+                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSavePersonalInfo()">Save Changes</button>
                 </div>
               </div>
               <div class="rounded-[14px] border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -99,16 +105,16 @@
                   </div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Email Address</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="email" value="j.bautista@ctu.edu.ph"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Phone Number</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="(032) 401-2222"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Email Address</label><input id="fac-email" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="email" value="{{ $user->usr_email }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Phone Number</label><input id="fac-phone" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_phone_number }}"></div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Office Location</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="Room 205, ICT Building"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Department</label><input class="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-[13px] text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="BSIS" readonly></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Office Location</label><input id="fac-address" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_address }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Department</label><input class="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2.5 text-[13px] text-slate-900 outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" value="{{ $faculty->program->dept_name ?? $faculty->department->college_name ?? 'Not assigned' }}" readonly></div>
                 </div>
-                <div class="mb-4 flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Bio / About</label><textarea class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" rows="3">Faculty member handling Programming and Systems subjects. Bachelor of Science in Computer Science, CTU.</textarea></div>
+                <div class="mb-4 flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Bio / About</label><textarea id="fac-bio" class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" rows="3">{{ $faculty->fac_bio }}</textarea></div>
                 <div class="flex justify-end">
-                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="showToast('Contact details saved!')">Save Changes</button>
+                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSaveContact()">Save Changes</button>
                 </div>
               </div>
             </div>
@@ -122,13 +128,13 @@
                     <div class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Update your account password</div>
                   </div>
                 </div>
-                <div class="mb-3.5 flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Current Password</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" placeholder="••••••••"></div>
+                <div class="mb-3.5 flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Current Password</label><input id="fac-current-password" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" autocomplete="current-password" placeholder="••••••••"></div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">New Password</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" placeholder="Min. 8 characters"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Confirm New Password</label><input class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" placeholder="Re-enter new password"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">New Password</label><input id="fac-new-password" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" autocomplete="new-password" placeholder="Min. 8 characters"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Confirm New Password</label><input id="fac-new-password-confirmation" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="password" autocomplete="new-password" placeholder="Re-enter new password"></div>
                 </div>
                 <div class="mt-1 flex justify-end">
-                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="showToast('Password updated successfully!')">Update Password</button>
+                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facUpdatePassword()">Update Password</button>
                 </div>
               </div>
               <div class="rounded-[14px] border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
@@ -139,20 +145,20 @@
                   </div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Session Timeout</label><select class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
-                      <option>15 minutes</option>
-                      <option selected>30 minutes</option>
-                      <option>1 hour</option>
-                      <option>Never</option>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Session Timeout</label><select id="fac-session-timeout" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
+                      <option value="15" @selected($sessionTimeout===15)>15 minutes</option>
+                      <option value="30" @selected($sessionTimeout===30)>30 minutes</option>
+                      <option value="60" @selected($sessionTimeout===60)>1 hour</option>
+                      <option value="999999" @selected($sessionTimeout===999999)>Never</option>
                     </select></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Max Login Attempts</label><select class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
-                      <option>3</option>
-                      <option selected>5</option>
-                      <option>10</option>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Max Login Attempts</label><select id="fac-max-login-attempts" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900">
+                      <option value="3" @selected($maxLoginAttempts===3)>3</option>
+                      <option value="5" @selected($maxLoginAttempts===5)>5</option>
+                      <option value="10" @selected($maxLoginAttempts===10)>10</option>
                     </select></div>
                 </div>
                 <div class="mt-1 flex justify-end">
-                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="showToast('Security settings saved!')">Save Changes</button>
+                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSaveSecuritySettings()">Save Changes</button>
                 </div>
               </div>
             </div>
@@ -172,32 +178,32 @@
                       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">Schedule Updates</div>
                       <div class="mt-0.5 text-xs text-slate-400">When your schedule is modified</div>
                     </div>
-                    <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                    <label class="toggle-switch"><input id="fac-notif-schedule" type="checkbox" @checked($notificationPreferences['faculty_notif_schedule_updates']) onchange="toggleSwitch(this)"><span class="toggle-track {{ $notificationPreferences['faculty_notif_schedule_updates'] ? 'on' : '' }}"><span class="toggle-thumb"></span></span></label>
                   </div>
                   <div class="flex items-center justify-between rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
                     <div>
                       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">New Assignments</div>
                       <div class="mt-0.5 text-xs text-slate-400">When a new subject is assigned to you</div>
                     </div>
-                    <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                    <label class="toggle-switch"><input id="fac-notif-assignments" type="checkbox" @checked($notificationPreferences['faculty_notif_new_assignments']) onchange="toggleSwitch(this)"><span class="toggle-track {{ $notificationPreferences['faculty_notif_new_assignments'] ? 'on' : '' }}"><span class="toggle-thumb"></span></span></label>
                   </div>
                   <div class="flex items-center justify-between rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
                     <div>
                       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">Reminders</div>
                       <div class="mt-0.5 text-xs text-slate-400">Deadlines and important announcements</div>
                     </div>
-                    <label class="toggle-switch"><input type="checkbox" checked onchange="toggleSwitch(this)"><span class="toggle-track on"><span class="toggle-thumb"></span></span></label>
+                    <label class="toggle-switch"><input id="fac-notif-reminders" type="checkbox" @checked($notificationPreferences['faculty_notif_reminders']) onchange="toggleSwitch(this)"><span class="toggle-track {{ $notificationPreferences['faculty_notif_reminders'] ? 'on' : '' }}"><span class="toggle-thumb"></span></span></label>
                   </div>
                   <div class="flex items-center justify-between rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
                     <div>
                       <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">System Announcements</div>
                       <div class="mt-0.5 text-xs text-slate-400">General system updates and messages</div>
                     </div>
-                    <label class="toggle-switch"><input type="checkbox" onchange="toggleSwitch(this)"><span class="toggle-track"><span class="toggle-thumb"></span></span></label>
+                    <label class="toggle-switch"><input id="fac-notif-announcements" type="checkbox" @checked($notificationPreferences['faculty_notif_system_announcements']) onchange="toggleSwitch(this)"><span class="toggle-track {{ $notificationPreferences['faculty_notif_system_announcements'] ? 'on' : '' }}"><span class="toggle-thumb"></span></span></label>
                   </div>
                 </div>
                 <div class="mt-4 flex justify-end">
-                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="showToast('Notification preferences saved!')">Save Preferences</button>
+                  <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSaveNotificationPreferences()">Save Preferences</button>
                 </div>
               </div>
             </div>
@@ -1055,7 +1061,6 @@
       } else {
         track.classList.remove('on');
       }
-      showToast('Notification preference updated!');
     }
 
     function openEditRoom(name, type, capacity, status, location, facilities) {
@@ -1525,6 +1530,135 @@
     }
 
     // ── FACULTY SETTINGS ───────────────────────────────────────────────────────
+    @php
+    $facSettingsEndpoints = [
+      'avatarUpdate' => route('faculty.profile.avatar.update'),
+      'avatarRemove' => route('faculty.profile.avatar.remove'),
+      'personalInfo' => route('faculty.profile.personal-info.update'),
+      'contact' => route('faculty.profile.contact.update'),
+      'password' => route('faculty.profile.password.update'),
+      'security' => route('faculty.security.update'),
+      'notifications' => route('faculty.profile.notification-preferences.update'),
+    ];
+    @endphp
+    const FAC_SETTINGS_ENDPOINTS = @json($facSettingsEndpoints);
+
+    async function facRequest(url, method, data) {
+      const headers = {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+      };
+      let body = data;
+
+      if (data && !(data instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify(data);
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers,
+        body
+      });
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error('The server returned an unexpected response. Please try again.');
+      }
+
+      if (!response.ok) {
+        const validationMessage = result.errors ? Object.values(result.errors).flat()[0] : null;
+        throw new Error(validationMessage || result.message || 'Unable to save your settings.');
+      }
+
+      return result;
+    }
+
+    async function facSaveRequest(url, data, successMessage) {
+      try {
+        await facRequest(url, 'PUT', data);
+        showToast(successMessage);
+      } catch (error) {
+        showToast(error.message);
+      }
+    }
+
+    function facSavePersonalInfo() {
+      return facSaveRequest(FAC_SETTINGS_ENDPOINTS.personalInfo, {
+        fac_first_name: document.getElementById('fac-first-name').value.trim(),
+        fac_last_name: document.getElementById('fac-last-name').value.trim(),
+        fac_middle_name: document.getElementById('fac-middle-name').value.trim(),
+        fac_suffix: document.getElementById('fac-suffix').value.trim(),
+        fac_employee_id: document.getElementById('fac-employee-id').value.trim(),
+        fac_gender: document.getElementById('fac-gender').value,
+        fac_civil_status: document.getElementById('fac-civil-status').value,
+        fac_dob: document.getElementById('fac-dob').value,
+        fac_nationality: document.getElementById('fac-nationality').value.trim(),
+      }, 'Personal information saved.');
+    }
+
+    function facSaveContact() {
+      return facSaveRequest(FAC_SETTINGS_ENDPOINTS.contact, {
+        usr_email: document.getElementById('fac-email').value.trim(),
+        fac_phone_number: document.getElementById('fac-phone').value.trim(),
+        fac_address: document.getElementById('fac-address').value.trim(),
+        fac_bio: document.getElementById('fac-bio').value.trim(),
+      }, 'Contact details saved.');
+    }
+
+    async function facUpdatePassword() {
+      const currentPassword = document.getElementById('fac-current-password');
+      const newPassword = document.getElementById('fac-new-password');
+      const confirmation = document.getElementById('fac-new-password-confirmation');
+
+      try {
+        await facRequest(FAC_SETTINGS_ENDPOINTS.password, 'PUT', {
+          current_password: currentPassword.value,
+          new_password: newPassword.value,
+          new_password_confirmation: confirmation.value,
+        });
+        currentPassword.value = '';
+        newPassword.value = '';
+        confirmation.value = '';
+        showToast('Password updated successfully.');
+      } catch (error) {
+        showToast(error.message);
+      }
+    }
+
+    function facSaveSecuritySettings() {
+      return facSaveRequest(FAC_SETTINGS_ENDPOINTS.security, {
+        usr_session_timeout_minutes: Number(document.getElementById('fac-session-timeout').value),
+        usr_max_login_attempts: Number(document.getElementById('fac-max-login-attempts').value),
+      }, 'Security settings saved.');
+    }
+
+    function facSaveNotificationPreferences() {
+      return facSaveRequest(FAC_SETTINGS_ENDPOINTS.notifications, {
+        faculty_notif_schedule_updates: document.getElementById('fac-notif-schedule').checked,
+        faculty_notif_new_assignments: document.getElementById('fac-notif-assignments').checked,
+        faculty_notif_reminders: document.getElementById('fac-notif-reminders').checked,
+        faculty_notif_system_announcements: document.getElementById('fac-notif-announcements').checked,
+      }, 'Notification preferences saved.');
+    }
+
+    function facRenderAvatar(url) {
+      const preview = document.getElementById('fac-pic-preview');
+      preview.replaceChildren();
+      if (url) {
+        const image = document.createElement('img');
+        image.src = url;
+        image.alt = 'Profile photo';
+        image.className = 'h-full w-full object-cover';
+        preview.appendChild(image);
+      } else {
+        preview.textContent = preview.dataset.initials;
+      }
+      preview.dataset.avatarUrl = url || '';
+    }
+
     function showFacSettingsSection(section, el) {
       ['profile', 'security', 'notifications'].forEach(s => {
         const elem = document.getElementById('fac-settings-' + s);
@@ -1540,22 +1674,31 @@
       el.classList.add(...activeClasses);
     }
 
-    function facPreviewPic(input) {
+    async function facPreviewPic(input) {
       if (!input.files || !input.files[0]) return;
-      const reader = new FileReader();
-      reader.onload = e => {
-        const p = document.getElementById('fac-pic-preview');
-        p.innerHTML = `<img src="${e.target.result}" class="h-full w-full object-cover">`;
-        showToast('Profile photo updated!');
-      };
-      reader.readAsDataURL(input.files[0]);
+      const formData = new FormData();
+      formData.append('avatar', input.files[0]);
+
+      try {
+        const result = await facRequest(FAC_SETTINGS_ENDPOINTS.avatarUpdate, 'POST', formData);
+        facRenderAvatar(result.url);
+        showToast('Profile photo updated.');
+      } catch (error) {
+        showToast(error.message);
+      } finally {
+        input.value = '';
+      }
     }
 
-    function facResetPic() {
-      const p = document.getElementById('fac-pic-preview');
-      if (p) p.innerHTML = 'JB';
-      document.getElementById('fac-pic-upload').value = '';
-      showToast('Profile photo removed.');
+    async function facResetPic() {
+      try {
+        await facRequest(FAC_SETTINGS_ENDPOINTS.avatarRemove, 'DELETE');
+        facRenderAvatar('');
+        document.getElementById('fac-pic-upload').value = '';
+        showToast('Profile photo removed.');
+      } catch (error) {
+        showToast(error.message);
+      }
     }
 
     // ── FACULTY QUOTES ─────────────────────────────────────────────────────────
