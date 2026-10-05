@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use App\Http\Controllers\Dean\DeanDepartmentController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
@@ -11,18 +10,6 @@ use App\Http\Controllers\Dean\NotificationController;
 use App\Http\Controllers\Dean\ScheduleReportsController;
 use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Admin\AdminProfileController;
-
-/*
-|--------------------------------------------------------------------------
-| LOGIN / LOGOUT
-|--------------------------------------------------------------------------
-*/
-Route::get('/login', function () {
-    return view('index');
-})->name('login');
-
-Route::post('/login',  [LoginController::class, 'login'])->name('login.authenticate');
-Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------

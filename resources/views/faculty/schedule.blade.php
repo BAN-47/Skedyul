@@ -1,306 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="csrf-token" content="{{ csrf_token() }}">
-@vite(['resources/css/app.css', 'resources/js/app.js'])
-<title>SKEDYUL — My Schedule</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>SKEDYUL — My Schedule</title>
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
+  <style>
+    @media print {
+      @page { size: landscape; margin: 10mm; }
+      body { background:#fff !important; color:#111827 !important; overflow:visible !important; }
+      .sidebar, .topbar, .no-print { display:none !important; }
+      #screen-app, .main, .page, .page-content { display:block !important; width:100% !important; height:auto !important; max-height:none !important; overflow:visible !important; margin:0 !important; padding:0 !important; }
+      .schedule-layout { grid-template-columns:260px minmax(0,1fr) !important; gap:8px !important; }
+      .schedule-scroll { overflow:visible !important; }
+      .schedule-min-width { min-width:0 !important; }
+      .print-card { break-inside:avoid; box-shadow:none !important; }
+      .signature-card { break-inside:avoid; margin-top:12px !important; }
+      a { color:inherit !important; text-decoration:none !important; }
+    }
+  </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-<div id="screen-app" class="screen active flex-row">
+<body class="bg-slate-50 font-sans text-slate-900">
+  @php
+    $days = $days ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    $shift = $shift ?? 'day';
+    $gridStart = $shift === 'night' ? 16 * 60 : 7 * 60;
+    $gridEnd = $shift === 'night' ? 21 * 60 : 16 * 60;
+    $slotMinutes = 30;
+    $slotCount = intdiv($gridEnd - $gridStart, $slotMinutes);
+    $showNoonBreak = $shift === 'day';
+    $signatories = $signatories ?? [];
+  @endphp
 
-  @include('partials.facultyMember_sidebar')
+  <div id="screen-app" class="screen active flex-row">
+    @include('partials.facultyMember_sidebar')
 
-  <!-- Main -->
-  <div class="main">
-
-    @php
-      // Flatten $schedules into the shape faculty_header.blade.php expects
-      // for its "Today's Schedule" notification feed.
-      $scheduleForJs = [];
-      foreach (($schedules ?? collect()) as $sch) {
-        $scheduleForJs[] = [
-          'code'  => $sch->subject->subj_code ?? 'N/A',
-          'room'  => $sch->room->room_name ?? 'N/A',
-          'day'   => $sch->sch_day ?? '',
-          'start' => \Carbon\Carbon::parse($sch->sch_start_time)->format('H:i'),
-          'end'   => \Carbon\Carbon::parse($sch->sch_end_time)->format('H:i'),
-        ];
-      }
-    @endphp
-
-    @include('partials.faculty_header', [
+    <div class="main">
+      @php
+        $scheduleFeed = $allSchedules->map(fn ($schedule) => [
+          'code' => $schedule->subject->course_code ?? 'N/A',
+          'room' => $schedule->room->room_name ?? 'N/A',
+          'day' => $schedule->sch_day ?? '',
+          'start' => \Illuminate\Support\Carbon::parse($schedule->sch_start_time)->format('H:i'),
+          'end' => \Illuminate\Support\Carbon::parse($schedule->sch_end_time)->format('H:i'),
+        ])->values()->all();
+      @endphp
+      @include('partials.faculty_header', [
         'title' => 'My Schedule',
-        'scheduleFeed' => $scheduleForJs,
+        'scheduleFeed' => $scheduleFeed,
         'announcements' => $announcements ?? null,
-    ])
+      ])
 
-    <!-- FACULTY SCHEDULE PAGE -->
-    <div id="page-faculty-schedule" class="page active">
-
-      <!-- Currently Using Room -->
-      <div class="card mb-5">
-        <div class="card-header">
-          <div><div class="card-title">Currently Using Room</div><div class="card-sub">Live session status</div></div>
-          <span class="badge {{ $currentSchedule ? 'badge-green' : 'badge-grey' }}">
-            {{ $currentSchedule ? 'Now in Session' : 'No Active Class' }}
-          </span>
+      <main class="page-content" id="page-faculty-schedule">
+        <div class="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 class="text-xl font-extrabold text-slate-900">My Teaching Schedule</h1>
+            <p class="mt-1 text-sm text-slate-500">View-only schedule and course summary for {{ $activeSemester->label ?? 'the active semester' }}.</p>
+          </div>
+          <button type="button" onclick="window.print()" class="btn btn-secondary">Print Schedule</button>
         </div>
 
-        @if ($currentSchedule)
-          <div class="flex items-start justify-between gap-4 rounded-xl bg-gradient-to-br from-slate-900 to-blue-900 p-5"
-               data-start="{{ $currentSchedule->sch_start_time }}" data-end="{{ $currentSchedule->sch_end_time }}" id="live-room-block">
-            <div>
-              <div class="mb-1.5 text-[10px] font-bold uppercase tracking-[1.2px] text-white/40">Now in Session</div>
-              <div class="text-[22px] font-extrabold text-white">{{ $currentSchedule->room->room_name ?? 'N/A' }}</div>
-              <div class="mt-0.5 text-sm text-white/60">{{ $currentSchedule->subject->subj_code ?? '' }} — {{ $currentSchedule->subject->subj_name ?? 'N/A' }}</div>
-              <div class="mt-0.5 text-xs text-white/40">{{ $currentSchedule->section->sec_name ?? 'N/A' }} · {{ $currentSchedule->sch_start_time }}–{{ $currentSchedule->sch_end_time }}</div>
-              <div class="mt-3.5">
-                <div class="mb-1 flex justify-between text-[11px] text-white/40">
-                  <span>{{ $currentSchedule->sch_start_time }}</span><span>{{ $currentSchedule->sch_end_time }}</span>
+        <div class="schedule-layout grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside class="print-card card !p-0 self-start overflow-hidden">
+            <div class="bg-blue-600 px-3 py-2.5 text-center text-[12px] font-extrabold tracking-wide text-white">
+              Summary of Courses
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-[10px]">
+                <thead>
+                  <tr class="bg-slate-100 text-left text-[9px] font-bold uppercase text-slate-600">
+                    <th class="border-b border-slate-200 px-1.5 py-2">Course Code</th>
+                    <th class="border-b border-l border-slate-200 px-1.5 py-2">Descriptive Title</th>
+                    <th class="border-b border-l border-slate-200 px-1.5 py-2">Degree Yr. &amp; Sec.</th>
+                    <th class="border-b border-l border-slate-200 px-1.5 py-2 text-center">Students</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @forelse($courseRows as $schedule)
+                    @php
+                      $course = $schedule->subject;
+                      $section = $schedule->section;
+                    @endphp
+                    <tr class="border-b border-slate-100 text-slate-700">
+                      <td class="whitespace-nowrap px-1.5 py-2 font-bold text-slate-800">{{ $course->course_code ?? '—' }}</td>
+                      <td class="border-l border-slate-100 px-1.5 py-2 leading-snug">{{ $course->course_name ?? '—' }}</td>
+                      <td class="whitespace-nowrap border-l border-slate-100 px-1.5 py-2">{{ $section->sec_name ?? '—' }}</td>
+                      <td class="border-l border-slate-100 px-1.5 py-2 text-center">{{ $section->sec_no_of_student ?? $section->sec_max_capacity ?? '—' }}</td>
+                    </tr>
+                  @empty
+                    <tr>
+                      <td colspan="4" class="px-2 py-4 text-center italic text-slate-400">No courses assigned this semester.</td>
+                    </tr>
+                  @endforelse
+                </tbody>
+              </table>
+            </div>
+
+            <div class="space-y-1.5 border-t border-slate-200 p-3 text-[11px] text-slate-700">
+              <div class="flex justify-between gap-2"><span class="font-bold">No. of Preparations:</span><span>{{ $loadStats['preparations'] ?? 0 }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">No. of Units:</span><span>{{ $loadStats['units'] ?? 0 }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">No. of Hours/Week:</span><span>{{ $loadStats['hours_week'] ?? 0 }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Administrative Designation:</span><span class="text-right">{{ $loadStats['designation'] ?: '—' }}</span></div>
+              <div class="my-1.5 border-t border-slate-100"></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Production:</span><span>{{ $loadStats['production'] ?? '—' }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Extension:</span><span>{{ $loadStats['extension'] ?? '—' }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Research:</span><span>{{ $loadStats['research'] ?? '—' }}</span></div>
+            </div>
+          </aside>
+
+          <section class="print-card card !p-0 overflow-hidden">
+            <div class="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div class="inline-flex min-w-[220px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
+                  {{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}
+                </span>
+                <span class="min-w-0">
+                  <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing my schedule</span>
+                  <span class="block truncate text-[13px] font-semibold text-slate-800">{{ $faculty->full_name }}</span>
+                </span>
+              </div>
+
+              <span class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">
+                {{ $activeSemester->label ?? 'No active semester' }}
+              </span>
+
+              <div class="flex overflow-hidden rounded-lg border border-slate-300" aria-label="Schedule shift">
+                <a href="{{ route('faculty.schedule', ['shift' => 'day']) }}" class="px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Day</a>
+                <a href="{{ route('faculty.schedule', ['shift' => 'night']) }}" class="border-l border-slate-300 px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Night</a>
+              </div>
+
+              <span class="ml-auto text-[11px] italic text-slate-400">View only</span>
+            </div>
+
+            <div class="schedule-scroll overflow-x-auto">
+              <div class="schedule-min-width min-w-[840px]">
+                <div class="grid border-b border-slate-200 bg-slate-100" style="grid-template-columns:90px repeat({{ count($days) }},minmax(0,1fr));">
+                  <div class="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">Time</div>
+                  @foreach($days as $day)
+                    <div class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">{{ $day }}</div>
+                  @endforeach
                 </div>
-                <div class="h-1.5 w-[280px] max-w-full overflow-hidden rounded-full bg-white/10">
-                  <div id="web-room-progress" class="h-full w-0 rounded-full bg-green-400 transition-[width] duration-1000"></div>
+
+                <div id="faculty-week-grid" class="relative grid bg-white" style="grid-template-columns:90px repeat({{ count($days) }},minmax(0,1fr)); grid-template-rows:repeat({{ $slotCount }},26px);">
+                  @for($slot = 0; $slot < $slotCount; $slot += 2)
+                    @php
+                      $minutes = $gridStart + ($slot * $slotMinutes);
+                      $hour = \Illuminate\Support\Carbon::createFromTime(intdiv($minutes, 60), 0);
+                      $hourEnd = (clone $hour)->addHour();
+                    @endphp
+                    <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500" style="grid-column:1;grid-row:{{ $slot + 1 }} / span 2;">
+                      {{ $hour->format('g') }}–{{ $hourEnd->format('g A') }}
+                    </div>
+                  @endfor
+
+                  @for($slot = 0; $slot < $slotCount; $slot++)
+                    @php $minutes = $gridStart + ($slot * $slotMinutes); @endphp
+                    @foreach($days as $dayIndex => $day)
+                      <div class="border-b border-l border-slate-100 {{ $minutes % 60 === 0 ? '!border-b-slate-200' : '' }}" style="grid-column:{{ $dayIndex + 2 }};grid-row:{{ $slot + 1 }};"></div>
+                    @endforeach
+                  @endfor
+
+                  @if($showNoonBreak)
+                    <div class="pointer-events-none z-10 flex items-center justify-center bg-slate-900 text-[11px] font-bold tracking-[3px] text-white" style="grid-column:2 / span {{ count($days) }};grid-row:11 / span 2;">NOON BREAK</div>
+                  @endif
+
+                  @foreach($schedules as $schedule)
+                    @php
+                      $dayIndex = array_search($schedule->sch_day, $days, true);
+                      if ($dayIndex === false) continue;
+                      $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                      $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                      $startMinutes = max(($start->hour * 60) + $start->minute, $gridStart);
+                      $endMinutes = min(($end->hour * 60) + $end->minute, $gridEnd);
+                      if ($endMinutes <= $startMinutes) continue;
+                      $row = intdiv($startMinutes - $gridStart, $slotMinutes) + 1;
+                      $span = max(1, (int) ceil(($endMinutes - $startMinutes) / $slotMinutes));
+                      $course = $schedule->subject;
+                    @endphp
+                    <article class="z-20 m-[3px] flex flex-col items-center justify-center overflow-hidden rounded-md border border-emerald-600 bg-emerald-500 px-1.5 py-1 text-center leading-tight text-white shadow-sm" style="grid-column:{{ $dayIndex + 2 }};grid-row:{{ $row }} / span {{ $span }};">
+                      <strong class="text-[12px] font-extrabold tracking-wide">{{ $course->course_code ?? '—' }}</strong>
+                      <span class="mt-1 text-[10px] font-semibold">{{ $schedule->section->sec_name ?? 'Section' }}</span>
+                      <span class="text-[10px]">{{ $schedule->room->room_name ?? 'Room not set' }}</span>
+                      <span class="mt-1 text-[9px] font-medium opacity-90">{{ $course->course_name ?? '' }}</span>
+                    </article>
+                  @endforeach
                 </div>
               </div>
             </div>
-            <div class="shrink-0 text-right">
-              <div class="mb-1.5 text-[11px] text-white/40">Time Remaining</div>
-              <div id="web-room-countdown" class="font-mono text-4xl font-extrabold tracking-[2px] text-green-400">--:--</div>
-              <div class="mt-0.5 text-[11px] text-white/30">min : sec</div>
-            </div>
-          </div>
-          <div class="mt-3.5 flex items-center gap-3 border-t border-slate-200 pt-3.5 dark:border-slate-800">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-[13px] font-extrabold text-white">
-              {{ strtoupper(substr($faculty->fac_first_name,0,1) . substr($faculty->fac_last_name,0,1)) }}
-            </div>
-            <div><div class="text-[13px] font-bold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div><div class="text-[11px] text-slate-400">Assigned Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div></div>
-            <span class="badge badge-green ml-auto">Active</span>
-          </div>
 
-          @if ($nextInRoom)
-            <div class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
-              <div class="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Next Class in this Room</div>
-              <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $nextInRoom->subject->subj_code ?? '' }} — {{ $nextInRoom->subject->subj_name ?? 'N/A' }}</div>
-              <div class="mt-0.5 text-[11px] text-slate-400">{{ $nextInRoom->sch_start_time }} · {{ $nextInRoom->section->sec_name ?? 'N/A' }}</div>
-            </div>
-          @endif
-        @else
-          <div class="p-6 text-center text-[13px] text-slate-400">
-            You don't have a class in session right now.
-          </div>
-        @endif
-      </div>
-
-      <!-- Weekly Overview with clickable events -->
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <div class="mb-4">
-          <div class="text-base font-bold text-gray-900">Weekly Overview</div>
-          <div class="text-xs text-gray-500 mt-0.5">{{ $activeSemester->sem_name ?? 'Current Semester' }} · Click any subject to view details</div>
-        </div>
-        <div class="overflow-auto">
-          <div class="grid min-w-[700px] grid-cols-[80px_repeat(6,minmax(0,1fr))] gap-px overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-700">
-            <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">Time</div>
-            @foreach ($weekDays as $day)
-              <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">{{ $day }}</div>
-            @endforeach
-
-            @php
-              $colorCycle = ['blue', 'amber', 'green', 'teal', 'purple'];
-              $subjectColors = [];
-              $colorIndex = 0;
-            @endphp
-
-            @forelse ($allTimes as $time)
-              <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">{{ \Carbon\Carbon::createFromTimeString($time)->format('g:i') }}</div>
-              @foreach ($weekDays as $day)
-                @php
-                  $sch = $byDay[$day]->firstWhere('sch_start_time', $time);
-                  if ($sch) {
-                    $subjId = $sch->sch_subj_id;
-                    if (!isset($subjectColors[$subjId])) {
-                      $subjectColors[$subjId] = $colorCycle[$colorIndex % count($colorCycle)];
-                      $colorIndex++;
-                    }
-                    $color = $subjectColors[$subjId];
-                  }
-                @endphp
-                <div class="relative min-h-[52px] bg-white p-1 dark:bg-slate-900">
-                  @if ($sch)
-                    @php
-                      $eventColorClasses = [
-                        'blue' => 'border-blue-600 bg-blue-100 text-blue-900',
-                        'amber' => 'border-amber-600 bg-amber-100 text-amber-900',
-                        'green' => 'border-green-600 bg-green-100 text-green-900',
-                        'teal' => 'border-cyan-600 bg-cyan-100 text-cyan-900',
-                        'purple' => 'border-violet-600 bg-violet-100 text-violet-900',
-                      ][$color];
-                    @endphp
-                    <div class="subject-event flex h-full cursor-pointer flex-col justify-center rounded-md border-l-[3px] px-2 py-1.5 text-[11px] font-semibold leading-tight {{ $eventColorClasses }}"
-                         data-code="{{ $sch->subject->subj_code ?? '' }}"
-                         data-name="{{ $sch->subject->subj_name ?? '' }}"
-                         data-units="{{ $sch->subject->subj_units ?? '' }}"
-                         data-lec="{{ $sch->subject->subj_lec_hours ?? 0 }}"
-                         data-lab="{{ $sch->subject->subj_lab_hours ?? 0 }}"
-                         data-dept="{{ $faculty->department->dept_code ?? '' }}"
-                         data-room="{{ $sch->room->room_name ?? 'N/A' }}"
-                         data-section="{{ $sch->section->sec_name ?? 'N/A' }}"
-                         data-schedule="{{ $sch->sch_day }} {{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}">
-                      <b>{{ $sch->subject->subj_code ?? '' }}</b>
-                      <span>{{ $sch->room->room_name ?? '' }} · {{ $sch->section->sec_name ?? '' }}</span>
-                    </div>
-                  @endif
-                </div>
-              @endforeach
-            @empty
-              <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">—</div>
-              @foreach ($weekDays as $day)
-                <div class="relative min-h-[52px] bg-white p-1 dark:bg-slate-900"></div>
-              @endforeach
-            @endforelse
-          </div>
+            @if($schedules->isEmpty())
+              <div class="border-t border-slate-100 px-4 py-3 text-center text-[12px] text-slate-500">
+                {{ $activeSemester ? 'No ' . $shift . '-shift classes are assigned to you this semester.' : 'There is no active semester.' }}
+              </div>
+            @endif
+          </section>
         </div>
 
-        <!-- Legend -->
-        <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3.5 dark:border-slate-800">
-          @foreach ($schedules->unique('sch_subj_id') as $sch)
-            <div class="flex items-center gap-1.5 text-xs">
-              <div class="h-3 w-3 rounded-sm border-l-[3px] border-blue-600 bg-blue-100"></div>
-              {{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? '' }}
-            </div>
-          @endforeach
-          <div class="ml-auto text-xs text-slate-400">Click any subject block to view details</div>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- end .main -->
-</div><!-- end #screen-app -->
-
-<!-- FACULTY SUBJECT DETAIL MODAL -->
-<div class="modal-overlay" id="modal-web-subject-detail">
-  <div class="modal w-[480px] max-w-[92vw] bg-white p-6 dark:bg-slate-900">
-    <div class="modal-header">
-      <div class="modal-title">Subject Details</div>
-      <button class="modal-close" onclick="closeModal('modal-web-subject-detail')">✕</button>
-    </div>
-    <div id="wsd-header" class="mb-[18px] rounded-xl bg-gradient-to-br from-blue-600 to-slate-900 px-[18px] py-4">
-      <div id="wsd-code" class="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/60"></div>
-      <div id="wsd-name" class="text-xl font-extrabold text-white"></div>
-    </div>
-    <div class="mb-3.5 grid grid-cols-2 gap-3">
-      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Units</div>
-        <div id="wsd-units" class="text-[26px] font-extrabold text-slate-900 dark:text-slate-100"></div>
-      </div>
-      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Hours</div>
-        <div id="wsd-hours" class="mt-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
-      </div>
-      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Room</div>
-        <div id="wsd-room" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
-      </div>
-      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Section</div>
-        <div id="wsd-section" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
-      </div>
-    </div>
-    <div class="mb-3 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Schedule</div>
-      <div id="wsd-schedule" class="text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
-    </div>
-    <div class="mb-[18px] rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
-      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Faculty</div>
-      <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
-      <div class="mt-0.5 text-[11px] text-slate-400">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
-    </div>
-
-    <div class="flex justify-end gap-2 mt-2">
-      <button class="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200" onclick="closeModal('modal-web-subject-detail')">Close</button>
+        <section class="signature-card card mt-4 overflow-x-auto print-card">
+          <table class="w-full min-w-[720px] border-collapse text-center text-[12px]">
+            <thead>
+              <tr class="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                <th class="w-1/3 border-b border-slate-300 px-4 py-2">Prepared by:</th>
+                <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Reviewed, Certified True and Correct:</th>
+                <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Approved by:</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="px-4 pb-3 pt-8 align-bottom">
+                  <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['chair_name'] ?: '—' }}</div>
+                  <div class="pt-1 text-slate-600">{{ $signatories['chair_title'] ?? 'Department Chair' }}</div>
+                </td>
+                <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">
+                  <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['dean_name'] ?: '—' }}</div>
+                  <div class="pt-1 text-slate-600">{{ $signatories['dean_title'] ?? 'Dean, CCICT' }}</div>
+                </td>
+                <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">
+                  <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['campus_director'] ?: '—' }}</div>
+                  <div class="pt-1 text-slate-600">Campus Director</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </main>
     </div>
   </div>
-</div>
-
-<!-- TOAST (Tailwind) -->
-<div class="toast fixed bottom-6 right-6 z-[300] bg-gray-900 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-lg opacity-0 translate-y-2 pointer-events-none transition-all duration-300 [&.show]:opacity-100 [&.show]:translate-y-0 [&.show]:pointer-events-auto" id="toast">✅ <span id="toast-msg"></span></div>
-
-<script>
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
-});
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, schedule) {
-  document.getElementById('wsd-code').textContent = code + ' · ' + dept;
-  document.getElementById('wsd-name').textContent = name;
-  document.getElementById('wsd-units').textContent = units + 'u';
-  document.getElementById('wsd-hours').textContent = lec + 'h Lecture' + (parseInt(lab) > 0 ? ' · ' + lab + 'h Lab' : '');
-  document.getElementById('wsd-room').textContent = room;
-  document.getElementById('wsd-section').textContent = section;
-  document.getElementById('wsd-schedule').textContent = schedule;
-  openModal('modal-web-subject-detail');
-}
-
-// Wire up subject blocks via data attributes (avoids quote-escaping issues)
-document.querySelectorAll('.subject-event').forEach(el => {
-  el.addEventListener('click', () => {
-    openWebSubjectDetail(
-      el.dataset.code, el.dataset.name, el.dataset.units, el.dataset.lec,
-      el.dataset.lab, el.dataset.dept, el.dataset.room, el.dataset.section,
-      el.dataset.schedule
-    );
-  });
-});
-
-// ── LIVE ROOM COUNTDOWN (real start/end from server) ────────────────────
-function startWebRoomCountdown() {
-  const block = document.getElementById('live-room-block');
-  if (!block) return; // no active session right now
-
-  const [sh, sm] = block.dataset.start.split(':').map(Number);
-  const [eh, em] = block.dataset.end.split(':').map(Number);
-  const start = new Date(); start.setHours(sh, sm, 0, 0);
-  const end = new Date(); end.setHours(eh, em, 0, 0);
-
-  function tick() {
-    const cur = new Date();
-    const remaining = end - cur;
-    const total = end - start;
-    const el = document.getElementById('web-room-countdown');
-    const prog = document.getElementById('web-room-progress');
-    if (!el) return;
-    if (remaining <= 0) {
-      el.textContent = '00:00';
-      el.classList.remove('text-amber-300', 'text-green-400');
-      el.classList.add('text-red-400');
-      if (prog) prog.style.width = '100%';
-      return;
-    }
-    const mins = Math.floor(remaining / 60000);
-    const secs = Math.floor((remaining % 60000) / 1000);
-    el.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-    el.classList.remove('text-red-400', 'text-amber-300', 'text-green-400');
-    el.classList.add(mins < 5 ? 'text-red-400' : mins < 15 ? 'text-amber-300' : 'text-green-400');
-    if (prog) prog.style.width = Math.min(100, Math.max(0, ((cur - start) / total) * 100)) + '%';
-  }
-  tick();
-  setInterval(tick, 1000);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  startWebRoomCountdown();
-});
-</script>
 </body>
+
 </html>

@@ -24,12 +24,15 @@ class LoginController extends Controller
             'password' => 'required'
         ]);
 
-        $user = User::where('usr_email', $request->email)
-            ->where('usr_is_active', true)
+        $user = User::whereRaw('LOWER(usr_email) = ?', [strtolower(trim($request->email))])
             ->first();
 
         if (!$user) {
             return back()->with('error', 'Account not found.');
+        }
+
+        if (!$user->usr_is_active) {
+            return back()->with('error', 'Your account is awaiting administrator approval or has been deactivated. Please contact the administrator.');
         }
 
         if ($user->usr_locked_until && $user->usr_locked_until->isFuture()) {

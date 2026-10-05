@@ -62,6 +62,12 @@ class Faculty extends Model
     {
         return $this->belongsTo(College::class, 'fac_college_id', 'college_id');
     }
+
+    public function college()
+    {
+        return $this->belongsTo(College::class, 'fac_college_id', 'college_id');
+    }
+
     public function program()
     {
         return $this->belongsTo(Departments::class, 'fac_dept_id', 'dept_id');

@@ -43,6 +43,8 @@
 
                 ['admin.users', route('admin.users'), '', 'User Accounts'],
 
+                ['admin.pending-accounts', route('admin.pending-accounts'), '', 'Pending Account Approval'],
+
                 ['subject.index', route('subject.index'), '', 'Courses'],
 
                 ['admin.rooms', route('admin.rooms'), '', 'Rooms'],

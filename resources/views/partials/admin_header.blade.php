@@ -71,10 +71,30 @@ function renderNotifList(notifications) {
     };
 
     list.innerHTML = notifications.map(n => `
-        <div class="notif-drop-item ${!n.notif_is_read ? 'unread' : ''}" onclick="markRead('${n.notif_id}', this)">
+        <div class="notif-drop-item ${!n.notif_is_read ? 'unread' : ''}" role="button" tabindex="0" onclick="openAdminNotification('${n.notif_id}', '${n.notif_type}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAdminNotification('${n.notif_id}', '${n.notif_type}')}" style="cursor:pointer">
             <div class="notif-drop-dot" style="background:${dotColors[n.notif_type] || '#94a3b8'};"></div>
             <div><div class="notif-drop-text"><b>${n.notif_title}</b> — ${n.notif_message}</div><div class="notif-drop-time">${formatNotifTime(n.notif_created_at)}</div></div>
         </div>`).join('');
+}
+
+function openAdminNotification(id, type) {
+    const request = fetch(`/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        },
+    }).catch(() => null);
+
+    if (type === 'new_user') {
+        request.finally(() => window.location.assign('{{ route("admin.pending-accounts") }}'));
+        return;
+    }
+
+    request.finally(() => {
+        loadNotifications();
+        updateNotifCount();
+    });
 }
 
 function formatNotifTime(isoString) {

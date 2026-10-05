@@ -5,9 +5,11 @@ use Illuminate\Support\Facades\DB;
 
 // Controllers
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\PendingFacultyAccountController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\RoomController;
 use App\Http\Controllers\Admin\NotifController;
@@ -69,8 +71,17 @@ Route::get('/login', function () {
         };
     }
 
-    return view('index');
+    return view('index', [
+        'colleges' => \App\Models\College::orderBy('college_name')->get(),
+        'departments' => \App\Models\Departments::orderBy('dept_name')->get(),
+        'showRegister' => false,
+    ]);
 })->name('login');
+
+Route::get('/register', [RegistrationController::class, 'create'])->name('register');
+Route::post('/register', [RegistrationController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('register.store');
 
 Route::post('/login', [LoginController::class, 'login'])
     ->name('login.authenticate');
@@ -131,6 +142,18 @@ Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function (
 
     Route::get('/users', [UserController::class, 'index'])
         ->name('admin.users');
+
+    Route::get('/pending-accounts', [PendingFacultyAccountController::class, 'index'])
+        ->name('admin.pending-accounts');
+
+    Route::get('/pending-accounts/{id}/photo', [PendingFacultyAccountController::class, 'photo'])
+        ->name('admin.pending-accounts.photo');
+
+    Route::post('/pending-accounts/{id}/approve', [PendingFacultyAccountController::class, 'approve'])
+        ->name('admin.pending-accounts.approve');
+
+    Route::post('/pending-accounts/{id}/reject', [PendingFacultyAccountController::class, 'reject'])
+        ->name('admin.pending-accounts.reject');
 
     Route::get('/users/{id}/edit', [UserController::class, 'edit'])
         ->name('admin.users.edit');

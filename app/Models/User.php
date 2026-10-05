@@ -28,13 +28,9 @@ class User extends Authenticatable
         'usr_password_hash',
         'usr_role',
         'usr_is_active',
-        'usr_employee_id',
-        'usr_rank_title',
-        'usr_gender',
-        'usr_civil_status',
-        'usr_dob',
-        'usr_nationality',
     ];
+
+    // Employee ID and faculty personal details are stored on the role profile tables.
 
     /**
      * USER.usr_id is a UUID PK (non-incrementing). Generate it on create
