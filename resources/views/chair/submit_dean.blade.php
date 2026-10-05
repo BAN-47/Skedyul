@@ -22,7 +22,6 @@
 
       <div id="submit-blocked" class="mb-5 flex items-center gap-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         <div class="leading-relaxed"><strong class="font-bold">Submission Blocked</strong> — 1 unresolved conflict exists. The schedule cannot be published or sent to the Dean until all conflicts are fixed.</div>
-        <a href="{{ route('chair.conflict_checker') }}" class="ml-auto whitespace-nowrap rounded-lg bg-red-100 px-3 py-1.5 text-[12px] font-semibold text-red-600 transition hover:bg-red-200">Go Fix</a>
       </div>
 
       <div id="submit-ready" class="mb-5 hidden items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
@@ -143,12 +142,6 @@
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
-let hasConflict = true;
-const CHAIR_NOTIFS = [
-  { dot:'var(--red)', text:'<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time:'Today, 08:00 AM', unread:true },
-  { dot:'var(--blue)', text:'<b>Reminder</b> — Schedule submission deadline is Friday.', time:'Yesterday, 4:00 PM', unread:false },
-];
 
 function renderNotifList() {
   const list = document.getElementById('notif-list');
@@ -195,7 +188,7 @@ renderNotifList();
 </body>
 </html>
 
-// ── ATTEMPT SUBMIT ─────────────────────────────────────────────────────────────
+<!-- // ── ATTEMPT SUBMIT ─────────────────────────────────────────────────────────────
 function attemptSubmit() {
   if (hasConflict) {
     showToast('Cannot submit — fix the conflict first!');
@@ -225,7 +218,7 @@ function clearConflict() {
   btn.textContent = 'Submit to Dean';
   const badge = document.getElementById('submit-overall-badge');
   if (badge) { badge.textContent = 'Ready'; badge.className = 'badge badge-green'; }
-}
+} -->
 </script>
 </body>
 </html>

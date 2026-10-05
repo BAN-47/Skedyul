@@ -24,7 +24,7 @@
             <div class="stat-card-bar bg-blue-600"></div>
             <div class="stat-icon">👥</div>
             <div class="stat-label">Total Users</div>
-            <div class="stat-value">{{ $users->count() }}</div>
+            <div class="stat-value">{{ $stats['total'] ?? $users->total() }}</div>
             <div class="stat-sub">All roles combined</div>
           </div>
 
@@ -32,7 +32,7 @@
             <div class="stat-card-bar bg-green-600"></div>
             <div class="stat-icon">👨‍🏫</div>
             <div class="stat-label">Faculty</div>
-            <div class="stat-value">{{ $users->where('usr_role','faculty')->count() }}</div>
+            <div class="stat-value">{{ $stats['faculty'] ?? 0 }}</div>
             <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
           </div>
 
@@ -40,7 +40,7 @@
             <div class="stat-card-bar bg-amber-500"></div>
             <div class="stat-icon">📋</div>
             <div class="stat-label">Dept. Chairs</div>
-            <div class="stat-value">{{ $users->where('usr_role','department_chair')->count() }}</div>
+            <div class="stat-value">{{ $stats['chairs'] ?? 0 }}</div>
             <div class="stat-sub">Active this semester</div>
           </div>
 
@@ -48,8 +48,8 @@
             <div class="stat-card-bar bg-cyan-600"></div>
             <div class="stat-icon">✅</div>
             <div class="stat-label">Active Accounts</div>
-            <div class="stat-value">{{ $users->where('usr_is_active', true)->count() }}</div>
-            <div class="stat-sub">{{ $users->where('usr_is_active', false)->count() }} inactive</div>
+            <div class="stat-value">{{ $stats['active'] ?? 0 }}</div>
+            <div class="stat-sub">{{ $stats['inactive'] ?? 0 }} inactive</div>
           </div>
         </div>
 
@@ -81,126 +81,126 @@
                 </tr>
               </thead>
 
-<tbody>
-  @forelse($users as $user)
+              <tbody>
+                @forelse($users as $user)
 
-  @php
-    $displayName = trim(implode(' ', array_filter([
-      $user->usr_first_name,
-      $user->usr_middle_name,
-      $user->usr_last_name,
-      $user->usr_suffix,
-    ])));
+                @php
+                $displayName = trim(implode(' ', array_filter([
+                $user->usr_first_name,
+                $user->usr_middle_name,
+                $user->usr_last_name,
+                $user->usr_suffix,
+                ])));
 
-    $displayName = $displayName ?: $user->usr_name;
+                $displayName = $displayName ?: $user->usr_name;
 
-    $colors = ['#2563eb','#16a34a','#d97706','#0891b2','#7c3aed'];
-    $colorIndex = crc32($displayName) % count($colors);
-    $avatarColor = $colors[$colorIndex];
+                $colors = ['#2563eb','#16a34a','#d97706','#0891b2','#7c3aed'];
+                $colorIndex = crc32($displayName) % count($colors);
+                $avatarColor = $colors[$colorIndex];
 
-    $roleLabels = [
-      'faculty' => 'Faculty',
-      'department_chair' => 'Dept. Chair',
-      'dean' => 'Dean',
-      'system_admin' => 'System Admin',
-    ];
-  @endphp
+                $roleLabels = [
+                'faculty' => 'Faculty',
+                'department_chair' => 'Dept. Chair',
+                'dean' => 'Dean',
+                'system_admin' => 'System Admin',
+                ];
+                @endphp
 
-  <tr class="user-row"
-    data-user-id="{{ $user->usr_id }}"
-    data-name="{{ $displayName }}"
-    data-first-name="{{ $user->usr_first_name }}"
-    data-last-name="{{ $user->usr_last_name }}"
-    data-role="{{ $user->usr_role }}"
-    data-email="{{ $user->usr_email }}"
-    data-active="{{ $user->usr_is_active ? '1' : '0' }}"
-    data-bio="{{ $user->usr_bio }}"
-    data-room-location="{{ $user->room_location }}">
+                <tr class="user-row"
+                  data-user-id="{{ $user->usr_id }}"
+                  data-name="{{ $displayName }}"
+                  data-first-name="{{ $user->usr_first_name }}"
+                  data-last-name="{{ $user->usr_last_name }}"
+                  data-role="{{ $user->usr_role }}"
+                  data-email="{{ $user->usr_email }}"
+                  data-active="{{ $user->usr_is_active ? '1' : '0' }}"
+                  data-bio="{{ $user->usr_bio }}"
+                  data-room-location="{{ $user->room_location }}">
 
-    <td>
-      <div class="flex items-center gap-2.5">
+                  <td>
+                    <div class="flex items-center gap-2.5">
 
-        <div
-          class="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-extrabold text-white flex-shrink-0"
-          style="background:{{ $avatarColor }};">
-          {{ strtoupper(substr($displayName, 0, 1)) }}
-        </div>
+                      <div
+                        class="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-extrabold text-white flex-shrink-0"
+                        style="background:{{ $avatarColor }};">
+                        {{ strtoupper(substr($displayName, 0, 1)) }}
+                      </div>
 
-        <button
-          type="button"
-          onclick="openProfileModal('{{ $user->usr_id }}')"
-          class="font-semibold text-[13px] text-slate-900 hover:text-blue-600 text-left">
-          {{ $displayName }}
-        </button>
+                      <button
+                        type="button"
+                        onclick="openProfileModal('{{ $user->usr_id }}')"
+                        class="font-semibold text-[13px] text-slate-900 hover:text-blue-600 text-left">
+                        {{ $displayName }}
+                      </button>
 
-      </div>
-    </td>
+                    </div>
+                  </td>
 
-    <td>
-      <span class="badge badge-grey">
-        {{ $roleLabels[$user->usr_role] ?? ucfirst($user->usr_role) }}
-      </span>
-    </td>
+                  <td>
+                    <span class="badge badge-grey">
+                      {{ $roleLabels[$user->usr_role] ?? ucfirst($user->usr_role) }}
+                    </span>
+                  </td>
 
-    <td class="text-slate-500">
-      {{ $user->usr_email }}
-    </td>
+                  <td class="text-slate-500">
+                    {{ $user->usr_email }}
+                  </td>
 
-    <td>
-      <span class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
-        {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
-      </span>
-    </td>
+                  <td>
+                    <span class="badge {{ $user->usr_is_active ? 'badge-green' : 'badge-amber' }}">
+                      {{ $user->usr_is_active ? 'Active' : 'Inactive' }}
+                    </span>
+                  </td>
 
-    <td>
-      <div class="flex gap-1.5">
+                  <td>
+                    <div class="flex gap-1.5">
 
-        <button
-          type="button"
-          class="btn btn-secondary !px-3 !py-1.5 !text-[12px]"
-          onclick="openEditModal('{{ $user->usr_id }}')">
-          Edit
-        </button>
+                      <button
+                        type="button"
+                        class="btn btn-secondary !px-3 !py-1.5 !text-[12px]"
+                        onclick="openEditModal('{{ $user->usr_id }}')">
+                        Edit
+                      </button>
 
-        <form
-          method="POST"
-          action="{{ route('admin.users.destroy', ['id' => $user->usr_id]) }}"
-          onsubmit="return confirm('Delete this user?')"
-          class="inline">
+                      <form
+                        method="POST"
+                        action="{{ route('admin.users.destroy', ['id' => $user->usr_id]) }}"
+                        onsubmit="return confirm('Delete this user?')"
+                        class="inline">
 
-          @csrf
-          @method('DELETE')
+                        @csrf
+                        @method('DELETE')
 
-          <button
-            type="submit"
-            class="btn btn-danger !px-3 !py-1.5 !text-[12px]">
-            Delete
-          </button>
+                        <button
+                          type="submit"
+                          class="btn btn-danger !px-3 !py-1.5 !text-[12px]">
+                          Delete
+                        </button>
 
-        </form>
+                      </form>
 
-      </div>
-    </td>
+                    </div>
+                  </td>
 
-  </tr>
+                </tr>
 
-  @empty
+                @empty
 
-  <tr>
-    <td colspan="5"
-      class="text-center py-10 text-[14px] text-slate-400">
-      No user accounts found. Click
-      <strong>+ Add User</strong> to get started.
-    </td>
-  </tr>
+                <tr>
+                  <td colspan="5"
+                    class="text-center py-10 text-[14px] text-slate-400">
+                    No user accounts found. Click
+                    <strong>+ Add User</strong> to get started.
+                  </td>
+                </tr>
 
-  @endforelse
-</tbody>
+                @endforelse
+              </tbody>
             </table>
           </div>
 
           <div class="flex items-center justify-between mt-4 pt-3.5 border-t border-slate-200">
-            <div id="page-info" class="text-[13px] text-slate-400"></div>
+            <div id="page-info" class="text-[13px] text-slate-400">Showing 0–0 of 0 users</div>
 
             <div class="flex items-center gap-1.5">
               <button id="btn-prev" type="button"
@@ -327,7 +327,7 @@
 
           <div>
             <label class="field-label">Date of Birth</label>
-            <input name="usr_dob" type="date" class="field-input">
+            <input name="usr_dob" type="date" class="field-input" min="1950-01-01" max="{{ \Illuminate\Support\Carbon::now()->subYears(6)->format('Y-m-d') }}">
           </div>
 
           <div>
@@ -339,24 +339,24 @@
 
         <div class="role-field" data-roles="faculty" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-<div>
-  <label class="field-label">Rank / Title</label>
-  <select name="usr_rank_title" class="field-input">
-    <option value="">-- Select Rank --</option>
-    <option value="Instructor I">Instructor I</option>
-    <option value="Instructor II">Instructor II</option>
-    <option value="Instructor III">Instructor III</option>
-    <option value="Assistant Professor I">Assistant Professor I</option>
-    <option value="Assistant Professor II">Assistant Professor II</option>
-    <option value="Assistant Professor III">Assistant Professor III</option>
-    <option value="Assistant Professor IV">Assistant Professor IV</option>
-    <option value="Associate Professor I">Associate Professor I</option>
-    <option value="Associate Professor II">Associate Professor II</option>
-    <option value="Associate Professor III">Associate Professor III</option>
-    <option value="Associate Professor IV">Associate Professor IV</option>
-    <option value="Associate Professor V">Associate Professor V</option>
-  </select>
-</div>
+            <div>
+              <label class="field-label">Rank / Title</label>
+              <select name="usr_rank_title" class="field-input">
+                <option value="">-- Select Rank --</option>
+                <option value="Instructor I">Instructor I</option>
+                <option value="Instructor II">Instructor II</option>
+                <option value="Instructor III">Instructor III</option>
+                <option value="Assistant Professor I">Assistant Professor I</option>
+                <option value="Assistant Professor II">Assistant Professor II</option>
+                <option value="Assistant Professor III">Assistant Professor III</option>
+                <option value="Assistant Professor IV">Assistant Professor IV</option>
+                <option value="Associate Professor I">Associate Professor I</option>
+                <option value="Associate Professor II">Associate Professor II</option>
+                <option value="Associate Professor III">Associate Professor III</option>
+                <option value="Associate Professor IV">Associate Professor IV</option>
+                <option value="Associate Professor V">Associate Professor V</option>
+              </select>
+            </div>
 
             <div>
               <label class="field-label">Employment Type</label>
@@ -576,8 +576,7 @@
 
           <div>
             <label class="field-label">Date of Birth</label>
-            <input id="edit-dob" name="usr_dob"
-              type="date" class="field-input">
+            <input id="edit-dob" name="usr_dob" type="date" class="field-input" min="1950-01-01" max="{{ now()->subYears(6)->format('Y-m-d') }}">
           </div>
 
           <div>
@@ -589,24 +588,24 @@
 
         <div class="role-field" data-roles="faculty" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-<div>
-  <label class="field-label">Rank / Title</label>
-  <select id="edit-rank-title" name="usr_rank_title" class="field-input">
-    <option value="">-- Select Rank --</option>
-    <option value="Instructor I">Instructor I</option>
-    <option value="Instructor II">Instructor II</option>
-    <option value="Instructor III">Instructor III</option>
-    <option value="Assistant Professor I">Assistant Professor I</option>
-    <option value="Assistant Professor II">Assistant Professor II</option>
-    <option value="Assistant Professor III">Assistant Professor III</option>
-    <option value="Assistant Professor IV">Assistant Professor IV</option>
-    <option value="Associate Professor I">Associate Professor I</option>
-    <option value="Associate Professor II">Associate Professor II</option>
-    <option value="Associate Professor III">Associate Professor III</option>
-    <option value="Associate Professor IV">Associate Professor IV</option>
-    <option value="Associate Professor V">Associate Professor V</option>
-  </select>
-</div>
+            <div>
+              <label class="field-label">Rank / Title</label>
+              <select id="edit-rank-title" name="usr_rank_title" class="field-input">
+                <option value="">-- Select Rank --</option>
+                <option value="Instructor I">Instructor I</option>
+                <option value="Instructor II">Instructor II</option>
+                <option value="Instructor III">Instructor III</option>
+                <option value="Assistant Professor I">Assistant Professor I</option>
+                <option value="Assistant Professor II">Assistant Professor II</option>
+                <option value="Assistant Professor III">Assistant Professor III</option>
+                <option value="Assistant Professor IV">Assistant Professor IV</option>
+                <option value="Associate Professor I">Associate Professor I</option>
+                <option value="Associate Professor II">Associate Professor II</option>
+                <option value="Associate Professor III">Associate Professor III</option>
+                <option value="Associate Professor IV">Associate Professor IV</option>
+                <option value="Associate Professor V">Associate Professor V</option>
+              </select>
+            </div>
 
             <div>
               <label class="field-label">Employment Type</label>
@@ -825,13 +824,13 @@
     <span id="toast-msg"></span>
   </div>
 
-@if(session('error') || session('success'))
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  showToast(@json(session('error') ?? session('success')));
-});
-</script>
-@endif
+  @if(session('error') || session('success'))
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      showToast(@json(session('error') ?? session('success')));
+    });
+  </script>
+  @endif
 
 
   <script>
@@ -982,16 +981,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Keep hidden full number in sync before submit
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
       const addForm = document.getElementById('form-add-user');
       if (addForm) {
-        addForm.addEventListener('submit', function () {
+        addForm.addEventListener('submit', function() {
           syncPhoneField('add');
         });
       }
       const editForm = document.getElementById('form-edit-user');
       if (editForm) {
-        editForm.addEventListener('submit', function () {
+        editForm.addEventListener('submit', function() {
           syncPhoneField('edit');
         });
       }
@@ -1326,55 +1325,105 @@ document.addEventListener('DOMContentLoaded', function() {
       if (count) count.style.display = 'none';
     }
 
-function filterUsers(query) {
-  const q = query.trim().toLowerCase();
+    // ── Client-side pagination (10 per page) ──
+    const USERS_PER_PAGE = 10;
+    let currentPage = 1;
+    let filterQuery = '';
 
-  document.querySelectorAll(
-    '#users-table tbody tr.user-row'
-  ).forEach(row => {
-
-    const name =
-      (row.dataset.name || '').toLowerCase();
-
-    const firstName =
-      (row.dataset.firstName || '').toLowerCase();
-
-    const lastName =
-      (row.dataset.lastName || '').toLowerCase();
-
-    const email =
-      (row.dataset.email || '').toLowerCase();
-
-    const role =
-      (row.dataset.role || '').toLowerCase();
-
-    const match =
-      name.includes(q) ||
-      firstName.includes(q) ||
-      lastName.includes(q) ||
-      email.includes(q) ||
-      role.includes(q);
-
-    row.style.display = match ? '' : 'none';
-  });
-}
-
-
-    function changePage(direction) {
-      // Pagination can be added later.
+    function getUserRows() {
+      return Array.from(document.querySelectorAll('#users-table tbody tr.user-row'));
     }
 
+    function rowMatchesFilter(row, q) {
+      if (!q) return true;
+      const name = (row.dataset.name || '').toLowerCase();
+      const firstName = (row.dataset.firstName || '').toLowerCase();
+      const lastName = (row.dataset.lastName || '').toLowerCase();
+      const email = (row.dataset.email || '').toLowerCase();
+      const role = (row.dataset.role || '').toLowerCase();
+      return name.includes(q) || firstName.includes(q) || lastName.includes(q)
+        || email.includes(q) || role.includes(q);
+    }
+
+    function getFilteredRows() {
+      return getUserRows().filter(row => rowMatchesFilter(row, filterQuery));
+    }
+
+    function renderUserPage() {
+      const rows = getUserRows();
+      const filtered = getFilteredRows();
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / USERS_PER_PAGE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const start = (currentPage - 1) * USERS_PER_PAGE;
+      const end = start + USERS_PER_PAGE;
+
+      rows.forEach(row => { row.style.display = 'none'; });
+      filtered.forEach((row, i) => {
+        row.style.display = (i >= start && i < end) ? '' : 'none';
+      });
+
+      const from = total === 0 ? 0 : start + 1;
+      const to = Math.min(end, total);
+      const info = document.getElementById('page-info');
+      if (info) {
+        info.textContent = total === 0
+          ? 'No users found'
+          : 'Showing ' + from + '–' + to + ' of ' + total + ' users (page ' + currentPage + ' of ' + totalPages + ')';
+      }
+
+      const btnPrev = document.getElementById('btn-prev');
+      const btnNext = document.getElementById('btn-next');
+      if (btnPrev) {
+        btnPrev.disabled = currentPage <= 1;
+        btnPrev.classList.toggle('opacity-40', currentPage <= 1);
+        btnPrev.classList.toggle('pointer-events-none', currentPage <= 1);
+      }
+      if (btnNext) {
+        btnNext.disabled = currentPage >= totalPages;
+        btnNext.classList.toggle('opacity-40', currentPage >= totalPages);
+        btnNext.classList.toggle('pointer-events-none', currentPage >= totalPages);
+      }
+
+      const nums = document.getElementById('page-numbers');
+      if (nums) {
+        nums.innerHTML = '';
+        const fromP = Math.max(1, currentPage - 2);
+        const toP = Math.min(totalPages, currentPage + 2);
+        for (let p = fromP; p <= toP; p++) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = String(p);
+          b.className = 'btn min-w-[36px] text-center ' + (p === currentPage ? 'btn-primary' : 'btn-secondary');
+          b.addEventListener('click', function () { currentPage = p; renderUserPage(); });
+          nums.appendChild(b);
+        }
+      }
+    }
+
+    function filterUsers(query) {
+      filterQuery = (query || '').trim().toLowerCase();
+      currentPage = 1;
+      renderUserPage();
+    }
+
+    function changePage(direction) {
+      currentPage += direction;
+      renderUserPage();
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
       const addRole = document.querySelector(
         '#form-add-user select[name="usr_role"]'
       );
-
       if (addRole) toggleRoleFields(addRole);
 
       const editRole = document.getElementById('edit-role');
-
       if (editRole) toggleRoleFields(editRole);
+
+      renderUserPage();
     });
   </script>
 

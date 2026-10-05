@@ -8,9 +8,9 @@
 <title>SKEDYUL — Faculty Dashboard</title>
 
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-<div id="screen-app" class="screen active" style="flex-direction:row;">
+<div id="screen-app" class="screen active flex-row">
 
   @include('partials.facultyMember_sidebar')
 
@@ -495,7 +495,7 @@ function facPreviewPic(input) {
   const reader = new FileReader();
   reader.onload = e => {
     const p = document.getElementById('fac-pic-preview');
-    p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    p.innerHTML = `<img src="${e.target.result}" class="h-full w-full object-cover">`;
     showToast('Profile photo updated!');
   };
   reader.readAsDataURL(input.files[0]);
@@ -525,18 +525,16 @@ function renderFacQuote() {
   const a = document.getElementById('fac-quote-author');
   const d = document.getElementById('fac-quote-dots');
   if (!t) return;
-  t.style.opacity = '0'; a.style.opacity = '0';
+  t.classList.add('opacity-0'); a.classList.add('opacity-0');
   setTimeout(() => {
     t.textContent = q.text; a.textContent = q.author;
-    t.style.transition = 'opacity 0.5s'; a.style.transition = 'opacity 0.5s';
-    t.style.opacity = '1'; a.style.opacity = '1';
+    t.classList.remove('opacity-0'); a.classList.remove('opacity-0');
   }, 300);
   if (d) {
     d.innerHTML = '';
     FAC_QUOTES.forEach((_, i) => {
       const dot = document.createElement('div');
-      dot.className = 'w-1.5 h-1.5 rounded-full cursor-pointer transition-colors duration-300 ' +
-        (i === facQuoteIndex ? 'bg-white/90' : 'bg-white/25');
+      dot.className = `h-1.5 w-1.5 cursor-pointer rounded-full transition-colors ${i === facQuoteIndex ? 'bg-white/90' : 'bg-white/25'}`;
       dot.onclick = () => { facQuoteIndex = i; renderFacQuote(); resetFacQuoteTimer(); };
       d.appendChild(dot);
     });
@@ -647,9 +645,9 @@ function updateScheduleStatuses() {
 
       statusCell.innerHTML = `
         <div class="min-w-[110px]">
-          <span class="${badgeBase} ${urgent ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">${mins}m ${secs}s left</span>
-          <div class="h-1 bg-gray-200 rounded mt-1 overflow-hidden">
-            <div class="h-full transition-[width] duration-1000 ease-linear ${urgent ? 'bg-red-500' : 'bg-green-500'}" style="width:${pct}%;"></div>
+          <span class="badge ${urgent ? 'badge-red' : 'badge-green'}">${mins}m ${secs}s left</span>
+          <div class="mt-1 h-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+            <div class="h-full transition-[width] duration-1000 ${urgent ? 'bg-red-600' : 'bg-green-600'}" style="width:${pct}%;"></div>
           </div>
         </div>`;
     } else {
