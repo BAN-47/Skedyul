@@ -25,25 +25,38 @@ class ChairSettingsController extends Controller
         ]);
 
         $chair = $this->currentChair();
-        $publicId = 'chair_' . $chair->dc_id;
 
-        Storage::disk('cloudinary')->delete('skedyul/chair-avatars/' . $publicId);
+        // delete old file if one exists
+        if ($chair->dc_profile_image) {
+            $oldPath = public_path('images/chair_profile/' . $chair->dc_profile_image);
+            if (file_exists($oldPath)) {
+                unlink($oldPath);
+            }
+        }
 
-        $path = $request->file('avatar')->storeAs('skedyul/chair-avatars', $publicId, 'cloudinary');
+        $filename = $chair->dc_id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
+        $request->file('avatar')->move(public_path('images/chair_profile'), $filename);
 
         $chair->update([
-            'dc_profile_image' => Storage::disk('cloudinary')->url($path),
+            'dc_profile_image' => $filename,
         ]);
 
-        return response()->json(['success' => true, 'url' => Storage::disk('cloudinary')->url($path)]);
+        return response()->json([
+            'success' => true,
+            'url' => asset('images/chair_profile/' . $filename),
+        ]);
     }
 
     public function removeAvatar()
     {
         $chair = $this->currentChair();
-        $publicId = 'chair_' . $chair->dc_id;
 
-        Storage::disk('cloudinary')->delete('skedyul/chair-avatars/' . $publicId);
+        if ($chair->dc_profile_image) {
+            $path = public_path('images/chair_profile/' . $chair->dc_profile_image);
+            if (file_exists($path)) {
+                unlink($path);
+            }
+        }
 
         $chair->update(['dc_profile_image' => null]);
 
@@ -136,7 +149,7 @@ class ChairSettingsController extends Controller
     {
         $chair = $this->currentChair()->load(['department']);
 
-        return view('chair.settings', [
+        return view('chair.chair_settings', [
             'chair' => $chair,
             'departmentName' => $chair->department->dept_name ?? 'Not assigned',
             'academicYear' => \App\Models\AcademicYear::where('ay_is_active', true)->first(),

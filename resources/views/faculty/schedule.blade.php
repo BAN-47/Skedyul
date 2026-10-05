@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 <title>SKEDYUL — My Schedule</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/faculty/schedule.css') }}">
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-<div id="screen-app" class="screen active" style="flex-direction:row;">
+<div id="screen-app" class="screen active flex-row">
 
   @include('partials.facultyMember_sidebar')
 
@@ -24,7 +23,7 @@
     <div id="page-faculty-schedule" class="page active">
 
       <!-- Currently Using Room -->
-      <div class="card" style="margin-bottom:20px;">
+      <div class="card mb-5">
         <div class="card-header">
           <div><div class="card-title">Currently Using Room</div><div class="card-sub">Live session status</div></div>
           <span class="badge {{ $currentSchedule ? 'badge-green' : 'badge-grey' }}">
@@ -33,44 +32,44 @@
         </div>
 
         @if ($currentSchedule)
-          <div style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:12px;padding:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;"
+          <div class="flex items-start justify-between gap-4 rounded-xl bg-gradient-to-br from-slate-900 to-blue-900 p-5"
                data-start="{{ $currentSchedule->sch_start_time }}" data-end="{{ $currentSchedule->sch_end_time }}" id="live-room-block">
             <div>
-              <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px;">Now in Session</div>
-              <div style="font-size:22px;font-weight:800;color:#fff;">{{ $currentSchedule->room->room_name ?? 'N/A' }}</div>
-              <div style="font-size:14px;color:rgba(255,255,255,0.6);margin-top:3px;">{{ $currentSchedule->subject->subj_code ?? '' }} — {{ $currentSchedule->subject->subj_name ?? 'N/A' }}</div>
-              <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:2px;">{{ $currentSchedule->section->sec_name ?? 'N/A' }} · {{ $currentSchedule->sch_start_time }}–{{ $currentSchedule->sch_end_time }}</div>
-              <div style="margin-top:14px;">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:5px;">
+              <div class="mb-1.5 text-[10px] font-bold uppercase tracking-[1.2px] text-white/40">Now in Session</div>
+              <div class="text-[22px] font-extrabold text-white">{{ $currentSchedule->room->room_name ?? 'N/A' }}</div>
+              <div class="mt-0.5 text-sm text-white/60">{{ $currentSchedule->subject->subj_code ?? '' }} — {{ $currentSchedule->subject->subj_name ?? 'N/A' }}</div>
+              <div class="mt-0.5 text-xs text-white/40">{{ $currentSchedule->section->sec_name ?? 'N/A' }} · {{ $currentSchedule->sch_start_time }}–{{ $currentSchedule->sch_end_time }}</div>
+              <div class="mt-3.5">
+                <div class="mb-1 flex justify-between text-[11px] text-white/40">
                   <span>{{ $currentSchedule->sch_start_time }}</span><span>{{ $currentSchedule->sch_end_time }}</span>
                 </div>
-                <div style="height:6px;background:rgba(255,255,255,0.12);border-radius:20px;overflow:hidden;width:280px;">
-                  <div id="web-room-progress" style="height:100%;background:#4ade80;border-radius:20px;transition:width 1s linear;width:0%;"></div>
+                <div class="h-1.5 w-[280px] max-w-full overflow-hidden rounded-full bg-white/10">
+                  <div id="web-room-progress" class="h-full w-0 rounded-full bg-green-400 transition-[width] duration-1000"></div>
                 </div>
               </div>
             </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:6px;">Time Remaining</div>
-              <div id="web-room-countdown" style="font-size:36px;font-weight:800;color:#4ade80;font-family:var(--mono);letter-spacing:2px;">--:--</div>
-              <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:3px;">min : sec</div>
+            <div class="shrink-0 text-right">
+              <div class="mb-1.5 text-[11px] text-white/40">Time Remaining</div>
+              <div id="web-room-countdown" class="font-mono text-4xl font-extrabold tracking-[2px] text-green-400">--:--</div>
+              <div class="mt-0.5 text-[11px] text-white/30">min : sec</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
-            <div style="width:36px;height:36px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0;">
+          <div class="mt-3.5 flex items-center gap-3 border-t border-slate-200 pt-3.5 dark:border-slate-800">
+            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600 text-[13px] font-extrabold text-white">
               {{ strtoupper(substr($faculty->fac_first_name,0,1) . substr($faculty->fac_last_name,0,1)) }}
             </div>
-            <div><div style="font-size:13px;font-weight:700;color:var(--text);">{{ $faculty->full_name }}</div><div style="font-size:11px;color:var(--text3);">Assigned Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div></div>
-            <span class="badge badge-green" style="margin-left:auto;">Active</span>
+            <div><div class="text-[13px] font-bold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div><div class="text-[11px] text-slate-400">Assigned Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div></div>
+            <span class="badge badge-green ml-auto">Active</span>
           </div>
           @if ($nextInRoom)
-            <div style="margin-top:12px;padding:12px;background:var(--grey);border-radius:10px;">
-              <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Next Class in this Room</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text);">{{ $nextInRoom->subject->subj_code ?? '' }} — {{ $nextInRoom->subject->subj_name ?? 'N/A' }}</div>
-              <div style="font-size:11px;color:var(--text3);margin-top:2px;">{{ $nextInRoom->sch_start_time }} · {{ $nextInRoom->section->sec_name ?? 'N/A' }}</div>
+            <div class="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
+              <div class="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">Next Class in this Room</div>
+              <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $nextInRoom->subject->subj_code ?? '' }} — {{ $nextInRoom->subject->subj_name ?? 'N/A' }}</div>
+              <div class="mt-0.5 text-[11px] text-slate-400">{{ $nextInRoom->sch_start_time }} · {{ $nextInRoom->section->sec_name ?? 'N/A' }}</div>
             </div>
           @endif
         @else
-          <div style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">
+          <div class="p-6 text-center text-[13px] text-slate-400">
             You don't have a class in session right now.
           </div>
         @endif
@@ -84,11 +83,11 @@
             <div class="card-sub">{{ $activeSemester->sem_name ?? 'Current Semester' }} · Click any subject to view details</div>
           </div>
         </div>
-        <div class="schedule-grid-wrap">
-          <div class="schedule-grid">
-            <div class="sg-header">Time</div>
+        <div class="overflow-auto">
+          <div class="grid min-w-[700px] grid-cols-[80px_repeat(6,minmax(0,1fr))] gap-px overflow-hidden rounded-xl bg-slate-200 dark:bg-slate-700">
+            <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">Time</div>
             @foreach ($weekDays as $day)
-              <div class="sg-header">{{ $day }}</div>
+              <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">{{ $day }}</div>
             @endforeach
 
             @php
@@ -99,7 +98,7 @@
             @endphp
 
             @forelse ($allTimes as $time)
-              <div class="sg-time">{{ \Carbon\Carbon::createFromTimeString($time)->format('g:i') }}</div>
+              <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">{{ \Carbon\Carbon::createFromTimeString($time)->format('g:i') }}</div>
               @foreach ($weekDays as $day)
                 @php
                   $sch = $byDay[$day]->firstWhere('sch_start_time', $time);
@@ -112,10 +111,18 @@
                     $color = $subjectColors[$subjId];
                   }
                 @endphp
-                <div class="sg-cell">
+                <div class="relative min-h-[52px] bg-white p-1 dark:bg-slate-900">
                   @if ($sch)
-                    <div class="sg-event {{ $color }} subject-event"
-                         style="cursor:pointer;"
+                    @php
+                      $eventColorClasses = [
+                        'blue' => 'border-blue-600 bg-blue-100 text-blue-900',
+                        'amber' => 'border-amber-600 bg-amber-100 text-amber-900',
+                        'green' => 'border-green-600 bg-green-100 text-green-900',
+                        'teal' => 'border-cyan-600 bg-cyan-100 text-cyan-900',
+                        'purple' => 'border-violet-600 bg-violet-100 text-violet-900',
+                      ][$color];
+                    @endphp
+                    <div class="subject-event flex h-full cursor-pointer flex-col justify-center rounded-md border-l-[3px] px-2 py-1.5 text-[11px] font-semibold leading-tight {{ $eventColorClasses }}"
                          data-code="{{ $sch->subject->subj_code ?? '' }}"
                          data-name="{{ $sch->subject->subj_name ?? '' }}"
                          data-units="{{ $sch->subject->subj_units ?? '' }}"
@@ -124,8 +131,7 @@
                          data-dept="{{ $faculty->department->dept_code ?? '' }}"
                          data-room="{{ $sch->room->room_name ?? 'N/A' }}"
                          data-section="{{ $sch->section->sec_name ?? 'N/A' }}"
-                         data-schedule="{{ $sch->sch_day }} {{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}"
-                         data-color="#2563eb">
+                         data-schedule="{{ $sch->sch_day }} {{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}">
                       <b>{{ $sch->subject->subj_code ?? '' }}</b>
                       <span>{{ $sch->room->room_name ?? '' }} · {{ $sch->section->sec_name ?? '' }}</span>
                     </div>
@@ -133,22 +139,22 @@
                 </div>
               @endforeach
             @empty
-              <div class="sg-time">—</div>
+              <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">—</div>
               @foreach ($weekDays as $day)
-                <div class="sg-cell"></div>
+                <div class="relative min-h-[52px] bg-white p-1 dark:bg-slate-900"></div>
               @endforeach
             @endforelse
           </div>
         </div>
         <!-- Legend -->
-        <div style="display:flex;gap:16px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center;">
+        <div class="mt-4 flex flex-wrap items-center gap-4 border-t border-slate-200 pt-3.5 dark:border-slate-800">
           @foreach ($schedules->unique('sch_subj_id') as $sch)
-            <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
-              <div style="width:12px;height:12px;border-radius:3px;background:#dbeafe;border-left:3px solid #2563eb;"></div>
+            <div class="flex items-center gap-1.5 text-xs">
+              <div class="h-3 w-3 rounded-sm border-l-[3px] border-blue-600 bg-blue-100"></div>
               {{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? '' }}
             </div>
           @endforeach
-          <div style="font-size:12px;color:var(--text3);margin-left:auto;">Click any subject block to view details</div>
+          <div class="ml-auto text-xs text-slate-400">Click any subject block to view details</div>
         </div>
       </div>
     </div>
@@ -158,41 +164,41 @@
 
 <!-- FACULTY SUBJECT DETAIL MODAL -->
 <div class="modal-overlay" id="modal-web-subject-detail">
-  <div class="modal" style="width:480px;">
+  <div class="modal w-[480px] max-w-[92vw] bg-white p-6 dark:bg-slate-900">
     <div class="modal-header">
       <div class="modal-title">Subject Details</div>
       <button class="modal-close" onclick="closeModal('modal-web-subject-detail')">✕</button>
     </div>
-    <div id="wsd-header" style="padding:16px 18px;border-radius:12px;margin-bottom:18px;">
-      <div id="wsd-code" style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;"></div>
-      <div id="wsd-name" style="font-size:20px;font-weight:800;color:#fff;"></div>
+    <div id="wsd-header" class="mb-[18px] rounded-xl bg-gradient-to-br from-blue-600 to-slate-900 px-[18px] py-4">
+      <div id="wsd-code" class="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/60"></div>
+      <div id="wsd-name" class="text-xl font-extrabold text-white"></div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Units</div>
-        <div id="wsd-units" style="font-size:26px;font-weight:800;color:var(--text);"></div>
+    <div class="mb-3.5 grid grid-cols-2 gap-3">
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Units</div>
+        <div id="wsd-units" class="text-[26px] font-extrabold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Hours</div>
-        <div id="wsd-hours" style="font-size:13px;font-weight:600;color:var(--text);margin-top:4px;"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Hours</div>
+        <div id="wsd-hours" class="mt-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Room</div>
-        <div id="wsd-room" style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px;"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Room</div>
+        <div id="wsd-room" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
       </div>
-      <div style="background:var(--grey);border-radius:10px;padding:14px;">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Section</div>
-        <div id="wsd-section" style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px;"></div>
+      <div class="rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+        <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Section</div>
+        <div id="wsd-section" class="mt-0.5 text-base font-bold text-slate-900 dark:text-slate-100"></div>
       </div>
     </div>
-    <div style="background:var(--grey);border-radius:10px;padding:14px;margin-bottom:12px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Schedule</div>
-      <div id="wsd-schedule" style="font-size:13px;font-weight:600;color:var(--text);"></div>
+    <div class="mb-3 rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Schedule</div>
+      <div id="wsd-schedule" class="text-[13px] font-semibold text-slate-900 dark:text-slate-100"></div>
     </div>
-    <div style="background:var(--grey);border-radius:10px;padding:14px;margin-bottom:18px;">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Faculty</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text);">{{ $faculty->full_name }}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px;">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
+    <div class="mb-[18px] rounded-xl bg-slate-50 p-3.5 dark:bg-slate-800">
+      <div class="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Faculty</div>
+      <div class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $faculty->full_name }}</div>
+      <div class="mt-0.5 text-[11px] text-slate-400">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Department</div>
     </div>
     <div class="modal-footer">
       <button class="topbar-btn btn-secondary" onclick="closeModal('modal-web-subject-detail')">Close</button>
@@ -217,8 +223,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, schedule, color) {
-  document.getElementById('wsd-header').style.background = 'linear-gradient(135deg,' + color + ',#0f172a)';
+function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, schedule) {
   document.getElementById('wsd-code').textContent = code + ' · ' + dept;
   document.getElementById('wsd-name').textContent = name;
   document.getElementById('wsd-units').textContent = units + 'u';
@@ -235,7 +240,7 @@ document.querySelectorAll('.subject-event').forEach(el => {
     openWebSubjectDetail(
       el.dataset.code, el.dataset.name, el.dataset.units, el.dataset.lec,
       el.dataset.lab, el.dataset.dept, el.dataset.room, el.dataset.section,
-      el.dataset.schedule, el.dataset.color
+      el.dataset.schedule
     );
   });
 });
@@ -257,11 +262,18 @@ function startWebRoomCountdown() {
     const el = document.getElementById('web-room-countdown');
     const prog = document.getElementById('web-room-progress');
     if (!el) return;
-    if (remaining <= 0) { el.textContent = '00:00'; el.style.color = '#f87171'; if (prog) prog.style.width = '100%'; return; }
+    if (remaining <= 0) {
+      el.textContent = '00:00';
+      el.classList.remove('text-amber-300', 'text-green-400');
+      el.classList.add('text-red-400');
+      if (prog) prog.style.width = '100%';
+      return;
+    }
     const mins = Math.floor(remaining / 60000);
     const secs = Math.floor((remaining % 60000) / 1000);
     el.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-    el.style.color = mins < 5 ? '#f87171' : mins < 15 ? '#fbbf24' : '#4ade80';
+    el.classList.remove('text-red-400', 'text-amber-300', 'text-green-400');
+    el.classList.add(mins < 5 ? 'text-red-400' : mins < 15 ? 'text-amber-300' : 'text-green-400');
     if (prog) prog.style.width = Math.min(100, Math.max(0, ((cur - start) / total) * 100)) + '%';
   }
   tick();

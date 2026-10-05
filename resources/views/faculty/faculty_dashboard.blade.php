@@ -8,9 +8,9 @@
 <title>SKEDYUL — Faculty Dashboard</title>
 
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100">
 
-<div id="screen-app" class="screen active" style="flex-direction:row;">
+<div id="screen-app" class="screen active flex-row">
 
   @include('partials.facultyMember_sidebar')
 
@@ -23,23 +23,23 @@
     <!-- FACULTY DASHBOARD PAGE -->
     <div id="page-faculty-dashboard" class="page active">
       <!-- Welcome Banner with rotating quote -->
-      <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1a2d5a 100%);border-radius:16px;padding:24px 28px;margin-bottom:24px;position:relative;overflow:hidden;">
-        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:28px 28px;pointer-events:none;"></div>
-        <div style="position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;">
-          <div style="flex:1;">
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;">Welcome back, {{ $faculty->full_name }}</div>
-            <div style="font-size:20px;line-height:1.35;font-weight:700;color:#fff;margin-bottom:10px;font-style:italic;" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.4);font-weight:600;" id="fac-quote-author">— Mark Van Doren</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:14px;">
-              <button onclick="prevFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8249;</button>
-              <div id="fac-quote-dots" style="display:flex;gap:5px;"></div>
-              <button onclick="nextFacQuote()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;cursor:pointer;font-size:13px;">&#8250;</button>
+      <div class="quote-banner mb-6">
+        <div class="quote-banner-grid"></div>
+        <div class="relative z-10 flex items-start justify-between gap-6">
+          <div class="min-w-0 flex-1">
+            <div class="mb-1.5 text-[11px] font-bold uppercase tracking-[1.5px] text-white/40">Welcome back, {{ $faculty->full_name }}</div>
+            <div class="mb-2.5 text-xl font-bold italic leading-[1.35] text-white transition-opacity duration-500" id="fac-quote-text">"The art of teaching is the art of assisting discovery."</div>
+            <div class="text-xs font-semibold text-white/40 transition-opacity duration-500" id="fac-quote-author">— Mark Van Doren</div>
+            <div class="mt-3.5 flex items-center gap-2">
+              <button type="button" aria-label="Previous quote" onclick="prevFacQuote()" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white/10 text-[13px] text-white">&#8249;</button>
+              <div id="fac-quote-dots" class="flex gap-1.5"></div>
+              <button type="button" aria-label="Next quote" onclick="nextFacQuote()" class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-0 bg-white/10 text-[13px] text-white">&#8250;</button>
             </div>
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:44px;opacity:0.12;line-height:1;margin-bottom:10px;">"</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Dept</div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-top:2px;">
+          <div class="hidden shrink-0 text-right sm:block">
+            <div class="mb-2.5 text-[44px] leading-none opacity-[.12]">"</div>
+            <div class="text-[11px] text-white/30">Faculty · {{ $faculty->department->dept_code ?? 'N/A' }} Dept</div>
+            <div class="mt-0.5 text-[11px] text-white/30">
               @if ($faculty->department)
                 AY {{ now()->year }}–{{ now()->year + 1 }}
               @endif
@@ -48,52 +48,52 @@
         </div>
       </div>
 
-      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:24px;">
-        <div class="stat-card" style="--accent:#2563eb"><div class="stat-label">Teaching Load</div><div class="stat-value">{{ $totalHours }}h</div><div class="stat-sub">of 30h max</div></div>
-        <div class="stat-card" style="--accent:#16a34a"><div class="stat-label">My Subjects</div><div class="stat-value">{{ $mySubjects->count() }}</div><div class="stat-sub">This semester</div></div>
-        <div class="stat-card" style="--accent:#d97706"><div class="stat-label">My Sections</div><div class="stat-value">{{ $mySections->count() }}</div><div class="stat-sub">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div></div>
+      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-blue-600"></div><div class="stat-label">Teaching Load</div><div class="stat-value">{{ $totalHours }}h</div><div class="stat-sub">of 30h max</div></div>
+        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-green-600"></div><div class="stat-label">My Subjects</div><div class="stat-value">{{ $mySubjects->count() }}</div><div class="stat-sub">This semester</div></div>
+        <div class="stat-card"><div class="absolute inset-x-0 top-0 h-[3px] bg-amber-600"></div><div class="stat-label">My Sections</div><div class="stat-value">{{ $mySections->count() }}</div><div class="stat-sub">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div></div>
       </div>
 
-      <div class="row">
-        <div style="flex:1;">
+      <div class="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div class="min-w-0">
           <div class="card">
             <div class="card-header"><div><div class="card-title">Today's Schedule — {{ $today }}</div><div class="card-sub">Current Semester</div></div></div>
-            <div class="table-wrap"><table>
-              <tr><th>Time</th><th>Subject</th><th>Room</th><th>Section</th><th>Status</th></tr>
-              @forelse ($todaySchedule as $sch)
-                <tr class="sched-row" data-start="{{ $sch->sch_start_time }}" data-end="{{ $sch->sch_end_time }}">
-                  <td style="font-family:var(--mono);font-size:12px;color:var(--text3);">{{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}</td>
-                  <td><b>{{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? 'N/A' }}</b></td>
-                  <td>{{ $sch->room->room_name ?? 'N/A' }}</td>
-                  <td>{{ $sch->section->sec_name ?? 'N/A' }}</td>
-                  <td class="sched-status">
-                    <span class="badge badge-grey">—</span>
-                  </td>
-                </tr>
-              @empty
-                <tr><td colspan="5" class="text-center" style="text-align: center;">No classes scheduled today.</td></tr>
-              @endforelse
+            <div class="overflow-x-auto"><table class="w-full border-collapse">
+              <thead><tr><th>Time</th><th>Subject</th><th>Room</th><th>Section</th><th>Status</th></tr></thead>
+              <tbody>
+                @forelse ($todaySchedule as $sch)
+                  <tr class="sched-row" data-start="{{ $sch->sch_start_time }}" data-end="{{ $sch->sch_end_time }}">
+                    <td class="whitespace-nowrap font-mono text-xs text-slate-400">{{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}</td>
+                    <td><b>{{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? 'N/A' }}</b></td>
+                    <td>{{ $sch->room->room_name ?? 'N/A' }}</td>
+                    <td>{{ $sch->section->sec_name ?? 'N/A' }}</td>
+                    <td class="sched-status"><span class="badge badge-grey">—</span></td>
+                  </tr>
+                @empty
+                  <tr><td colspan="5" class="py-8 text-center text-slate-400">No classes scheduled today.</td></tr>
+                @endforelse
+              </tbody>
             </table></div>
           </div>
         </div>
-        <div style="width:280px;flex-shrink:0;">
+        <div class="min-w-0">
           <div class="card">
             <div class="card-header"><div class="card-title">My Subjects</div></div>
             @forelse ($mySubjects as $i => $subj)
-              @php $colors = ['var(--blue)', 'var(--amber)', 'var(--green)', 'var(--purple)', 'var(--teal)']; @endphp
-              <div class="workload-item">
-                <div class="workload-header">
-                  <div class="workload-name">{{ $subj->subj_code }} — {{ $subj->subj_name }}</div>
-                  <div class="workload-val" style="--wc: {{ $colors[$i % count($colors)] }}; color: var(--wc);">{{ $subj->subj_units ?? '' }}u</div>
+              @php $colors = [['text-blue-600', 'bg-blue-600'], ['text-amber-600', 'bg-amber-600'], ['text-green-600', 'bg-green-600'], ['text-violet-600', 'bg-violet-600'], ['text-cyan-600', 'bg-cyan-600']]; $color = $colors[$i % count($colors)]; @endphp
+              <div class="mb-3.5">
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <div class="min-w-0 truncate text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $subj->subj_code }} — {{ $subj->subj_name }}</div>
+                  <div class="shrink-0 font-mono text-xs font-bold {{ $color[0] }}">{{ $subj->subj_units ?? '' }}u</div>
                 </div>
-                <div class="workload-bar"><div class="workload-fill" style="width:100%;background:var(--wc);"></div></div>
+                <div class="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div class="h-full w-full rounded-full transition-all duration-700 {{ $color[1] }}"></div></div>
               </div>
             @empty
-              <div style="font-size:13px;color:var(--text3);text-align:center;padding:12px;">No subjects assigned.</div>
+              <div class="p-3 text-center text-[13px] text-slate-400">No subjects assigned.</div>
             @endforelse
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">
-              <div><div style="color:var(--text3);">Total Load</div><div style="font-weight:800;font-size:18px;color:var(--text);">{{ $totalHours }}h</div></div>
-              <div style="text-align:right;"><div style="color:var(--text3);">Max Load</div><div style="font-weight:800;font-size:18px;color:var(--green);">30h</div></div>
+            <div class="mt-3 flex justify-between border-t border-slate-200 pt-3 text-xs dark:border-slate-800">
+              <div><div class="text-slate-400">Total Load</div><div class="text-lg font-extrabold text-slate-900 dark:text-slate-100">{{ $totalHours }}h</div></div>
+              <div class="text-right"><div class="text-slate-400">Max Load</div><div class="text-lg font-extrabold text-green-600">30h</div></div>
             </div>
           </div>
         </div>
@@ -419,7 +419,7 @@ function facPreviewPic(input) {
   const reader = new FileReader();
   reader.onload = e => {
     const p = document.getElementById('fac-pic-preview');
-    p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    p.innerHTML = `<img src="${e.target.result}" class="h-full w-full object-cover">`;
     showToast('Profile photo updated!');
   };
   reader.readAsDataURL(input.files[0]);
@@ -449,17 +449,16 @@ function renderFacQuote() {
   const a = document.getElementById('fac-quote-author');
   const d = document.getElementById('fac-quote-dots');
   if (!t) return;
-  t.style.opacity = '0'; a.style.opacity = '0';
+  t.classList.add('opacity-0'); a.classList.add('opacity-0');
   setTimeout(() => {
     t.textContent = q.text; a.textContent = q.author;
-    t.style.transition = 'opacity 0.5s'; a.style.transition = 'opacity 0.5s';
-    t.style.opacity = '1'; a.style.opacity = '1';
+    t.classList.remove('opacity-0'); a.classList.remove('opacity-0');
   }, 300);
   if (d) {
     d.innerHTML = '';
     FAC_QUOTES.forEach((_, i) => {
       const dot = document.createElement('div');
-      dot.style.cssText = `width:6px;height:6px;border-radius:50%;background:${i===facQuoteIndex?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.25)'};cursor:pointer;transition:background 0.3s;`;
+      dot.className = `h-1.5 w-1.5 cursor-pointer rounded-full transition-colors ${i === facQuoteIndex ? 'bg-white/90' : 'bg-white/25'}`;
       dot.onclick = () => { facQuoteIndex = i; renderFacQuote(); resetFacQuoteTimer(); };
       d.appendChild(dot);
     });
@@ -572,10 +571,10 @@ function updateScheduleStatuses() {
       const urgent = mins < 5;
 
       statusCell.innerHTML = `
-        <div style="min-width:110px;">
+        <div class="min-w-[110px]">
           <span class="badge ${urgent ? 'badge-red' : 'badge-green'}">${mins}m ${secs}s left</span>
-          <div style="height:4px;background:var(--grey2);border-radius:4px;margin-top:4px;overflow:hidden;">
-            <div style="height:100%;width:${pct}%;background:${urgent ? 'var(--red)' : 'var(--green)'};transition:width 1s linear;"></div>
+          <div class="mt-1 h-1 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+            <div class="h-full transition-[width] duration-1000 ${urgent ? 'bg-red-600' : 'bg-green-600'}" style="width:${pct}%;"></div>
           </div>
         </div>`;
     } else {
