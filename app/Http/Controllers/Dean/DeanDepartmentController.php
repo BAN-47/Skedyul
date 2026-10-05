@@ -15,6 +15,7 @@ use App\Models\Schedule_Submission;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 
 class DeanDepartmentController extends Controller
 {
@@ -33,7 +34,7 @@ class DeanDepartmentController extends Controller
 
         // Each Dean is assigned to exactly one Department via department_dean.
         // Only show that department here — not the whole university.
-        $deanAssignment = Dean::where('dean_usr_id', auth()->id())->first();
+        $deanAssignment = Dean::where('dean_usr_id', Auth::id())->first();
 
         $departments = $deanAssignment
             ? College::where('college_id', $deanAssignment->dean_college_id)->get()
