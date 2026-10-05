@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 // Controllers
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\RoomController;
@@ -75,6 +76,7 @@ Route::post('/logout', [LoginController::class, 'logout'])
 */
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.dashboard');
 
 
@@ -84,7 +86,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'audit.activity'])->group(function () {
 
     Route::get('/notifications', [NotifController::class, 'index'])
         ->name('notifications.index');
@@ -106,7 +108,10 @@ Route::middleware('auth')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin')->middleware('auth')->group(function () {
+Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function () {
+
+    Route::get('/activity-logs', [ActivityLogController::class, 'index'])
+        ->name('admin.activity-logs');
 
     /*
     |--------------------------------------------------------------------------
@@ -210,15 +215,19 @@ Route::prefix('admin')->middleware('auth')->group(function () {
 */
 
 Route::get('/subject', [SubjectController::class, 'index'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('subject.index');
 
 Route::post('/subject', [SubjectController::class, 'store'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('subject.store');
 
 Route::put('/subject/{id}', [SubjectController::class, 'update'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('subject.update');
 
 Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('subject.destroy');
 
 
@@ -229,18 +238,23 @@ Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])
 */
 
 Route::get('/rooms', [RoomController::class, 'index'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.rooms');
 
 Route::post('/rooms', [RoomController::class, 'store'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.rooms.store');
 
 Route::get('/rooms/{room}', [RoomController::class, 'show'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.rooms.show');
 
 Route::put('/rooms/{room}', [RoomController::class, 'update'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.rooms.update');
 
 Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.rooms.destroy');
 
 
@@ -251,6 +265,7 @@ Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])
 */
 
 Route::get('/programs', [ProgramController::class, 'index'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.programs');
 
 
@@ -261,6 +276,7 @@ Route::get('/programs', [ProgramController::class, 'index'])
 */
 
 Route::get('/departments', [DepartmentController::class, 'index'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('admin.departments');
 
 /* Settings routes are inside admin+auth group above. */

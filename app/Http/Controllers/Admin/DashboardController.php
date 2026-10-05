@@ -139,9 +139,6 @@ class DashboardController extends Controller
             $dbStatus = 'Offline';
         }
 
-        // ---------- ACTIVITY LOG (no AuditLog model yet) ----------
-        $audit_log = collect();
-
         $dbRecords = $totalUsers + $totalSections + $subjectsOffered + $totalRooms;
 
         return view('admin.admin_dashboard', compact(
@@ -165,7 +162,6 @@ class DashboardController extends Controller
             'roomsInUse',
             'roomsAvailable',
             'roomsOccupied',
-            'audit_log',
             'dbRecords',
             'dbStatus',
             'notifCount'

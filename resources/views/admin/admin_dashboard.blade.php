@@ -464,50 +464,6 @@
                 </div>
             </div>
 
-            {{-- ══ RECENT ACTIVITY ══ --}}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">Recent System Activity</div>
-                        <div class="card-sub">Latest actions across all users</div>
-                    </div>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                @foreach(['Time','User','Action','Details','Status'] as $h)
-                                <th>{{ $h }}</th>
-                                @endforeach
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($audit_log as $log)
-                            <tr>
-                                <td class="font-mono text-[11px] text-slate-400">{{ $log->created_at->format('h:i A') }}</td>
-                                <td class="font-semibold">{{ $log->user_name }}</td>
-                                <td>{{ $log->action }}</td>
-                                <td class="text-slate-500">{{ $log->details }}</td>
-                                <td>
-                                    @php
-                                        $logBadgeClass = match($log->status) {
-                                            'Success' => 'badge-green',
-                                            'Info'    => 'badge-blue',
-                                            'Warning' => 'badge-red',
-                                            default   => 'badge-grey',
-                                        };
-                                    @endphp
-                                    <span class="badge {{ $logBadgeClass }}">{{ $log->status }}</span>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr><td colspan="5" class="text-center py-6 text-slate-400">No recent activity.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
         </div>{{-- end page-content --}}
     </div>{{-- end app-main --}}
 </div>{{-- end app-shell --}}
@@ -574,7 +530,6 @@
     renderQuote();
 })();
 </script>
-
 
 <script>
 (function () {

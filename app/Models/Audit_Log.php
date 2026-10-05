@@ -10,8 +10,7 @@ class Audit_Log extends Model
     protected $primaryKey = 'al_id';
     public $incrementing = false;
     protected $keyType = 'string';
-
-    const CREATED_AT = 'al_created_at';
+    public $timestamps = false;
 
     protected $fillable = [
         'al_usr_id',
@@ -19,8 +18,14 @@ class Audit_Log extends Model
         'al_target_table',
         'al_target_id',
         'al_description',
-        'al_ip_address'
+        'al_ip_address',
+        'al_created_at',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'al_usr_id', 'usr_id');
+    }
 }
 
 ?>

@@ -164,6 +164,39 @@
                     </div>
                 </div>
 
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">My Recent Activity</div>
+                            <div class="card-sub">Your latest sign-ins and account changes</div>
+                        </div>
+                    </div>
+                    <div class="space-y-0">
+                        @forelse($recentActivity ?? [] as $activity)
+                            @php
+                                $activityDetail = preg_replace('/^Role: [^;]+; /', '', (string) $activity->al_description);
+                                $activityDetail = preg_replace('/; HTTP \d{3}$/', '', $activityDetail);
+                                $activityTime = \Illuminate\Support\Carbon::parse($activity->al_created_at)->timezone(config('app.timezone'));
+                                $activityIsLogin = in_array($activity->al_action, ['Logged in', 'Logged out'], true);
+                            @endphp
+                            <div class="flex items-start gap-3.5 border-b border-slate-100 py-3.5 last:border-b-0">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $activityIsLogin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600' }}">
+                                    <i class="ti {{ $activity->al_action === 'Logged in' ? 'ti-login' : ($activity->al_action === 'Logged out' ? 'ti-logout' : 'ti-edit') }}"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                        <div class="text-[13px] font-semibold text-slate-700">{{ $activity->al_action }}</div>
+                                        <time class="whitespace-nowrap text-[11px] font-medium text-slate-400" datetime="{{ $activityTime->toIso8601String() }}">{{ $activityTime->format('M j, Y · g:i A') }}</time>
+                                    </div>
+                                    <div class="mt-1 break-words text-[12px] text-slate-500">{{ $activityDetail ?: $activity->al_target_table }}</div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-6 text-center text-sm text-slate-400">No activity recorded yet.</div>
+                        @endforelse
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

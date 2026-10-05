@@ -172,6 +172,35 @@
         </div>
       </div>
 
+      <div class="card mt-4">
+        <div class="card-header">
+          <div>
+            <div class="card-title">My Recent Activity</div>
+            <div class="card-sub">Your sign-ins and recent changes</div>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead><tr><th>Time</th><th>Action</th><th>Details</th></tr></thead>
+            <tbody>
+              @forelse($recentActivity as $activity)
+                @php
+                  $activityDetail = preg_replace('/^Role: [^;]+; /', '', (string) $activity->al_description);
+                  $activityDetail = preg_replace('/; HTTP \d{3}$/', '', $activityDetail);
+                @endphp
+                <tr>
+                  <td class="whitespace-nowrap text-xs text-slate-400">{{ \Illuminate\Support\Carbon::parse($activity->al_created_at)->format('M j, Y g:i A') }}</td>
+                  <td class="font-semibold">{{ $activity->al_action }}</td>
+                  <td class="text-xs text-slate-500">{{ $activityDetail ?: $activity->al_target_table }}</td>
+                </tr>
+              @empty
+                <tr><td colspan="3" class="py-5 text-center text-sm text-slate-400">No activity recorded yet.</td></tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
     <!-- ══ END DASHBOARD ══ -->
 

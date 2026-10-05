@@ -49,6 +49,8 @@
             ];
 
             $navSystem = [
+                ['admin.activity-logs', route('admin.activity-logs'), '', 'Activity Logs'],
+
                 ['admin.reports', route('admin.reports'), '', 'Reports'],
 
                 ['admin.settings', route('admin.settings'), '', 'Settings'],

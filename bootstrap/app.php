@@ -18,7 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->alias([
+            'audit.activity' => \App\Http\Middleware\AuditActivityMiddleware::class,
+        ]);
     })
     
     ->withExceptions(function (Exceptions $exceptions): void {

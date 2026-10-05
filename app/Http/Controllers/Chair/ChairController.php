@@ -13,6 +13,7 @@ use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\Notification;
+use App\Models\Audit_Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -131,6 +132,11 @@ class ChairController extends Controller
             ->where('notif_is_read', false)
             ->count();
 
+        $recentActivity = Audit_Log::where('al_usr_id', $user->usr_id)
+            ->orderByDesc('al_created_at')
+            ->limit(8)
+            ->get();
+
         return view('chair.chair_dashboard', compact(
             'deptChair',
             'academicYear',
@@ -145,7 +151,8 @@ class ChairController extends Controller
             'subjectsPlotted',
             'notifications',
             'unreadCount',
-            'conflictsCount'
+            'conflictsCount',
+            'recentActivity'
         ));
     }
 

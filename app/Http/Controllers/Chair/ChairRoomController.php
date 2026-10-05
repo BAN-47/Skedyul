@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\AcademicYear;
 use App\Models\Semester;
-use App\Models\room as Room;
+use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\Faculty;
 use App\Models\Course;
@@ -15,6 +15,7 @@ use App\Models\Study_Load;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 class ChairRoomController extends Controller
 {
@@ -28,11 +29,15 @@ class ChairRoomController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        $building = 'CCICT Building';
-
-        $rooms = Room::where('room_building', $building)
-            ->orderBy('room_name')
-            ->get();
+        $roomQuery = Room::query();
+        if (Schema::hasColumn('room', 'room_college_id')) {
+            $roomQuery->where('room_college_id', $deptChair->dc_college_id);
+        } else {
+            // Continue showing the legacy campus rooms until the Supabase column is added.
+            $roomQuery->where('room_building', 'CCICT Building');
+        }
+        $rooms = $roomQuery->orderBy('room_name')->get();
+        $building = $rooms->pluck('room_building')->filter()->unique()->implode(', ') ?: 'Rooms assigned to your college';
 
         $schedules = $semester
             ? Schedule::with(['subject', 'section'])

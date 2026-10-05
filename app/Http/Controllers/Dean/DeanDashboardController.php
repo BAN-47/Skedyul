@@ -12,6 +12,7 @@ use App\Models\Schedule_Submission;
 use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
+use App\Models\Audit_Log;
 use Illuminate\Support\Facades\Auth;
 
 class DeanDashboardController extends Controller
@@ -131,6 +132,10 @@ class DeanDashboardController extends Controller
             ->count();
 
         $pendingDeptCount = $pendingApprovals->count();
+        $recentActivity = Audit_Log::where('al_usr_id', Auth::id())
+            ->orderByDesc('al_created_at')
+            ->limit(8)
+            ->get();
 
         return view('dean.dean_dashboard', compact(
             'academicYear',
@@ -144,7 +149,8 @@ class DeanDashboardController extends Controller
             'subjectsPlotted',
             'pendingApprovals',
             'scheduledApprovedCount',
-            'pendingDeptCount'
+            'pendingDeptCount',
+            'recentActivity'
         ));
     }
 

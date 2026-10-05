@@ -29,7 +29,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 | DEAN ROUTES
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
+Route::middleware(['auth', 'audit.activity'])->prefix('dean')->name('dean.')->group(function () {
 
     Route::get('/dashboard', [DeanDashboardController::class, 'index'])->name('dashboard');
     Route::get('/departments', [DeanDepartmentController::class, 'index'])->name('departments');
@@ -62,7 +62,9 @@ Route::middleware('auth')->prefix('dean')->name('dean.')->group(function () {
     });
 
 Route::put('/dean/profile/notification-preferences', [App\Http\Controllers\Dean\DeanSettingsController::class, 'updateNotificationPreferences'])
+            ->middleware(['auth', 'audit.activity'])
             ->name('dean.profile.notification-preferences.update');
 
 Route::get('/notifications/pending-count', [DeanSettingsController::class, 'pendingCount'])
+    ->middleware(['auth', 'audit.activity'])
     ->name('dean.notifications.pending-count');
