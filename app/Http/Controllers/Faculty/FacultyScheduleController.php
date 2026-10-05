@@ -21,6 +21,7 @@ class FacultyScheduleController extends Controller
             ->when($activeSemester, fn ($q) => $q->where('sch_sem_id', $activeSemester->sem_id))
             ->get();
 
+        $allTimes = $schedules->pluck('sch_start_time')->unique()->sort()->values();
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         $byDay = collect($weekDays)->mapWithKeys(fn ($day) => [
             $day => $schedules->where('sch_day', $day)->sortBy('sch_start_time')->values()
@@ -47,7 +48,7 @@ class FacultyScheduleController extends Controller
         }
 
         return view('faculty.schedule', compact(
-            'faculty', 'schedules', 'byDay', 'weekDays', 'currentSchedule', 'nextInRoom', 'activeSemester'
+            'faculty', 'schedules', 'allTimes', 'byDay', 'weekDays', 'currentSchedule', 'nextInRoom', 'activeSemester'
         ));
     }
 }

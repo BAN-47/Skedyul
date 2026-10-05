@@ -107,6 +107,12 @@
               <div class="bg-[#1a2d5a] px-2 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide text-white">{{ $day }}</div>
             @endforeach
 
+            @php
+              $colorCycle = ['blue', 'amber', 'green', 'teal', 'purple'];
+              $subjectColors = [];
+              $colorIndex = 0;
+            @endphp
+
             @forelse ($allTimes as $time)
               <div class="bg-slate-100 p-2 text-center font-mono text-[11px] font-semibold text-slate-400 dark:bg-slate-800">{{ \Carbon\Carbon::createFromTimeString($time)->format('g:i') }}</div>
               @foreach ($weekDays as $day)
