@@ -34,6 +34,7 @@ Route::middleware('auth')->prefix('chair')->group(function () {
 
 // Chair Faculty Load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
+    // Used by the Subject Management page to pre-assign faculty before plotting.
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
 
     // PBS — Program by Section

@@ -70,6 +70,15 @@
       </div>
 
       <!-- Faculty Load + Workload Distribution -->
+      <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <input id="dashboard-faculty-search" type="search" placeholder="Search faculty..." aria-label="Search dashboard faculty"
+          class="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+        <div class="flex items-center gap-3 text-xs text-slate-500">
+          <span id="dashboard-faculty-page-info" aria-live="polite"></span>
+          <button type="button" id="dashboard-faculty-prev" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+          <button type="button" id="dashboard-faculty-next" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+        </div>
+      </div>
       <div class="two-col">
         <div class="card">
           <div class="card-header">
@@ -98,7 +107,7 @@
                       default     => 'badge-green',
                   };
                 @endphp
-                <tr>
+                <tr data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
                   <td><b>{{ $fl['name'] }}</b></td>
                   <td><span class="font-mono font-bold {{ $loadColor }}">{{ $fl['hours'] }}u</span></td>
                   <td>
@@ -115,6 +124,7 @@
               @empty
                 <tr><td colspan="4" class="text-center text-slate-400 py-4">No faculty in this department yet.</td></tr>
               @endforelse
+              <tr id="dashboard-table-no-results" class="hidden"><td colspan="4" class="text-center text-slate-400 py-4">No faculty match your search.</td></tr>
             </tbody>
           </table>
         </div>
@@ -141,7 +151,7 @@
                   default     => 'text-green-600',
               };
             @endphp
-            <div class="workload-item">
+            <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
               <div class="workload-header">
                 <div class="workload-name">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}</div>
                 <div class="workload-val {{ $textColor }}">{{ $fl['hours'] }}/30u</div>
@@ -158,6 +168,7 @@
           @empty
             <div class="text-[13px] text-slate-400 py-4 text-center">No workload data yet.</div>
           @endforelse
+          <div id="dashboard-list-no-results" class="hidden text-[13px] text-slate-400 py-4 text-center">No faculty match your search.</div>
         </div>
       </div>
 
@@ -171,6 +182,45 @@
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
 <script>
+(() => {
+  const search = document.getElementById('dashboard-faculty-search');
+  const items = [...document.querySelectorAll('[data-dashboard-faculty]')];
+  const facultyGroups = [...items.reduce((groups, item) => {
+    const key = item.dataset.personKey;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+    return groups;
+  }, new Map()).values()];
+  const tableEmpty = document.getElementById('dashboard-table-no-results');
+  const listEmpty = document.getElementById('dashboard-list-no-results');
+  const info = document.getElementById('dashboard-faculty-page-info');
+  const previous = document.getElementById('dashboard-faculty-prev');
+  const next = document.getElementById('dashboard-faculty-next');
+  const pageSize = 10;
+  let page = 0;
+
+  function renderFacultyPage() {
+    const query = search.value.trim().toLowerCase();
+    const matches = facultyGroups.filter(group => group[0].dataset.search.includes(query));
+    const pages = Math.max(1, Math.ceil(matches.length / pageSize));
+    page = Math.min(page, pages - 1);
+    const first = page * pageSize;
+    items.forEach(item => { item.style.display = 'none'; });
+    matches.slice(first, first + pageSize).flat().forEach(item => { item.style.display = ''; });
+    const hasMatches = matches.length > 0;
+    tableEmpty.classList.toggle('hidden', hasMatches || facultyGroups.length === 0);
+    listEmpty.classList.toggle('hidden', hasMatches || facultyGroups.length === 0);
+    info.textContent = hasMatches ? `Showing ${first + 1}–${Math.min(first + pageSize, matches.length)} of ${matches.length}` : 'Showing 0 of 0';
+    previous.disabled = page === 0;
+    next.disabled = page >= pages - 1;
+  }
+
+  search.addEventListener('input', () => { page = 0; renderFacultyPage(); });
+  previous.addEventListener('click', () => { page--; renderFacultyPage(); });
+  next.addEventListener('click', () => { page++; renderFacultyPage(); });
+  renderFacultyPage();
+})();
+
 function setActiveNav(el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el.classList.add('active');

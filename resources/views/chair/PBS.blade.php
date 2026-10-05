@@ -406,12 +406,32 @@
 
       <div class="mb-3">
         <label class="field-label">Professor</label>
-        <select id="add-faculty" class="field-input">
-          <option value="">-- Select Professor --</option>
-          @foreach($faculty as $f)
-            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}</option>
-          @endforeach
-        </select>
+        <div class="relative" id="pbs-teacher-picker">
+          <input type="hidden" id="add-faculty" value="">
+          <button type="button" id="pbs-teacher-trigger" onclick="togglePbsTeacherPicker()" aria-haspopup="listbox" aria-expanded="false"
+                  class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[13px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+            <span id="pbs-teacher-label" class="block truncate">Choose a professor</span>
+            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+          </button>
+          <div id="pbs-teacher-panel" class="hidden absolute left-0 top-[calc(100%+6px)] z-[70] w-full min-w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+            <div class="border-b border-slate-100 bg-slate-50 p-3">
+              <div class="mb-2 text-sm font-bold text-slate-800">Select a professor</div>
+              <input id="pbs-teacher-search" type="search" oninput="filterPbsTeachers(this.value)" placeholder="Search by name..." autocomplete="off" aria-label="Search professors"
+                     class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+            </div>
+            <div id="pbs-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
+              @foreach($faculty as $f)
+                @php $professorName = trim($f->fac_first_name.' '.$f->fac_last_name); @endphp
+                <button type="button" role="option" aria-selected="false" data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}" data-label="{{ $professorName }}"
+                        onclick="selectPbsTeacher(this)" class="pbs-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
+                  <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
+                  <span class="pbs-teacher-check hidden text-sm font-bold text-indigo-600" aria-hidden="true">✓</span>
+                </button>
+              @endforeach
+              <div id="pbs-teacher-empty" class="hidden px-3 py-6 text-center text-[13px] text-slate-500">No professors match that search.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="mb-3">
@@ -455,6 +475,7 @@
 
     <div class="modal-footer">
       <button type="button" onclick="closeModal('modal-add-schedule')" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="add-another-submit" onclick="submitAdd(true)" class="btn btn-secondary">Save &amp; Add Another</button>
       <button type="button" id="add-submit" onclick="submitAdd()" class="btn btn-primary">Confirm Schedule</button>
     </div>
   </div>

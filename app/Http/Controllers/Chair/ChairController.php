@@ -12,7 +12,6 @@ use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Study_Load;
-use App\Models\Workload;
 use App\Models\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
@@ -43,20 +42,34 @@ class ChairController extends Controller
         // have one — a chair only manages faculty actually assigned to their
         // program, not the whole department (same pattern used everywhere
         // else a chair is program-specific).
+        $programId = $deptChair->dc_dept_id;
+        $assignedFacultyIds = $semester && $programId
+            ? Study_Load::where('sl_sem_id', $semester->sem_id)
+                ->whereHas('section', fn ($q) => $q->where('sec_dept_id', $programId))
+                ->distinct()
+                ->pluck('sl_fac_id')
+            : collect();
+
         $faculty = Faculty::with('user')
-            ->where('fac_college_id', $deptId)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('fac_dept_id', $deptChair->dc_prog_id))
+            ->where(function ($q) use ($deptId, $programId) {
+                $q->where('fac_college_id', $deptId)
+                    ->when($programId, fn ($query) => $query->where('fac_dept_id', $programId));
+            })
+            ->orWhereIn('fac_id', $assignedFacultyIds)
             ->get();
 
         $totalFaculty = $faculty->count();
 
-        $facultyLoad = $faculty->map(function ($f) use ($semester, $academicYear) {
-            $workload = Workload::where('wl_fac_id', $f->fac_id)
-                ->when($semester, fn($q) => $q->where('wl_sem_id', $semester->sem_id))
-                ->when($academicYear, fn($q) => $q->where('wl_ay_id', $academicYear->ay_id))
-                ->first();
+        $studyLoadsByFaculty = Study_Load::with('subject')
+            ->whereIn('sl_fac_id', $faculty->pluck('fac_id'))
+            ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
+            ->get()
+            ->groupBy('sl_fac_id');
 
-            $totalHours = (float) ($workload->wl_total_hours ?? 0);
+        $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
+            $totalHours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
+                ->sum(fn ($load) => (float) ($load->subject?->course_lecture_hours ?? 0)
+                    + (float) ($load->subject?->course_lab_hours ?? 0));
             $remaining  = max(0, 30 - $totalHours);
             $percent    = min(100, (int) round(($totalHours / 30) * 100));
 

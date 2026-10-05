@@ -317,10 +317,13 @@ class PbsController extends Controller
                 fn ($q) => $q->where('sch_sem_id', $request->input('semester'))
             );
 
-        $ids = $query->pluck('sch_load_id', 'sch_id');
+        $schedules = $query->get(['sch_id', 'sch_load_id', 'sch_fac_id', 'sch_sem_id']);
+        $ids = $schedules->pluck('sch_load_id');
 
-        Schedule::whereIn('sch_id', $ids->keys())->delete();
-        \App\Models\Study_Load::whereIn('sl_id', $ids->values())->delete();
+        Schedule::whereIn('sch_id', $schedules->pluck('sch_id'))->delete();
+        \App\Models\Study_Load::whereIn('sl_id', $ids)->delete();
+        $schedules->unique(fn ($schedule) => $schedule->sch_fac_id.'|'.$schedule->sch_sem_id)
+            ->each(fn ($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
     }

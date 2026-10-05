@@ -139,7 +139,7 @@ class User extends Authenticatable
     public function getRoomLocationAttribute(): ?string
     {
         $rooms = $this->faculty?->studyLoads
-            ->map(fn ($load) => $load->schedule?->room)
+            ->flatMap(fn ($load) => $load->schedules->map(fn ($schedule) => $schedule->room))
             ->filter()
             ->map(function ($room) {
 

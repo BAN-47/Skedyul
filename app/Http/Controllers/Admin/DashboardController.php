@@ -35,25 +35,49 @@ class DashboardController extends Controller
         $semester     = Semester::where('sem_is_active', true)->first();
 
         // ---------- SECTIONS ----------
-        $sectionAll = Section::with('program')
+        $sectionAll = Section::with([
+            'program.department',
+            'studyLoads' => fn ($query) => $query
+                ->when($semester, fn ($loads) => $loads->where('sl_sem_id', $semester->sem_id))
+                ->with(['schedules' => fn ($schedules) => $schedules
+                    ->where('sch_is_active', true)
+                    ->when($semester, fn ($items) => $items->where('sch_sem_id', $semester->sem_id))]),
+        ])
             ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
             ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
             ->orderBy('sec_name')
             ->get();
 
         $totalSections    = $sectionAll->count();
-        $scheduledCount   = $sectionAll->where('sec_status', 'Scheduled')->count();
-        $inProgressCount  = $sectionAll->where('sec_status', 'In Progress')->count();
-        $unscheduledCount = $sectionAll->where('sec_status', 'Unscheduled')->count();
+        $sectionAll->each(function ($section) {
+            $loads = $section->studyLoads;
+            $scheduledLoads = $loads->filter(fn ($load) => $load->schedules->isNotEmpty())->count();
+            $totalLoads = $loads->count();
+
+            $section->schedule_load_total = $totalLoads;
+            $section->schedule_load_plotted = $scheduledLoads;
+            $section->schedule_progress_percent = $totalLoads > 0
+                ? (int) round(($scheduledLoads / $totalLoads) * 100)
+                : 0;
+            $section->schedule_progress_status = match (true) {
+                $totalLoads > 0 && $scheduledLoads === $totalLoads => 'Fully Scheduled',
+                $scheduledLoads > 0 => 'In Progress',
+                default => 'Unscheduled',
+            };
+        });
+
+        $scheduledCount   = $sectionAll->where('schedule_progress_status', 'Fully Scheduled')->count();
+        $inProgressCount  = $sectionAll->where('schedule_progress_status', 'In Progress')->count();
+        $unscheduledCount = $sectionAll->where('schedule_progress_status', 'Unscheduled')->count();
 
         // Full list for client-side JS pagination (8 per page)
         $section = $sectionAll;
 
         $program = $sectionAll
-            ->groupBy(fn($s) => $s->program->prog_name ?? 'Unknown')
+            ->groupBy(fn($s) => $s->program->dept_name ?? $s->program->prog_name ?? 'Unknown Department')
             ->map(function ($group, $programName) {
-                $total     = $group->count();
-                $scheduled = $group->where('sec_status', 'Scheduled')->count();
+                $total     = $group->sum('schedule_load_total');
+                $scheduled = $group->sum('schedule_load_plotted');
                 $percent   = $total > 0 ? round(($scheduled / $total) * 100) : 0;
 
                 $color = match (true) {

@@ -40,8 +40,19 @@ class ChairFacultyLoadController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::where('fac_college_id', $deptChair->dc_college_id)
-            ->when($deptChair->dc_dept_id, fn ($q) => $q->where('fac_dept_id', $deptChair->dc_dept_id))
+        $programSectionIds = Section::where('sec_dept_id', $deptChair->dc_dept_id)->pluck('sec_id');
+        $assignedFacultyIds = $semester
+            ? Study_Load::where('sl_sem_id', $semester->sem_id)
+                ->whereIn('sl_sec_id', $programSectionIds)
+                ->distinct()
+                ->pluck('sl_fac_id')
+            : collect();
+
+        $faculty = Faculty::where(function ($q) use ($deptChair) {
+                $q->where('fac_college_id', $deptChair->dc_college_id)
+                    ->when($deptChair->dc_dept_id, fn ($query) => $query->where('fac_dept_id', $deptChair->dc_dept_id));
+            })
+            ->orWhereIn('fac_id', $assignedFacultyIds)
             ->orderBy('fac_first_name')
             ->get();
 
@@ -53,24 +64,23 @@ class ChairFacultyLoadController extends Controller
             ->orderBy('course_code')
             ->get();
 
-        $subjectsById = $subjects->keyBy('course_id');
-
         $studyLoads = Study_Load::whereIn('sl_fac_id', $facultyIds)
             ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
+            ->with('subject')
             ->get()
             ->groupBy('sl_fac_id');
 
-        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
+        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads) {
             $loads = $studyLoads->get($f->fac_id, collect());
 
-            $totalUnits = $loads->sum(function ($sl) use ($subjectsById) {
-                $subj = $subjectsById->get($sl->sl_course_id);
+            $totalUnits = $loads->sum(function ($sl) {
+                $subj = $sl->subject;
                 return $subj
                     ? ((float) $subj->course_lecture_hours + (float) $subj->course_lab_hours)
                     : 0;
             });
 
-            $subjectCodes = $loads->map(fn ($sl) => optional($subjectsById->get($sl->sl_course_id))->course_code)
+            $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)
                 ->filter()
                 ->implode(', ');
 

@@ -35,6 +35,73 @@ function clearInlineError(boxId) {
     if (box) box.classList.add('hidden');
 }
 
+function setButtonLoading(button, loading, label = 'Saving...') {
+    if (!button) return;
+    if (!button.dataset.idleHtml) button.dataset.idleHtml = button.innerHTML;
+    button.disabled = loading;
+    button.setAttribute('aria-busy', String(loading));
+    button.innerHTML = loading
+        ? `<span class="inline-flex items-center gap-2"><span aria-hidden="true" class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"></span>${label}</span>`
+        : button.dataset.idleHtml;
+}
+
+function setAddButtonsLoading(loading, keepOpen = false) {
+    const confirm = document.getElementById('add-submit');
+    const another = document.getElementById('add-another-submit');
+    if (!loading) {
+        setButtonLoading(confirm, false);
+        setButtonLoading(another, false);
+        return;
+    }
+    setButtonLoading(confirm, !keepOpen, 'Saving schedule...');
+    setButtonLoading(another, keepOpen, 'Saving & preparing next...');
+    (keepOpen ? confirm : another).disabled = true;
+}
+
+function togglePbsTeacherPicker() {
+    const panel = document.getElementById('pbs-teacher-panel');
+    const trigger = document.getElementById('pbs-teacher-trigger');
+    if (!panel || !trigger) return;
+    panel.classList.toggle('hidden');
+    trigger.setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
+    if (!panel.classList.contains('hidden')) {
+        const search = document.getElementById('pbs-teacher-search');
+        search.value = '';
+        filterPbsTeachers('');
+        setTimeout(() => search.focus(), 30);
+    }
+}
+
+function filterPbsTeachers(query) {
+    const q = query.trim().toLowerCase();
+    const options = [...document.querySelectorAll('.pbs-teacher-option')];
+    options.forEach(option => { option.style.display = option.dataset.name.includes(q) ? '' : 'none'; });
+    const empty = document.getElementById('pbs-teacher-empty');
+    if (empty) empty.classList.toggle('hidden', options.some(option => option.style.display !== 'none'));
+}
+
+function selectPbsTeacher(option) {
+    document.getElementById('add-faculty').value = option.dataset.id;
+    document.getElementById('pbs-teacher-label').textContent = option.dataset.label;
+    document.getElementById('pbs-teacher-trigger').classList.remove('text-slate-600');
+    document.getElementById('pbs-teacher-trigger').classList.add('text-slate-800');
+    document.querySelectorAll('.pbs-teacher-option').forEach(item => {
+        const selected = item === option;
+        item.setAttribute('aria-selected', String(selected));
+        item.classList.toggle('bg-indigo-50', selected);
+        item.querySelector('.pbs-teacher-check').classList.toggle('hidden', !selected);
+    });
+    document.getElementById('pbs-teacher-panel').classList.add('hidden');
+    document.getElementById('pbs-teacher-trigger').setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', event => {
+    const picker = document.getElementById('pbs-teacher-picker');
+    if (!picker || picker.contains(event.target)) return;
+    document.getElementById('pbs-teacher-panel')?.classList.add('hidden');
+    document.getElementById('pbs-teacher-trigger')?.setAttribute('aria-expanded', 'false');
+});
+
 /*
   Backend responses come back as { success, conflict, message }.
   - conflict === true  -> a double-booking (teacher/room/section already
@@ -188,6 +255,16 @@ function openAddModal(day, startTime) {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    document.getElementById('pbs-teacher-label').textContent = 'Choose a professor';
+    document.getElementById('pbs-teacher-trigger').classList.add('text-slate-600');
+    document.getElementById('pbs-teacher-trigger').classList.remove('text-slate-800');
+    document.getElementById('pbs-teacher-panel').classList.add('hidden');
+    document.getElementById('pbs-teacher-trigger').setAttribute('aria-expanded', 'false');
+    document.querySelectorAll('.pbs-teacher-option').forEach(option => {
+        option.setAttribute('aria-selected', 'false');
+        option.classList.remove('bg-indigo-50');
+        option.querySelector('.pbs-teacher-check').classList.add('hidden');
+    });
 
     // Reset subject filter (show all until a section is chosen)
     filterSubjectsBySection('add-section', 'add-subject');
@@ -208,11 +285,11 @@ function openAddModal(day, startTime) {
         }
     }
 
-    document.getElementById('add-submit').disabled = false;
+    setAddButtonsLoading(false);
     openModal('modal-add-schedule');
 }
 
-function submitAdd() {
+function submitAdd(keepOpen = false) {
     clearInlineError('add-error');
 
     const payload = {
@@ -236,8 +313,7 @@ function submitAdd() {
         return;
     }
 
-    const btn = document.getElementById('add-submit');
-    btn.disabled = true;
+    setAddButtonsLoading(true, keepOpen);
 
     fetch('/chair/pbs', {
         method:  'POST',
@@ -252,19 +328,27 @@ function submitAdd() {
         const data = await res.json().catch(() => ({}));
 
         if (data.success) {
-            closeModal('modal-add-schedule');
             showToast(data.message || 'Schedule added.');
-            setTimeout(() => location.reload(), 800);
+            if (keepOpen) {
+                document.getElementById('add-day').value = '';
+                document.getElementById('add-start').value = '';
+                document.getElementById('add-end').value = '';
+                document.getElementById('add-description').value = '';
+                setAddButtonsLoading(false);
+            } else {
+                closeModal('modal-add-schedule');
+                setTimeout(() => location.reload(), 800);
+            }
         } else {
             // 422 conflict → toast (bottom-right), modal stays open
             // other errors → inline in modal
             handleScheduleError(data, 'add-error');
-            btn.disabled = false;
+            setAddButtonsLoading(false);
         }
     })
     .catch(() => {
         showInlineError('add-error', 'Something went wrong. Please try again.');
-        btn.disabled = false;
+        setAddButtonsLoading(false);
     });
 }
 
@@ -286,7 +370,7 @@ function openEditModal(block) {
     const roomEl = document.getElementById('edit-room');
     if (roomEl) roomEl.value = block.dataset.room || '';
 
-    document.getElementById('edit-submit').disabled = false;
+    setButtonLoading(document.getElementById('edit-submit'), false);
     openModal('modal-edit-schedule');
 }
 
@@ -317,7 +401,7 @@ function submitEdit() {
     }
 
     const btn = document.getElementById('edit-submit');
-    btn.disabled = true;
+    setButtonLoading(btn, true, 'Saving changes...');
 
     fetch(`/chair/pbs/${id}`, {
         method:  'POST',
@@ -337,12 +421,12 @@ function submitEdit() {
             setTimeout(() => location.reload(), 800);
         } else {
             handleScheduleError(data, 'edit-error');
-            btn.disabled = false;
+            setButtonLoading(btn, false);
         }
     })
     .catch(() => {
         showInlineError('edit-error', 'Something went wrong. Please try again.');
-        btn.disabled = false;
+        setButtonLoading(btn, false);
     });
 }
 

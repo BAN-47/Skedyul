@@ -23,7 +23,7 @@ class UserController extends Controller
 
         $users = User::query()
             ->with([
-                'faculty.studyLoads.schedule.room' => function ($query) {
+                'faculty.studyLoads.schedules.room' => function ($query) {
                     $query->select(
                         'room_id',
                         'room_name',
