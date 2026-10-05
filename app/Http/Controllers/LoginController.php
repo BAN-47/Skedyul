@@ -14,6 +14,11 @@ class LoginController extends Controller
 {
     public function login(Request $request)
     {
+        // An already authenticated user should not see the login form again.
+        if (Auth::check()) {
+            return $this->redirectForRole(Auth::user()->usr_role);
+        }
+
         $request->validate([
             'email' => 'required|email',
             'password' => 'required'
@@ -54,7 +59,9 @@ class LoginController extends Controller
             $user->save();
         }
 
+        // Replace the pre-login session ID to prevent session fixation.
         Auth::login($user);
+        $request->session()->regenerate();
         AuditActivityLogger::record(
             $user,
             'Logged in',
@@ -63,7 +70,12 @@ class LoginController extends Controller
             $request->ip()
         );
 
-        switch ($user->usr_role) {
+        return $this->redirectForRole($user->usr_role);
+    }
+
+    private function redirectForRole(?string $role)
+    {
+        switch ($role) {
             case 'system_admin':
                 return redirect()->route('admin.dashboard');
             case 'department_chair':
@@ -74,7 +86,9 @@ class LoginController extends Controller
                 return redirect()->route('faculty.dashboard');
             default:
                 Auth::logout();
-                return back()->with('error', 'Invalid role.');
+                request()->session()->invalidate();
+                request()->session()->regenerateToken();
+                return redirect()->route('login')->with('error', 'Invalid role.');
         }
     }
 
