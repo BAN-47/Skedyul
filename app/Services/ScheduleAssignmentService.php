@@ -32,6 +32,10 @@ class ScheduleAssignmentService
 
     public function assign(array $data): array
     {
+        if (!$this->facultyAccountIsActive($data['fac_id'])) {
+            return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
+        }
+
         if ($conflict = $this->findConflict($data)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
@@ -110,6 +114,10 @@ class ScheduleAssignmentService
 
     public function update(string $scheduleId, array $data): array
     {
+        if (!$this->facultyAccountIsActive($data['fac_id'])) {
+            return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
+        }
+
         $schedule = Schedule::findOrFail($scheduleId);
 
         if ($conflict = $this->findConflict($data, excludeScheduleId: $scheduleId)) {
@@ -197,6 +205,14 @@ class ScheduleAssignmentService
             ->with('subject')
             ->get()
             ->sum(fn ($load) => (float) ($load->subject?->course_lecture_hours ?? 0) + (float) ($load->subject?->course_lab_hours ?? 0));
+    }
+
+    private function facultyAccountIsActive(string $facultyId): bool
+    {
+        return Faculty::query()
+            ->whereKey($facultyId)
+            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->exists();
     }
 
     public function syncWorkload(string $facultyId, string $semesterId): void

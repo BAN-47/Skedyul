@@ -38,7 +38,11 @@ class PbtController extends Controller
         $filters['semester'] = $activeSem->sem_id ?? null;
         $facultyId = $request->query('faculty');
 
-        $selectedFaculty = $facultyId ? Faculty::find($facultyId) : null;
+        $selectedFaculty = $facultyId
+            ? Faculty::whereKey($facultyId)
+                ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+                ->first()
+            : null;
 
         $schedules = collect();
         if ($selectedFaculty) {
@@ -65,6 +69,7 @@ class PbtController extends Controller
 
         // Build teacher groups (must be faculty rows for FK)
         $allFaculty = Faculty::query()
+            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();

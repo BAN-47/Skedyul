@@ -8,6 +8,7 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Semester;
+use App\Models\Study_Load;
 use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -53,24 +54,27 @@ class FacultyScheduleController extends Controller
             ->unique(fn ($schedule) => $schedule->sch_course_id . '|' . $schedule->sch_sec_id)
             ->values();
 
-        $coursePreparations = $allSchedules
-            ->filter(fn ($schedule) => $schedule->subject)
-            ->unique('sch_course_id')
-            ->values();
+        // Match PBT: units/preparations come from assigned Study Loads,
+        // while weekly hours come from the meetings attached to those loads.
+        $studyLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
+            ->when($activeSemester, fn ($query) => $query->where('sl_sem_id', $activeSemester->sem_id))
+            ->with(['subject', 'schedules'])
+            ->get();
+
+        $units = $studyLoads->sum(fn ($load) =>
+            (float) ($load->subject->course_lecture_hours ?? 0)
+            + (float) ($load->subject->course_lab_hours ?? 0)
+        );
+        $hoursPerWeek = $studyLoads->sum(fn ($load) => $load->schedules->sum(function ($schedule) {
+            $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+            $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+            return $start->diffInMinutes($end) / 60;
+        }));
 
         $loadStats = [
-            'preparations' => $coursePreparations->count(),
-            'units' => $coursePreparations->sum(fn ($schedule) =>
-                (float) ($schedule->subject->course_lecture_hours ?? 0)
-                + (float) ($schedule->subject->course_lab_hours ?? 0)
-            ),
-            'hours_week' => round($allSchedules->sum(function ($schedule) {
-                $start = strtotime((string) $schedule->sch_start_time);
-                $end = strtotime((string) $schedule->sch_end_time);
-                return $start !== false && $end !== false && $end > $start
-                    ? ($end - $start) / 3600
-                    : 0;
-            }), 2),
+            'preparations' => $studyLoads->pluck('sl_course_id')->unique()->count(),
+            'units' => $units ?: null,
+            'hours_week' => $hoursPerWeek ?: null,
             'designation' => $faculty->fac_rank,
             'production' => null,
             'extension' => null,

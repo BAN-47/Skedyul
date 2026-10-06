@@ -16,6 +16,9 @@ class FacultyAccountReview extends Model
         'fvr_usr_id',
         'fvr_id_photo_path',
         'fvr_status',
+        'fvr_applicant_name',
+        'fvr_applicant_email',
+        'fvr_decision_note',
         'fvr_reviewed_by',
         'fvr_reviewed_at',
     ];
