@@ -1,7 +1,46 @@
 
     const loginPath = document.body.dataset.loginUrl;
     const registerPath = document.body.dataset.registerUrl;
+    const registerDraftKey = 'skedyul.register.draft.v1';
     let registerPhonePicker = null;
+
+    function saveRegisterDraft(form) {
+      if (!form) return;
+      const draft = {};
+      [...form.elements].forEach((field) => {
+        if (!field.name || field.name === '_token' || field.type === 'password' || field.type === 'file' || field.disabled) return;
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          if (field.checked) draft[field.name] = field.value;
+          return;
+        }
+        draft[field.name] = field.value;
+      });
+      try {
+        sessionStorage.setItem(registerDraftKey, JSON.stringify(draft));
+      } catch (_) {
+        // Storage may be unavailable in a private browsing session.
+      }
+    }
+
+    function restoreRegisterDraft(form) {
+      if (!form) return;
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(registerDraftKey) || '{}');
+        Object.entries(draft).forEach(([name, value]) => {
+          const field = form.elements.namedItem(name);
+          if (!field || field.type === 'password' || field.type === 'file') return;
+          if (field instanceof RadioNodeList) {
+            [...field].forEach((option) => { option.checked = option.value === value; });
+          } else if (field.type === 'checkbox') {
+            field.checked = Boolean(value);
+          } else {
+            field.value = value;
+          }
+        });
+      } catch (_) {
+        // Ignore malformed or unavailable saved drafts.
+      }
+    }
 
     function initRegisterPhonePicker() {
       const input = document.getElementById('register-phone');
@@ -134,6 +173,21 @@
 
     window.addEventListener('popstate', () => setAuthView(location.pathname === registerPath, false));
 
+    document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.target);
+        if (!input) return;
+        const showPassword = input.type === 'password';
+        input.type = showPassword ? 'text' : 'password';
+        const label = button.dataset.target === 'confirm-password'
+          ? (showPassword ? 'Hide confirm password' : 'Show confirm password')
+          : (showPassword ? 'Hide password' : 'Show password');
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.querySelector('[data-eye-slash]')?.classList.toggle('hidden', !showPassword);
+      });
+    });
+
     document.querySelectorAll('[data-auth-view]').forEach((link) => {
       link.addEventListener('click', (event) => {
         event.preventDefault();
@@ -174,7 +228,17 @@
         button.textContent = 'Submitting for approval…';
       });
 
-      if (!document.getElementById('register-view').hidden) initRegisterPhonePicker();
+      const registerView = document.getElementById('register-view');
+      if (document.getElementById('registration-success')) {
+        try { sessionStorage.removeItem(registerDraftKey); } catch (_) {}
+      } else {
+        restoreRegisterDraft(form);
+      }
+
+      if (!registerView.hidden) initRegisterPhonePicker();
+
+      form?.addEventListener('input', () => saveRegisterDraft(form));
+      form?.addEventListener('change', () => saveRegisterDraft(form));
 
       const college = document.getElementById('register-college');
       const department = document.getElementById('register-department');

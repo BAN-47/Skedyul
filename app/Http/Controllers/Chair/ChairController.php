@@ -69,8 +69,10 @@ class ChairController extends Controller
 
         $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
             $totalHours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
-                ->sum(fn ($load) => (float) ($load->subject?->course_lecture_hours ?? 0)
-                    + (float) ($load->subject?->course_lab_hours ?? 0));
+                ->sum(fn ($load) => $load->subject?->course_units !== null
+                    ? (float) $load->subject->course_units
+                    : (float) ($load->subject?->course_lecture_hours ?? 0)
+                        + (float) ($load->subject?->course_lab_hours ?? 0));
             $remaining  = max(0, 30 - $totalHours);
             $percent    = min(100, (int) round(($totalHours / 30) * 100));
 

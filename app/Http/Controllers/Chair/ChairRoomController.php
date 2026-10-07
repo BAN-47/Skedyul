@@ -78,7 +78,7 @@ class ChairRoomController extends Controller
         $faculty = $facultyRecords->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
             $totalUnits = $studyLoads->get($f->fac_id, collect())->sum(function ($sl) use ($subjectsById) {
                 $s = $subjectsById->get($sl->sl_subj_id);
-                return $s ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours) : 0;
+                return $s ? (float) ($s->subj_units ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)) : 0;
             });
             return [
                 'id'    => $f->fac_id,

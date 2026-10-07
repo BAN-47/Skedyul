@@ -75,7 +75,7 @@
             </button>
             <button type="button" onclick="setMisShift('night')"
                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300 {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">
-              Night
+              Evening
             </button>
           </div>
         </div>
@@ -105,6 +105,7 @@
                   <th class="px-2 py-2 text-left border-b border-l border-slate-200">Day</th>
                   <th class="px-2 py-2 text-center border-b border-l border-slate-200">Lec</th>
                   <th class="px-2 py-2 text-center border-b border-l border-slate-200">Lab</th>
+                  <th class="px-2 py-2 text-center border-b border-l border-slate-200">Total Hrs</th>
                   <th class="px-2 py-2 text-center border-b border-l border-slate-200">Unit</th>
                   <th class="px-2 py-2 text-left border-b border-l border-slate-200">Room</th>
                   <th class="px-2 py-2 text-left border-b border-l border-slate-200">Instructor</th>
@@ -118,7 +119,8 @@
                     $title = $course->course_name ?? $course->subj_name ?? '—';
                     $lec   = $course->course_lecture_hours ?? $course->subj_lecture_hours ?? 0;
                     $lab   = $course->course_lab_hours ?? $course->subj_lab_hours ?? 0;
-                    $unit  = (float) $lec + (float) $lab;
+                    $totalHours = $course->course_total_hours ?? ((float) $lec + (float) $lab);
+                    $unit  = (float) ($course->course_units ?? ((float) $lec + (float) $lab));
                     try {
                       $time = \Illuminate\Support\Carbon::parse($s->sch_start_time)->format('g:i A')
                         . ' – '
@@ -148,6 +150,7 @@
                     <td class="px-2 py-1.5 whitespace-nowrap border-l border-slate-100 uppercase">{{ $day }}</td>
                     <td class="px-2 py-1.5 text-center border-l border-slate-100">{{ $lec }}</td>
                     <td class="px-2 py-1.5 text-center border-l border-slate-100">{{ $lab }}</td>
+                    <td class="px-2 py-1.5 text-center border-l border-slate-100">{{ $totalHours }}</td>
                     <td class="px-2 py-1.5 text-center font-semibold border-l border-slate-100">{{ $unit }}</td>
                     <td class="px-2 py-1.5 whitespace-nowrap border-l border-slate-100">{{ $room }}</td>
                     <td class="px-2 py-1.5 border-l border-slate-100">{{ $inst }}</td>

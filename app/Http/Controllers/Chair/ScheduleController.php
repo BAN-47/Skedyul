@@ -122,12 +122,12 @@ class ScheduleController extends Controller
         }
 
         // ---------- 30-UNIT MAX WORKLOAD CHECK ----------
-        $subjectHours = $subject->subj_lecture_hours + $subject->subj_lab_hours;
+        $subjectHours = $subject->subj_units ?? ($subject->subj_lecture_hours + $subject->subj_lab_hours);
 
         $existingHours = Study_Load::where('sl_fac_id', $data['fac_id'])
             ->where('sl_sem_id', $semester->sem_id)
             ->join('course', 'course.course_id', '=', 'study_load.sl_course_id')
-            ->sum(DB::raw('course.course_lecture_hours + course.course_lab_hours'));
+            ->sum(DB::raw('COALESCE(course.course_units, course.course_lecture_hours + course.course_lab_hours)'));
 
         $newTotal = $existingHours + $subjectHours;
 

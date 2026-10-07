@@ -86,11 +86,14 @@
                                     <th
                                         class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">
                                         Lab</th>
+                                    <th
+                                        class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">
+                                        Total Hrs</th>
                                 </tr>
                             </thead>
                             <tbody id="subjects-table">
                                 <tr id="subjects-empty-row">
-                                    <td colspan="5" class="px-3 py-10 text-center text-sm text-slate-400">
+                                    <td colspan="6" class="px-3 py-10 text-center text-sm text-slate-400">
                                         Select a year level and semester above to load subjects.
                                     </td>
                                 </tr>
@@ -124,7 +127,7 @@
             if (!year || !sem) {
                 tbody.innerHTML = `
                     <tr id="subjects-empty-row">
-                        <td colspan="5" class="px-3 py-10 text-center text-sm text-slate-400">
+                        <td colspan="6" class="px-3 py-10 text-center text-sm text-slate-400">
                             Select a year level and semester above to load subjects.
                         </td>
                     </tr>`;
@@ -144,7 +147,7 @@
             if (list.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-3 py-10 text-center text-sm text-slate-400">
+                        <td colspan="6" class="px-3 py-10 text-center text-sm text-slate-400">
                             No subjects for this year and semester.
                         </td>
                     </tr>`;
@@ -157,6 +160,7 @@
             const totalUnits = list.reduce((a, s) => a + Number(s.units || 0), 0);
             const totalLec = list.reduce((a, s) => a + Number(s.lec || 0), 0);
             const totalLab = list.reduce((a, s) => a + Number(s.lab || 0), 0);
+            const totalHours = list.reduce((a, s) => a + Number(s.total || 0), 0);
 
             hint.classList.remove('hidden');
             hint.textContent = `${yearLabel} · ${semLabel}`;
@@ -170,6 +174,7 @@
                     <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${s.units}</td>
                     <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${s.lec}</td>
                     <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${s.lab}</td>
+                    <td class="border-b border-slate-100 px-3 py-3 text-sm text-slate-600">${s.total}</td>
                 </tr>
             `).join('') + `
                 <tr class="bg-slate-50/80">
@@ -177,6 +182,7 @@
                     <td class="px-3 py-2.5 text-[12px] font-bold text-slate-700">${totalUnits}</td>
                     <td class="px-3 py-2.5 text-[12px] font-bold text-slate-700">${totalLec}</td>
                     <td class="px-3 py-2.5 text-[12px] font-bold text-slate-700">${totalLab}</td>
+                    <td class="px-3 py-2.5 text-[12px] font-bold text-slate-700">${totalHours}</td>
                 </tr>`;
         }
     </script>

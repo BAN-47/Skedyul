@@ -60,7 +60,7 @@ class ScheduleAssignmentService
 
                 if (!$studyLoad) {
                     $course = Course::findOrFail($data['subj_id']);
-                    $courseUnits = (float) $course->course_lecture_hours + (float) $course->course_lab_hours;
+                    $courseUnits = $this->unitsForCourse($course);
                     if ($currentUnits + $courseUnits > $maxUnits) {
                         throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} currently has {$currentUnits}u; this course adds {$courseUnits}u and would exceed the {$maxUnits}u limit.");
                     }
@@ -135,7 +135,7 @@ class ScheduleAssignmentService
                 ])->first();
                 if (!$targetLoad || $targetLoad->sl_id !== $schedule->sch_load_id) {
                     $course = Course::findOrFail($data['subj_id']);
-                    $courseUnits = (float) $course->course_lecture_hours + (float) $course->course_lab_hours;
+                    $courseUnits = $this->unitsForCourse($course);
                     $currentUnits = $this->facultyUnits($data['fac_id'], $data['sem_id']);
                     $replacingSameFacultyLoad = $schedule->sch_fac_id === $data['fac_id'] && $schedule->sch_sem_id === $data['sem_id'];
                     $oldLoadHasOtherSchedules = Schedule::where('sch_load_id', $schedule->sch_load_id)
@@ -144,8 +144,7 @@ class ScheduleAssignmentService
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
                     if ($replacingSameFacultyLoad && $willRemoveOldLoad) {
                         $oldCourse = Course::find($schedule->sch_course_id);
-                        $currentUnits -= (float) ($oldCourse?->course_lecture_hours ?? 0)
-                            + (float) ($oldCourse?->course_lab_hours ?? 0);
+                        $currentUnits -= $oldCourse ? $this->unitsForCourse($oldCourse) : 0;
                     }
                     $projectedUnits = $currentUnits + ($targetLoad ? 0 : $courseUnits);
                     $unitsToAdd = $targetLoad ? 0 : $courseUnits;
@@ -204,7 +203,15 @@ class ScheduleAssignmentService
             ->where('sl_sem_id', $semesterId)
             ->with('subject')
             ->get()
-            ->sum(fn ($load) => (float) ($load->subject?->course_lecture_hours ?? 0) + (float) ($load->subject?->course_lab_hours ?? 0));
+            ->sum(fn ($load) => $load->subject ? $this->unitsForCourse($load->subject) : 0);
+    }
+
+    private function unitsForCourse(Course $course): float
+    {
+        // Older course rows may not have credits populated yet; keep their previous behavior until migrated.
+        return $course->course_units !== null
+            ? (float) $course->course_units
+            : (float) $course->course_lecture_hours + (float) $course->course_lab_hours;
     }
 
     private function facultyAccountIsActive(string $facultyId): bool

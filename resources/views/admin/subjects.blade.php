@@ -124,13 +124,14 @@
                                     <th>Units</th>
                                     <th>Lec Hrs</th>
                                     <th>Lab Hrs</th>
+                                    <th>Total Hrs</th>
                                     <th>Program</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody id="subjects-tbody">
                                 <tr id="subjects-empty-row">
-                                    <td colspan="7" class="text-center text-slate-400 py-10">
+                                    <td colspan="8" class="text-center text-slate-400 py-10">
                                         Select a program, year level and semester to view subjects.
                                     </td>
                                 </tr>
@@ -222,23 +223,26 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="grid grid-cols-4 gap-3 mb-3">
                     <div>
                         <label class="field-label">Units</label>
-                        <input class="field-input bg-slate-50" id="add-subj-units" type="number" value="0"
-                            readonly>
+                        <input class="field-input" id="add-subj-units" name="subj_units" type="number" min="0" step="0.5" value="{{ old('subj_units', 0) }}" required>
                     </div>
                     <div>
                         <label class="field-label">Lecture Hrs</label>
                         <input class="field-input" id="add-subj-lec" name="subj_lecture_hours" type="number"
                             min="0" max="12" step="0.5" value="{{ old('subj_lecture_hours', 0) }}"
-                            oninput="updateSubjectUnits('add')" required>
+                            oninput="updateSubjectTotalHours('add')" required>
                     </div>
                     <div>
                         <label class="field-label">Lab Hrs</label>
                         <input class="field-input" id="add-subj-lab" name="subj_lab_hours" type="number"
                             min="0" max="12" step="0.5" value="{{ old('subj_lab_hours', 0) }}"
-                            oninput="updateSubjectUnits('add')" required>
+                            oninput="updateSubjectTotalHours('add')" required>
+                    </div>
+                    <div>
+                        <label class="field-label">Total Hrs</label>
+                        <input class="field-input bg-slate-50" id="add-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
 
@@ -316,23 +320,26 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-3 mb-3">
+                <div class="grid grid-cols-4 gap-3 mb-3">
                     <div>
                         <label class="field-label">Units</label>
-                        <input class="field-input bg-slate-50" id="edit-subj-units" type="number" value="0"
-                            readonly>
+                        <input class="field-input" id="edit-subj-units" name="subj_units" type="number" min="0" step="0.5" required>
                     </div>
                     <div>
                         <label class="field-label">Lecture Hrs</label>
                         <input class="field-input" id="edit-subj-lec" name="subj_lecture_hours" type="number"
-                            min="0" max="12" step="0.5" oninput="updateSubjectUnits('edit')"
+                            min="0" max="12" step="0.5" oninput="updateSubjectTotalHours('edit')"
                             required>
                     </div>
                     <div>
                         <label class="field-label">Lab Hrs</label>
                         <input class="field-input" id="edit-subj-lab" name="subj_lab_hours" type="number"
-                            min="0" max="12" step="0.5" oninput="updateSubjectUnits('edit')"
+                            min="0" max="12" step="0.5" oninput="updateSubjectTotalHours('edit')"
                             required>
+                    </div>
+                    <div>
+                        <label class="field-label">Total Hrs</label>
+                        <input class="field-input bg-slate-50" id="edit-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
 
@@ -379,11 +386,13 @@
             setTimeout(() => t.classList.remove('show'), 3000);
         }
 
-        function updateSubjectUnits(prefix) {
+        function updateSubjectTotalHours(prefix) {
             const lecture = Number(document.getElementById(`${prefix}-subj-lec`).value) || 0;
             const lab = Number(document.getElementById(`${prefix}-subj-lab`).value) || 0;
-            document.getElementById(`${prefix}-subj-units`).value = lecture + lab;
+            document.getElementById(`${prefix}-subj-total`).value = lecture + lab;
         }
+
+        updateSubjectTotalHours('add');
 
         function escapeHtml(str) {
             if (str == null) return '';
@@ -410,7 +419,7 @@
             if (!prog || !year || !sem) {
                 tbody.innerHTML = `
       <tr id="subjects-empty-row">
-        <td colspan="7" class="text-center text-slate-400 py-10">
+        <td colspan="8" class="text-center text-slate-400 py-10">
           Select a program, year level and semester to view subjects.
         </td>
       </tr>`;
@@ -433,7 +442,7 @@
             if (list.length === 0) {
                 tbody.innerHTML = `
       <tr>
-        <td colspan="7" class="text-center text-slate-400 py-10">
+        <td colspan="8" class="text-center text-slate-400 py-10">
           No subjects for ${escapeHtml(progLabel)} · ${escapeHtml(yearLabel)} · ${escapeHtml(semLabel)}.
         </td>
       </tr>`;
@@ -455,6 +464,7 @@
       <td>${s.units}</td>
       <td>${s.lec}</td>
       <td>${s.lab}</td>
+      <td>${s.total}</td>
       <td>${escapeHtml(s.prog_name)}</td>
       <td>
         <div class="flex gap-1.5">
@@ -465,6 +475,8 @@
             data-name="${escapeAttr(s.name)}"
             data-lec="${s.lec}"
             data-lab="${s.lab}"
+            data-units="${s.units}"
+            data-total="${s.total}"
             data-dept="${s.dept_id || ''}"
             data-prog="${s.prog_id || ''}"
             data-year="${s.year_level ?? ''}"
@@ -495,7 +507,8 @@
             document.getElementById('edit-subj-prog').value = btn.dataset.prog || '';
             document.getElementById('edit-subj-year').value = btn.dataset.year || '';
             document.getElementById('edit-subj-sem').value = btn.dataset.sem || '';
-            updateSubjectUnits('edit');
+            document.getElementById('edit-subj-units').value = btn.dataset.units || 0;
+            updateSubjectTotalHours('edit');
 
             openModal('modal-edit-subject');
         }

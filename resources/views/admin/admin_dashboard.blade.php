@@ -381,7 +381,7 @@
                                 <tr class="dash-subj-row">
                                     <td><span class="font-mono text-[12px] text-slate-600">{{ $subjects->course_code ?? $subjects->subj_code }}</span></td>
                                     <td class="font-semibold">{{ $subjects->course_name ?? $subjects->subj_name }}</td>
-                                    <td>{{ ($subjects->course_lecture_hours ?? $subjects->subj_lecture_hours ?? 0) + ($subjects->course_lab_hours ?? $subjects->subj_lab_hours ?? 0) }}</td>
+                                    <td>{{ $subjects->course_units ?? $subjects->subj_units ?? (($subjects->course_lecture_hours ?? $subjects->subj_lecture_hours ?? 0) + ($subjects->course_lab_hours ?? $subjects->subj_lab_hours ?? 0)) }}</td>
                                     <td>{{ $subjects->program->dept_name ?? $subjects->program->prog_name ?? $subjects->department->dept_name ?? 'N/A' }}</td>
                                     <td>
                                         <span class="badge {{ ($subjects->course_is_active ?? $subjects->subj_is_active ?? true) ? 'badge-green' : 'badge-red' }}">

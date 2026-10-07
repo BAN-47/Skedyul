@@ -266,7 +266,7 @@
 
             <div class="flex rounded-md overflow-hidden border border-slate-300">
               <button type="button" id="shift-day" onclick="setShift('day')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
-              <button type="button" id="shift-night" onclick="setShift('night')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Night</button>
+              <button type="button" id="shift-night" onclick="setShift('night')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Evening</button>
             </div>
 
             <div class="ml-auto text-[11px] text-slate-400 italic">

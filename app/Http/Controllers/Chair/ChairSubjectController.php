@@ -152,7 +152,7 @@ class ChairSubjectController extends Controller
             $faculty = $facultyRecords->map(function (Faculty $f) use ($studyLoads, $subjectsById) {
                 $totalUnits = $studyLoads->get($f->fac_id, collect())->sum(function ($sl) use ($subjectsById) {
                     $s = $subjectsById->get($sl->sl_course_id);
-                    return $s ? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours) : 0;
+                    return $s ? (float) ($s->subj_units ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)) : 0;
                 });
 
                 return [
@@ -183,7 +183,8 @@ class ChairSubjectController extends Controller
                 'name'       => $s->subj_name,
                 'lec'        => (float) $s->subj_lecture_hours,
                 'lab'        => (float) $s->subj_lab_hours,
-                'units'      => (float) $s->subj_lecture_hours + (float) $s->subj_lab_hours,
+                'total'      => (float) ($s->course_total_hours ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)),
+                'units'      => (float) ($s->subj_units ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)),
                 'faculty'    => $s->assignedFaculty,
                 'dept_id'    => $s->subj_dept_id,
                 'year_level' => $year !== null && $year !== '' ? (int) $year : null,
@@ -211,6 +212,7 @@ class ChairSubjectController extends Controller
             'subj_prog_id' => 'required|exists:department,dept_id',
             'subj_code' => 'required|string|unique:course,course_code',
             'subj_name' => 'required|string',
+            'subj_units' => 'required|numeric|min:0',
             'subj_lecture_hours' => 'required|numeric|min:0',
             'subj_lab_hours' => 'required|numeric|min:0',
         ]);
@@ -237,6 +239,7 @@ class ChairSubjectController extends Controller
                 Rule::unique('course', 'course_code')->ignore($subject->course_id, 'course_id'),
             ],
             'subj_name' => 'required|string',
+            'subj_units' => 'required|numeric|min:0',
             'subj_lecture_hours' => 'required|numeric|min:0',
             'subj_lab_hours' => 'required|numeric|min:0',
         ]);

@@ -155,7 +155,7 @@
           {{-- Email --}}
           <div class="mb-4">
             <label class="mb-2 block text-[11px] font-bold uppercase tracking-[.8px] text-slate-500">
-              Email Address
+              Email Address <span class="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
               type="email"
@@ -172,14 +172,20 @@
           {{-- Password --}}
           <div class="mb-8">
             <label class="mb-2 block text-[11px] font-bold uppercase tracking-[.8px] text-slate-500">
-              Password
+              Password <span class="text-red-500" aria-hidden="true">*</span>
             </label>
+            <div class="relative">
             <input
+              id="login-password"
               type="password"
               name="password"
               placeholder="Enter your password"
               required
-              class="w-full rounded-[10px] border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-[3px] focus:ring-blue-600/10">
+              class="w-full rounded-[10px] border border-slate-200 bg-white px-3.5 py-3 pr-12 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-[3px] focus:ring-blue-600/10">
+              <button type="button" data-password-toggle data-target="login-password" aria-label="Show password" title="Show password" class="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 transition hover:text-blue-600">
+                <svg data-eye-icon viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path data-eye-slash d="M3 3l18 18" class="hidden"/></svg>
+              </button>
+            </div>
             @error('password')
             <div class="mt-1 text-xs text-red-500">{{ $message }}</div>
             @enderror
@@ -232,7 +238,8 @@
 
       <div id="register-view" class="w-full max-w-[680px] animate-[fadeUp_.6s_ease]" @unless($showRegister ?? false) hidden @endunless>
         <div class="mb-2 text-5xl font-extrabold tracking-tight text-gray-400 leading-none">REGIS<span class="text-blue-500">TER</span></div>
-        <p class="mb-5 text-xs font-semibold leading-relaxed text-slate-600">Create a faculty account. Complete the same faculty information used in Admin User Accounts.</p>
+        <p class="mb-2 text-xs font-semibold leading-relaxed text-slate-600">Create a faculty account. Complete the same faculty information used in Admin User Accounts.</p>
+        <p class="mb-5 text-[10px] text-slate-500"><span class="font-bold text-red-500">*</span> Required field. Civil Status and Suffix are optional. Your entries are saved in this tab if the page refreshes; select the ID photo again after a refresh.</p>
 
         @if($errors->any())
         <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{{ $errors->first() }}</div>
@@ -243,7 +250,7 @@
           <div class="mb-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Account Information</div>
           <div class="grid grid-cols-2 gap-x-3 gap-y-2.5">
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">First Name</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">First Name <span class="text-red-500" aria-hidden="true">*</span></label>
               <input name="usr_first_name" value="{{ old('usr_first_name') }}" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600" autocomplete="given-name">@error('usr_first_name')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
@@ -253,7 +260,7 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Last Name</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Last Name <span class="text-red-500" aria-hidden="true">*</span></label>
               <input name="usr_last_name" value="{{ old('usr_last_name') }}" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600" autocomplete="family-name">@error('usr_last_name')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
@@ -264,20 +271,31 @@
 
             <div class="col-span-2">
               <div class="mb-1 flex items-center justify-between">
-                <label class="text-[10px] font-bold uppercase text-slate-700">Email Address</label>
+                <label class="text-[10px] font-bold uppercase text-slate-700">Email Address <span class="text-red-500" aria-hidden="true">*</span></label>
                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-indigo-700">Faculty Role</span>
               </div>
               <input type="email" name="usr_email" value="{{ old('usr_email') }}" required autocomplete="email" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600">@error('usr_email')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Password</label>
-              <input id="register-password" type="password" name="password" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600">@error('password')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Password <span class="text-red-500" aria-hidden="true">*</span></label>
+              <div class="relative">
+                <input id="register-password" type="password" name="password" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 pr-9 text-xs outline-none focus:border-blue-600">
+                <button type="button" data-password-toggle data-target="register-password" aria-label="Show password" title="Show password" class="absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 hover:text-blue-600">
+                  <svg data-eye-icon viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path data-eye-slash d="M3 3l18 18" class="hidden"/></svg>
+                </button>
+              </div>
+              @error('password')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Confirm Password</label>
-              <input id="confirm-password" type="password" name="password_confirmation" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600">
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Confirm Password <span class="text-red-500" aria-hidden="true">*</span></label>
+              <div class="relative">
+                <input id="confirm-password" type="password" name="password_confirmation" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 pr-9 text-xs outline-none focus:border-blue-600">
+                <button type="button" data-password-toggle data-target="confirm-password" aria-label="Show confirm password" title="Show confirm password" class="absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 hover:text-blue-600">
+                  <svg data-eye-icon viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/><path data-eye-slash d="M3 3l18 18" class="hidden"/></svg>
+                </button>
+              </div>
               <p id="password-match" class="mt-1 min-h-3 text-[10px]" aria-live="polite">
               </p>
             </div>
@@ -304,7 +322,7 @@
 
             <div>
               <label for="register-dob" class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Date of Birth</label>
-              <input id="register-dob" type="date" name="usr_dob" value="{{ old('usr_dob') }}" min="1950-01-01" max="{{ now()->subYears(6)->format('Y-m-d') }}" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+              <input id="register-dob" type="date" name="usr_dob" value="{{ old('usr_dob') }}" min="1950-01-01" max="{{ now()->subYears()->format('Y-m-d') }}" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
               @error('usr_dob')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
@@ -321,7 +339,7 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Employment Type</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Employment Type <span class="text-red-500" aria-hidden="true">*</span></label>
               <select name="employment_type" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="full_time" @selected(old('employment_type','full_time')==='full_time' )>Full-time</option>
                 <option value="part_time" @selected(old('employment_type')==='part_time' )>Part-time</option>
@@ -329,7 +347,7 @@
             </div>
 
             <div class="col-span-2">
-              <label for="faculty-id-photo" class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Faculty ID Photo (for verification)</label>
+              <label for="faculty-id-photo" class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Faculty ID Photo (for verification) <span class="text-red-500" aria-hidden="true">*</span></label>
               <input
                 id="faculty-id-photo"
                 type="file"
@@ -343,7 +361,7 @@
 
             <div class="col-span-2">
               <div class="mb-1 flex items-center justify-between">
-                <label for="register-phone" class="text-[10px] font-bold uppercase text-slate-700">Phone Number</label>
+                <label for="register-phone" class="text-[10px] font-bold uppercase text-slate-700">Phone Number <span class="text-red-500" aria-hidden="true">*</span></label>
                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-indigo-700">Faculty Role</span>
               </div>
               <input id="register-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="Phone Number" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
@@ -357,14 +375,14 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">College</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">College <span class="text-red-500" aria-hidden="true">*</span></label>
               <select id="register-college" name="college_id" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="">Select college</option>@foreach(($colleges ?? []) as $college)<option value="{{ $college->college_id }}" @selected(old('college_id')===$college->college_id)>{{ $college->college_name }} ({{ $college->college_code }})</option>@endforeach
               </select>@error('college_id')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Department / Program</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Department / Program <span class="text-red-500" aria-hidden="true">*</span></label>
               <select id="register-department" name="dept_id" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="">Select program</option>@foreach(($departments ?? []) as $department)<option value="{{ $department->dept_id }}" data-college="{{ $department->dept_college_id }}" @selected(old('dept_id')===$department->dept_id)>{{ $department->dept_name }} ({{ $department->dept_code }})</option>@endforeach
               </select>@error('dept_id')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror

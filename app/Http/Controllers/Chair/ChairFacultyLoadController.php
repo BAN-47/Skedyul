@@ -22,7 +22,7 @@ use Illuminate\Support\Str;
  * Faculty Load = assign subjects to teachers (study_load only).
  * Room + day/time belong to PBS / PBT schedule plotters, not here.
  *
- * Units = subject lecture + lab hours.
+ * Units = curriculum credit units; lecture/lab hours are contact hours.
  * Full-time max = 30u | Part-time max = 22u
  */
 class ChairFacultyLoadController extends Controller
@@ -75,9 +75,7 @@ class ChairFacultyLoadController extends Controller
 
             $totalUnits = $loads->sum(function ($sl) {
                 $subj = $sl->subject;
-                return $subj
-                    ? ((float) $subj->course_lecture_hours + (float) $subj->course_lab_hours)
-                    : 0;
+                return self::courseUnits($subj);
             });
 
             $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)
@@ -167,7 +165,7 @@ class ChairFacultyLoadController extends Controller
         $faculty = Faculty::findOrFail($data['fac_id']);
         $subject = Course::findOrFail($data['subj_id']);
 
-        $subjectUnits = (float) $subject->course_lecture_hours + (float) $subject->course_lab_hours;
+        $subjectUnits = self::courseUnits($subject);
         if ($subjectUnits <= 0) {
             $subjectUnits = 3; // fallback if hours not set
         }
@@ -181,9 +179,7 @@ class ChairFacultyLoadController extends Controller
             ->get()
             ->sum(function ($sl) {
                 $s = Course::find($sl->sl_course_id);
-                return $s
-                    ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
-                    : 0;
+                return self::courseUnits($s);
             });
 
         if (($currentUnits + $subjectUnits) > $maxUnits) {
@@ -229,9 +225,7 @@ class ChairFacultyLoadController extends Controller
                     ->get()
                     ->sum(function ($sl) {
                         $s = Course::find($sl->sl_course_id);
-                        return $s
-                            ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
-                            : 0;
+                        return self::courseUnits($s);
                     });
 
                 $semester = Semester::find($data['sem_id']);
@@ -282,9 +276,7 @@ class ChairFacultyLoadController extends Controller
                 ->get()
                 ->sum(function ($sl) {
                     $s = Course::find($sl->sl_course_id);
-                    return $s
-                        ? ((float) $s->course_lecture_hours + (float) $s->course_lab_hours)
-                        : 0;
+                    return self::courseUnits($s);
                 });
 
             Workload::where('wl_fac_id', $facId)
@@ -293,5 +285,13 @@ class ChairFacultyLoadController extends Controller
         });
 
         return response()->json(['success' => true, 'message' => 'Subject unassigned.']);
+    }
+
+    private static function courseUnits(?Course $course): float
+    {
+        if (!$course) return 0;
+        return $course->course_units !== null
+            ? (float) $course->course_units
+            : (float) $course->course_lecture_hours + (float) $course->course_lab_hours;
     }
 }

@@ -26,6 +26,7 @@ class Subject extends Model
         'subj_prog_id' => 'course_dept_id',
         'subj_code' => 'course_code',
         'subj_name' => 'course_name',
+        'subj_units' => 'course_units',
         'subj_lecture_hours' => 'course_lecture_hours',
         'subj_lab_hours' => 'course_lab_hours',
         'subj_is_active' => 'course_is_active',
@@ -33,9 +34,9 @@ class Subject extends Model
 
     protected $fillable = [
         'course_college_id', 'course_dept_id', 'course_code', 'course_name',
-        'course_lecture_hours', 'course_lab_hours', 'course_is_active',
+        'course_units', 'course_lecture_hours', 'course_lab_hours', 'course_is_active',
         'subj_dept_id', 'subj_prog_id', 'subj_code', 'subj_name',
-        'subj_lecture_hours', 'subj_lab_hours', 'subj_is_active',
+        'subj_units', 'subj_lecture_hours', 'subj_lab_hours', 'subj_is_active',
     ];
 
     public function getAttribute($key)

@@ -185,7 +185,10 @@ class PbtController extends Controller
             ->with('subject', 'schedules')
             ->get();
 
-        $units = $loads->sum(fn ($l) => ($l->course->course_lecture_hours ?? $l->subject->course_lecture_hours ?? 0) + ($l->course->course_lab_hours ?? $l->subject->course_lab_hours ?? 0));
+        $units = $loads->sum(fn ($load) => $load->subject?->course_units !== null
+            ? (float) $load->subject->course_units
+            : (float) ($load->subject?->course_lecture_hours ?? 0)
+                + (float) ($load->subject?->course_lab_hours ?? 0));
 
         $hoursPerWeek = $loads->sum(function ($load) {
             return $load->schedules->sum(function ($schedule) {
