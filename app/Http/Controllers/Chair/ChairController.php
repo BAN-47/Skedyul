@@ -164,7 +164,7 @@ class ChairController extends Controller
      */
     public function markNotificationRead(Request $request, Notification $notification)
     {
-        abort_unless($notification->notif_usr_id === Auth::id(), 403);
+        abort_unless((string) $notification->notif_usr_id === (string) Auth::id(), 403);
 
         $notification->update(['notif_is_read' => true]);
 

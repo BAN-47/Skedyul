@@ -124,8 +124,13 @@ class ChairSettingsController extends Controller
             'chair_notif_faculty_overload' => 'sometimes|required|boolean',
         ]);
 
+        $userId = (string) $request->user()->usr_id;
         foreach ($data as $key => $value) {
-            \App\Models\SystemSetting::set($key, $value ? '1' : '0', Auth::id());
+            \App\Models\SystemSetting::set(
+                $this->chairNotificationPreferenceKey($userId, $key),
+                $value ? '1' : '0',
+                $userId
+            );
         }
 
         return response()->json(['success' => true]);
@@ -148,13 +153,25 @@ class ChairSettingsController extends Controller
     public function settings()
     {
         $chair = $this->currentChair()->load(['department']);
+        $notificationPreferences = [
+            'chair_notif_faculty_overload' => (bool) \App\Models\SystemSetting::get(
+                $this->chairNotificationPreferenceKey((string) Auth::id(), 'chair_notif_faculty_overload'),
+                '1'
+            ),
+        ];
 
         return view('chair.chair_settings', [
             'chair' => $chair,
             'departmentName' => $chair->department->dept_name ?? 'Not assigned',
             'academicYear' => \App\Models\AcademicYear::where('ay_is_active', true)->first(),
             'activeSemester' => \App\Models\Semester::where('sem_is_active', true)->first(),
+            'notificationPreferences' => $notificationPreferences,
         ]);
+    }
+
+    private function chairNotificationPreferenceKey(string $userId, string $preference): string
+    {
+        return 'chair_notif_user_' . $userId . '_' . $preference;
     }
 
     public function notificationsList(Request $request)
@@ -165,5 +182,14 @@ class ChairSettingsController extends Controller
             ->get();
 
         return response()->json($notifications);
+    }
+
+    public function unreadNotificationsCount()
+    {
+        $count = Notification::where('notif_usr_id', Auth::id())
+            ->where('notif_is_read', false)
+            ->count();
+
+        return response()->json(['count' => $count]);
     }
 }

@@ -15,7 +15,9 @@ use App\Http\Controllers\Chair\ScheduleSubmissionController;
 Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard index
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
-    Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.readAll');
+    Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
+    Route::get('/notifications/unread-count', [ChairSettingsController::class, 'unreadNotificationsCount'])->name('chair.notifications.unread-count');
+    Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');
     Route::post('/notifications/{notification}/read', [ChairController::class, 'markNotificationRead'])->name('chair.notifications.read');
 
     // Chair Faculty Load
@@ -85,9 +87,3 @@ Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function (
 });
 
 Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');
-
-Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
-    Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
-    Route::post('/notifications/{notification}/read', [ChairSettingsController::class, 'markNotificationRead'])->name('chair.notifications.read');
-    Route::post('/notifications/read-all', [ChairSettingsController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');
-});

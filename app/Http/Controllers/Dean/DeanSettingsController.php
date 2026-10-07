@@ -27,7 +27,18 @@ class DeanSettingsController extends Controller
             'dean' => $this->currentDean(),
             'academicYear' => $academicYear,
             'activeSemester' => $activeSemester,
+            'notificationPreferences' => [
+                'dean_notif_faculty_overload' => (bool) SystemSetting::get(
+                    $this->deanNotificationPreferenceKey((string) Auth::id(), 'dean_notif_faculty_overload'),
+                    '1'
+                ),
+            ],
         ]);
+    }
+
+    private function deanNotificationPreferenceKey(string $userId, string $preference): string
+    {
+        return 'dean_notif_user_' . $userId . '_' . $preference;
     }
 
     private function currentDean(): Dean
@@ -142,8 +153,13 @@ class DeanSettingsController extends Controller
             'dean_notif_faculty_overload' => 'required|boolean',
         ]);
 
+        $userId = (string) $request->user()->usr_id;
         foreach ($data as $key => $value) {
-            \App\Models\SystemSetting::set($key, $value ? '1' : '0', auth()->id());
+            SystemSetting::set(
+                $this->deanNotificationPreferenceKey($userId, $key),
+                $value ? '1' : '0',
+                $userId
+            );
         }
 
         return response()->json(['success' => true]);

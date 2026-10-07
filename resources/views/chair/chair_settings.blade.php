@@ -209,8 +209,8 @@
                       <div class="text-xs text-slate-400 mt-0.5">Notify when any faculty member exceeds their maximum unit load</div>
                     </div>
                     <label class="toggle-switch">
-                      <input type="checkbox" data-field="chair_notif_faculty_overload" {{ (bool) \App\Models\SystemSetting::get('chair_notif_faculty_overload', true) ? 'checked' : '' }} onchange="toggleSwitch(this)">
-                      <span class="toggle-track {{ (bool) \App\Models\SystemSetting::get('chair_notif_faculty_overload', true) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                      <input type="checkbox" data-field="chair_notif_faculty_overload" {{ $notificationPreferences['chair_notif_faculty_overload'] ? 'checked' : '' }} onchange="toggleSwitch(this)">
+                      <span class="toggle-track {{ $notificationPreferences['chair_notif_faculty_overload'] ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                     </label>
                   </div>
                 </div>
