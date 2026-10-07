@@ -22,13 +22,13 @@ use Illuminate\Support\Str;
  * Faculty Load = assign subjects to teachers (study_load only).
  * Room + day/time belong to PBS / PBT schedule plotters, not here.
  *
- * Units = curriculum credit units; lecture/lab hours are contact hours.
- * Full-time max = 30u | Part-time max = 22u
+ * Academic units are displayed separately from teaching hours.
+ * Full-time max = 30 teaching hours | Part-time max = 22 teaching hours.
  */
 class ChairFacultyLoadController extends Controller
 {
-    const FULL_TIME_MAX_UNITS = 30;
-    const PART_TIME_MAX_UNITS = 22;
+    const FULL_TIME_MAX_HOURS = 30;
+    const PART_TIME_MAX_HOURS = 22;
     const NEAR_MAX_BUFFER     = 3;
 
     public function index()
@@ -73,26 +73,24 @@ class ChairFacultyLoadController extends Controller
         $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads) {
             $loads = $studyLoads->get($f->fac_id, collect());
 
-            $totalUnits = $loads->sum(function ($sl) {
-                $subj = $sl->subject;
-                return self::courseUnits($subj);
-            });
+            $totalUnits = $loads->sum(fn ($sl) => (float) ($sl->subject?->course_units ?? 0));
+            $totalHours = $loads->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
 
             $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)
                 ->filter()
                 ->implode(', ');
 
             $isPartTime = $f->fac_employment_type === 'part_time';
-            $maxUnits   = $isPartTime ? self::PART_TIME_MAX_UNITS : self::FULL_TIME_MAX_UNITS;
-            $remaining  = max(0, $maxUnits - $totalUnits);
+            $maxHours   = $isPartTime ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
+            $remaining  = max(0, $maxHours - $totalHours);
 
-            if ($totalUnits >= $maxUnits) {
+            if ($totalHours >= $maxHours) {
                 $statusLabel = 'Full';
                 $statusBadge = 'badge-red';
-            } elseif ($totalUnits >= $maxUnits - self::NEAR_MAX_BUFFER) {
+            } elseif ($totalHours >= $maxHours - self::NEAR_MAX_BUFFER) {
                 $statusLabel = 'Near Max';
                 $statusBadge = 'badge-amber';
-            } elseif ($totalUnits <= 0) {
+            } elseif ($totalHours <= 0) {
                 $statusLabel = $isPartTime ? 'Part-time' : 'Available';
                 $statusBadge = $isPartTime ? 'badge-teal' : 'badge-blue';
             } elseif ($isPartTime) {
@@ -103,10 +101,10 @@ class ChairFacultyLoadController extends Controller
                 $statusBadge = 'badge-green';
             }
 
-            if ($totalUnits >= $maxUnits) {
+            if ($totalHours >= $maxHours) {
                 $actionLabel = 'Full';
                 $actionStyle = 'disabled';
-            } elseif ($totalUnits == 0) {
+            } elseif ($totalHours == 0) {
                 $actionLabel = 'Assign';
                 $actionStyle = 'primary';
             } else {
@@ -120,8 +118,9 @@ class ChairFacultyLoadController extends Controller
                 'employment'   => $f->fac_employment_type,
                 'subjects'     => $subjectCodes !== '' ? $subjectCodes : '—',
                 'total_units'  => $totalUnits,
+                'total_hours'  => $totalHours,
                 'remaining'    => $remaining,
-                'max_units'    => $maxUnits,
+                'max_hours'    => $maxHours,
                 'is_part_time' => $isPartTime,
                 'status_label' => $statusLabel,
                 'status_badge' => $statusBadge,
@@ -151,7 +150,7 @@ class ChairFacultyLoadController extends Controller
     /**
      * Assign a subject to a faculty member for a section + semester.
      * Creates study_load only — NO schedule / room (that is PBS/PBT).
-     * Updates workload total units for the semester.
+     * Updates workload total teaching hours for the semester.
      */
     public function assign(Request $request)
     {
@@ -165,39 +164,17 @@ class ChairFacultyLoadController extends Controller
         $faculty = Faculty::findOrFail($data['fac_id']);
         $subject = Course::findOrFail($data['subj_id']);
 
-        $subjectUnits = self::courseUnits($subject);
-        if ($subjectUnits <= 0) {
-            $subjectUnits = 3; // fallback if hours not set
-        }
+        $subjectHours = \App\Services\ScheduleAssignmentService::courseHours($subject);
 
         $isPartTime = $faculty->fac_employment_type === 'part_time';
-        $maxUnits   = $isPartTime ? self::PART_TIME_MAX_UNITS : self::FULL_TIME_MAX_UNITS;
+        $maxHours   = $isPartTime ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
 
-        // Current load from study_load (source of truth)
-        $currentUnits = Study_Load::where('sl_fac_id', $data['fac_id'])
-            ->where('sl_sem_id', $data['sem_id'])
-            ->get()
-            ->sum(function ($sl) {
-                $s = Course::find($sl->sl_course_id);
-                return self::courseUnits($s);
-            });
-
-        if (($currentUnits + $subjectUnits) > $maxUnits) {
-            $label = $isPartTime ? 'part-time' : 'full-time';
-            return response()->json([
-                'success' => false,
-                'message' => "Workload limit exceeded ({$label} max {$maxUnits}u). "
-                    . "Currently {$currentUnits}u — adding {$subjectUnits}u would reach "
-                    . ($currentUnits + $subjectUnits) . "u.",
-            ], 422);
-        }
-
-        // Already assigned this exact subject+section+semester?
+        // Avoid reporting a false overload when an assignment is duplicated.
         $exists = Study_Load::where([
-            'sl_fac_id'  => $data['fac_id'],
+            'sl_fac_id' => $data['fac_id'],
             'sl_course_id' => $data['subj_id'],
-            'sl_sec_id'  => $data['sec_id'],
-            'sl_sem_id'  => $data['sem_id'],
+            'sl_sec_id' => $data['sec_id'],
+            'sl_sem_id' => $data['sem_id'],
         ])->exists();
 
         if ($exists) {
@@ -207,8 +184,25 @@ class ChairFacultyLoadController extends Controller
             ], 422);
         }
 
+        // Current load from study_load (source of truth)
+        $currentHours = Study_Load::where('sl_fac_id', $data['fac_id'])
+            ->where('sl_sem_id', $data['sem_id'])
+            ->with('subject')
+            ->get()
+            ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
+
+        if (($currentHours + $subjectHours) > $maxHours) {
+            $label = $isPartTime ? 'part-time' : 'full-time';
+            return response()->json([
+                'success' => false,
+                'message' => "Teaching-hour limit exceeded ({$label} max {$maxHours} hours). "
+                    . "Currently {$currentHours} hours; adding {$subjectHours} hours would total "
+                    . ($currentHours + $subjectHours) . " hours.",
+            ], 422);
+        }
+
         try {
-            $load = DB::transaction(function () use ($data, $subjectUnits) {
+            $load = DB::transaction(function () use ($data, $subjectHours) {
                 $load = Study_Load::create([
                     'sl_id'          => (string) Str::uuid(),
                     'sl_fac_id'      => $data['fac_id'],
@@ -219,14 +213,12 @@ class ChairFacultyLoadController extends Controller
                     'sl_assigned_at' => now(),
                 ]);
 
-                // Keep workload table in sync (sum of study_load units)
+                // Keep workload table in sync with weekly teaching hours.
                 $newTotal = Study_Load::where('sl_fac_id', $data['fac_id'])
                     ->where('sl_sem_id', $data['sem_id'])
+                    ->with('subject')
                     ->get()
-                    ->sum(function ($sl) {
-                        $s = Course::find($sl->sl_course_id);
-                        return self::courseUnits($s);
-                    });
+                    ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
 
                 $semester = Semester::find($data['sem_id']);
 
@@ -256,7 +248,7 @@ class ChairFacultyLoadController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Subject assigned (+{$subjectUnits}u).",
+            'message' => "Subject assigned (+{$subjectHours} teaching hours).",
             'load_id' => $load->sl_id,
         ]);
     }
@@ -273,11 +265,9 @@ class ChairFacultyLoadController extends Controller
 
             $newTotal = Study_Load::where('sl_fac_id', $facId)
                 ->where('sl_sem_id', $semId)
+                ->with('subject')
                 ->get()
-                ->sum(function ($sl) {
-                    $s = Course::find($sl->sl_course_id);
-                    return self::courseUnits($s);
-                });
+                ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
 
             Workload::where('wl_fac_id', $facId)
                 ->where('wl_sem_id', $semId)
@@ -287,11 +277,4 @@ class ChairFacultyLoadController extends Controller
         return response()->json(['success' => true, 'message' => 'Subject unassigned.']);
     }
 
-    private static function courseUnits(?Course $course): float
-    {
-        if (!$course) return 0;
-        return $course->course_units !== null
-            ? (float) $course->course_units
-            : (float) $course->course_lecture_hours + (float) $course->course_lab_hours;
-    }
 }

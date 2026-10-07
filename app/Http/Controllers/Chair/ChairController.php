@@ -68,18 +68,16 @@ class ChairController extends Controller
             ->groupBy('sl_fac_id');
 
         $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
+            $maxHours = $f->fac_employment_type === 'part_time' ? 22 : 30;
             $totalHours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
-                ->sum(fn ($load) => $load->subject?->course_units !== null
-                    ? (float) $load->subject->course_units
-                    : (float) ($load->subject?->course_lecture_hours ?? 0)
-                        + (float) ($load->subject?->course_lab_hours ?? 0));
-            $remaining  = max(0, 30 - $totalHours);
-            $percent    = min(100, (int) round(($totalHours / 30) * 100));
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $remaining  = max(0, $maxHours - $totalHours);
+            $percent    = min(100, (int) round(($totalHours / $maxHours) * 100));
 
             $status = match (true) {
+                $totalHours >= $maxHours => 'Full',
+                $totalHours >= $maxHours - 3 => 'Near Max',
                 $f->fac_employment_type === 'part_time' => 'Part-time',
-                $totalHours >= 30 => 'Full',
-                $totalHours >= 27 => 'Near Max',
                 default => 'OK',
             };
 
@@ -89,6 +87,7 @@ class ChairController extends Controller
                 'hours'      => $totalHours,
                 'remaining'  => $remaining,
                 'percent'    => $percent,
+                'max_hours'  => $maxHours,
                 'status'     => $status,
                 'employment' => $f->fac_employment_type,
             ];

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Faculty;
-use App\Models\Workload;
+use App\Models\Study_Load;
 use App\Models\Semester;
 use App\Models\Dept_Chair;
 use App\Models\Notification;
@@ -22,18 +22,16 @@ class ScheduleReportsController extends Controller
             ->where('sch_is_active', true)
             ->get();
 
-        $faculty = Faculty::with(['studyLoads.subject'])->get();
+        $faculty = Faculty::get();
+        $loadsByFaculty = Study_Load::with('subject')
+            ->when($activeSemester, fn($q) => $q->where('sl_sem_id', $activeSemester->sem_id))
+            ->get()
+            ->groupBy('sl_fac_id');
 
-        $facultyIds = $faculty->pluck('fac_id');
-        $workloadTotals = Workload::whereIn('wl_fac_id', $facultyIds)
-            ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-            ->selectRaw('wl_fac_id, SUM(wl_total_hours) as total')
-            ->groupBy('wl_fac_id')
-            ->pluck('total', 'wl_fac_id');
-
-        $byFaculty = $faculty->map(function ($fac) use ($workloadTotals) {
-            $subjects = $fac->studyLoads->pluck('subject.subj_code')->filter()->unique()->implode(', ');
-            $hours = $workloadTotals->get($fac->fac_id, 0);   // ← no query, just lookup
+        $byFaculty = $faculty->map(function ($fac) use ($loadsByFaculty) {
+            $loads = $loadsByFaculty->get($fac->fac_id, collect());
+            $subjects = $loads->pluck('subject.course_code')->filter()->unique()->implode(', ');
+            $hours = $loads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
 
             return ['name' => $fac->full_name, 'subjects' => $subjects, 'hours' => $hours];
         });
@@ -52,20 +50,22 @@ class ScheduleReportsController extends Controller
         $facultyRecords = Faculty::where('fac_college_id', $deptId)->get();
         $facultyIds = $facultyRecords->pluck('fac_id');
 
-        $workloadTotals = Workload::whereIn('wl_fac_id', $facultyIds)
-            ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-            ->selectRaw('wl_fac_id, SUM(wl_total_hours) as total')
-            ->groupBy('wl_fac_id')
-            ->pluck('total', 'wl_fac_id');
+        $loadsByFaculty = Study_Load::with('subject')
+            ->whereIn('sl_fac_id', $facultyIds)
+            ->when($activeSemester, fn($q) => $q->where('sl_sem_id', $activeSemester->sem_id))
+            ->get()
+            ->groupBy('sl_fac_id');
 
-        $faculty = $facultyRecords->map(function ($fac) use ($workloadTotals) {
-            $hours = $workloadTotals->get($fac->fac_id, 0);
+        $faculty = $facultyRecords->map(function ($fac) use ($loadsByFaculty) {
+            $hours = $loadsByFaculty->get($fac->fac_id, collect())
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $maxHours = $fac->fac_employment_type === 'part_time' ? 22 : 30;
             return [
                 'name'       => $fac->full_name,
                 'rank'       => $fac->fac_rank,
                 'employment' => $fac->fac_employment_type,
                 'load'       => $hours . 'h',
-                'status'     => $hours > 30 ? 'Overload' : ($hours > 27 ? 'Near Max' : 'OK'),
+                'status'     => $hours > $maxHours ? 'Overload' : ($hours >= $maxHours - 3 ? 'Near Max' : 'OK'),
             ];
         });
 

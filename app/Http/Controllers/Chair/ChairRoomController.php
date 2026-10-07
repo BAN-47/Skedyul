@@ -102,13 +102,40 @@ class ChairRoomController extends Controller
 
     public function store(Request $request)
     {
-        // ASSUMPTION: adding brand-new physical rooms belongs to the Technical
-        // Admin's Room Management page, not the Chair. This route was already
-        // wired in your routes file, so it's kept functional (no fatal error
-        // if it's ever hit) rather than left calling an undefined method —
-        // but it intentionally doesn't create anything yet. Tell me if Chairs
-        // should actually be able to add rooms and I'll build it properly.
-        return back()->with('info', 'Adding new rooms is managed by the Technical Admin, not from this page.');
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        abort_if(!$chair, 403, 'Your account is not assigned as a department chair.');
+
+        $validated = $request->validate([
+            'room_name' => 'required|string|max:100',
+            'room_type' => 'required|string|max:50',
+            'room_capacity' => 'required|integer|min:1',
+            'room_building' => 'required|string|max:100',
+            'room_location' => 'nullable|string|max:150',
+        ]);
+
+        if (!Schema::hasColumn('room', 'room_college_id')) {
+            return back()->withInput()->with('error', 'Add the room_college_id column in Supabase before creating college-assigned rooms.');
+        }
+        // The college comes from the chair's account, never from user input.
+        $validated['room_college_id'] = $chair->dc_college_id;
+        $validated['room_is_available'] = true;
+
+        try {
+            $duplicate = Room::query()
+                ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
+                ->where('room_college_id', $chair->dc_college_id)
+                ->exists();
+            if ($duplicate) {
+                return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+            }
+
+            Room::create($validated);
+        } catch (\Throwable $e) {
+            report($e);
+            return back()->withInput()->with('error', 'Unable to add this room. Check that the room_college_id column exists in Supabase, then try again.');
+        }
+
+        return redirect()->route('chair.rooms')->with('success', 'Room added and assigned to your college.');
     }
 
     public function assignSchedule(Request $request)

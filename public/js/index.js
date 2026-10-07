@@ -17,6 +17,8 @@
       });
       try {
         sessionStorage.setItem(registerDraftKey, JSON.stringify(draft));
+        const status = document.getElementById('register-draft-status');
+        if (status) status.textContent = 'Draft saved in this browser. Password and ID photo are not saved.';
       } catch (_) {
         // Storage may be unavailable in a private browsing session.
       }
@@ -26,6 +28,10 @@
       if (!form) return;
       try {
         const draft = JSON.parse(sessionStorage.getItem(registerDraftKey) || '{}');
+        const status = document.getElementById('register-draft-status');
+        if (Object.keys(draft).length && status) {
+          status.textContent = 'Your saved form details were restored. Re-enter your password and select your ID photo.';
+        }
         Object.entries(draft).forEach(([name, value]) => {
           const field = form.elements.namedItem(name);
           if (!field || field.type === 'password' || field.type === 'file') return;

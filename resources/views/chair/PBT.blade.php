@@ -41,7 +41,7 @@
 
   $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Same Day/Night shift mechanics as PBS.
+  // Same Day/Evening shift mechanics as PBS.
   $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
 
   if ($shift === 'night') {
@@ -124,6 +124,8 @@
                 <tr class="bg-slate-100 text-slate-600 uppercase font-bold">
                   <th class="px-1.5 py-1.5 text-left border-b border-slate-200">Course Code</th>
                   <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Descriptive Title</th>
+                  <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Units</th>
+                  <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Hrs/<br>Week</th>
                   <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Degree<br>Yr. &amp; Sec.</th>
                   <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Total<br>No. of Students</th>
                 </tr>
@@ -134,6 +136,14 @@
                     $course = $s->course ?? $s->subject;
                     $code  = $course->course_code ?? $course->subj_code ?? '—';
                     $title = $course->course_name ?? $course->subj_name ?? '—';
+                    $courseUnits = $course->course_units ?? 0;
+                    $courseHours = \App\Services\ScheduleAssignmentService::courseHours($course);
+                    $courseMeetings = $schedules->where('sch_course_id', $s->sch_course_id)->where('sch_sec_id', $s->sch_sec_id);
+                    $scheduledHours = $courseMeetings->sum(function ($meeting) {
+                        $start = \Illuminate\Support\Carbon::parse($meeting->sch_start_time);
+                        $end = \Illuminate\Support\Carbon::parse($meeting->sch_end_time);
+                        return $start->diffInMinutes($end) / 60;
+                    });
                     $secName = optional($s->section)->sec_name ?? '—';
                     $studs = optional($s->section)->sec_no_of_student
                         ?? optional($s->section)->sec_max_capacity
@@ -142,12 +152,14 @@
                   <tr class="border-b border-slate-100 text-slate-700">
                     <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">{{ $code }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 leading-snug">{{ $title }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 text-center">{{ $courseUnits }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 text-center" title="{{ $scheduledHours }} of {{ $courseHours }} course hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 whitespace-nowrap">{{ $secName }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 text-center font-semibold">{{ $studs }}</td>
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="4" class="px-2 py-3 text-center text-slate-400 italic">
+                    <td colspan="6" class="px-2 py-3 text-center text-slate-400 italic">
                       @if(empty($selectedFaculty))
                         Select a teacher to view their courses.
                       @else
@@ -166,7 +178,7 @@
               <span>{{ $loadStats['preparations'] ?? '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="font-bold">No. of Units:</span>
+              <span class="font-bold">Academic Units:</span>
               <span>{{ $loadStats['units'] ?? '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
@@ -477,13 +489,15 @@
       </div>
 
       <div class="mb-3">
-        <label class="field-label">Day</label>
-        <select id="add-day" class="field-input">
-          <option value="">-- Select Day --</option>
+        <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
+        <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           @foreach($days as $d)
-            <option value="{{ $d }}">{{ $d }}</option>
+            <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
+              <input type="checkbox" name="add-days[]" value="{{ $d }}" class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+              <span>{{ $d }}</span>
+            </label>
           @endforeach
-        </select>
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3 mb-3">

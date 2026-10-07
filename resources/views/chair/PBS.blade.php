@@ -32,9 +32,9 @@
 
   $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Grid range depends on the Day/Night shift toggle:
+  // Grid range depends on the Day/Evening shift toggle:
   //   Day   → 7:00 AM–4:00 PM, includes the noon break
-  //   Night → 4:00 PM–9:00 PM, no noon break (shift starts after noon)
+  //   Evening → 4:00 PM–9:00 PM, no noon break (shift starts after noon)
   // 30-minute sub-rows so you can click a precise half-hour, but time
   // labels display as hourly ranges (7-8 AM).
   $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
@@ -113,6 +113,12 @@
               ->filter(fn ($s) => ($s->course ?? $s->subject))
               ->unique(fn ($s) => $s->sch_course_id ?? $s->sch_subj_id ?? spl_object_id($s))
               ->values();
+            $summaryUnits = $courseSummary->sum(fn ($s) => (float) (($s->course ?? $s->subject)?->course_units ?? 0));
+            $summaryHours = $schedules->sum(function ($s) {
+                $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                return $start->diffInMinutes($end) / 60;
+            });
           @endphp
           <div class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-200 bg-slate-50 text-[11px] items-center">
             <div class="px-2 py-1.5 font-bold text-slate-600 uppercase leading-tight">No. of<br>Students</div>
@@ -125,9 +131,11 @@
                      title="{{ empty($selectedSection) ? 'Select a section first' : 'Saved with Save Draft for '.$selectedSection->sec_name }}">
             </div>
           </div>
-          <div class="grid grid-cols-[88px_1fr] gap-0 bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase">
-            <div class="px-2 py-1.5" style="text-align: center;"><strong>Course Code</strong></div>
-            <div class="px-2 py-1.5 border-l border-slate-200" style="text-align: center;"><strong>Descriptive <br>Title</strong></div>
+          <div class="grid grid-cols-[48px_minmax(0,1fr)_25px_31px] gap-0 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-600 uppercase">
+            <div class="px-1 py-1.5 text-center"><strong>Code</strong></div>
+            <div class="px-1 py-1.5 border-l border-slate-200 text-center"><strong>Course Title</strong></div>
+            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Units</strong></div>
+            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Hrs</strong></div>
           </div>
           <div class="p-0">
             @forelse($courseSummary as $s)
@@ -136,9 +144,19 @@
                 $code = $course->course_code ?? $course->subj_code ?? '—';
                 $title = $course->course_name ?? $course->subj_name ?? '—';
               @endphp
-              <div class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-100 text-[11px]">
-                <div class="px-2 py-1.5 font-bold text-slate-800">{{ $code }}</div>
-                <div class="px-2 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">{{ $title }}</div>
+              @php
+                $courseHours = (float) ($course->course_lecture_hours ?? 0) + (float) ($course->course_lab_hours ?? 0);
+                $courseScheduledHours = $schedules->where('sch_course_id', $s->sch_course_id)->sum(function ($meeting) {
+                    $start = \Illuminate\Support\Carbon::parse($meeting->sch_start_time);
+                    $end = \Illuminate\Support\Carbon::parse($meeting->sch_end_time);
+                    return $start->diffInMinutes($end) / 60;
+                });
+              @endphp
+              <div class="grid grid-cols-[48px_minmax(0,1fr)_25px_31px] gap-0 border-b border-slate-100 text-[10px]">
+                <div class="px-1 py-1.5 font-bold text-slate-800 break-words">{{ $code }}</div>
+                <div class="px-1 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">{{ $title }}</div>
+                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700">{{ $course->course_units ?? 0 }}</div>
+                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700" title="{{ $courseScheduledHours }} of {{ $courseHours }} course hours scheduled">{{ $courseScheduledHours }}/{{ $courseHours }}</div>
               </div>
             @empty
               <div class="p-3 text-center text-[11px] text-slate-400">
@@ -150,6 +168,12 @@
               </div>
             @endforelse
           </div>
+          @if($selectedSection)
+            <div class="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10.5px] text-slate-700 space-y-1">
+              <div class="flex justify-between gap-2"><span class="font-bold">Academic Units:</span><span>{{ $summaryUnits }}u</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Scheduled Hours/Week:</span><span>{{ $summaryHours }}h</span></div>
+            </div>
+          @endif
           @if($selectedSection)
             <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10.5px] text-slate-500">
               Section: <span class="font-bold text-slate-700">{{ $selectedSection->sec_name }}</span>
@@ -445,13 +469,15 @@
       </div>
 
       <div class="mb-3">
-        <label class="field-label">Day</label>
-        <select id="add-day" class="field-input">
-          <option value="">-- Select Day --</option>
+        <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
+        <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           @foreach($days as $d)
-            <option value="{{ $d }}">{{ $d }}</option>
+            <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
+              <input type="checkbox" name="add-days[]" value="{{ $d }}" class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+              <span>{{ $d }}</span>
+            </label>
           @endforeach
-        </select>
+        </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3 mb-3">

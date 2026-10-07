@@ -52,12 +52,12 @@
                         <div class="text-[13px] text-slate-400 mt-0.5">
                             {{ $department->dept_name ?? 'Department' }}
                             @if ($program)
-                                &middot; {{ $program->prog_code }}
+                                &middot; {{ $program->dept_code ?? $program->prog_code }}
                             @endif
                             &middot; Full-time max
-                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_UNITS }}u
+                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_HOURS }} teaching hours
                             &middot; Part-time max
-                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_UNITS }}u
+                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_HOURS }} teaching hours
                         </div>
                     </div>
                 </div>
@@ -77,7 +77,7 @@
                         <table class="data-table" id="faculty-load-table">
                             <thead>
                                 <tr>
-                                    @foreach (['Faculty', 'Employment', 'Course Code', 'Total Units', 'Units Left', 'Status'] as $h)
+                                    @foreach (['Faculty', 'Employment', 'Course Code', 'Academic Units', 'Teaching Hours', 'Hours Left', 'Status'] as $h)
                                         <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
@@ -89,11 +89,12 @@
                                         <td>{{ $fl['employment'] === 'part_time' ? 'Part-time' : 'Full-time' }}</td>
                                         <td class="text-slate-500">{{ $fl['subjects'] }}</td>
                                         <td><span class="font-mono font-bold">{{ $fl['total_units'] }}u</span></td>
+                                        <td><span class="font-mono font-bold">{{ $fl['total_hours'] }}h</span></td>
                                         <td>
-                                            <span class="badge {{ $fl['status_badge'] }}">{{ $fl['remaining'] }}u
+                                            <span class="badge {{ $fl['status_badge'] }}">{{ $fl['remaining'] }}h
                                                 left</span>
                                             <span class="text-[10px] text-slate-400 ml-1">/
-                                                {{ $fl['max_units'] }}u</span>
+                                                {{ $fl['max_hours'] }}h</span>
                                         </td>
                                         <td><span
                                                 class="badge {{ $fl['status_badge'] }}">{{ $fl['status_label'] }}</span>
@@ -101,12 +102,12 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center py-8 text-slate-400">No faculty in this
+                                        <td colspan="7" class="text-center py-8 text-slate-400">No faculty in this
                                             department yet.</td>
                                     </tr>
                                 @endforelse
                                 <tr id="faculty-load-no-results" class="hidden">
-                                    <td colspan="6" class="text-center py-8 text-slate-400">No faculty loads match your search.</td>
+                                    <td colspan="7" class="text-center py-8 text-slate-400">No faculty loads match your search.</td>
                                 </tr>
                             </tbody>
                         </table>

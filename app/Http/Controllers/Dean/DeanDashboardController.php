@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Faculty;
 use App\Models\College;
 use App\Models\Departments;
-use App\Models\Workload;
+use App\Models\Study_Load;
 use App\Models\Schedule_Submission;
 use App\Models\Course;
 use App\Models\AcademicYear;
@@ -19,7 +19,8 @@ class DeanDashboardController extends Controller
 {
     // Hardcoded assumption: max weekly teaching load per faculty.
     // No config value exists for this yet — adjust here if your team defines one.
-    const MAX_LOAD_HOURS = 30;
+    const FULL_TIME_MAX_HOURS = 30;
+    const PART_TIME_MAX_HOURS = 22;
 
     public function index()
     {
@@ -31,20 +32,26 @@ class DeanDashboardController extends Controller
         $faculty = Faculty::with('user', 'department')->get();
         $totalFaculty = $faculty->count();
 
-        // Latest workload per faculty for the active semester
-        $workloads = Workload::when($semester, fn($q) => $q->where('wl_sem_id', $semester->sem_id))
-            ->when($academicYear, fn($q) => $q->where('wl_ay_id', $academicYear->ay_id))
+        // Compute from assigned courses so old workload rows that used units
+        // are not mistaken for teaching hours.
+        $studyLoadsByFaculty = Study_Load::with('subject')
+            ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
             ->get()
-            ->keyBy('wl_fac_id');
+            ->groupBy('sl_fac_id');
 
-        $facultyLoads = $faculty->map(function ($f) use ($workloads) {
-            $hours = optional($workloads->get($f->fac_id))->wl_total_hours ?? 0;
+        $facultyLoads = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
+            $maxHours = $f->fac_employment_type === 'part_time'
+                ? self::PART_TIME_MAX_HOURS
+                : self::FULL_TIME_MAX_HOURS;
+            $hours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
             return [
                 'faculty'  => $f,
                 'hours'    => $hours,
+                'max_hours' => $maxHours,
                 'status'   => match (true) {
-                    $hours > self::MAX_LOAD_HOURS      => 'Overload',
-                    $hours >= self::MAX_LOAD_HOURS - 3 => 'Near Max',
+                    $hours > $maxHours      => 'Overload',
+                    $hours >= $maxHours - 3 => 'Near Max',
                     default                             => 'Available',
                 },
             ];
@@ -83,7 +90,7 @@ class DeanDashboardController extends Controller
 
             $count = $progFacultyLoads->count();
             $avgPercent = $count > 0
-                ? round($progFacultyLoads->avg('hours') / self::MAX_LOAD_HOURS * 100)
+            ? round($progFacultyLoads->avg(fn ($fl) => $fl['hours'] / $fl['max_hours'] * 100))
                 : 0;
 
             $color = match (true) {

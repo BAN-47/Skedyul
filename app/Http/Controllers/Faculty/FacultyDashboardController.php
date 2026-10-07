@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Faculty;
 use App\Http\Controllers\Controller;
 use App\Models\Faculty;
 use App\Models\Schedule;
-use App\Models\Workload;
+use App\Models\Study_Load;
 use App\Models\Semester;
 use Carbon\Carbon;
 
@@ -17,9 +17,12 @@ class FacultyDashboardController extends Controller
 
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $totalHours = Workload::where('wl_fac_id', $faculty->fac_id)
-            ->when($activeSemester, fn ($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-            ->sum('wl_total_hours');
+        $totalHours = Study_Load::where('sl_fac_id', $faculty->fac_id)
+            ->when($activeSemester, fn ($q) => $q->where('sl_sem_id', $activeSemester->sem_id))
+            ->with('subject')
+            ->get()
+            ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+        $maxHours = $faculty->fac_employment_type === 'part_time' ? 22 : 30;
 
         $schedules = Schedule::with(['subject', 'section', 'room'])
             ->where('sch_fac_id', $faculty->fac_id)
@@ -34,7 +37,7 @@ class FacultyDashboardController extends Controller
         $todaySchedule = $schedules->where('sch_day', $today)->sortBy('sch_start_time')->values();
 
         return view('faculty.faculty_dashboard', compact(
-            'faculty', 'totalHours', 'mySubjects', 'mySections', 'todaySchedule', 'today'
+            'faculty', 'totalHours', 'maxHours', 'mySubjects', 'mySections', 'todaySchedule', 'today'
         ));
     }
 }

@@ -78,7 +78,7 @@
                         <div class="stat-card-bar bg-red-600"></div>
                         <div class="stat-label">Avg. Faculty Load</div>
                         <div class="stat-value">{{ $avgFacultyLoad ?? 0 }}h</div>
-                        <div class="stat-sub">of 30h max</div>
+                        <div class="stat-sub">FT max 30h · PT max 22h</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-bar bg-green-600"></div>

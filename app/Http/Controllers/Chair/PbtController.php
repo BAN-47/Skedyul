@@ -77,23 +77,21 @@ class PbtController extends Controller
         $chairUsrIds = \App\Models\Dept_Chair::pluck('dc_usr_id')->filter()->all();
         $deanUsrIds  = Dean::pluck('dean_usr_id')->filter()->all();
 
-        // Only the currently logged-in Dept. Chair can appear in the list
-        // (a chair may plot their own schedule, but not other chairs')
-        $currentChairUsrId = auth()->user()?->usr_id;
+        // Every active department chair with a Faculty row can be selected.
+        // Schedules store fac_id, so chairs/deans without a Faculty row cannot
+        // be scheduled as teachers until that linked row exists.
         $facultyChairs = $allFaculty->filter(
-            fn ($f) => $f->fac_usr_id === $currentChairUsrId
-                && in_array($f->fac_usr_id, $chairUsrIds, true)
+            fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
         )->values();
 
         $deans = $allFaculty->filter(
             fn ($f) => in_array($f->fac_usr_id, $deanUsrIds, true)
         )->values();
 
-        // Exclude other chairs + deans from full-time / part-time lists
-        // (logged-in chair is kept out of full/part so they only appear under DEPT CHAIR)
+        // Keep chairs and deans in their own groups so every eligible person
+        // is visible without listing the same person in multiple groups.
         $otherChairIds = $allFaculty
-            ->filter(fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
-                && $f->fac_usr_id !== $currentChairUsrId)
+            ->filter(fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true))
             ->pluck('fac_id')
             ->all();
 
@@ -185,10 +183,9 @@ class PbtController extends Controller
             ->with('subject', 'schedules')
             ->get();
 
-        $units = $loads->sum(fn ($load) => $load->subject?->course_units !== null
-            ? (float) $load->subject->course_units
-            : (float) ($load->subject?->course_lecture_hours ?? 0)
-                + (float) ($load->subject?->course_lab_hours ?? 0));
+        // Academic credit units and scheduled weekly contact hours are
+        // different totals. Units come from each distinct Study Load course.
+        $units = $loads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
 
         $hoursPerWeek = $loads->sum(function ($load) {
             return $load->schedules->sum(function ($schedule) {
@@ -217,7 +214,7 @@ class PbtController extends Controller
             ->value('sem_id');
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, bool $multipleDays = false): array
     {
         return $request->validate([
             'subj_id'    => 'required|uuid|exists:course,course_id',
@@ -225,7 +222,9 @@ class PbtController extends Controller
             'sem_id'     => 'nullable|uuid|exists:semester,sem_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
-            'day'        => 'required|string|max:15',
+            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
+            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
             'start_time' => 'required|date_format:H:i',
             'end_time'   => 'required|date_format:H:i|after:start_time',
         ]);
@@ -233,7 +232,7 @@ class PbtController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, true);
         $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
         if (empty($data['sem_id'])) {
             return response()->json([
@@ -241,7 +240,7 @@ class PbtController extends Controller
                 'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
             ], 422);
         }
-        $result = $this->scheduler->assign($data);
+        $result = $this->scheduler->assignMultiple($data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 

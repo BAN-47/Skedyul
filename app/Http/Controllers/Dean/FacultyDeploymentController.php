@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Dean;
 use App\Http\Controllers\Controller;
 use App\Models\Faculty;
 use App\Models\College;
-use App\Models\Workload;
 use App\Models\Semester;
 use App\Models\Dept_Chair;
 use App\Models\Notification;
@@ -37,9 +36,9 @@ class FacultyDeploymentController extends Controller
                     ->unique()
                     ->implode(', ');
 
-                $hours = Workload::where('wl_fac_id', $fac->fac_id)
-                    ->when($activeSemester, fn($q) => $q->where('wl_sem_id', $activeSemester->sem_id))
-                    ->sum('wl_total_hours');
+                $hours = $fac->studyLoads
+                    ->when($activeSemester, fn ($loads) => $loads->where('sl_sem_id', $activeSemester->sem_id))
+                    ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
 
                 $programCode = $fac->program->dept_code
                     ?? $fac->program->prog_code
@@ -50,6 +49,7 @@ class FacultyDeploymentController extends Controller
                     'department' => $programCode, // BSIS / BSIT / BIT-CT
                     'subjects'   => $subjects ?: '—',
                     'hours'      => $hours,
+                    'max_hours'  => $fac->fac_employment_type === 'part_time' ? 22 : 30,
                     'employment' => $fac->fac_employment_type,
                     '_sort'      => $programCode,
                 ];

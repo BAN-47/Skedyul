@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\College;
 use App\Models\Departments;
 use App\Models\Faculty;
-use App\Models\Workload;
 use App\Models\Section;
 use App\Models\Study_Load;
 use App\Models\Dept_Chair;
@@ -20,8 +19,9 @@ use Illuminate\Support\Facades\Auth;
 class DeanDepartmentController extends Controller
 {
     // Keep these in sync with DeanFacultyWorkloadController / DeanDashboardController
-    const MAX_LOAD_HOURS     = 30;
-    const NEAR_MAX_THRESHOLD = 27;
+    const FULL_TIME_MAX_HOURS = 30;
+    const PART_TIME_MAX_HOURS = 22;
+    const NEAR_MAX_BUFFER     = 3;
     const OK_THRESHOLD       = 20;
 
     // Cycles through brand colors per department card, in department order.
@@ -40,14 +40,15 @@ class DeanDepartmentController extends Controller
             ? College::where('college_id', $deanAssignment->dean_college_id)->get()
             : collect(); // Dean has no department assigned yet — show nothing rather than everything
 
-        // Latest workload (total hours) per faculty for the active semester.
-        // Presence of a row here = faculty has actually been through
-        // scheduling this semester. Absence = not yet assigned anything,
-        // NOT "0 hours" — those two are treated differently below.
-        $workloads = Workload::when($semester, fn($q) => $q->where('wl_sem_id', $semester->sem_id))
-            ->when($academicYear, fn($q) => $q->where('wl_ay_id', $academicYear->ay_id))
+        // Calculate from course assignments so legacy workload rows that
+        // stored academic units are not shown as teaching hours.
+        $loadsByFaculty = Study_Load::with('subject')
+            ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
             ->get()
-            ->keyBy('wl_fac_id');
+            ->groupBy('sl_fac_id');
+        $hoursByFaculty = $loadsByFaculty->map(fn ($loads) => $loads->sum(
+            fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
+        ));
 
         $deptData = [];
 
@@ -56,15 +57,13 @@ class DeanDepartmentController extends Controller
 
             $facultyCount = $facultyList->count();
 
-            // Only faculty with an actual workload record count toward the
-            // average — an unassigned faculty isn't a genuine "0h", so it
-            // shouldn't drag the department average down.
-            $assignedFaculty = $facultyList->filter(fn($f) => $workloads->has($f->fac_id));
+            // Only faculty with a course assignment count toward the average.
+            $assignedFaculty = $facultyList->filter(fn($f) => $loadsByFaculty->has($f->fac_id));
             $avgLoad = $assignedFaculty->count() > 0
-                ? round($assignedFaculty->sum(fn($f) => $workloads->get($f->fac_id)->wl_total_hours ?? 0) / $assignedFaculty->count())
+                ? round($assignedFaculty->sum(fn($f) => $hoursByFaculty->get($f->fac_id, 0)) / $assignedFaculty->count())
                 : 0;
 
-            $loadPct = min(100, round(($avgLoad / self::MAX_LOAD_HOURS) * 100));
+            $loadPct = min(100, round(($avgLoad / self::FULL_TIME_MAX_HOURS) * 100));
 
             // ---------- PROGRAM BREAKDOWN ----------
             // A faculty member "belongs" to whichever program(s) they're
@@ -88,9 +87,9 @@ class DeanDepartmentController extends Controller
 
                 $progFaculty = Faculty::whereIn('fac_id', $facultyIds)->get();
 
-                $progFacultyRows = $progFaculty->map(function ($f) use ($workloads) {
-                    $hasWorkload = $workloads->has($f->fac_id);
-                    $hours = $hasWorkload ? ($workloads->get($f->fac_id)->wl_total_hours ?? 0) : 0;
+                $progFacultyRows = $progFaculty->map(function ($f) use ($loadsByFaculty, $hoursByFaculty) {
+                    $hasWorkload = $loadsByFaculty->has($f->fac_id);
+                    $hours = $hasWorkload ? $hoursByFaculty->get($f->fac_id, 0) : 0;
                     [$statusLabel, $statusColor] = $this->resolveStatus($hours, $f->fac_employment_type, $hasWorkload);
 
                     return [
@@ -105,11 +104,11 @@ class DeanDepartmentController extends Controller
 
                 $progFacultyCount = $progFaculty->count();
 
-                $progAssignedFaculty = $progFaculty->filter(fn($f) => $workloads->has($f->fac_id));
+                $progAssignedFaculty = $progFaculty->filter(fn($f) => $loadsByFaculty->has($f->fac_id));
                 $progAvgLoad = $progAssignedFaculty->count() > 0
-                    ? round($progAssignedFaculty->sum(fn($f) => $workloads->get($f->fac_id)->wl_total_hours ?? 0) / $progAssignedFaculty->count())
+                    ? round($progAssignedFaculty->sum(fn($f) => $hoursByFaculty->get($f->fac_id, 0)) / $progAssignedFaculty->count())
                     : 0;
-                $progLoadPct = min(100, round(($progAvgLoad / self::MAX_LOAD_HOURS) * 100));
+                $progLoadPct = min(100, round(($progAvgLoad / self::FULL_TIME_MAX_HOURS) * 100));
 
                 $progSectionCount = Section::where('sec_dept_id', $prog->dept_id)
                     ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
@@ -124,7 +123,7 @@ class DeanDepartmentController extends Controller
                     'facultyCount' => $progFacultyCount,
                     'sections'     => $progSectionCount,
                     'avgLoad'      => $progAssignedFaculty->count() > 0 ? $progAvgLoad . 'h' : '—',
-                    'maxLoad'      => self::MAX_LOAD_HOURS . 'h',
+                    'maxLoad'      => 'FT ' . self::FULL_TIME_MAX_HOURS . 'h / PT ' . self::PART_TIME_MAX_HOURS . 'h',
                     'loadPct'      => $progLoadPct,
                     'loadColor'    => $this->resolveLoadColor($progAvgLoad),
                     'faculty'      => $progFacultyRows,
@@ -150,7 +149,7 @@ class DeanDepartmentController extends Controller
                 'facultyCount'   => $facultyCount,
                 'sections'       => $sectionCount,
                 'avgLoad'        => $assignedFaculty->count() > 0 ? $avgLoad . 'h' : '—',
-                'maxLoad'        => self::MAX_LOAD_HOURS . 'h',
+                'maxLoad'        => 'FT ' . self::FULL_TIME_MAX_HOURS . 'h / PT ' . self::PART_TIME_MAX_HOURS . 'h',
                 'loadPct'        => $loadPct,
                 'loadColor'      => $this->resolveLoadColor($avgLoad),
                 'scheduleStatus' => $scheduleStatus,
@@ -203,10 +202,10 @@ class DeanDepartmentController extends Controller
      */
     private function resolveLoadColor(float $avgLoad): string
     {
-        if ($avgLoad > self::MAX_LOAD_HOURS) {
+        if ($avgLoad > self::FULL_TIME_MAX_HOURS) {
             return 'var(--red)';
         }
-        if ($avgLoad >= self::NEAR_MAX_THRESHOLD) {
+        if ($avgLoad >= self::FULL_TIME_MAX_HOURS - self::NEAR_MAX_BUFFER) {
             return 'var(--amber)';
         }
         return 'var(--blue)';
@@ -227,13 +226,16 @@ class DeanDepartmentController extends Controller
             return ['Not Yet Assigned', 'grey'];
         }
 
-        if ($hours > self::MAX_LOAD_HOURS) {
+        $maxHours = $employmentType === 'part_time'
+            ? self::PART_TIME_MAX_HOURS
+            : self::FULL_TIME_MAX_HOURS;
+        if ($hours > $maxHours) {
             return ['Overload', 'red'];
         }
-        if ($hours >= self::NEAR_MAX_THRESHOLD) {
+        if ($hours >= $maxHours - self::NEAR_MAX_BUFFER) {
             return ['Near Max', 'amber'];
         }
-        if ($hours >= self::OK_THRESHOLD) {
+        if ($employmentType !== 'part_time' && $hours >= self::OK_THRESHOLD) {
             return ['OK', 'green'];
         }
 

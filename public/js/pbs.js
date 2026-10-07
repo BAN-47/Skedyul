@@ -15,13 +15,15 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]').content;
 }
 
+let toastTimeout;
 function showToast(msg) {
     const t = document.getElementById('toast');
     const m = document.getElementById('toast-msg');
     if (!t || !m) return;
     m.textContent = msg;
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 4200);
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => t.classList.remove('show'), 9200);
 }
 
 function showInlineError(boxId, msg) {
@@ -270,7 +272,9 @@ function openAddModal(day, startTime) {
     filterSubjectsBySection('add-section', 'add-subject');
 
     // Pre-fill day + times from the clicked cell
-    document.getElementById('add-day').value   = day || '';
+    document.querySelectorAll('.add-day-checkbox').forEach(input => {
+        input.checked = input.value === (day || '');
+    });
     document.getElementById('add-start').value = startTime || '';
     document.getElementById('add-end').value   = startTime ? addMinutesToTime(startTime, 60) : '';
 
@@ -298,14 +302,14 @@ function submitAdd(keepOpen = false) {
         room_id:     document.getElementById('add-room').value,
         sem_id:      document.getElementById('add-semester').value,
         sec_id:      document.getElementById('add-section').value,
-        day:         document.getElementById('add-day').value,
+        days:        [...document.querySelectorAll('.add-day-checkbox:checked')].map(input => input.value),
         start_time:  document.getElementById('add-start').value,
         end_time:    document.getElementById('add-end').value,
     };
 
     if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
-        !payload.sem_id || !payload.day || !payload.start_time || !payload.end_time) {
-        showInlineError('add-error', 'Please fill in subject, professor, room, semester, section, day, and both times.');
+        !payload.sem_id || !payload.days.length || !payload.start_time || !payload.end_time) {
+        showInlineError('add-error', 'Please fill in subject, professor, room, semester, section, at least one day, and both times.');
         return;
     }
     if (payload.end_time <= payload.start_time) {
@@ -330,7 +334,7 @@ function submitAdd(keepOpen = false) {
         if (data.success) {
             showToast(data.message || 'Schedule added.');
             if (keepOpen) {
-                document.getElementById('add-day').value = '';
+                document.querySelectorAll('.add-day-checkbox').forEach(input => { input.checked = false; });
                 document.getElementById('add-start').value = '';
                 document.getElementById('add-end').value = '';
                 document.getElementById('add-description').value = '';

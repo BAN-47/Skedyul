@@ -67,6 +67,12 @@ class ReportsController extends Controller
     {
         if (!$semester) return collect();
 
+        $facultyLoadHours = DB::table('study_load as sl')
+            ->join('course as load_course', 'load_course.course_id', '=', 'sl.sl_course_id')
+            ->where('sl.sl_sem_id', $semester->sem_id)
+            ->selectRaw('sl.sl_fac_id, SUM(COALESCE(load_course.course_lecture_hours, 0) + COALESCE(load_course.course_lab_hours, 0)) as total_hours')
+            ->groupBy('sl.sl_fac_id');
+
         return DB::table('faculty')
             ->join(DB::raw('"USER"'), DB::raw('"USER".usr_id'), '=', 'faculty.fac_usr_id')
             ->join('college', 'faculty.fac_college_id', '=', 'college.college_id')
@@ -74,10 +80,7 @@ class ReportsController extends Controller
             ->leftJoin('course', 'schedule.sch_course_id', '=', 'course.course_id')
             ->leftJoin('section', 'schedule.sch_sec_id', '=', 'section.sec_id')
             ->leftJoin('room', 'schedule.sch_room_id', '=', 'room.room_id')
-            ->leftJoin('workload', function ($join) use ($semester) {
-                $join->on('workload.wl_fac_id', '=', 'faculty.fac_id')
-                     ->where('workload.wl_sem_id', '=', $semester->sem_id);
-            })
+            ->leftJoinSub($facultyLoadHours, 'faculty_load', fn ($join) => $join->on('faculty_load.sl_fac_id', '=', 'faculty.fac_id'))
             ->where(function ($q) use ($semester) {
                 $q->where('schedule.sch_sem_id', $semester->sem_id)
                   ->orWhereNull('schedule.sch_sem_id');
@@ -98,7 +101,7 @@ class ReportsController extends Controller
                 'schedule.sch_day        as day',
                 'schedule.sch_start_time as start_time',
                 'schedule.sch_end_time   as end_time',
-                DB::raw('COALESCE(workload.wl_total_hours, 0) as total_hours')
+                DB::raw('COALESCE(faculty_load.total_hours, 0) as total_hours')
             )
             ->orderBy(DB::raw('"USER".usr_name'))
             ->orderBy('schedule.sch_day')

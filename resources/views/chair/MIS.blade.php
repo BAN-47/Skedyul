@@ -120,7 +120,7 @@
                     $lec   = $course->course_lecture_hours ?? $course->subj_lecture_hours ?? 0;
                     $lab   = $course->course_lab_hours ?? $course->subj_lab_hours ?? 0;
                     $totalHours = $course->course_total_hours ?? ((float) $lec + (float) $lab);
-                    $unit  = (float) ($course->course_units ?? ((float) $lec + (float) $lab));
+                    $unit  = (float) ($course->course_units ?? 0);
                     try {
                       $time = \Illuminate\Support\Carbon::parse($s->sch_start_time)->format('g:i A')
                         . ' – '

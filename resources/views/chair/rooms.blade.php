@@ -29,7 +29,18 @@
                         <div class="card-title">Rooms for Your College</div>
                         <div class="card-sub">Room availability and scheduled classes for {{ $semester->sem_name ?? 'the active semester' }}</div>
                     </div>
+                    <button type="button" onclick="openChairAddRoom()" class="btn btn-primary">+ Add Room</button>
                 </div>
+
+                @if(session('success'))
+                    <div class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ session('success') }}</div>
+                @endif
+                @if(session('error'))
+                    <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ session('error') }}</div>
+                @endif
+                @if($errors->any())
+                    <div class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ $errors->first() }}</div>
+                @endif
 
                 <div class="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
                     <input id="chair-room-search" type="search" placeholder="Search rooms or subjects..." aria-label="Search rooms"
@@ -74,7 +85,7 @@
                                 <td><button type="button" class="btn btn-secondary text-[11px] px-3 py-1.5" onclick="viewChairRoom('{{ $room->room_id }}')">View</button></td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="text-center py-6 text-slate-400">No rooms assigned to your college yet. Ask the administrator to assign rooms to your college.</td></tr>
+                            <tr><td colspan="6" class="text-center py-6 text-slate-400">No rooms assigned to your college yet. Use Add Room to create one.</td></tr>
                         @endforelse
                         <tr id="chair-room-no-results" hidden><td colspan="6" class="text-center py-6 text-slate-400">No rooms match your search.</td></tr>
                         </tbody>
@@ -82,6 +93,51 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="chair-room-add-modal">
+    <div class="modal-box w-[520px] max-w-[94vw]">
+        <form method="POST" action="{{ route('chair.rooms.store') }}">
+            @csrf
+            <div class="modal-header">
+                <div><div class="modal-title">Add Room</div><div class="text-xs text-slate-400">This room will be assigned to your college.</div></div>
+                <button type="button" onclick="closeChairAddRoom()" class="modal-close">✕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="field-label">Room Name / Number</label>
+                    <input name="room_name" value="{{ old('room_name') }}" placeholder="e.g. Room 303" required maxlength="100" class="field-input">
+                </div>
+                <div>
+                    <label class="field-label">Room Type</label>
+                    <select name="room_type" required class="field-input">
+                        <option value="">Select type</option>
+                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room'] as $type)
+                            <option value="{{ $type }}" @selected(old('room_type') === $type)>{{ $type }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                    <label class="field-label">Capacity</label>
+                    <input type="number" name="room_capacity" value="{{ old('room_capacity') }}" min="1" required placeholder="e.g. 40" class="field-input">
+                </div>
+                <div>
+                    <label class="field-label">Building</label>
+                    <input name="room_building" value="{{ old('room_building') }}" required maxlength="100" placeholder="e.g. CCICT Building" class="field-input">
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="field-label">Location / Floor <span class="font-normal normal-case text-slate-400">(optional)</span></label>
+                <input name="room_location" value="{{ old('room_location') }}" maxlength="150" placeholder="e.g. 2nd Floor" class="field-input">
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeChairAddRoom()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Room</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -102,6 +158,8 @@
 </div>
 
 <script>
+function openChairAddRoom() { document.getElementById('chair-room-add-modal').classList.add('active'); }
+function closeChairAddRoom() { document.getElementById('chair-room-add-modal').classList.remove('active'); }
 const chairRooms = {
     @foreach($roomData as $item)
     @php
@@ -194,6 +252,12 @@ function closeChairRoomModal() { document.getElementById('chair-room-view-modal'
 document.getElementById('chair-room-view-modal').addEventListener('click', event => {
     if (event.target.id === 'chair-room-view-modal') closeChairRoomModal();
 });
+document.getElementById('chair-room-add-modal').addEventListener('click', event => {
+    if (event.target.id === 'chair-room-add-modal') closeChairAddRoom();
+});
+@if($errors->any())
+openChairAddRoom();
+@endif
 </script>
 </body>
 </html>

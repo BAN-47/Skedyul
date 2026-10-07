@@ -74,7 +74,7 @@
           <div class="absolute top-0 left-0 right-0 h-1 bg-blue-600"></div>
           <div class="text-xs text-gray-500 font-semibold mb-1">Teaching Load</div>
           <div class="text-2xl font-extrabold text-gray-900">{{ $totalHours }}h</div>
-          <div class="text-[11px] text-gray-400 mt-0.5">of 30h max</div>
+          <div class="text-[11px] text-gray-400 mt-0.5">of {{ $maxHours }}h max</div>
         </div>
         <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
           <div class="absolute top-0 left-0 right-0 h-1 bg-green-600"></div>
@@ -158,7 +158,7 @@
               </div>
               <div class="text-right">
                 <div class="text-gray-400">Max Load</div>
-                <div class="font-extrabold text-lg text-green-600">30h</div>
+                <div class="font-extrabold text-lg text-green-600">{{ $maxHours }}h</div>
               </div>
             </div>
           </div>

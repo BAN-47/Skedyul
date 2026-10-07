@@ -61,12 +61,7 @@ class FacultyScheduleController extends Controller
             ->with(['subject', 'schedules'])
             ->get();
 
-        $units = $studyLoads->sum(fn ($load) =>
-            $load->subject?->course_units !== null
-                ? (float) $load->subject->course_units
-                : (float) ($load->subject->course_lecture_hours ?? 0)
-                    + (float) ($load->subject->course_lab_hours ?? 0)
-        );
+        $units = $studyLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
         $hoursPerWeek = $studyLoads->sum(fn ($load) => $load->schedules->sum(function ($schedule) {
             $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
             $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);

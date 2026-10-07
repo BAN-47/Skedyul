@@ -42,7 +42,7 @@
                                     <td><b>{{ $f['name'] }}</b></td>
                                     <td>{{ $f['department'] }}</td>
                                     <td>{{ $f['subjects'] }}</td>
-                                    <td class="{{ $f['hours'] > 30 ? 'text-red-600' : '' }}">{{ $f['hours'] }}h</td>
+                                    <td class="{{ $f['hours'] > $f['max_hours'] ? 'text-red-600' : '' }}">{{ $f['hours'] }}h / {{ $f['max_hours'] }}h</td>
                                     <td>
                                         <span
                                             class="badge {{ $f['employment'] === 'full_time' ? 'badge-green' : 'badge-blue' }}">

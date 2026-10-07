@@ -214,7 +214,7 @@ class PbsController extends Controller
         ]);
     }
 
-    private function validated(Request $request): array
+    private function validated(Request $request, bool $multipleDays = false): array
     {
         $data = $request->validate([
             'subj_id'    => 'required|uuid|exists:course,course_id',
@@ -222,7 +222,9 @@ class PbsController extends Controller
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
             'sem_id'     => 'required|uuid|exists:semester,sem_id',
-            'day'        => 'required|string|max:15',
+            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
+            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
             'start_time' => 'required|date_format:H:i',
             'end_time'   => 'required|date_format:H:i|after:start_time',
         ]);
@@ -243,7 +245,7 @@ class PbsController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validated($request);
+        $data = $this->validated($request, true);
         $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
         if (empty($data['sem_id'])) {
             return response()->json([
@@ -251,7 +253,7 @@ class PbsController extends Controller
                 'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
             ], 422);
         }
-        $result = $this->scheduler->assign($data);
+        $result = $this->scheduler->assignMultiple($data);
 
         return response()->json($result, $result['success'] ? 201 : 422);
     }

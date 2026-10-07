@@ -84,7 +84,7 @@
           <div class="card-header">
             <div>
               <div class="card-title">Faculty Load Summary</div>
-              <div class="card-sub">{{ $deptChair->program->prog_code ?? '' }} &middot; Max 30 units/week</div>
+              <div class="card-sub">{{ $deptChair->program->prog_code ?? '' }} &middot; Full-time max 30h/week, part-time max 22h/week</div>
             </div>
           </div>
           <table>
@@ -109,15 +109,11 @@
                 @endphp
                 <tr data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
                   <td><b>{{ $fl['name'] }}</b></td>
-                  <td><span class="font-mono font-bold {{ $loadColor }}">{{ $fl['hours'] }}u</span></td>
+                  <td><span class="font-mono font-bold {{ $loadColor }}">{{ $fl['hours'] }}h</span></td>
                   <td>
-                    @if($fl['employment'] === 'part_time')
-                      <span class="badge badge-grey">Part-time</span>
-                    @else
-                      <span class="badge {{ $statusBadge === 'badge-red' ? 'badge-red' : ($statusBadge === 'badge-amber' ? 'badge-amber' : 'badge-blue') }}">
-                        {{ $fl['remaining'] }}u left
-                      </span>
-                    @endif
+                    <span class="badge {{ $statusBadge === 'badge-red' ? 'badge-red' : ($statusBadge === 'badge-amber' ? 'badge-amber' : 'badge-blue') }}">
+                      {{ $fl['remaining'] }}h left / {{ $fl['max_hours'] }}h
+                    </span>
                   </td>
                   <td><span class="badge {{ $statusBadge }}">{{ $fl['status'] }}</span></td>
                 </tr>
@@ -133,7 +129,7 @@
           <div class="card-header">
             <div>
               <div class="card-title">Workload Distribution</div>
-              <div class="card-sub">Units per week &middot; Max 30</div>
+              <div class="card-sub">Teaching hours per week &middot; full-time max 30h, part-time max 22h</div>
             </div>
           </div>
           @forelse($facultyLoad as $fl)
@@ -154,15 +150,11 @@
             <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
               <div class="workload-header">
                 <div class="workload-name">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}</div>
-                <div class="workload-val {{ $textColor }}">{{ $fl['hours'] }}/30u</div>
+                <div class="workload-val {{ $textColor }}">{{ $fl['hours'] }}/{{ $fl['max_hours'] }}h</div>
               </div>
               <div class="workload-bar"><div class="workload-fill {{ $barColor }}" style="width:{{ $fl['percent'] }}%"></div></div>
-              <div class="text-[11px] {{ $fl['employment'] === 'part_time' ? 'text-slate-400' : $textColor }} mt-1">
-                @if($fl['employment'] === 'part_time')
-                  Part-time &mdash; verify additional load with Dean
-                @else
-                  {{ $fl['remaining'] }} units remaining{{ $fl['status'] === 'Near Max' ? ' — near maximum' : '' }}
-                @endif
+              <div class="text-[11px] {{ $textColor }} mt-1">
+                {{ $fl['remaining'] }} teaching hours remaining{{ $fl['status'] === 'Near Max' ? ' — near maximum' : '' }}
               </div>
             </div>
           @empty

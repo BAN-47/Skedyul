@@ -73,7 +73,7 @@ class Room extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'room_name', 'room_building', 'room_location', 'room_type',
+        'room_name', 'room_college_id', 'room_building', 'room_location', 'room_type',
         'room_capacity', 'room_is_available',
     ];
 }

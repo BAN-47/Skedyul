@@ -86,7 +86,7 @@
 <script>
 const CHAIR_NOTIFS = [
   { dot:'var(--red)', text:'<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27u/30u (3u remaining).', time:'Today, 08:00 AM', unread:true },
+  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27h/30h (3h remaining).', time:'Today, 08:00 AM', unread:true },
   { dot:'var(--blue)', text:'<b>Reminder</b> — Schedule submission deadline is Friday.', time:'Yesterday, 4:00 PM', unread:false },
 ];
 
