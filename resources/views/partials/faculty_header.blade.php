@@ -28,154 +28,192 @@
 </div>
 
 @php
-    // ── Today's schedule feed ───────────────────────────────────────────
-    // Two ways to feed this header, so it works on pages with different
-    // data shapes:
-    //
-    // 1) Pass $scheduleFeed directly — an already-flat array of
-    //    ['code'=>, 'room'=>, 'day'=>, 'start'=>'H:i', 'end'=>'H:i']
-    //    (e.g. the faculty dashboard, which already builds this shape
-    //    from $todaySchedule for its own countdown table).
-    //
-    // 2) Pass $subjects — the same nested shape the faculty subjects
-    //    page's grid is built from (['subject'=>, 'room'=>, 'schedules'=>
-    //    [['day'=>,'start'=>,'end'=>], ...]]) — and this header will
-    //    flatten it itself.
-    //
-    // If neither is passed, this header just shows chair/dean messages
-    // with no "today's schedule" section.
-    if (isset($scheduleFeed)) {
-        $facultyHeaderSchedule = $scheduleFeed;
-    } else {
-        $facultyHeaderSchedule = [];
-        foreach (($subjects ?? []) as $entry) {
-            $subj = $entry['subject'] ?? null;
-            $code = $subj->subj_code ?? ($entry['code'] ?? 'N/A');
-            foreach (($entry['schedules'] ?? []) as $sched) {
-                $facultyHeaderSchedule[] = [
-                    'code'  => $code,
-                    'room'  => $entry['room'] ?? '',
-                    'day'   => $sched['day'],
-                    'start' => \Carbon\Carbon::parse($sched['start'])->format('H:i'),
-                    'end'   => \Carbon\Carbon::parse($sched['end'])->format('H:i'),
-                ];
-            }
-        }
-    }
-
-    // ── Messages from the chair/dean ────────────────────────────────────
-    // Wire this to a real query (e.g. $announcements = Announcement::forFaculty($faculty->id)->latest()->get())
-    // once that table/relationship exists. Pass $announcements in from the
-    // including page to override this placeholder.
-    $facultyHeaderAnnouncements = $announcements ?? [
-        ['from' => 'Chair Rodrigo Tan', 'role' => 'BSIS Chair', 'color' => '#d97706',
-         'message' => 'Please submit your consultation hours schedule by Friday.', 'time' => '2h ago'],
-        ['from' => 'Dean Villaceran', 'role' => 'Dean, CCICT', 'color' => '#0891b2',
-         'message' => 'IS102 will be under maintenance next Monday — classes moved to IS201.', 'time' => 'Yesterday'],
+    $facultyHeaderNotificationEndpoints = [
+        'index' => route('notifications.index'),
+        'unreadCount' => route('notifications.unread-count'),
+        'read' => route('notifications.read', ['id' => '__notification_id__']),
+        'readAll' => route('notifications.read-all'),
     ];
 @endphp
-
 <script>
-const FACULTY_HEADER_SCHEDULE = @json($facultyHeaderSchedule);
-const FACULTY_HEADER_ANNOUNCEMENTS = @json($facultyHeaderAnnouncements);
-const FACULTY_HEADER_DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const FACULTY_HEADER_NOTIFICATION_ENDPOINTS = @json($facultyHeaderNotificationEndpoints);
+let facultyHeaderNotifOpen = false;
 
-function facultyHeaderParseTimeToday(timeStr) {
-    const [h, m] = timeStr.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m, 0, 0);
-    return d;
+async function facultyHeaderRequest(url, options = {}) {
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            'Accept': 'application/json',
+            ...(options.headers || {}),
+        },
+    });
+    let result;
+    try {
+        result = await response.json();
+    } catch {
+        throw new Error('The server returned an unexpected response.');
+    }
+    if (!response.ok) {
+        throw new Error(result.message || 'Unable to update notifications.');
+    }
+    return result;
 }
 
-function renderFacultyHeaderNotifList() {
+function facultyHeaderShowNotifMessage(message) {
     const list = document.getElementById('notif-list');
     if (!list) return;
-
-    const now = new Date();
-    const todayName = FACULTY_HEADER_DAY_NAMES[now.getDay()];
-
-    // Today's classes that are upcoming or currently in session, soonest first
-    const todaysSched = FACULTY_HEADER_SCHEDULE
-        .filter(s => s.day === todayName)
-        .map(s => ({ ...s, start: facultyHeaderParseTimeToday(s.start), end: facultyHeaderParseTimeToday(s.end) }))
-        .filter(s => s.end >= now)
-        .sort((a, b) => a.start - b.start);
-
-    const schedItems = todaysSched.map(s => {
-        let label, dot;
-        if (now < s.start) {
-            const mins = Math.floor((s.start - now) / 60000);
-            label = `Starts in ${mins < 60 ? mins + 'm' : Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm'}`;
-            dot = '#2563eb';
-        } else {
-            const mins = Math.floor((s.end - now) / 60000);
-            label = mins < 5 ? `Ending in ${mins}m` : `Ongoing — ${mins}m left`;
-            dot = mins < 5 ? '#dc2626' : '#16a34a';
-        }
-        return { dot, text: `<b>${s.code}</b> — ${s.room} · ${label}`, time: 'Today', unread: true };
-    });
-
-    const announceItems = FACULTY_HEADER_ANNOUNCEMENTS.map(a => ({
-        dot: a.color,
-        text: `<b>${a.from}</b> — ${a.message}`,
-        time: a.time,
-        unread: false,
-    }));
-
-    const items = [...schedItems, ...announceItems];
-
-    list.innerHTML = items.length
-        ? items.map((n) => `
-            <div class="notif-drop-item ${n.unread ? 'unread' : ''}" onclick="facultyHeaderMarkRead(this)">
-                <div class="notif-drop-dot" style="background:${n.dot};"></div>
-                <div><div class="notif-drop-text">${n.text}</div><div class="notif-drop-time">${n.time}</div></div>
-            </div>`).join('')
-        : `<div class="px-4 py-6 text-center text-xs text-slate-400">No notifications right now.</div>`;
-
-    updateFacultyHeaderNotifCount();
+    const item = document.createElement('div');
+    item.className = 'px-4 py-6 text-center text-xs text-slate-400';
+    item.textContent = message;
+    list.replaceChildren(item);
 }
 
-function facultyHeaderToggleNotifDropdown() {
+function facultyHeaderFormatNotifTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const now = new Date();
+    const today = date.toDateString() === now.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (today) return `Today, ${time}`;
+    if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+function renderFacultyHeaderNotifList(notifications) {
+    const list = document.getElementById('notif-list');
+    if (!list) return;
+    if (!notifications.length) {
+        facultyHeaderShowNotifMessage('No notifications yet.');
+        return;
+    }
+
+    const dotColors = {
+        conflict: '#dc2626',
+        overload: '#d97706',
+        reminder: '#2563eb',
+        info: '#2563eb',
+        assignment: '#2563eb',
+        approval: '#16a34a',
+    };
+    const fragment = document.createDocumentFragment();
+
+    notifications.forEach(notification => {
+        const item = document.createElement('div');
+        item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;
+        if (!notification.notif_is_read) {
+            item.setAttribute('role', 'button');
+            item.tabIndex = 0;
+            item.addEventListener('click', () => facultyHeaderMarkRead(notification.notif_id, item));
+            item.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    facultyHeaderMarkRead(notification.notif_id, item);
+                }
+            });
+        }
+
+        const dot = document.createElement('div');
+        dot.className = 'notif-drop-dot';
+        dot.style.backgroundColor = dotColors[notification.notif_type] || '#94a3b8';
+
+        const content = document.createElement('div');
+        const text = document.createElement('div');
+        text.className = 'notif-drop-text';
+        const title = document.createElement('b');
+        title.textContent = notification.notif_title || 'Notification';
+        text.append(title, document.createTextNode(` — ${notification.notif_message || ''}`));
+
+        const time = document.createElement('div');
+        time.className = 'notif-drop-time';
+        time.textContent = facultyHeaderFormatNotifTime(notification.notif_created_at);
+
+        content.append(text, time);
+        item.append(dot, content);
+        fragment.appendChild(item);
+    });
+    list.replaceChildren(fragment);
+}
+
+async function loadFacultyHeaderNotifications() {
+    facultyHeaderShowNotifMessage('Loading notifications…');
+    try {
+        const notifications = await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.index);
+        if (!Array.isArray(notifications)) throw new Error('The server returned invalid notifications.');
+        renderFacultyHeaderNotifList(notifications);
+    } catch (error) {
+        facultyHeaderShowNotifMessage(error.message || 'Failed to load notifications.');
+    }
+}
+
+async function facultyHeaderToggleNotifDropdown() {
     const dd = document.getElementById('notif-dropdown');
     if (!dd) return;
-    const isHidden = dd.style.display === 'none';
-    dd.style.display = isHidden ? 'block' : 'none';
+    facultyHeaderNotifOpen = !facultyHeaderNotifOpen;
+    dd.style.display = facultyHeaderNotifOpen ? 'block' : 'none';
+    if (facultyHeaderNotifOpen) await loadFacultyHeaderNotifications();
 }
 
 document.addEventListener('click', function (e) {
     const bell = document.getElementById('topbar-notif-bell');
     if (bell && !bell.contains(e.target)) {
+        facultyHeaderNotifOpen = false;
         const dd = document.getElementById('notif-dropdown');
         if (dd) dd.style.display = 'none';
     }
 });
 
-function facultyHeaderMarkRead(el) {
-    if (!el) return;
-    el.classList.remove('unread');
-    updateFacultyHeaderNotifCount();
-}
-
-function facultyHeaderMarkAllRead() {
-    document.querySelectorAll('.notif-drop-item.unread').forEach((el) => el.classList.remove('unread'));
-    updateFacultyHeaderNotifCount();
-}
-
-function updateFacultyHeaderNotifCount() {
-    const unread = document.querySelectorAll('.notif-drop-item.unread').length;
-    const badge = document.getElementById('notif-count');
-    if (badge) {
-        badge.textContent = unread;
-        badge.style.display = unread > 0 ? 'inline' : 'none';
+async function facultyHeaderMarkRead(id, el) {
+    if (!id || !el || !el.classList.contains('unread')) return;
+    try {
+        const url = FACULTY_HEADER_NOTIFICATION_ENDPOINTS.read.replace('__notification_id__', encodeURIComponent(id));
+        await facultyHeaderRequest(url, {
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        });
+        el.classList.remove('unread');
+        el.removeAttribute('role');
+        el.removeAttribute('tabindex');
+        updateFacultyHeaderNotifCount();
+    } catch (error) {
+        facultyHeaderShowNotifMessage(error.message || 'Unable to mark this notification as read.');
     }
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderFacultyHeaderNotifList);
-} else {
-    renderFacultyHeaderNotifList();
+async function facultyHeaderMarkAllRead() {
+    try {
+        await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.readAll, {
+            method: 'PUT',
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        });
+        document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(el => {
+            el.classList.remove('unread');
+            el.removeAttribute('role');
+            el.removeAttribute('tabindex');
+        });
+        updateFacultyHeaderNotifCount();
+    } catch (error) {
+        facultyHeaderShowNotifMessage(error.message || 'Unable to mark notifications as read.');
+    }
 }
 
-// Keep "Starts in Xm" / "Ongoing" text accurate without a page refresh
-setInterval(renderFacultyHeaderNotifList, 30000);
+async function updateFacultyHeaderNotifCount() {
+    try {
+        const result = await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.unreadCount);
+        const count = Number(result.count);
+        if (!Number.isInteger(count) || count < 0) throw new Error('The server returned an invalid notification count.');
+        const badge = document.getElementById('notif-count');
+        if (badge) {
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'inline' : 'none';
+        }
+    } catch (error) {
+        console.error('Unable to refresh faculty notification count:', error);
+    }
+}
+
+updateFacultyHeaderNotifCount();
+setInterval(updateFacultyHeaderNotifCount, 30000);
 </script>

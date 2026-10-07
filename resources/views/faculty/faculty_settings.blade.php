@@ -17,9 +17,7 @@
 
     <!-- Main -->
     <div class="main">
-      <div class="topbar">
-        <div class="topbar-title" id="topbar-title">Settings</div>
-      </div>
+      @include('partials.faculty_header', ['title' => 'Settings'])
 
       <!-- FACULTY SETTINGS PAGE -->
       <div id="page-faculty-settings" class="page active">

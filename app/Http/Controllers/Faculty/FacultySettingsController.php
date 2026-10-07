@@ -26,16 +26,18 @@ class FacultySettingsController extends Controller
     {
         $faculty = $this->currentFaculty()->load(['department', 'program']);
         $user = Auth::user();
-        $notificationPreferences = [
-            'faculty_notif_schedule_updates' => true,
-            'faculty_notif_new_assignments' => true,
-            'faculty_notif_reminders' => true,
-            'faculty_notif_system_announcements' => false,
-        ];
-
-        foreach ($notificationPreferences as $key => $default) {
-            $notificationPreferences[$key] = (bool) SystemSetting::get($key, $default ? '1' : '0');
-        }
+        $preferenceKey = fn (string $key): string => 'faculty_notif_user_' . $user->usr_id . '_' . $key;
+        $notificationPreferences = collect([
+            'faculty_notif_schedule_updates',
+            'faculty_notif_new_assignments',
+            'faculty_notif_reminders',
+            'faculty_notif_system_announcements',
+        ])->mapWithKeys(fn (string $key) => [
+            $key => (bool) SystemSetting::get($preferenceKey($key), match ($key) {
+                'faculty_notif_system_announcements' => '0',
+                default => '1',
+            }),
+        ])->all();
 
         return view('faculty.faculty_settings', [
             'faculty' => $faculty,
@@ -199,8 +201,9 @@ class FacultySettingsController extends Controller
             'faculty_notif_system_announcements' => 'required|boolean',
         ]);
 
+        $userId = (string) $request->user()->usr_id;
         foreach ($validated as $key => $value) {
-            SystemSetting::set($key, $value ? '1' : '0', Auth::id());
+            SystemSetting::set('faculty_notif_user_' . $userId . '_' . $key, $value ? '1' : '0', $userId);
         }
 
         return response()->json(['success' => true]);
