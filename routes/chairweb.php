@@ -10,24 +10,20 @@ use App\Http\Controllers\Chair\ChairSettingsController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
 use App\Http\Controllers\Chair\MisController;
-
+use App\Http\Controllers\Chair\ScheduleSubmissionController;
 
 Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
-// Chair dashboard index 
+    // Chair dashboard index
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
     Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.readAll');
     Route::post('/notifications/{notification}/read', [ChairController::class, 'markNotificationRead'])->name('chair.notifications.read');
 
-// Chair Faculty Load
+    // Chair Faculty Load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
-    // Used by the Subject Management page to pre-assign faculty before plotting.
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
     Route::put('/faculty-load/{faculty}/special-position', [ChairFacultyLoadController::class, 'updateSpecialPosition'])->name('chair.faculty_load.special-position');
 
     // PBS — Program by Section
-    // Note: named 'chair.pbs' (not 'chair.pbs.index') to match the sidebar's
-    // route('chair.pbs') call, and left un-nested so the URL stays /chair/pbs
-    // (not /chair/chair/pbs) to match pbs.js's fetch('/chair/pbs') calls.
     Route::get('/pbs', [PbsController::class, 'index'])->name('chair.pbs');
     Route::post('/pbs', [PbsController::class, 'store'])->name('chair.pbs.store');
     Route::put('/pbs/{id}', [PbsController::class, 'update'])->name('chair.pbs.update');
@@ -37,36 +33,33 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
 
     // PBT — Program by Teacher
-    // Same fix as PBS: flat 'chair.pbt' name, single /chair/pbt URL.
     Route::get('/pbt', [PbtController::class, 'index'])->name('chair.pbt');
     Route::post('/pbt', [PbtController::class, 'store'])->name('chair.pbt.store');
     Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
     Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
     Route::post('/pbt/save-draft', [PbtController::class, 'saveDraft'])->name('chair.pbt.save-draft');
+    Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
 
     // MIS — Class Program for MIS
     Route::get('/mis', [MisController::class, 'index'])->name('chair.mis');
     Route::put('/mis/{id}/code', [MisController::class, 'updateMisCode'])->name('chair.mis.code');
     Route::put('/mis/campus-director', [MisController::class, 'updateCampusDirector'])->name('chair.mis.campus-director');
 
-    Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
-
-    //Subject
+    // Subjects
     Route::get('/subjects', [ChairSubjectController::class, 'index'])->name('chair.subjects');
     Route::post('/subjects', [ChairSubjectController::class, 'store'])->name('chair.subject.store');
     Route::put('/subjects/{id}', [ChairSubjectController::class, 'update'])->name('chair.subject.update');
     Route::delete('/subjects/{id}', [ChairSubjectController::class, 'destroy'])->name('chair.subject.destroy');
 
-     // Room
+    // Rooms and schedules
     Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
     Route::post('/rooms', [ChairRoomController::class, 'store'])->name('chair.rooms.store');
     Route::post('/schedules', [ChairRoomController::class, 'assignSchedule'])->name('chair.schedules.store');
     Route::put('/schedules/{schedule}', [ChairRoomController::class, 'updateSchedule'])->name('chair.schedules.update');
 
-
-    Route::get('/submit-dean', function () {
-        return view('chair.submit_dean');
-    })->name('chair.submit_dean');
+    // Dean schedule submission
+    Route::get('/submit-dean', [ScheduleSubmissionController::class, 'index'])->name('chair.submit_dean');
+    Route::post('/submit-dean', [ScheduleSubmissionController::class, 'store'])->name('chair.submit_dean.store');
 
     Route::get('/export-reports', function () {
         return view('chair.export_reports');
@@ -75,7 +68,6 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::get('/settings', function () {
         return view('chair.settings');
     })->name('chair.settings');
-
 });
 
 Route::post('/schedule', function () {

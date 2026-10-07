@@ -7,21 +7,27 @@ use Illuminate\Support\Str;
 
 class Schedule_Submission extends Model
 {
-    protected $table      = 'schedule_submission';
+    protected $table = 'schedule_submission';
     protected $primaryKey = 'schsub_id';
-    public    $incrementing = false;
-    protected $keyType    = 'string';
-    public    $timestamps = false;
+    public $incrementing = false;
+    protected $keyType = 'string';
+    public $timestamps = false;
 
     protected static function boot()
     {
         parent::boot();
-        static::creating(fn($m) => $m->schsub_id = $m->schsub_id ?: (string) Str::uuid());
+
+        static::creating(function ($model) {
+            if (empty($model->schsub_id)) {
+                $model->schsub_id = (string) Str::uuid();
+            }
+        });
     }
 
     protected $fillable = [
         'schsub_id',
         'schsub_dept_id',
+        'schsub_fac_id',
         'schsub_sem_id',
         'schsub_submitted_by',
         'schsub_submitted_at',
@@ -29,18 +35,23 @@ class Schedule_Submission extends Model
         'schsub_reviewed_at',
         'schsub_status',
         'schsub_remarks',
+        'schsub_schedule_snapshot',
     ];
 
     protected $casts = [
         'schsub_submitted_at' => 'datetime',
-        'schsub_reviewed_at'  => 'datetime',
+        'schsub_reviewed_at' => 'datetime',
+        'schsub_schedule_snapshot' => 'array',
     ];
-
-    // ── Relationships ──────────────────────────────────────────────────────
 
     public function department()
     {
-        return $this->belongsTo(College::class, 'schsub_dept_id', 'college_id');
+        return $this->belongsTo(Departments::class, 'schsub_dept_id', 'dept_id');
+    }
+
+    public function faculty()
+    {
+        return $this->belongsTo(Faculty::class, 'schsub_fac_id', 'fac_id');
     }
 
     public function semester()
@@ -58,11 +69,20 @@ class Schedule_Submission extends Model
         return $this->belongsTo(User::class, 'schsub_reviewed_by', 'usr_id');
     }
 
-    // Schedules that belong to this submission's department + semester
     public function schedules()
     {
-        return Schedule::where('sch_sem_id', $this->schsub_sem_id)
-            ->whereHas('faculty', fn($q) => $q->where('fac_college_id', $this->schsub_dept_id))
+        return Schedule::query()
+            ->where('sch_sem_id', $this->schsub_sem_id)
+            ->where('sch_is_active', true)
+            ->when(
+                $this->schsub_fac_id,
+                fn($query) => $query->where('sch_fac_id', $this->schsub_fac_id)
+            )
+            ->whereHas(
+                'faculty',
+                fn($query) =>
+                $query->where('fac_dept_id', $this->schsub_dept_id)
+            )
             ->get();
     }
 }

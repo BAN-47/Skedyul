@@ -20,6 +20,7 @@
             'slate' => ['text' => 'text-slate-500', 'bar' => 'bg-slate-400'],
             'red' => ['text' => 'text-red-600', 'bar' => 'bg-red-600'],
         ];
+
         $statusBadge = [
             'Overload' => 'badge badge-red',
             'Near Max' => 'badge badge-amber',
@@ -32,13 +33,12 @@
         @include('partials.dean_sidebar')
 
         <div class="app-main">
-            {{-- Topbar only (not the full dean_header layout) --}}
             <div class="topbar">
                 <div class="topbar-title">Dean Dashboard</div>
                 <div class="flex items-center gap-2">
                     <a href="{{ route('dean.schedule_reports') }}" class="btn btn-primary">Export Report</a>
                     <a href="{{ route('dean.pending_approvals') }}" class="btn btn-secondary flex items-center gap-1.5">
-                        Notifications
+                        Pending Approvals
                         @if (($pendingDeptCount ?? 0) > 0)
                             <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                                 {{ $pendingDeptCount }}
@@ -49,11 +49,11 @@
             </div>
 
             <div class="page-content overflow-y-auto" style="max-height: calc(100vh - 64px); padding-bottom: 32px;">
-
                 <div class="flex items-center gap-3 mb-6">
                     <div class="flex-1">
-                        <div class="text-[22px] font-extrabold">{{ $greeting ?? 'Hello' }},
-                            {{ $greetingName ?? 'Dean' }}</div>
+                        <div class="text-[22px] font-extrabold">
+                            {{ $greeting ?? 'Hello' }}, {{ $greetingName ?? 'Dean' }}
+                        </div>
                         <div class="text-[13px] text-slate-400 mt-0.5">
                             AY {{ $ayLabel ?? '—' }} · {{ $semLabel ?? '—' }} · CCICT Overview
                         </div>
@@ -84,8 +84,10 @@
                         <div class="stat-card-bar bg-green-600"></div>
                         <div class="stat-label">Schedules Approved</div>
                         <div class="stat-value">{{ $scheduledApprovedCount ?? 0 }}</div>
-                        <div class="stat-sub">Pending: {{ $pendingDeptCount ?? 0 }}
-                            dept{{ ($pendingDeptCount ?? 0) === 1 ? '' : 's' }}</div>
+                        <div class="stat-sub">
+                            Pending: {{ $pendingDeptCount ?? 0 }}
+                            dept{{ ($pendingDeptCount ?? 0) === 1 ? '' : 's' }}
+                        </div>
                     </div>
                 </div>
 
@@ -99,10 +101,13 @@
                         </div>
 
                         @forelse($deptSummary ?? [] as $dept)
-                            @php $c = $colorMap[$dept['color'] ?? 'slate'] ?? $colorMap['slate']; @endphp
+                            @php
+                                $c = $colorMap[$dept['color'] ?? 'slate'] ?? $colorMap['slate'];
+                            @endphp
                             <div class="workload-item">
                                 <div class="workload-header">
-                                    <div class="workload-name">{{ $dept['name'] }} — {{ $dept['count'] }} Faculty
+                                    <div class="workload-name">
+                                        {{ $dept['name'] }} — {{ $dept['count'] }} Faculty
                                     </div>
                                     <div class="workload-val {{ $c['text'] }}">{{ $dept['percent'] }}%</div>
                                 </div>
@@ -131,29 +136,25 @@
                         <div class="card-header">
                             <div>
                                 <div class="card-title">Pending Approvals</div>
-                                <div class="card-sub">Awaiting Dean's signature</div>
+                                <div class="card-sub">
+                                    Showing {{ count($pendingApprovals ?? []) }} of {{ $pendingDeptCount ?? 0 }}
+                                    pending
+                                </div>
                             </div>
                             <a href="{{ route('dean.pending_approvals') }}"
-                                class="text-[12px] font-semibold text-blue-600 hover:underline">View all</a>
+                                class="topbar-btn btn-primary px-3 py-2 text-xs">
+                                Go to Pending Approvals
+                            </a>
                         </div>
 
                         @forelse($pendingApprovals ?? [] as $item)
                             <div class="approval-item">
                                 <div class="approval-avatar" style="background:{{ $item['color'] ?? '#64748b' }};">
-                                    {{ $item['initials'] ?? 'CH' }}</div>
+                                    {{ $item['initials'] ?? 'CH' }}
+                                </div>
                                 <div class="approval-content">
                                     <div class="approval-name">{{ $item['title'] ?? 'Schedule' }}</div>
                                     <div class="approval-detail">{{ $item['detail'] ?? '' }}</div>
-                                    <div class="approval-actions">
-                                        <button type="button"
-                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-blue-600 text-white hover:bg-blue-700"
-                                            onclick="approveSubmission('{{ $item['id'] }}', this)">Approve</button>
-                                        <a href="{{ route('dean.pending_approvals.review', $item['id']) }}"
-                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 inline-block">Review</a>
-                                        <button type="button"
-                                            class="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-red-100 text-red-600 hover:bg-red-200"
-                                            onclick="returnSubmission('{{ $item['id'] }}', this)">Return</button>
-                                    </div>
                                 </div>
                             </div>
                         @empty
@@ -171,32 +172,50 @@
                             <div class="card-sub">Your latest sign-ins and account changes</div>
                         </div>
                     </div>
+
                     <div class="space-y-0">
                         @forelse($recentActivity ?? [] as $activity)
                             @php
-                                $activityDetail = preg_replace('/^Role: [^;]+; /', '', (string) $activity->al_description);
+                                $activityDetail = preg_replace(
+                                    '/^Role: [^;]+; /',
+                                    '',
+                                    (string) $activity->al_description,
+                                );
                                 $activityDetail = preg_replace('/; HTTP \d{3}$/', '', $activityDetail);
-                                $activityTime = \Illuminate\Support\Carbon::parse($activity->al_created_at)->timezone(config('app.timezone'));
+                                $activityTime = \Illuminate\Support\Carbon::parse($activity->al_created_at)->timezone(
+                                    config('app.timezone'),
+                                );
                                 $activityIsLogin = in_array($activity->al_action, ['Logged in', 'Logged out'], true);
                             @endphp
+
                             <div class="flex items-start gap-3.5 border-b border-slate-100 py-3.5 last:border-b-0">
-                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $activityIsLogin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600' }}">
-                                    <i class="ti {{ $activity->al_action === 'Logged in' ? 'ti-login' : ($activity->al_action === 'Logged out' ? 'ti-logout' : 'ti-edit') }}"></i>
+                                <div
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $activityIsLogin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600' }}">
+                                    <i
+                                        class="ti {{ $activity->al_action === 'Logged in' ? 'ti-login' : ($activity->al_action === 'Logged out' ? 'ti-logout' : 'ti-edit') }}"></i>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                        <div class="text-[13px] font-semibold text-slate-700">{{ $activity->al_action }}</div>
-                                        <time class="whitespace-nowrap text-[11px] font-medium text-slate-400" datetime="{{ $activityTime->toIso8601String() }}">{{ $activityTime->format('M j, Y · g:i A') }}</time>
+                                        <div class="text-[13px] font-semibold text-slate-700">
+                                            {{ $activity->al_action }}
+                                        </div>
+                                        <time class="whitespace-nowrap text-[11px] font-medium text-slate-400"
+                                            datetime="{{ $activityTime->toIso8601String() }}">
+                                            {{ $activityTime->format('M j, Y · g:i A') }}
+                                        </time>
                                     </div>
-                                    <div class="mt-1 break-words text-[12px] text-slate-500">{{ $activityDetail ?: $activity->al_target_table }}</div>
+                                    <div class="mt-1 break-words text-[12px] text-slate-500">
+                                        {{ $activityDetail ?: $activity->al_target_table }}
+                                    </div>
                                 </div>
                             </div>
                         @empty
-                            <div class="py-6 text-center text-sm text-slate-400">No activity recorded yet.</div>
+                            <div class="py-6 text-center text-sm text-slate-400">
+                                No activity recorded yet.
+                            </div>
                         @endforelse
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -207,59 +226,69 @@
         const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
         function showToast(msg) {
-            const t = document.getElementById('toast');
+            const toast = document.getElementById('toast');
             document.getElementById('toast-msg').textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        async function approveSubmission(id, btn) {
+        async function approveSubmission(id, button) {
             if (!confirm('Approve this schedule submission?')) return;
-            btn.disabled = true;
+
+            button.disabled = true;
+
             try {
-                const res = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/approve`, {
+                const response = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/approve`, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': CSRF,
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
                     },
                 });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
                     showToast(data.message || 'Failed to approve.');
-                    btn.disabled = false;
+                    button.disabled = false;
                     return;
                 }
+
                 showToast(data.message || 'Schedule approved.');
                 setTimeout(() => location.reload(), 500);
-            } catch (e) {
+            } catch (error) {
                 showToast('Failed to approve.');
-                btn.disabled = false;
+                button.disabled = false;
             }
         }
 
-        async function returnSubmission(id, btn) {
+        async function returnSubmission(id, button) {
             if (!confirm('Return this schedule to the chair?')) return;
-            btn.disabled = true;
+
+            button.disabled = true;
+
             try {
-                const res = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/return`, {
+                const response = await fetch(`{{ url('/dean/pending-approvals') }}/${id}/return`, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': CSRF,
-                        'Accept': 'application/json'
+                        'Accept': 'application/json',
                     },
                 });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
                     showToast(data.message || 'Failed to return.');
-                    btn.disabled = false;
+                    button.disabled = false;
                     return;
                 }
+
                 showToast(data.message || 'Returned to chair.');
                 setTimeout(() => location.reload(), 500);
-            } catch (e) {
+            } catch (error) {
                 showToast('Failed to return.');
-                btn.disabled = false;
+                button.disabled = false;
             }
         }
     </script>

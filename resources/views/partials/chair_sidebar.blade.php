@@ -53,7 +53,7 @@
         <div class="nav-section-label">Submission</div>
         <a href="{{ route('chair.submit_dean') }}"
             class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
-            <span class="nav-icon"></span> Submit to Dean
+            <span class="nav-icon"></span> PBT Submission
         </a>
 
         <div class="nav-section-label">System</div>
