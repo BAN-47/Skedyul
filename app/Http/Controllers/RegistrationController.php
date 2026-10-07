@@ -8,6 +8,7 @@ use App\Models\Faculty;
 use App\Models\FacultyAccountReview;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -48,6 +49,10 @@ class RegistrationController extends Controller
             'dept_id' => ['required', 'uuid', 'exists:department,dept_id'],
             'usr_rank_title' => ['required', 'string', 'max:255'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
+            'special_position' => [
+                'nullable',
+                Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS)),
+            ],
             'faculty_id_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], [
             'password.confirmed' => 'The password confirmation does not match.',
@@ -118,6 +123,10 @@ class RegistrationController extends Controller
                     'fac_address' => $data['role_address'] ?? null,
                     'fac_employment_type' => $data['employment_type'],
                     'fac_rank' => $data['usr_rank_title'] ?? null,
+                    'fac_special_position' => $data['special_position'] ?? null,
+                    'fac_special_position_max_hours' => isset($data['special_position'])
+                        ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
+                        : null,
                 ]);
 
                 FacultyAccountReview::create([

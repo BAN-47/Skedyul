@@ -90,6 +90,7 @@ class ChairController extends Controller
                 'max_hours'  => $maxHours,
                 'status'     => $status,
                 'employment' => $f->fac_employment_type,
+                'special_position' => $f->fac_special_position,
             ];
         });
 

@@ -30,23 +30,24 @@ class ScheduleAssignmentService
     private const FULL_TIME_MAX_HOURS = 30;
     private const PART_TIME_MAX_HOURS = 22;
 
-    /** Policy ranges; a chair may assign a cap within the listed range. */
-    public const SPECIAL_POSITION_RANGES = [
-        'Vice-President' => [3, 3],
-        'University Director' => [3, 6],
-        'Campus Director' => [3, 6],
-        'Assistant Campus Director' => [6, 9],
-        'Dean of Instruction' => [6, 9],
-        'College Dean' => [6, 9],
-        'Associate College Dean' => [9, 12],
-        'Department SUC Function Chairperson' => [12, 15],
-        'Campus Secretary' => [12, 15],
+    /** Fixed caps use the upper end of each policy range. */
+    public const SPECIAL_POSITION_MAX_HOURS = [
+        'Vice-President' => 3,
+        'University Director' => 6,
+        'Campus Director' => 6,
+        'Assistant Campus Director' => 9,
+        'Dean of Instruction' => 9,
+        'College Dean' => 9,
+        'Associate College Dean' => 12,
+        'Department SUC Function Chairperson' => 15,
+        'Campus Secretary' => 15,
     ];
 
     public static function facultyMaxHours(Faculty $faculty): float
     {
-        if ($faculty->fac_special_position && $faculty->fac_special_position_max_hours !== null) {
-            return (float) $faculty->fac_special_position_max_hours;
+        if ($faculty->fac_special_position
+            && isset(self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position])) {
+            return (float) self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position];
         }
 
         return $faculty->fac_employment_type === 'part_time'

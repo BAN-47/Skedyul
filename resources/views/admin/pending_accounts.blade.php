@@ -74,6 +74,7 @@
                 <div><div class="pending-account-label">College</div><div class="pending-account-value">{{ $faculty?->college?->college_name ?? '—' }}</div></div>
                 <div><div class="pending-account-label">Department / Program</div><div class="pending-account-value">{{ $faculty?->program?->dept_name ?? '—' }}</div></div>
                 <div><div class="pending-account-label">Rank / Title</div><div class="pending-account-value">{{ $faculty?->fac_rank ?? '—' }}</div></div>
+                <div><div class="pending-account-label">Declared special position / load limit</div><div class="pending-account-value">{{ $faculty?->fac_special_position ? $faculty->fac_special_position . ' · ' . rtrim(rtrim(number_format((float) $faculty->fac_special_position_max_hours, 2), '0'), '.') . ' hours/week' : '—' }}</div></div>
                 <div><div class="pending-account-label">Employment</div><div class="pending-account-value">{{ ($faculty?->fac_employment_type ?? '') === 'part_time' ? 'Part-time' : 'Full-time' }}</div></div>
                 <div class="col-span-full"><div class="pending-account-label">Address</div><div class="pending-account-value">{{ $faculty?->fac_address ?? '—' }}</div></div>
               </div>

@@ -112,6 +112,7 @@
                   data-first-name="{{ $user->usr_first_name }}"
                   data-last-name="{{ $user->usr_last_name }}"
                   data-role="{{ $user->usr_role }}"
+                  data-special-position="{{ $user->faculty?->fac_special_position ?? '' }}"
                   data-email="{{ $user->usr_email }}"
                   data-active="{{ $user->usr_is_active ? '1' : '0' }}"
                   data-bio="{{ $user->usr_bio }}"
@@ -137,9 +138,14 @@
                   </td>
 
                   <td>
-                    <span class="badge badge-grey">
-                      {{ $roleLabels[$user->usr_role] ?? ucfirst($user->usr_role) }}
-                    </span>
+                    <div class="flex flex-col items-start gap-1">
+                      <span class="badge badge-grey">
+                        {{ $roleLabels[$user->usr_role] ?? ucfirst($user->usr_role) }}
+                      </span>
+                      @if ($user->faculty?->fac_special_position)
+                        <span class="text-[11px] text-slate-500">{{ $user->faculty->fac_special_position }} · {{ rtrim(rtrim(number_format((float) $user->faculty->fac_special_position_max_hours, 2), '0'), '.') }}h/week</span>
+                      @endif
+                    </div>
                   </td>
 
                   <td class="text-slate-500">
@@ -337,9 +343,9 @@
           </div>
         </div>
 
-        <div class="role-field" data-roles="faculty" style="display:none;">
+        <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
+            <div class="role-field" data-roles="faculty" style="display:none;">
               <label class="field-label">Rank / Title</label>
               <select name="usr_rank_title" class="field-input">
                 <option value="">-- Select Rank --</option>
@@ -365,6 +371,16 @@
                 <option value="part_time">Part-time</option>
               </select>
             </div>
+          </div>
+          <div class="col-span-2">
+            <label class="field-label">Special Position (Optional)</label>
+            <select id="add-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('add')">
+              <option value="">None</option>
+              @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
+                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              @endforeach
+            </select>
+            <p id="add-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>
           </div>
         </div>
 
@@ -405,7 +421,7 @@
 
             <div>
               <label class="field-label">College</label>
-              <select name="college_id" class="field-input">
+              <select id="add-college" name="college_id" class="field-input">
                 <option value="">— Select college —</option>
                 @foreach(($colleges ?? []) as $college)
                 <option value="{{ $college->college_id }}">
@@ -418,10 +434,10 @@
 
           <div>
             <label class="field-label">Department</label>
-            <select name="dept_id" class="field-input">
+            <select id="add-department" data-department-select name="dept_id" class="field-input">
               <option value="">— Select department —</option>
               @foreach(($departments ?? []) as $dept)
-              <option value="{{ $dept->dept_id }}">
+                <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
                 {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
@@ -586,9 +602,9 @@
           </div>
         </div>
 
-        <div class="role-field" data-roles="faculty" style="display:none;">
+        <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
+            <div class="role-field" data-roles="faculty" style="display:none;">
               <label class="field-label">Rank / Title</label>
               <select id="edit-rank-title" name="usr_rank_title" class="field-input">
                 <option value="">-- Select Rank --</option>
@@ -604,6 +620,13 @@
                 <option value="Associate Professor III">Associate Professor III</option>
                 <option value="Associate Professor IV">Associate Professor IV</option>
                 <option value="Associate Professor V">Associate Professor V</option>
+                <option value="Associate Professor V">Professor I</option>
+                <option value="Associate Professor V">Professor II</option>
+                <option value="Associate Professor V">Professor III</option>
+                <option value="Associate Professor V">Professor IV</option>
+                <option value="Associate Professor V">Professor V</option>
+                <option value="Associate Professor V">Professor VI</option>
+                <option value="Associate Professor V">University Professor</option>
               </select>
             </div>
 
@@ -615,6 +638,16 @@
                 <option value="part_time">Part-time</option>
               </select>
             </div>
+          </div>
+          <div class="col-span-2">
+            <label class="field-label">Special Position (Optional)</label>
+            <select id="edit-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('edit')">
+              <option value="">None</option>
+              @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
+                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              @endforeach
+            </select>
+            <p id="edit-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>
           </div>
         </div>
 
@@ -672,11 +705,11 @@
 
           <div>
             <label class="field-label">Department</label>
-            <select id="edit-department"
+              <select id="edit-department" data-department-select
               name="dept_id" class="field-input">
               <option value="">— Select department —</option>
               @foreach(($departments ?? []) as $dept)
-              <option value="{{ $dept->dept_id }}">
+                <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
                 {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
@@ -849,6 +882,16 @@
 
     let profileUserId = null;
 
+    function updateAdminSpecialPositionCap(which) {
+      const select = document.getElementById(`${which}-special-position`);
+      const note = document.getElementById(`${which}-special-position-cap`);
+      if (!select || !note) return;
+      const maxHours = select.selectedOptions[0]?.dataset.maxHours;
+      note.textContent = maxHours
+        ? `Fixed teaching-load limit: ${maxHours} hours per week.`
+        : 'No special-position limit.';
+    }
+
 
     function openModal(id) {
       document.getElementById(id)?.classList.add('active');
@@ -857,6 +900,54 @@
 
     function closeModal(id) {
       document.getElementById(id)?.classList.remove('active');
+    }
+
+
+    function updateCollegeDepartment(form, preferredDepartmentId) {
+      const college = form?.querySelector('select[name="college_id"]');
+      const department = form?.querySelector('[data-department-select]');
+      if (!college || !department) return;
+
+      if (!department._allDepartmentOptions) {
+        department._allDepartmentOptions = [...department.options]
+          .filter(option => option.value)
+          .map(option => option.cloneNode(true));
+      }
+
+      const selectedId = preferredDepartmentId === undefined
+        ? department.value
+        : String(preferredDepartmentId || '');
+      const matching = department._allDepartmentOptions
+        .filter(option => option.dataset.college === college.value);
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = !college.value
+        ? 'Select a college first'
+        : matching.length
+          ? 'Select department'
+          : 'No departments available for this college';
+      placeholder.selected = true;
+
+      department.replaceChildren(placeholder, ...matching.map(option => option.cloneNode(true)));
+      if (selectedId && matching.some(option => option.value === selectedId)) {
+        department.value = selectedId;
+      }
+
+      const roleField = department.closest('.role-field');
+      const roleIsVisible = !roleField || roleField.style.display !== 'none';
+      department.disabled = !roleIsVisible || !college.value || matching.length === 0;
+    }
+
+
+    function setupCollegeDepartmentSelectors() {
+      ['form-add-user', 'form-edit-user'].forEach(formId => {
+        const form = document.getElementById(formId);
+        const college = form?.querySelector('select[name="college_id"]');
+        if (!form || !college) return;
+
+        college.addEventListener('change', () => updateCollegeDepartment(form, ''));
+        updateCollegeDepartment(form);
+      });
     }
 
 
@@ -908,6 +999,8 @@
           input.disabled = !show;
         });
       });
+
+      updateCollegeDepartment(form);
     }
 
 
@@ -915,6 +1008,7 @@
       const form = document.getElementById('form-add-user');
 
       form.reset();
+      updateAdminSpecialPositionCap('add');
 
       form.querySelectorAll('.role-field').forEach(field => {
         field.style.display = 'none';
@@ -923,6 +1017,8 @@
           input.disabled = true;
         });
       });
+
+      updateCollegeDepartment(form, '');
 
       openModal('modal-add-user');
     }
@@ -1049,6 +1145,10 @@
 
         document.getElementById('edit-employment').value =
           data.employment_type || 'full_time';
+
+        document.getElementById('edit-special-position').value =
+          data.special_position || '';
+        updateAdminSpecialPositionCap('edit');
 
         setPhoneFromStored('edit', data.role_phone_number || '');
 
@@ -1221,9 +1321,9 @@
     }
 
     function getDepartmentName(id) {
-      const option = document.querySelector(
-        `#edit-department option[value="${CSS.escape(String(id))}"]`
-      );
+      const departmentSelect = document.getElementById('edit-department');
+      const options = departmentSelect?._allDepartmentOptions || [...(departmentSelect?.options || [])];
+      const option = options.find(item => item.value === String(id));
       return option ? option.textContent.trim() : 'Not provided';
     }
 
@@ -1341,8 +1441,9 @@
       const lastName = (row.dataset.lastName || '').toLowerCase();
       const email = (row.dataset.email || '').toLowerCase();
       const role = (row.dataset.role || '').toLowerCase();
+      const specialPosition = (row.dataset.specialPosition || '').toLowerCase();
       return name.includes(q) || firstName.includes(q) || lastName.includes(q)
-        || email.includes(q) || role.includes(q);
+        || email.includes(q) || role.includes(q) || specialPosition.includes(q);
     }
 
     function getFilteredRows() {
@@ -1415,6 +1516,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      setupCollegeDepartmentSelectors();
+
       const addRole = document.querySelector(
         '#form-add-user select[name="usr_role"]'
       );

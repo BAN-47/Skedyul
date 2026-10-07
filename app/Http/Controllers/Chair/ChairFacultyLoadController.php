@@ -32,7 +32,7 @@ class ChairFacultyLoadController extends Controller
     const PART_TIME_MAX_HOURS = 22;
     const NEAR_MAX_BUFFER     = 3;
 
-    public const SPECIAL_POSITION_RANGES = ScheduleAssignmentService::SPECIAL_POSITION_RANGES;
+    public const SPECIAL_POSITION_MAX_HOURS = ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS;
 
     public function index()
     {
@@ -124,8 +124,8 @@ class ChairFacultyLoadController extends Controller
                 'name'         => trim("{$f->fac_first_name} {$f->fac_last_name}"),
                 'employment'   => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
-                'special_position_range' => $f->fac_special_position
-                    ? self::SPECIAL_POSITION_RANGES[$f->fac_special_position] ?? null
+                'special_position_max_hours' => $f->fac_special_position
+                    ? self::SPECIAL_POSITION_MAX_HOURS[$f->fac_special_position] ?? null
                     : null,
                 'subjects'     => $subjectCodes !== '' ? $subjectCodes : '—',
                 'total_units'  => $totalUnits,
@@ -273,20 +273,11 @@ class ChairFacultyLoadController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'special_position' => ['nullable', 'string', 'in:' . implode(',', array_keys(self::SPECIAL_POSITION_RANGES))],
-            'max_hours' => ['nullable', 'numeric', 'min:1', 'max:30', 'required_with:special_position'],
+            'special_position' => ['nullable', 'string', 'in:' . implode(',', array_keys(self::SPECIAL_POSITION_MAX_HOURS))],
         ]);
 
         $position = $data['special_position'] ?? null;
-        $hours = $position ? (float) $data['max_hours'] : null;
-        if ($position) {
-            [$minimum, $maximum] = self::SPECIAL_POSITION_RANGES[$position];
-            if ($hours < $minimum || $hours > $maximum) {
-                return back()->withErrors([
-                    'max_hours' => "{$position} must be assigned between {$minimum} and {$maximum} teaching hours.",
-                ])->withInput();
-            }
-        }
+        $hours = $position ? self::SPECIAL_POSITION_MAX_HOURS[$position] : null;
 
         $faculty->fac_special_position = $position;
         $faculty->fac_special_position_max_hours = $hours;

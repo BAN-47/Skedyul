@@ -1,4 +1,5 @@
 <!-- ══════════ SIDEBAR ══════════ -->
+@php($chairSidebarProfile = Auth::user()->deptChair()->with('program')->first())
 <div class="sidebar">
     <div class="sidebar-logo">
         <div class="sidebar-logo-text">SKED<span>YUL</span></div>
@@ -11,6 +12,9 @@
         <div class="overflow-hidden">
             <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
             <div class="sidebar-user-role">Department Chair</div>
+            <div class="truncate text-[11px] text-slate-400" title="{{ $chairSidebarProfile?->program?->dept_name ?? 'Department not assigned' }}">
+                Handling: {{ $chairSidebarProfile?->program?->dept_code ?? $chairSidebarProfile?->program?->dept_name ?? 'Department not assigned' }}
+            </div>
         </div>
     </div>
 

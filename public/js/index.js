@@ -282,5 +282,17 @@
         college.addEventListener('change', () => updateDepartmentOptions());
         updateDepartmentOptions(true);
       }
+
+      const specialPosition = document.getElementById('register-special-position');
+      const specialPositionCap = document.getElementById('register-special-position-cap');
+      const updateSpecialPositionCap = () => {
+        if (!specialPosition || !specialPositionCap) return;
+        const maxHours = specialPosition.selectedOptions[0]?.dataset.maxHours;
+        specialPositionCap.textContent = maxHours
+          ? `Fixed teaching-load limit: ${maxHours} hours.`
+          : 'Select a position only if it applies to you.';
+      };
+      specialPosition?.addEventListener('change', updateSpecialPositionCap);
+      updateSpecialPositionCap();
     });
   

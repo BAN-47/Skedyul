@@ -89,7 +89,7 @@
           </div>
           <table>
             <thead>
-              <tr><th>Faculty</th><th>Load</th><th>Remaining</th><th>Status</th></tr>
+              <tr><th>Faculty</th><th>Special Position</th><th>Load</th><th>Remaining</th><th>Status</th></tr>
             </thead>
             <tbody>
               @forelse($facultyLoad as $fl)
@@ -107,8 +107,9 @@
                       default     => 'badge-green',
                   };
                 @endphp
-                <tr data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
+                <tr data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['status'].' '.$fl['hours']) }}">
                   <td><b>{{ $fl['name'] }}</b></td>
+                  <td>{{ $fl['special_position'] ?: '—' }}</td>
                   <td><span class="font-mono font-bold {{ $loadColor }}">{{ $fl['hours'] }}h</span></td>
                   <td>
                     <span class="badge {{ $statusBadge === 'badge-red' ? 'badge-red' : ($statusBadge === 'badge-amber' ? 'badge-amber' : 'badge-blue') }}">
@@ -118,9 +119,9 @@
                   <td><span class="badge {{ $statusBadge }}">{{ $fl['status'] }}</span></td>
                 </tr>
               @empty
-                <tr><td colspan="4" class="text-center text-slate-400 py-4">No faculty in this department yet.</td></tr>
+                <tr><td colspan="5" class="text-center text-slate-400 py-4">No faculty in this department yet.</td></tr>
               @endforelse
-              <tr id="dashboard-table-no-results" class="hidden"><td colspan="4" class="text-center text-slate-400 py-4">No faculty match your search.</td></tr>
+              <tr id="dashboard-table-no-results" class="hidden"><td colspan="5" class="text-center text-slate-400 py-4">No faculty match your search.</td></tr>
             </tbody>
           </table>
         </div>
@@ -147,9 +148,9 @@
                   default     => 'text-green-600',
               };
             @endphp
-            <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['status'].' '.$fl['hours']) }}">
+            <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['status'].' '.$fl['hours']) }}">
               <div class="workload-header">
-                <div class="workload-name">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}</div>
+                <div class="workload-name">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}{{ $fl['special_position'] ? ' · '.$fl['special_position'] : '' }}</div>
                 <div class="workload-val {{ $textColor }}">{{ $fl['hours'] }}/{{ $fl['max_hours'] }}h</div>
               </div>
               <div class="workload-bar"><div class="workload-fill {{ $barColor }}" style="width:{{ $fl['percent'] }}%"></div></div>

@@ -336,6 +336,18 @@
               </select>
             </div>
 
+            <div>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Special Position (Optional)</label>
+              <select id="register-special-position" name="special_position" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                <option value="">None</option>
+                @foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
+                  <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(old('special_position') === $position)>{{ $position }}</option>
+                @endforeach
+              </select>
+              <p id="register-special-position-cap" class="mt-1 text-[10px] text-slate-500">Select a position only if it applies to you.</p>
+              @error('special_position')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
+            </div>
+
             <div class="col-span-2">
               <label for="faculty-id-photo" class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Faculty ID Photo (for verification) <span class="text-red-500" aria-hidden="true">*</span></label>
               <input

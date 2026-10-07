@@ -9,6 +9,7 @@ use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\College;
 use App\Models\Departments;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -82,6 +83,22 @@ class UserController extends Controller
         ])));
     }
 
+    private function specialPositionDatabaseError(QueryException $exception): ?string
+    {
+        $state = $exception->errorInfo[0] ?? $exception->getCode();
+        $message = strtolower($exception->getMessage());
+
+        if ($state === '42703' && str_contains($message, 'fac_special_position')) {
+            return 'Special-position columns are missing from Supabase. Add fac_special_position and fac_special_position_max_hours to public.faculty, then save again.';
+        }
+
+        if ($state === '23514' && str_contains($message, 'faculty_special_position_cap_check')) {
+            return 'The saved special position and teaching-hour cap do not match. Choose the position again and save.';
+        }
+
+        return null;
+    }
+
     private function roleSpecificRules(string $role): array
     {
         $rules = [];
@@ -99,8 +116,16 @@ class UserController extends Controller
             $rules['college_id'] = 'nullable|uuid|exists:college,college_id';
         }
 
-        if ($role === 'faculty') {
+        if (in_array($role, ['faculty', 'dean', 'department_chair'])) {
+            // Chairs and deans also have a faculty profile for schedule/load assignment.
             $rules['employment_type'] = 'required|in:full_time,part_time';
+            $rules['special_position'] = [
+                'nullable',
+                Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS)),
+            ];
+        }
+
+        if ($role === 'faculty') {
             $rules['usr_rank_title'] = 'nullable|string|max:255';
         }
 
@@ -115,24 +140,32 @@ class UserController extends Controller
         array $data
     ): void {
         if ($oldRole && $oldRole !== $newRole) {
-            match ($oldRole) {
-                'faculty' => Faculty::where(
-                    'fac_usr_id',
-                    $user->usr_id
-                )->delete(),
+            // Keep the faculty row when changing faculty to a teaching-capable
+            // leadership role. Schedules reference fac_id, so preserving this
+            // record keeps their assignments and special-load settings intact.
+            $preserveFacultyProfile = $oldRole === 'faculty'
+                && in_array($newRole, ['department_chair', 'dean'], true);
 
-                'dean' => Dean::where(
-                    'dean_usr_id',
-                    $user->usr_id
-                )->delete(),
+            if (!$preserveFacultyProfile) {
+                match ($oldRole) {
+                    'faculty' => Faculty::where(
+                        'fac_usr_id',
+                        $user->usr_id
+                    )->delete(),
 
-                'department_chair' => Dept_Chair::where(
-                    'dc_usr_id',
-                    $user->usr_id
-                )->delete(),
+                    'dean' => Dean::where(
+                        'dean_usr_id',
+                        $user->usr_id
+                    )->delete(),
 
-                default => null,
-            };
+                    'department_chair' => Dept_Chair::where(
+                        'dc_usr_id',
+                        $user->usr_id
+                    )->delete(),
+
+                    default => null,
+                };
+            }
         }
 
         switch ($newRole) {
@@ -155,6 +188,10 @@ class UserController extends Controller
                         'fac_address' => $request->role_address,
                         'fac_employment_type' => $request->employment_type,
                         'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_special_position' => $data['special_position'] ?? null,
+                        'fac_special_position_max_hours' => isset($data['special_position'])
+                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
+                            : null,
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
@@ -199,6 +236,10 @@ class UserController extends Controller
                         'fac_address' => $request->role_address,
                         'fac_employment_type' => $request->input('employment_type', 'full_time'),
                         'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_special_position' => $data['special_position'] ?? null,
+                        'fac_special_position_max_hours' => isset($data['special_position'])
+                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
+                            : null,
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
@@ -243,6 +284,10 @@ class UserController extends Controller
                         'fac_address' => $request->role_address,
                         'fac_employment_type' => $request->input('employment_type', 'full_time'),
                         'fac_rank' => $data['usr_rank_title'] ?? null,
+                        'fac_special_position' => $data['special_position'] ?? null,
+                        'fac_special_position_max_hours' => isset($data['special_position'])
+                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
+                            : null,
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
@@ -338,6 +383,10 @@ class UserController extends Controller
         } catch (QueryException $e) {
             $sqlState = $e->errorInfo[0] ?? $e->getCode();
 
+            if ($specialPositionError = $this->specialPositionDatabaseError($e)) {
+                return redirect()->route('admin.users')->with('error', $specialPositionError);
+            }
+
             if ($sqlState === '23505') {
                 return redirect()->route('admin.users')
                     ->with('error', $this->uniqueViolationMessage($e));
@@ -353,6 +402,7 @@ class UserController extends Controller
     public function edit($id)
     {
         $user = User::findOrFail($id);
+        $facultyProfile = Faculty::where('fac_usr_id', $id)->first();
 
         $profile = match ($user->usr_role) {
             'faculty' => Faculty::where(
@@ -389,7 +439,8 @@ class UserController extends Controller
                 'role_address' => $profile->fac_address ?? null,
                 'college_id' => $profile->fac_college_id ?? null,
                 'dept_id' => $profile->fac_dept_id ?? null,
-                'employment_type' => $profile->fac_employment_type ?? null,
+                'employment_type' => $facultyProfile->fac_employment_type ?? null,
+                'special_position' => $facultyProfile->fac_special_position ?? null,
                 'usr_bio' => $profile->fac_bio ?? null,
             ],
 
@@ -408,7 +459,8 @@ class UserController extends Controller
                 'role_address' => $profile->dean_address ?? null,
                 'college_id' => $profile->dean_college_id ?? null,
                 'dept_id' => $profile->dean_dept_id ?? null,
-                'employment_type' => null,
+                'employment_type' => $facultyProfile->fac_employment_type ?? null,
+                'special_position' => $facultyProfile->fac_special_position ?? null,
                 'usr_bio' => $profile->dean_bio ?? null,
             ],
 
@@ -427,7 +479,8 @@ class UserController extends Controller
                 'role_address' => $profile->dc_address ?? null,
                 'college_id' => $profile->dc_college_id ?? null,
                 'dept_id' => $profile->dc_dept_id ?? null,
-                'employment_type' => null,
+                'employment_type' => $facultyProfile->fac_employment_type ?? null,
+                'special_position' => $facultyProfile->fac_special_position ?? null,
                 'usr_bio' => $profile->dc_bio ?? null,
             ],
 
@@ -450,6 +503,8 @@ class UserController extends Controller
                 'usr_bio' => null,
             ],
         };
+
+        $roleFields['special_position'] ??= $facultyProfile->fac_special_position ?? null;
 
         return response()->json(array_merge([
             'usr_id' => $user->usr_id,
@@ -513,6 +568,27 @@ class UserController extends Controller
                 );
         }
 
+        // Enforce one chair per program when changing an existing account's role.
+        // Excluding this account lets the current chair save edits to their own profile.
+        if (($data['usr_role'] ?? '') === 'department_chair' && $request->filled('dept_id')) {
+            $existingChair = Dept_Chair::where('dc_dept_id', $request->dept_id)
+                ->where('dc_usr_id', '!=', $user->usr_id)
+                ->first();
+
+            if ($existingChair) {
+                $programLabel = Departments::where('dept_id', $request->dept_id)
+                    ->value('dept_code')
+                    ?? 'the selected program';
+
+                return redirect()->route('admin.users')
+                    ->with(
+                        'error',
+                        "Cannot assign this account as the {$programLabel} department chair. "
+                        . 'That program already has a department chair. The account role was not changed; edit or remove the current chair first, or select another program.'
+                    );
+            }
+        }
+
         try {
             DB::transaction(function () use (
                 $user,
@@ -542,6 +618,10 @@ class UserController extends Controller
             });
         } catch (QueryException $e) {
             $sqlState = $e->errorInfo[0] ?? $e->getCode();
+
+            if ($specialPositionError = $this->specialPositionDatabaseError($e)) {
+                return redirect()->route('admin.users')->with('error', $specialPositionError);
+            }
 
             if ($sqlState === '23505') {
                 return redirect()->route('admin.users')

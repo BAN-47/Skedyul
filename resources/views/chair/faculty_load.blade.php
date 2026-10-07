@@ -100,16 +100,12 @@
                                                 @method('PUT')
                                                 <select name="special_position" data-position-select class="max-w-[180px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs">
                                                     <option value="">No special position</option>
-                                                    @foreach (\App\Http\Controllers\Chair\ChairFacultyLoadController::SPECIAL_POSITION_RANGES as $position => $range)
-                                                        <option value="{{ $position }}" data-min="{{ $range[0] }}" data-max="{{ $range[1] }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
+                                                    @foreach (\App\Http\Controllers\Chair\ChairFacultyLoadController::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
+                                                        <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
                                                     @endforeach
                                                 </select>
-                                                <input name="max_hours" data-position-hours type="number" min="1" max="30" step="1" value="{{ $fl['max_hours'] }}" aria-label="Special-position teaching-hour cap" class="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" {{ $fl['special_position'] ? '' : 'disabled' }}>
-                                                <span class="text-xs text-slate-500">h</span>
+                                                <span data-position-cap class="text-xs text-slate-500 {{ $fl['special_position'] ? '' : 'hidden' }}">{{ $fl['special_position_max_hours'] ? 'Fixed limit: '.$fl['special_position_max_hours'].'h/week' : '' }}</span>
                                                 <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
-                                                @if ($fl['special_position_range'])
-                                                    <span class="w-full text-[10px] text-slate-400">Policy range: {{ $fl['special_position_range'][0] }}–{{ $fl['special_position_range'][1] }}h (defaults to upper end)</span>
-                                                @endif
                                             </form>
                                         </td>
                                         <td class="text-slate-500">{{ $fl['subjects'] }}</td>
@@ -161,20 +157,15 @@
 
         (() => {
             document.querySelectorAll('[data-position-select]').forEach(select => {
-                const form = select.form;
-                const hours = form.querySelector('[data-position-hours]');
-                const syncRange = (useUpperEnd = false) => {
+                const cap = select.form.querySelector('[data-position-cap]');
+                const syncCap = () => {
                     const option = select.selectedOptions[0];
-                    const min = Number(option.dataset.min || 1);
-                    const max = Number(option.dataset.max || 30);
-                    const enabled = Boolean(select.value);
-                    hours.disabled = !enabled;
-                    hours.min = min;
-                    hours.max = max;
-                    if (enabled && (useUpperEnd || Number(hours.value) < min || Number(hours.value) > max)) hours.value = max;
+                    const maxHours = option.dataset.maxHours;
+                    cap.textContent = maxHours ? `Fixed limit: ${maxHours}h/week` : '';
+                    cap.classList.toggle('hidden', !maxHours);
                 };
-                select.addEventListener('change', () => syncRange(true));
-                syncRange();
+                select.addEventListener('change', syncCap);
+                syncCap();
             });
 
             const search = document.getElementById('faculty-load-search');
