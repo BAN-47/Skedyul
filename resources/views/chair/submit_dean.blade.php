@@ -2,240 +2,270 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SKEDYUL — Submit to Dean</title>
-  @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SKEDYUL — PBT Submission</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-900 antialiased">
+    <div class="flex h-screen overflow-hidden">
+        @include('partials.chair_sidebar')
 
-  <div class="flex h-screen overflow-hidden">
-    @include('partials.chair_sidebar')
+        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            @include('partials.chair_header', [
+                'title' => 'PBT Submission',
+                'badgeText' => 'Department Chair',
+            ])
 
-    <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
-      @include('partials.chair_header', ['title' => 'Submit to Dean', 'badgeText' => 'BSIS Department'])
+            <div class="flex-1 overflow-y-auto p-7">
+                <div class="mb-5">
+                    <h1 class="text-xl font-extrabold">Submit Faculty PBT to Dean</h1>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Choose a faculty member to review and submit their Program by Teacher schedule.
+                    </p>
+                </div>
 
-      <div id="page-submit" class="page-content flex-1 overflow-y-auto">
-        <div class="mb-5">
-          <div class="text-[20px] font-extrabold text-slate-900">Submit Schedule to Dean</div>
-          <div class="mt-1 text-[13px] text-slate-500">Final review before sending to Dean Villaceran</div>
-        </div>
+                @if (session('success'))
+                    <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                        {{ session('success') }}
+                    </div>
+                @endif
 
-        <div id="submit-blocked" class="mb-5 flex items-center gap-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <div class="leading-relaxed"><strong class="font-bold">Submission Blocked</strong> — 1 unresolved conflict exists. The schedule cannot be published or sent to the Dean until all conflicts are fixed.</div>
-        </div>
+                @if (session('error'))
+                    <div class="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        {{ session('error') }}
+                    </div>
+                @endif
 
-        <div id="submit-ready" class="mb-5 hidden items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          <div><strong class="font-bold">Ready to submit!</strong> All conflicts resolved. Click Submit below to send to Dean Villaceran.</div>
-        </div>
+                @if (!$semester)
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                        No active semester is set. Ask an administrator to set the active semester before submitting.
+                    </div>
+                @else
+                    @php
+                        $academicYearLabel =
+                            $semester->academicYear->ay_year_label ??
+                            ($semester->academicYear->ay_academic_year ?? 'Active academic year');
+                    @endphp
 
-        <div class="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div class="text-[15px] font-bold text-slate-900">Submission Checklist</div>
-              <div class="mt-1 text-[12px] text-slate-500">All items must pass before submission</div>
+                    <section class="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div class="mb-4">
+                            <h2 class="font-bold">Select a Faculty PBT</h2>
+                            <p class="mt-1 text-xs text-slate-500">
+                                {{ $academicYearLabel }} · {{ $semester->sem_name }}
+                            </p>
+                        </div>
+
+                        @if ($facultyOptions->isEmpty())
+                            <div class="rounded-xl bg-slate-50 p-5 text-sm text-slate-500">
+                                No faculty members with active scheduled classes were found in your department.
+                            </div>
+                        @else
+                            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($facultyOptions as $option)
+                                    @php
+                                        $isSelected = $selectedFaculty?->fac_id === $option['id'];
+                                        $statusClass = match (strtolower($option['status'])) {
+                                            'approved' => 'bg-emerald-100 text-emerald-700',
+                                            'pending' => 'bg-amber-100 text-amber-700',
+                                            'returned' => 'bg-red-100 text-red-700',
+                                            default => 'bg-slate-100 text-slate-600',
+                                        };
+                                    @endphp
+
+                                    <a href="{{ route('chair.submit_dean', ['faculty' => $option['id']]) }}"
+                                        class="rounded-xl border p-4 transition hover:border-blue-400 hover:bg-blue-50
+                                            {{ $isSelected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white' }}">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div class="font-semibold">{{ $option['name'] }}</div>
+                                                <div class="mt-1 text-sm text-slate-500">
+                                                    {{ $option['schedule_count'] }}
+                                                    {{ $option['schedule_count'] === 1 ? 'class' : 'classes' }}
+                                                </div>
+                                            </div>
+                                            <span
+                                                class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass }}">
+                                                {{ $option['status'] }}
+                                            </span>
+                                        </div>
+
+                                        @if ($option['submitted_at'])
+                                            <div class="mt-3 text-xs text-slate-400">
+                                                Submitted
+                                                {{ \Carbon\Carbon::parse($option['submitted_at'])->format('M d, Y') }}
+                                            </div>
+                                        @endif
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
+                    </section>
+
+                    @if ($selectedFaculty)
+                        @php
+                            $canSubmit =
+                                $scheduleDetailsComplete &&
+                                $conflicts === 0 &&
+                                (!$submission || $submission->schsub_status === 'returned');
+                        @endphp
+
+                        <section class="mb-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 class="font-bold">
+                                        {{ $selectedFaculty->user->usr_name ?? 'Selected Faculty' }}’s PBT
+                                    </h2>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Review this faculty member’s schedule before submitting it to the Dean.
+                                    </p>
+                                </div>
+
+                                <span
+                                    class="rounded-full px-3 py-1 text-xs font-bold {{ $canSubmit ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                    {{ $canSubmit ? 'Ready' : 'Not Ready' }}
+                                </span>
+                            </div>
+
+                            <div class="space-y-3 text-sm">
+                                <div class="flex justify-between border-b border-slate-100 pb-3">
+                                    <span>Scheduled classes included</span>
+                                    <span class="font-semibold">{{ $scheduleCount }}</span>
+                                </div>
+
+                                <div class="flex justify-between border-b border-slate-100 pb-3">
+                                    <span>Scheduling conflicts</span>
+                                    <span
+                                        class="font-semibold {{ $conflicts > 0 ? 'text-red-600' : 'text-emerald-600' }}">
+                                        {{ $conflicts > 0 ? $conflicts . ' found' : 'None found' }}
+                                    </span>
+                                </div>
+
+                                <div class="flex justify-between">
+                                    <span>Faculty, course, section, and room assigned for every class</span>
+                                    <span
+                                        class="font-semibold {{ $scheduleDetailsComplete ? 'text-emerald-600' : 'text-amber-600' }}">
+                                        {{ $scheduleDetailsComplete ? 'Complete' : 'Incomplete' }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <form method="POST" action="{{ route('chair.submit_dean.store') }}"
+                                class="mt-5 flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
+                                @csrf
+                                <input type="hidden" name="faculty_id" value="{{ $selectedFaculty->fac_id }}">
+
+                                @if ($submission && $submission->schsub_status !== 'returned')
+                                    <span class="mr-auto text-sm text-slate-600">
+                                        Submission status:
+                                        <strong>{{ ucfirst($submission->schsub_status) }}</strong>
+                                    </span>
+                                @endif
+
+                                <button type="submit" @disabled(!$canSubmit)
+                                    class="rounded-xl px-4 py-2 text-sm font-semibold text-white {{ $canSubmit ? 'bg-red-600 hover:bg-red-700' : 'cursor-not-allowed bg-slate-400' }}">
+                                    {{ $submission?->schsub_status === 'returned' ? 'Resubmit PBT to Dean' : 'Submit PBT to Dean' }}
+                                </button>
+                            </form>
+                        </section>
+
+                        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                            <div class="mb-4">
+                                <h2 class="font-bold">PBT Schedule</h2>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    These are the active classes included in this faculty member’s PBT.
+                                </p>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead>
+                                        <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                                            <th class="p-3">Faculty</th>
+                                            <th class="p-3">Course</th>
+                                            <th class="p-3">Section</th>
+                                            <th class="p-3">Day &amp; Time</th>
+                                            <th class="p-3">Room</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($schedules as $schedule)
+                                            <tr class="border-b border-slate-100">
+                                                <td class="p-3">
+                                                    {{ optional($schedule->faculty?->user)->usr_name ?? 'Unknown' }}
+                                                </td>
+                                                <td class="p-3">
+                                                    {{ $schedule->subject?->course_code ?? '—' }}
+                                                    @if ($schedule->subject?->course_name)
+                                                        — {{ $schedule->subject->course_name }}
+                                                    @endif
+                                                </td>
+                                                <td class="p-3">
+                                                    {{ $schedule->section?->sec_name ?? '—' }}
+                                                </td>
+                                                <td class="p-3">
+                                                    {{ $schedule->sch_day }},
+                                                    {{ \Carbon\Carbon::parse($schedule->sch_start_time)->format('g:i A') }}
+                                                    –
+                                                    {{ \Carbon\Carbon::parse($schedule->sch_end_time)->format('g:i A') }}
+                                                </td>
+                                                <td class="p-3">
+                                                    {{ $schedule->room?->room_name ?? '—' }}
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="5" class="p-8 text-center text-slate-500">
+                                                    No active scheduled classes for this faculty member.
+                                                </td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if ($schedules->total() > 0)
+                                <div
+                                    class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                                    <p class="text-sm text-slate-500">
+                                        Showing {{ $schedules->firstItem() }}–{{ $schedules->lastItem() }}
+                                        of {{ $schedules->total() }} classes
+                                    </p>
+
+                                    <div class="flex items-center gap-2">
+                                        @if ($schedules->onFirstPage())
+                                            <span
+                                                class="cursor-not-allowed rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                                                Previous
+                                            </span>
+                                        @else
+                                            <a href="{{ $schedules->previousPageUrl() }}"
+                                                class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                                Previous
+                                            </a>
+                                        @endif
+
+                                        @if ($schedules->hasMorePages())
+                                            <a href="{{ $schedules->nextPageUrl() }}"
+                                                class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                                Next
+                                            </a>
+                                        @else
+                                            <span
+                                                class="cursor-not-allowed rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                                                Next
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+                        </section>
+                    @endif
+                @endif
             </div>
-            <span id="submit-overall-badge" class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-600">Not Ready</span>
-          </div>
-
-          <div class="flex items-center gap-3 border-b border-slate-100 py-3">
-            <div class="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
-            <div class="flex-1 text-sm text-slate-700">All subjects assigned to faculty</div>
-            <div class="text-[12px] text-amber-600">1 unassigned (CC 501)</div>
-          </div>
-          <div class="flex items-center gap-3 border-b border-slate-100 py-3">
-            <div class="h-2.5 w-2.5 rounded-full bg-red-500" id="chk-conflict-dot"></div>
-            <div class="flex-1 text-sm text-slate-700">No scheduling conflicts</div>
-            <div class="text-[12px] text-red-600" id="chk-conflict-val">1 conflict — cannot publish</div>
-          </div>
-          <div class="flex items-center gap-3 border-b border-slate-100 py-3">
-            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
-            <div class="flex-1 text-sm text-slate-700">All faculty within 30-unit load</div>
-            <div class="text-[12px] text-emerald-600">Pass</div>
-          </div>
-          <div class="flex items-center gap-3 border-b border-slate-100 py-3">
-            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
-            <div class="flex-1 text-sm text-slate-700">All sections have complete subjects</div>
-            <div class="text-[12px] text-emerald-600">Pass</div>
-          </div>
-          <div class="flex items-center gap-3 py-3">
-            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
-            <div class="flex-1 text-sm text-slate-700">All rooms assigned</div>
-            <div class="text-[12px] text-emerald-600">Pass</div>
-          </div>
-
-          <div class="mt-5 flex justify-end gap-3 border-t border-slate-200 pt-4">
-            <button class="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="showToast('Draft PDF exported!')">Export Draft</button>
-            <button class="rounded-xl bg-red-600 px-3.5 py-2 text-[12px] font-semibold text-white transition hover:bg-red-700" id="btn-submit-dean" onclick="attemptSubmit()">Submit to Dean</button>
-          </div>
-        </div>
-
-        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <div class="text-[15px] font-bold text-slate-900">Schedule Summary</div>
-              <div class="mt-1 text-[12px] text-slate-500">BSIS Department · AY 2025–2026 · 1st Semester</div>
-            </div>
-            <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-600">Draft</span>
-          </div>
-
-          <div class="mb-4 grid gap-3 md:grid-cols-3">
-            <div class="rounded-xl bg-slate-100 p-4">
-              <div class="mb-2 text-[10px] font-bold uppercase tracking-[0.8px] text-slate-400">Faculty</div>
-              <div class="text-[22px] font-extrabold text-slate-900">4</div>
-              <div class="text-[11px] text-slate-500">assigned</div>
-            </div>
-            <div class="rounded-xl bg-slate-100 p-4">
-              <div class="mb-2 text-[10px] font-bold uppercase tracking-[0.8px] text-slate-400">Subjects</div>
-              <div class="text-[22px] font-extrabold text-slate-900">6</div>
-              <div class="text-[11px] text-slate-500">total (1 unassigned)</div>
-            </div>
-            <div class="rounded-xl bg-slate-100 p-4">
-              <div class="mb-2 text-[10px] font-bold uppercase tracking-[0.8px] text-slate-400">Sections</div>
-              <div class="text-[22px] font-extrabold text-slate-900">4</div>
-              <div class="text-[11px] text-slate-500">BSIS 1-A to 4-A</div>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto">
-            <table class="w-full border-collapse text-left">
-              <thead>
-                <tr>
-                  <th class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">Faculty</th>
-                  <th class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">Subjects</th>
-                  <th class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">Total Load</th>
-                  <th class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr class="hover:bg-slate-50">
-                  <td class="border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-900">Jerome Bautista</td>
-                  <td class="border-b border-slate-100 px-3 py-3 text-[12px] text-slate-600">CC 313, CC 401</td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="font-mono text-sm font-bold text-emerald-600">24u</span></td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">OK</span></td>
-                </tr>
-                <tr class="hover:bg-slate-50">
-                  <td class="border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-900">Felicitas Lagman</td>
-                  <td class="border-b border-slate-100 px-3 py-3 text-[12px] text-slate-600">IT 302, CC 202</td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="font-mono text-sm font-bold text-amber-600">27u</span></td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">Near Max</span></td>
-                </tr>
-                <tr class="hover:bg-slate-50">
-                  <td class="border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-900">Maria Santos</td>
-                  <td class="border-b border-slate-100 px-3 py-3 text-[12px] text-slate-600">GE 102, IT 101</td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="font-mono text-sm font-bold text-blue-600">18u</span></td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="inline-flex rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-600">Has Conflict</span></td>
-                </tr>
-                <tr class="hover:bg-slate-50">
-                  <td class="border-b border-slate-100 px-3 py-3 text-sm font-bold text-slate-900">Ana Reyes</td>
-                  <td class="border-b border-slate-100 px-3 py-3 text-[12px] text-slate-600">IT 401, GE 101</td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="font-mono text-sm font-bold text-cyan-600">18u</span></td>
-                  <td class="border-b border-slate-100 px-3 py-3"><span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">Part-time</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <div class="toast" id="toast"><span id="toast-msg"></span></div>
-
-  <script>
-    function renderNotifList() {
-      const list = document.getElementById('notif-list');
-      if (!list) return;
-      list.innerHTML = CHAIR_NOTIFS.map(n => `
-    <div class="flex items-start gap-3 border-b border-slate-100 px-4 py-3 ${n.unread ? 'bg-slate-50' : ''}" onclick="markRead(this)">
-      <div class="mt-1.5 h-2.5 w-2.5 rounded-full" style="background:${n.dot};"></div>
-      <div class="min-w-0 flex-1">
-        <div class="text-[12.5px] leading-relaxed text-slate-600">${n.text}</div>
-        <div class="mt-1 text-[11px] text-slate-400">${n.time}</div>
-      </div>
-    </div>`).join('');
-      updateNotifCount();
-    }
-    let notifOpen = false;
-
-    function toggleNotifDropdown() {
-      notifOpen = !notifOpen;
-      const dd = document.getElementById('notif-dropdown');
-      if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-    }
-    document.addEventListener('click', e => {
-      const bell = document.getElementById('topbar-notif-bell');
-      if (bell && !bell.contains(e.target)) {
-        notifOpen = false;
-        const dd = document.getElementById('notif-dropdown');
-        if (dd) dd.style.display = 'none';
-      }
-    });
-
-    function markRead(el) {
-      el.classList.remove('bg-slate-50');
-      updateNotifCount();
-    }
-
-    function markAllRead() {
-      document.querySelectorAll('#notif-list > div').forEach(el => el.classList.remove('bg-slate-50'));
-      updateNotifCount();
-    }
-
-    function updateNotifCount() {
-      const unread = document.querySelectorAll('#notif-list > div.bg-slate-50').length;
-      const badge = document.getElementById('notif-count');
-      if (badge) {
-        badge.textContent = unread;
-        badge.style.display = unread > 0 ? 'inline-flex' : 'none';
-      }
-    }
-
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      document.getElementById('toast-msg').textContent = msg;
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 3200);
-    }
-    renderNotifList();
-  </script>
-</body>
-
-</html>
-
-<!-- // ── ATTEMPT SUBMIT ─────────────────────────────────────────────────────────────
-function attemptSubmit() {
-  if (hasConflict) {
-    showToast('Cannot submit — fix the conflict first!');
-    return;
-  }
-  const btn = document.getElementById('btn-submit-dean');
-  btn.textContent = 'Submitted ✓';
-  btn.disabled = true;
-  btn.className = 'topbar-btn btn-secondary';
-  const badge = document.getElementById('submit-overall-badge');
-  if (badge) { badge.textContent = 'Submitted'; badge.className = 'badge badge-green'; }
-  document.getElementById('submit-ready').innerHTML = '<div class="success-alert-text"><strong>Schedule submitted!</strong> Sent to Dean Villaceran. Awaiting approval.</div>';
-  showToast('Schedule submitted to Dean Villaceran! Awaiting approval.');
-}
-
-// ── SIMULATE CONFLICT RESOLVED (for demo — wire to real state later) ──────────
-// Call clearConflict() from console or a button to test the "ready" state
-function clearConflict() {
-  hasConflict = false;
-  document.getElementById('submit-blocked').style.display = 'none';
-  document.getElementById('submit-ready').style.display = 'flex';
-  document.getElementById('chk-conflict-dot').style.background = 'var(--green)';
-  document.getElementById('chk-conflict-val').style.color = 'var(--green)';
-  document.getElementById('chk-conflict-val').textContent = 'Pass — no conflicts';
-  const btn = document.getElementById('btn-submit-dean');
-  btn.className = 'topbar-btn btn-primary';
-  btn.textContent = 'Submit to Dean';
-  const badge = document.getElementById('submit-overall-badge');
-  if (badge) { badge.textContent = 'Ready'; badge.className = 'badge badge-green'; }
-} -->
-</script>
+        </main>
+    </div>
 </body>
 
 </html>
