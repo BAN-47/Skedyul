@@ -46,6 +46,8 @@ class Faculty extends Model
         // Faculty-only information
         'fac_employment_type',
         'fac_rank',
+        'fac_special_position',
+        'fac_special_position_max_hours',
 
         // Profile
         'fac_profile_image',

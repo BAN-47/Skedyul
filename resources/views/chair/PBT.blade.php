@@ -125,7 +125,7 @@
                   <th class="px-1.5 py-1.5 text-left border-b border-slate-200">Course Code</th>
                   <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Descriptive Title</th>
                   <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Units</th>
-                  <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Hrs/<br>Week</th>
+                  <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Scheduled<br>Hours</th>
                   <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Degree<br>Yr. &amp; Sec.</th>
                   <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Total<br>No. of Students</th>
                 </tr>
@@ -139,11 +139,8 @@
                     $courseUnits = $course->course_units ?? 0;
                     $courseHours = \App\Services\ScheduleAssignmentService::courseHours($course);
                     $courseMeetings = $schedules->where('sch_course_id', $s->sch_course_id)->where('sch_sec_id', $s->sch_sec_id);
-                    $scheduledHours = $courseMeetings->sum(function ($meeting) {
-                        $start = \Illuminate\Support\Carbon::parse($meeting->sch_start_time);
-                        $end = \Illuminate\Support\Carbon::parse($meeting->sch_end_time);
-                        return $start->diffInMinutes($end) / 60;
-                    });
+                    $meetingHours = fn ($meeting) => (\Illuminate\Support\Carbon::parse($meeting->sch_start_time)->diffInMinutes(\Illuminate\Support\Carbon::parse($meeting->sch_end_time)) / 60);
+                    $scheduledHours = $courseMeetings->sum($meetingHours);
                     $secName = optional($s->section)->sec_name ?? '—';
                     $studs = optional($s->section)->sec_no_of_student
                         ?? optional($s->section)->sec_max_capacity
@@ -153,7 +150,7 @@
                     <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">{{ $code }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 leading-snug">{{ $title }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 text-center">{{ $courseUnits }}</td>
-                    <td class="px-1.5 py-1.5 border-l border-slate-100 text-center" title="{{ $scheduledHours }} of {{ $courseHours }} course hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</td>
+                    <td class="px-1.5 py-1.5 border-l border-slate-100 text-center" title="{{ $scheduledHours }} of {{ $courseHours }} total hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 whitespace-nowrap">{{ $secName }}</td>
                     <td class="px-1.5 py-1.5 border-l border-slate-100 text-center font-semibold">{{ $studs }}</td>
                   </tr>
@@ -178,12 +175,16 @@
               <span>{{ $loadStats['preparations'] ?? '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="font-bold">Academic Units:</span>
+              <span class="font-bold">No. of Units:</span>
               <span>{{ $loadStats['units'] ?? '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="font-bold">No. of Hours/Week:</span>
               <span>{{ $loadStats['hours_week'] ?? '—' }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="font-bold">Teaching Load Limit:</span>
+              <span>{{ isset($loadStats['load_limit']) ? rtrim(rtrim(number_format((float) $loadStats['load_limit'], 2), '0'), '.') . 'h' : '—' }}</span>
             </div>
             <div class="flex justify-between gap-2">
               <span class="font-bold">Administrative Designation:</span>
@@ -439,7 +440,7 @@
         Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : '—' }}</span>
       </div>
 
-      <div class="mb-3">
+      <div>
         <label class="field-label">Department</label>
         @if(!empty($chairDepartment))
           <div class="field-input bg-slate-100 font-semibold text-slate-700">
@@ -464,21 +465,24 @@
       </div>
 
       {{-- ── SUBJECT (auto-filtered by section year level) ── --}}
-      <div class="mb-3">
+      <div class="flex flex-col gap-3 mb-3">
+      <div>
         <label class="field-label">Subject</label>
         <select id="add-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                     data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}">
+                    data-semester="{{ $sub->course_semester ?? '' }}"
+                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
             </option>
           @endforeach
         </select>
       </div>
 
-      <div class="mb-3">
+      <div>
         <label class="field-label">Room</label>
         <select id="add-room" class="field-input">
           <option value="">-- Select Room --</option>
@@ -487,8 +491,9 @@
           @endforeach
         </select>
       </div>
+      </div>
 
-      <div class="mb-3">
+      <div>
         <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
         <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           @foreach($days as $d)
@@ -516,7 +521,6 @@
         <textarea id="add-description" rows="3" class="field-input resize-y"></textarea>
       </div>
 
-      <div id="add-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-1"></div>
     </div>
 
     <div class="modal-footer">
@@ -537,6 +541,7 @@
     </div>
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
+      <div id="edit-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
       {{-- FIXED FIELDS --}}
       <div class="mb-3">
         <label class="field-label">Semester</label>
@@ -577,21 +582,23 @@
       </div>
 
       {{-- SUBJECT (auto-filtered by section year level) --}}
-      <div class="mb-3">
+      <div class="flex flex-col gap-3 mb-3">
+      <div>
         <label class="field-label">Subject</label>
         <select id="edit-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                     data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}">
+                    data-semester="{{ $sub->course_semester ?? '' }}"
+                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
             </option>
           @endforeach
         </select>
       </div>
-
-      <div class="mb-3">
+      <div>
         <label class="field-label">Room</label>
         <select id="edit-room" class="field-input">
           <option value="">-- Select Room --</option>
@@ -599,6 +606,7 @@
             <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
           @endforeach
         </select>
+      </div>
       </div>
 
       <div class="mb-3">
@@ -627,7 +635,6 @@
         <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
       </div>
 
-      <div id="edit-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-1"></div>
     </div>
 
     <div class="modal-footer">

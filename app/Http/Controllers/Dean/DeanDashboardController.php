@@ -40,9 +40,7 @@ class DeanDashboardController extends Controller
             ->groupBy('sl_fac_id');
 
         $facultyLoads = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
-            $maxHours = $f->fac_employment_type === 'part_time'
-                ? self::PART_TIME_MAX_HOURS
-                : self::FULL_TIME_MAX_HOURS;
+            $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f);
             $hours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
                 ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
             return [

@@ -104,6 +104,7 @@
               <div class="flex justify-between gap-2"><span class="font-bold">No. of Preparations:</span><span>{{ $loadStats['preparations'] ?? 0 }}</span></div>
               <div class="flex justify-between gap-2"><span class="font-bold">No. of Units:</span><span>{{ $loadStats['units'] ?? 0 }}</span></div>
               <div class="flex justify-between gap-2"><span class="font-bold">No. of Hours/Week:</span><span>{{ $loadStats['hours_week'] ?? 0 }}</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">Teaching Load Limit:</span><span>{{ isset($loadStats['load_limit']) ? rtrim(rtrim(number_format((float) $loadStats['load_limit'], 2), '0'), '.') . 'h' : '—' }}</span></div>
               <div class="flex justify-between gap-2"><span class="font-bold">Administrative Designation:</span><span class="text-right">{{ $loadStats['designation'] ?: '—' }}</span></div>
               <div class="my-1.5 border-t border-slate-100"></div>
               <div class="flex justify-between gap-2"><span class="font-bold">Production:</span><span>{{ $loadStats['production'] ?? '—' }}</span></div>

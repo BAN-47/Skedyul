@@ -28,10 +28,19 @@ class PbtController extends Controller
         $deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)
             ->value('dc_dept_id');
 
-        $activeSem = DB::table('semester')->where('sem_is_active', true)->first();
-        $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
+        // Resolve the active term and academic year together to avoid a second
+        // round trip to Supabase on every PBT page load.
+        $activeSem = DB::table('semester as s')
+            ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+            ->where('s.sem_is_active', true)
+            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label')
+            ->first();
         if ($activeSem) {
-            $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
+            $year = $activeSem->ay_academic_year ?? $activeSem->ay_year_label ?? null;
+            if (!$year) {
+                $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
+                $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
+            }
             $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
             $activeSem->label = trim(($activeSem->sem_name ?? '') . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
         }
@@ -174,7 +183,7 @@ class PbtController extends Controller
         if (!$faculty) {
             return [
                 'preparations' => null, 'units' => null, 'hours_week' => null,
-                'designation' => null, 'production' => null, 'extension' => null, 'research' => null,
+                'designation' => null, 'load_limit' => null, 'production' => null, 'extension' => null, 'research' => null,
             ];
         }
 
@@ -199,7 +208,8 @@ class PbtController extends Controller
             'preparations' => $loads->pluck('sl_course_id')->unique()->count(),
             'units'        => $units ?: null,
             'hours_week'   => $hoursPerWeek ?: null,
-            'designation'  => $faculty->fac_rank,
+            'designation'  => $faculty->fac_special_position ?: $faculty->fac_rank,
+            'load_limit'   => \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty),
             'production'   => null,
             'extension'    => null,
             'research'     => null,

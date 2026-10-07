@@ -68,7 +68,7 @@ class ChairController extends Controller
             ->groupBy('sl_fac_id');
 
         $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
-            $maxHours = $f->fac_employment_type === 'part_time' ? 22 : 30;
+            $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f);
             $totalHours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
                 ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
             $remaining  = max(0, $maxHours - $totalHours);

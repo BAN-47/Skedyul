@@ -31,11 +31,13 @@ function showToast(msg) {
 
 function showInlineError(boxId, msg) {
   const box = document.getElementById(boxId);
+  if (!box) return;
   box.textContent = msg;
   box.classList.remove('hidden');
 }
 function clearInlineError(boxId) {
-  document.getElementById(boxId).classList.add('hidden');
+  const box = document.getElementById(boxId);
+  if (box) box.classList.add('hidden');
 }
 
 function setButtonLoading(button, loading, label = 'Saving...') {
@@ -68,9 +70,16 @@ function setAddButtonsLoading(loading, keepOpen = false) {
 */
 function handleScheduleError(data, inlineBoxId) {
   if (data.conflict) {
-    showToast(data.message || 'Conflict: that slot is already taken.');
+    const message = data.message || 'Conflict: that slot is already taken.';
+    showToast(message);
+    return;
+  }
+  const firstValidationError = data.errors ? Object.values(data.errors).flat()[0] : null;
+  const message = data.message || firstValidationError || 'Something went wrong.';
+  if (inlineBoxId === 'add-error' || /overextension/i.test(message)) {
+    showToast(message);
   } else {
-    showInlineError(inlineBoxId, data.message || 'Something went wrong.');
+    showInlineError(inlineBoxId, message);
   }
 }
 
@@ -210,11 +219,15 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
 document.addEventListener('DOMContentLoaded', () => {
   const addSec = document.getElementById('add-section');
   if (addSec) {
-    addSec.addEventListener('change', () => filterSubjectsBySection('add-section', 'add-subject'));
+    addSec.addEventListener('change', () => {
+      filterSubjectsBySection('add-section', 'add-subject');
+    });
   }
   const editSec = document.getElementById('edit-section');
   if (editSec) {
-    editSec.addEventListener('change', () => filterSubjectsBySection('edit-section', 'edit-subject'));
+    editSec.addEventListener('change', () => {
+      filterSubjectsBySection('edit-section', 'edit-subject');
+    });
   }
 });
 
@@ -258,11 +271,11 @@ function submitAdd(keepOpen = false) {
   };
 
   if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id || !payload.days.length || !payload.start_time || !payload.end_time) {
-    showInlineError('add-error', 'Please fill in subject, section, room, at least one day, and both times.');
+    showToast('Please select the course, section, room, at least one day, and both times.');
     return;
   }
   if (payload.end_time <= payload.start_time) {
-    showInlineError('add-error', 'End time must be later than start time.');
+    showToast('End time must be later than start time.');
     return;
   }
 
@@ -274,7 +287,8 @@ function submitAdd(keepOpen = false) {
     body: JSON.stringify(payload),
   })
   .then(async res => {
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({ message: `The server returned an unreadable response (${res.status}).` }));
+    if (!res.ok && !data.message && !data.errors) data.message = `Schedule could not be saved (HTTP ${res.status}).`;
     if (data.success) {
       showToast(data.message || 'Schedule added.');
       if (keepOpen) {
@@ -293,7 +307,7 @@ function submitAdd(keepOpen = false) {
     }
   })
   .catch(() => {
-    showInlineError('add-error', 'Something went wrong. Please try again.');
+    showToast('Something went wrong. Please try again.');
     setAddButtonsLoading(false);
   });
 }

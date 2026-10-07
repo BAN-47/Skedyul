@@ -31,6 +31,7 @@ function showInlineError(boxId, msg) {
     if (!box) return;
     box.textContent = msg;
     box.classList.remove('hidden');
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 function clearInlineError(boxId) {
     const box = document.getElementById(boxId);
@@ -115,15 +116,25 @@ document.addEventListener('click', event => {
 */
 function handleScheduleError(data, inlineBoxId) {
     if (data.conflict) {
-        showToast(data.message || 'Conflict: that slot is already taken.');
+        const message = data.message || 'Conflict: that slot is already taken.';
+        showToast(message);
     } else if (data.message) {
-        showInlineError(inlineBoxId, data.message);
+        if (inlineBoxId === 'add-error' || /overextension/i.test(data.message)) {
+            showToast(data.message);
+        } else {
+            showInlineError(inlineBoxId, data.message);
+        }
     } else if (data.errors) {
         // Laravel validation errors: { errors: { field: ['msg'] } }
         const first = Object.values(data.errors).flat()[0];
-        showInlineError(inlineBoxId, first || 'Validation failed.');
+        if (inlineBoxId === 'add-error' || /overextension/i.test(first || '')) {
+            showToast(first || 'Validation failed.');
+        } else {
+            showInlineError(inlineBoxId, first || 'Validation failed.');
+        }
     } else {
-        showInlineError(inlineBoxId, 'Something went wrong.');
+        if (inlineBoxId === 'add-error') showToast('Something went wrong.');
+        else showInlineError(inlineBoxId, 'Something went wrong.');
     }
 }
 
@@ -241,11 +252,15 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
 document.addEventListener('DOMContentLoaded', () => {
     const addSec = document.getElementById('add-section');
     if (addSec) {
-        addSec.addEventListener('change', () => filterSubjectsBySection('add-section', 'add-subject'));
+        addSec.addEventListener('change', () => {
+            filterSubjectsBySection('add-section', 'add-subject');
+        });
     }
     const editSec = document.getElementById('edit-section');
     if (editSec) {
-        editSec.addEventListener('change', () => filterSubjectsBySection('edit-section', 'edit-subject'));
+        editSec.addEventListener('change', () => {
+            filterSubjectsBySection('edit-section', 'edit-subject');
+        });
     }
 });
 
@@ -309,11 +324,11 @@ function submitAdd(keepOpen = false) {
 
     if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
         !payload.sem_id || !payload.days.length || !payload.start_time || !payload.end_time) {
-        showInlineError('add-error', 'Please fill in subject, professor, room, semester, section, at least one day, and both times.');
+        showToast('Please select the professor, room, section, course, at least one day, and both times.');
         return;
     }
     if (payload.end_time <= payload.start_time) {
-        showInlineError('add-error', 'End time must be later than start time.');
+        showToast('End time must be later than start time.');
         return;
     }
 
@@ -329,7 +344,8 @@ function submitAdd(keepOpen = false) {
         body: JSON.stringify(payload),
     })
     .then(async res => {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({ message: `The server returned an unreadable response (${res.status}).` }));
+        if (!res.ok && !data.message && !data.errors) data.message = `Schedule could not be saved (HTTP ${res.status}).`;
 
         if (data.success) {
             showToast(data.message || 'Schedule added.');
@@ -351,7 +367,7 @@ function submitAdd(keepOpen = false) {
         }
     })
     .catch(() => {
-        showInlineError('add-error', 'Something went wrong. Please try again.');
+        showToast('Something went wrong. Please try again.');
         setAddButtonsLoading(false);
     });
 }
@@ -396,7 +412,7 @@ function submitEdit() {
 
     if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
         !payload.sem_id || !payload.day || !payload.start_time || !payload.end_time) {
-        showInlineError('edit-error', 'Please fill in subject, professor, room, semester, section, day, and both times.');
+        showInlineError('edit-error', 'Please fill in professor, room, semester, section, course, day, and both times.');
         return;
     }
     if (payload.end_time <= payload.start_time) {

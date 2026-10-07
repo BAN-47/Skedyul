@@ -131,11 +131,12 @@
                      title="{{ empty($selectedSection) ? 'Select a section first' : 'Saved with Save Draft for '.$selectedSection->sec_name }}">
             </div>
           </div>
-          <div class="grid grid-cols-[48px_minmax(0,1fr)_25px_31px] gap-0 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-600 uppercase">
+          <div class="overflow-x-auto">
+          <div class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-600 uppercase">
             <div class="px-1 py-1.5 text-center"><strong>Code</strong></div>
             <div class="px-1 py-1.5 border-l border-slate-200 text-center"><strong>Course Title</strong></div>
             <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Units</strong></div>
-            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Hrs</strong></div>
+            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Scheduled<br>Hours</strong></div>
           </div>
           <div class="p-0">
             @forelse($courseSummary as $s)
@@ -145,18 +146,18 @@
                 $title = $course->course_name ?? $course->subj_name ?? '—';
               @endphp
               @php
+                $courseMeetings = $schedules->where('sch_course_id', $s->sch_course_id);
                 $courseHours = (float) ($course->course_lecture_hours ?? 0) + (float) ($course->course_lab_hours ?? 0);
-                $courseScheduledHours = $schedules->where('sch_course_id', $s->sch_course_id)->sum(function ($meeting) {
-                    $start = \Illuminate\Support\Carbon::parse($meeting->sch_start_time);
-                    $end = \Illuminate\Support\Carbon::parse($meeting->sch_end_time);
-                    return $start->diffInMinutes($end) / 60;
+                $scheduledHours = $courseMeetings->sum(function ($meeting) {
+                    return \Illuminate\Support\Carbon::parse($meeting->sch_start_time)
+                        ->diffInMinutes(\Illuminate\Support\Carbon::parse($meeting->sch_end_time)) / 60;
                 });
               @endphp
-              <div class="grid grid-cols-[48px_minmax(0,1fr)_25px_31px] gap-0 border-b border-slate-100 text-[10px]">
+              <div class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 border-b border-slate-100 text-[10px]">
                 <div class="px-1 py-1.5 font-bold text-slate-800 break-words">{{ $code }}</div>
                 <div class="px-1 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">{{ $title }}</div>
                 <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700">{{ $course->course_units ?? 0 }}</div>
-                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700" title="{{ $courseScheduledHours }} of {{ $courseHours }} course hours scheduled">{{ $courseScheduledHours }}/{{ $courseHours }}</div>
+                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700" title="{{ $scheduledHours }} of {{ $courseHours }} total hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</div>
               </div>
             @empty
               <div class="p-3 text-center text-[11px] text-slate-400">
@@ -168,9 +169,10 @@
               </div>
             @endforelse
           </div>
+          </div>
           @if($selectedSection)
             <div class="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10.5px] text-slate-700 space-y-1">
-              <div class="flex justify-between gap-2"><span class="font-bold">Academic Units:</span><span>{{ $summaryUnits }}u</span></div>
+              <div class="flex justify-between gap-2"><span class="font-bold">No. of Units:</span><span>{{ $summaryUnits }}u</span></div>
               <div class="flex justify-between gap-2"><span class="font-bold">Scheduled Hours/Week:</span><span>{{ $summaryHours }}h</span></div>
             </div>
           @endif
@@ -388,7 +390,7 @@
         <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
       </div>
 
-      <div class="mb-3">
+      <div>
         <label class="field-label">Department</label>
         @if(!empty($chairProgram) || !empty($chairDepartment))
           @php $dept = $chairDepartment ?? $chairProgram; @endphp
@@ -414,14 +416,17 @@
       </div>
 
       {{-- ── SUBJECT (auto-filtered by section year level) ── --}}
-      <div class="mb-3">
+      <div class="flex flex-col gap-3 mb-3">
+      <div>
         <label class="field-label">Subject</label>
         <select id="add-subject" class="field-input">
           <option value="">-- Select Subject --</option>
           @foreach($subjects as $sub)
             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                     data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}">
+                    data-semester="{{ $sub->course_semester ?? '' }}"
+                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
             </option>
           @endforeach
@@ -457,8 +462,9 @@
           </div>
         </div>
       </div>
+      </div>
 
-      <div class="mb-3">
+      <div>
         <label class="field-label">Room</label>
         <select id="add-room" class="field-input">
           <option value="">-- Select Room --</option>
@@ -496,7 +502,6 @@
         <textarea id="add-description" rows="3" class="field-input resize-y"></textarea>
       </div>
 
-      <div id="add-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-1"></div>
     </div>
 
     <div class="modal-footer">
@@ -517,6 +522,7 @@
     </div>
 
     <div class="max-h-[62vh] overflow-y-auto pr-1">
+      <div id="edit-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
       <input type="hidden" id="edit-id">
 
       {{-- FIXED FIELDS --}}
@@ -561,7 +567,9 @@
           @foreach($subjects as $sub)
             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                     data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}">
+                    data-semester="{{ $sub->course_semester ?? '' }}"
+                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
             </option>
           @endforeach
@@ -614,7 +622,6 @@
         <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
       </div>
 
-      <div id="edit-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-1"></div>
     </div>
 
     <div class="modal-footer">

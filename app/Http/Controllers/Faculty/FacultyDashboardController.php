@@ -22,7 +22,7 @@ class FacultyDashboardController extends Controller
             ->with('subject')
             ->get()
             ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
-        $maxHours = $faculty->fac_employment_type === 'part_time' ? 22 : 30;
+        $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty);
 
         $schedules = Schedule::with(['subject', 'section', 'room'])
             ->where('sch_fac_id', $faculty->fac_id)

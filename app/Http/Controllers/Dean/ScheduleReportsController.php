@@ -59,7 +59,7 @@ class ScheduleReportsController extends Controller
         $faculty = $facultyRecords->map(function ($fac) use ($loadsByFaculty) {
             $hours = $loadsByFaculty->get($fac->fac_id, collect())
                 ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
-            $maxHours = $fac->fac_employment_type === 'part_time' ? 22 : 30;
+            $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($fac);
             return [
                 'name'       => $fac->full_name,
                 'rank'       => $fac->fac_rank,

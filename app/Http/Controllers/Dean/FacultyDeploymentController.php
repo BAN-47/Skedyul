@@ -49,7 +49,7 @@ class FacultyDeploymentController extends Controller
                     'department' => $programCode, // BSIS / BSIT / BIT-CT
                     'subjects'   => $subjects ?: '—',
                     'hours'      => $hours,
-                    'max_hours'  => $fac->fac_employment_type === 'part_time' ? 22 : 30,
+                    'max_hours'  => \App\Services\ScheduleAssignmentService::facultyMaxHours($fac),
                     'employment' => $fac->fac_employment_type,
                     '_sort'      => $programCode,
                 ];

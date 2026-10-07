@@ -229,19 +229,19 @@
                         <input class="field-input" id="add-subj-units" name="subj_units" type="number" min="0" step="0.5" value="{{ old('subj_units', 0) }}" required>
                     </div>
                     <div>
-                        <label class="field-label">Lecture Hrs</label>
-                        <input class="field-input" id="add-subj-lec" name="subj_lecture_hours" type="number"
-                            min="0" max="12" step="0.5" value="{{ old('subj_lecture_hours', 0) }}"
+                        <label class="field-label">Lecture Units (1 = 1 hr)</label>
+                        <input class="field-input" id="add-subj-lec" name="subj_lecture_units" type="number"
+                            min="0" max="12" step="0.5" value="{{ old('subj_lecture_units', 0) }}"
                             oninput="updateSubjectTotalHours('add')" required>
                     </div>
                     <div>
-                        <label class="field-label">Lab Hrs</label>
-                        <input class="field-input" id="add-subj-lab" name="subj_lab_hours" type="number"
-                            min="0" max="12" step="0.5" value="{{ old('subj_lab_hours', 0) }}"
+                        <label class="field-label">Lab Units (1 = 3 hrs)</label>
+                        <input class="field-input" id="add-subj-lab" name="subj_lab_units" type="number"
+                            min="0" max="4" step="0.01" value="{{ old('subj_lab_units', 0) }}"
                             oninput="updateSubjectTotalHours('add')" required>
                     </div>
                     <div>
-                        <label class="field-label">Total Hrs</label>
+                        <label class="field-label">Total Teaching Hrs</label>
                         <input class="field-input bg-slate-50" id="add-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
@@ -326,19 +326,19 @@
                         <input class="field-input" id="edit-subj-units" name="subj_units" type="number" min="0" step="0.5" required>
                     </div>
                     <div>
-                        <label class="field-label">Lecture Hrs</label>
-                        <input class="field-input" id="edit-subj-lec" name="subj_lecture_hours" type="number"
+                        <label class="field-label">Lecture Units (1 = 1 hr)</label>
+                        <input class="field-input" id="edit-subj-lec" name="subj_lecture_units" type="number"
                             min="0" max="12" step="0.5" oninput="updateSubjectTotalHours('edit')"
                             required>
                     </div>
                     <div>
-                        <label class="field-label">Lab Hrs</label>
-                        <input class="field-input" id="edit-subj-lab" name="subj_lab_hours" type="number"
-                            min="0" max="12" step="0.5" oninput="updateSubjectTotalHours('edit')"
+                        <label class="field-label">Lab Units (1 = 3 hrs)</label>
+                        <input class="field-input" id="edit-subj-lab" name="subj_lab_units" type="number"
+                            min="0" max="4" step="0.01" oninput="updateSubjectTotalHours('edit')"
                             required>
                     </div>
                     <div>
-                        <label class="field-label">Total Hrs</label>
+                        <label class="field-label">Total Teaching Hrs</label>
                         <input class="field-input bg-slate-50" id="edit-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
@@ -389,7 +389,7 @@
         function updateSubjectTotalHours(prefix) {
             const lecture = Number(document.getElementById(`${prefix}-subj-lec`).value) || 0;
             const lab = Number(document.getElementById(`${prefix}-subj-lab`).value) || 0;
-            document.getElementById(`${prefix}-subj-total`).value = lecture + lab;
+            document.getElementById(`${prefix}-subj-total`).value = lecture + (lab * 3);
         }
 
         updateSubjectTotalHours('add');
@@ -474,7 +474,7 @@
             data-code="${escapeAttr(s.code)}"
             data-name="${escapeAttr(s.name)}"
             data-lec="${s.lec}"
-            data-lab="${s.lab}"
+            data-lab-units="${s.lab / 3}"
             data-units="${s.units}"
             data-total="${s.total}"
             data-dept="${s.dept_id || ''}"
@@ -502,7 +502,7 @@
             document.getElementById('edit-subj-code').value = btn.dataset.code || '';
             document.getElementById('edit-subj-name').value = btn.dataset.name || '';
             document.getElementById('edit-subj-lec').value = btn.dataset.lec || 0;
-            document.getElementById('edit-subj-lab').value = btn.dataset.lab || 0;
+            document.getElementById('edit-subj-lab').value = btn.dataset.labUnits || 0;
             document.getElementById('edit-subj-dept').value = btn.dataset.dept || '';
             document.getElementById('edit-subj-prog').value = btn.dataset.prog || '';
             document.getElementById('edit-subj-year').value = btn.dataset.year || '';

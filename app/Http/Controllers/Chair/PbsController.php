@@ -51,14 +51,21 @@ class PbsController extends Controller
     /** Active semester row + display label from Admin Settings (sem_is_active). */
     private function activeSemester(): ?object
     {
-        // Semester table has only 1st/2nd rows; year comes from active academic_year
-        $sem = DB::table('semester')->where('sem_is_active', true)->first();
+        // Resolve the active term and academic year in one database request.
+        $sem = DB::table('semester as s')
+            ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+            ->where('s.sem_is_active', true)
+            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label')
+            ->first();
         if (!$sem) {
             return null;
         }
 
-        $ay = DB::table('academic_year')->where('ay_is_active', true)->first();
-        $year = $ay->ay_academic_year ?? $ay->ay_year_label ?? '';
+        $year = $sem->ay_academic_year ?? $sem->ay_year_label ?? null;
+        if (!$year) {
+            $activeAy = DB::table('academic_year')->where('ay_is_active', true)->first();
+            $year = $activeAy->ay_academic_year ?? $activeAy->ay_year_label ?? '';
+        }
         $semName = $sem->sem_name ?? '';
         $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
         $sem->label = trim($semName . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));

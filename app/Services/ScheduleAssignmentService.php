@@ -30,6 +30,30 @@ class ScheduleAssignmentService
     private const FULL_TIME_MAX_HOURS = 30;
     private const PART_TIME_MAX_HOURS = 22;
 
+    /** Policy ranges; a chair may assign a cap within the listed range. */
+    public const SPECIAL_POSITION_RANGES = [
+        'Vice-President' => [3, 3],
+        'University Director' => [3, 6],
+        'Campus Director' => [3, 6],
+        'Assistant Campus Director' => [6, 9],
+        'Dean of Instruction' => [6, 9],
+        'College Dean' => [6, 9],
+        'Associate College Dean' => [9, 12],
+        'Department SUC Function Chairperson' => [12, 15],
+        'Campus Secretary' => [12, 15],
+    ];
+
+    public static function facultyMaxHours(Faculty $faculty): float
+    {
+        if ($faculty->fac_special_position && $faculty->fac_special_position_max_hours !== null) {
+            return (float) $faculty->fac_special_position_max_hours;
+        }
+
+        return $faculty->fac_employment_type === 'part_time'
+            ? self::PART_TIME_MAX_HOURS
+            : self::FULL_TIME_MAX_HOURS;
+    }
+
     /** Assign one course/session to several weekdays as one all-or-nothing action. */
     public function assignMultiple(array $data): array
     {
@@ -41,16 +65,22 @@ class ScheduleAssignmentService
         try {
             return DB::transaction(function () use ($data, $days) {
                 $created = [];
+                $hoursAfterAssignments = null;
                 foreach ($days as $day) {
                     $dayData = $data;
                     unset($dayData['days']);
                     $dayData['day'] = $day;
-                    $result = $this->assign($dayData);
+                    // The workload is unchanged between days in this one
+                    // request, so recalculate it once after all meetings save.
+                    $result = $this->assign($dayData, syncWorkload: false, refreshResponse: false);
                     if (empty($result['success'])) {
                         throw new RuntimeException('__MULTI_DAY_FAIL__' . json_encode($result));
                     }
                     $created[] = $result['schedule'];
+                    $hoursAfterAssignments = $result['hours_after'];
                 }
+
+                $this->syncWorkload($data['fac_id'], $data['sem_id'], $hoursAfterAssignments);
 
                 return [
                     'success' => true,
@@ -67,7 +97,7 @@ class ScheduleAssignmentService
         }
     }
 
-    public function assign(array $data): array
+    public function assign(array $data, bool $syncWorkload = true, bool $refreshResponse = true): array
     {
         if (!$this->facultyAccountIsActive($data['fac_id'])) {
             return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
@@ -78,7 +108,7 @@ class ScheduleAssignmentService
         }
 
         try {
-            $schedule = DB::transaction(function () use ($data) {
+            $result = DB::transaction(function () use ($data, $syncWorkload) {
                 $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
                 // One study load can have several meeting sessions (for example,
                 // the same course/section on different weekdays).
@@ -89,12 +119,11 @@ class ScheduleAssignmentService
                 $studyLoad = $loadQuery->first();
                 $course = Course::findOrFail($data['subj_id']);
                 $courseHours = self::courseHours($course);
-                $this->assertCourseHoursAvailable($data, $course, $courseHours);
+                $this->assertCourseHoursAvailable($data, $course);
 
                 $currentHours = $this->facultyHours($data['fac_id'], $data['sem_id']);
-                $maxHours = $faculty->fac_employment_type === 'part_time'
-                    ? self::PART_TIME_MAX_HOURS
-                    : self::FULL_TIME_MAX_HOURS;
+                $hoursAfterAssignment = $studyLoad ? $currentHours : $currentHours + $courseHours;
+                $maxHours = self::facultyMaxHours($faculty);
                 if ($studyLoad && $currentHours > $maxHours) {
                     throw new RuntimeException("LOAD_LIMIT:{$faculty->fac_first_name} {$faculty->fac_last_name} already has {$currentHours} teaching hours against the {$maxHours}-hour limit.");
                 }
@@ -115,7 +144,7 @@ class ScheduleAssignmentService
                     ]);
                 }
 
-                $schedule = Schedule::create([
+                $scheduleData = [
                     'sch_load_id'    => $studyLoad->sl_id,
                     'sch_fac_id'     => $data['fac_id'],
                     'sch_course_id'  => $data['subj_id'],
@@ -128,16 +157,36 @@ class ScheduleAssignmentService
                     'sch_status'     => 'draft',
                     'sch_is_active'  => true,
                     'sch_created_by' => Auth::id(),
-                ]);
+                ];
+                $schedule = Schedule::create($scheduleData);
 
-                $this->syncWorkload($data['fac_id'], $data['sem_id']);
-                return $schedule;
+                $updatedHours = $syncWorkload
+                    ? $this->syncWorkload($data['fac_id'], $data['sem_id'], $hoursAfterAssignment)
+                    : null;
+
+                return [
+                    'schedule' => $schedule,
+                    'hours' => $updatedHours,
+                    'max_hours' => $maxHours,
+                    'hours_after' => $hoursAfterAssignment,
+                ];
             });
-            $hours = $this->facultyHours($data['fac_id'], $data['sem_id']);
-            $max = Faculty::find($data['fac_id'])?->fac_employment_type === 'part_time'
-                ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
-            $notice = $hours >= $max ? " Faculty load is now {$hours} of {$max} teaching hours; further course assignments are blocked." : '';
-            return ['success' => true, 'message' => 'Schedule added.' . $notice, 'schedule' => $schedule->load(['subject', 'faculty', 'section', 'room'])];
+            $schedule = $result['schedule'];
+            $notice = '';
+            if ($syncWorkload && $result['hours'] !== null) {
+                $hours = $result['hours'];
+                $max = $result['max_hours'];
+                $notice = $hours >= $max ? " Faculty load is now {$hours} of {$max} teaching hours; further course assignments are blocked." : '';
+            }
+            if ($refreshResponse) {
+                $schedule->load(['subject', 'faculty', 'section', 'room']);
+            }
+            return [
+                'success' => true,
+                'message' => 'Schedule added.' . $notice,
+                'schedule' => $schedule,
+                'hours_after' => $result['hours_after'],
+            ];
         } catch (RuntimeException $e) {
             if (str_starts_with($e->getMessage(), 'LOAD_LIMIT:')) {
                 return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 11)];
@@ -173,7 +222,7 @@ class ScheduleAssignmentService
                 $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
                 $course = Course::findOrFail($data['subj_id']);
                 $courseHours = self::courseHours($course);
-                $this->assertCourseHoursAvailable($data, $course, $courseHours, $scheduleId);
+                $this->assertCourseHoursAvailable($data, $course, $scheduleId);
                 $targetLoad = Study_Load::where([
                     'sl_fac_id' => $data['fac_id'], 'sl_course_id' => $data['subj_id'],
                     'sl_sec_id' => $data['sec_id'], 'sl_sem_id' => $data['sem_id'],
@@ -191,7 +240,7 @@ class ScheduleAssignmentService
                     }
                     $projectedHours = $currentHours + ($targetLoad ? 0 : $courseHours);
                     $hoursToAdd = $targetLoad ? 0 : $courseHours;
-                    $maxHours = $faculty->fac_employment_type === 'part_time' ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
+                    $maxHours = self::facultyMaxHours($faculty);
                     if ($projectedHours > $maxHours) {
                         throw new RuntimeException("LOAD_LIMIT:Cannot assign {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
                     }
@@ -207,12 +256,13 @@ class ScheduleAssignmentService
                         Study_Load::whereKey($oldLoadId)->whereDoesntHave('schedules')->delete();
                     }
                 }
-                $schedule->update([
+                $scheduleData = [
                     'sch_fac_id' => $data['fac_id'], 'sch_course_id' => $data['subj_id'],
                     'sch_sec_id' => $data['sec_id'], 'sch_room_id' => $data['room_id'],
                     'sch_sem_id' => $data['sem_id'], 'sch_day' => $data['day'],
                     'sch_start_time' => $data['start_time'], 'sch_end_time' => $data['end_time'],
-                ]);
+                ];
+                $schedule->update($scheduleData);
                 $this->syncWorkload($data['fac_id'], $data['sem_id']);
                 return $schedule;
             });
@@ -243,11 +293,13 @@ class ScheduleAssignmentService
 
     public function facultyHours(string $facultyId, string $semesterId): float
     {
-        return (float) Study_Load::where('sl_fac_id', $facultyId)
-            ->where('sl_sem_id', $semesterId)
-            ->with('subject')
-            ->get()
-            ->sum(fn ($load) => $load->subject ? self::courseHours($load->subject) : 0);
+        $hours = DB::table('study_load as sl')
+            ->join('course as c', 'c.course_id', '=', 'sl.sl_course_id')
+            ->where('sl.sl_fac_id', $facultyId)
+            ->where('sl.sl_sem_id', $semesterId)
+            ->sum(DB::raw('COALESCE(c.course_lecture_hours, 0) + COALESCE(c.course_lab_hours, 0)'));
+
+        return (float) $hours;
     }
 
     public static function courseHours(?Course $course): float
@@ -268,12 +320,9 @@ class ScheduleAssignmentService
     private function assertCourseHoursAvailable(
         array $data,
         Course $course,
-        float $allowedHours,
         ?string $excludeScheduleId = null
     ): void {
-        // Missing course-hour data should not silently block scheduling; the
-        // course catalog can be completed later. Once set, its weekly hours
-        // become the cap for that course in that section and semester.
+        $allowedHours = self::courseHours($course);
         if ($allowedHours <= 0) {
             return;
         }
@@ -301,21 +350,23 @@ class ScheduleAssignmentService
             $section = \App\Models\Section::find($data['sec_id']);
             $sectionName = $section?->sec_name ?? 'the selected section';
             throw new RuntimeException(
-                "COURSE_HOURS:{$course->course_code} for {$sectionName} allows {$allowedHours} scheduled hours per week. "
-                . "It already has {$scheduledHours} hours; this meeting adds {$newHours}, totaling {$projectedHours}."
+                "COURSE_HOURS:Overextension: {$course->course_code} for {$sectionName} allows {$allowedHours} total hours per week. "
+                . "Already scheduled: {$scheduledHours} hours; this meeting adds {$newHours}, totaling {$projectedHours} hours."
             );
         }
     }
 
-    public function syncWorkload(string $facultyId, string $semesterId): void
+    public function syncWorkload(string $facultyId, string $semesterId, ?float $knownTotalHours = null): float
     {
         $semester = Semester::find($semesterId);
         $workload = Workload::firstOrNew(['wl_fac_id' => $facultyId, 'wl_sem_id' => $semesterId]);
         if (!$workload->exists) $workload->wl_id = (string) \Illuminate\Support\Str::uuid();
         $workload->wl_ay_id = $semester?->sem_ay_id ?? AcademicYear::where('ay_is_active', true)->value('ay_id');
-        $workload->wl_total_hours = $this->facultyHours($facultyId, $semesterId);
+        $totalHours = $knownTotalHours ?? $this->facultyHours($facultyId, $semesterId);
+        $workload->wl_total_hours = $totalHours;
         $workload->wl_type = $workload->wl_type ?? 'regular';
         $workload->save();
+        return $totalHours;
     }
 
     /**

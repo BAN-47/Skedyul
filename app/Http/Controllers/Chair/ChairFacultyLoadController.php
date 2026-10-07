@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Services\ScheduleAssignmentService;
 
 /**
  * Faculty Load = assign subjects to teachers (study_load only).
@@ -30,6 +31,8 @@ class ChairFacultyLoadController extends Controller
     const FULL_TIME_MAX_HOURS = 30;
     const PART_TIME_MAX_HOURS = 22;
     const NEAR_MAX_BUFFER     = 3;
+
+    public const SPECIAL_POSITION_RANGES = ScheduleAssignmentService::SPECIAL_POSITION_RANGES;
 
     public function index()
     {
@@ -81,13 +84,17 @@ class ChairFacultyLoadController extends Controller
                 ->implode(', ');
 
             $isPartTime = $f->fac_employment_type === 'part_time';
-            $maxHours   = $isPartTime ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
+            $maxHours   = ScheduleAssignmentService::facultyMaxHours($f);
             $remaining  = max(0, $maxHours - $totalHours);
+            $nearMaxBuffer = min(self::NEAR_MAX_BUFFER, max(1, $maxHours * 0.2));
 
-            if ($totalHours >= $maxHours) {
+            if ($totalHours > $maxHours) {
+                $statusLabel = 'Over Limit';
+                $statusBadge = 'badge-red';
+            } elseif ($totalHours >= $maxHours) {
                 $statusLabel = 'Full';
                 $statusBadge = 'badge-red';
-            } elseif ($totalHours >= $maxHours - self::NEAR_MAX_BUFFER) {
+            } elseif ($totalHours >= $maxHours - $nearMaxBuffer) {
                 $statusLabel = 'Near Max';
                 $statusBadge = 'badge-amber';
             } elseif ($totalHours <= 0) {
@@ -116,6 +123,10 @@ class ChairFacultyLoadController extends Controller
                 'id'           => $f->fac_id,
                 'name'         => trim("{$f->fac_first_name} {$f->fac_last_name}"),
                 'employment'   => $f->fac_employment_type,
+                'special_position' => $f->fac_special_position,
+                'special_position_range' => $f->fac_special_position
+                    ? self::SPECIAL_POSITION_RANGES[$f->fac_special_position] ?? null
+                    : null,
                 'subjects'     => $subjectCodes !== '' ? $subjectCodes : '—',
                 'total_units'  => $totalUnits,
                 'total_hours'  => $totalHours,
@@ -167,7 +178,7 @@ class ChairFacultyLoadController extends Controller
         $subjectHours = \App\Services\ScheduleAssignmentService::courseHours($subject);
 
         $isPartTime = $faculty->fac_employment_type === 'part_time';
-        $maxHours   = $isPartTime ? self::PART_TIME_MAX_HOURS : self::FULL_TIME_MAX_HOURS;
+        $maxHours   = ScheduleAssignmentService::facultyMaxHours($faculty);
 
         // Avoid reporting a false overload when an assignment is duplicated.
         $exists = Study_Load::where([
@@ -251,6 +262,39 @@ class ChairFacultyLoadController extends Controller
             'message' => "Subject assigned (+{$subjectHours} teaching hours).",
             'load_id' => $load->sl_id,
         ]);
+    }
+
+    public function updateSpecialPosition(Request $request, string $facultyId)
+    {
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $faculty = Faculty::whereKey($facultyId)
+            ->where('fac_college_id', $chair->dc_college_id)
+            ->when($chair->dc_dept_id, fn ($query) => $query->where('fac_dept_id', $chair->dc_dept_id))
+            ->firstOrFail();
+
+        $data = $request->validate([
+            'special_position' => ['nullable', 'string', 'in:' . implode(',', array_keys(self::SPECIAL_POSITION_RANGES))],
+            'max_hours' => ['nullable', 'numeric', 'min:1', 'max:30', 'required_with:special_position'],
+        ]);
+
+        $position = $data['special_position'] ?? null;
+        $hours = $position ? (float) $data['max_hours'] : null;
+        if ($position) {
+            [$minimum, $maximum] = self::SPECIAL_POSITION_RANGES[$position];
+            if ($hours < $minimum || $hours > $maximum) {
+                return back()->withErrors([
+                    'max_hours' => "{$position} must be assigned between {$minimum} and {$maximum} teaching hours.",
+                ])->withInput();
+            }
+        }
+
+        $faculty->fac_special_position = $position;
+        $faculty->fac_special_position_max_hours = $hours;
+        $faculty->save();
+
+        return back()->with('success', $position
+            ? "{$faculty->full_name}'s special position and {$hours}-hour limit were saved."
+            : "{$faculty->full_name}'s special position was removed.");
     }
 
     public function unassign($id)

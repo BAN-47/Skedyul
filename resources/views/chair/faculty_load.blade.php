@@ -58,6 +58,7 @@
                             {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_HOURS }} teaching hours
                             &middot; Part-time max
                             {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_HOURS }} teaching hours
+                            &middot; Special-position limits follow the faculty policy ranges
                         </div>
                     </div>
                 </div>
@@ -73,20 +74,44 @@
                 </div>
 
                 <div class="card">
+                    @if (session('success'))
+                        <div class="mx-4 mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{{ session('success') }}</div>
+                    @endif
+                    @if ($errors->has('max_hours'))
+                        <div class="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ $errors->first('max_hours') }}</div>
+                    @endif
                     <div class="overflow-x-auto">
                         <table class="data-table" id="faculty-load-table">
                             <thead>
                                 <tr>
-                                    @foreach (['Faculty', 'Employment', 'Course Code', 'Academic Units', 'Teaching Hours', 'Hours Left', 'Status'] as $h)
+                                    @foreach (['Faculty', 'Employment', 'Special Position / Limit', 'Course Code', 'Academic Units', 'Teaching Hours', 'Hours Left', 'Status'] as $h)
                                         <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($facultyLoad as $fl)
-                                    <tr data-load-row data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.$fl['subjects'].' '.$fl['status_label']) }}">
+                                    <tr data-load-row data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['status_label']) }}">
                                         <td class="font-semibold">{{ $fl['name'] }}</td>
                                         <td>{{ $fl['employment'] === 'part_time' ? 'Part-time' : 'Full-time' }}</td>
+                                        <td class="min-w-[260px]">
+                                            <form method="POST" action="{{ route('chair.faculty_load.special-position', $fl['id']) }}" class="flex flex-wrap items-center gap-1.5">
+                                                @csrf
+                                                @method('PUT')
+                                                <select name="special_position" data-position-select class="max-w-[180px] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs">
+                                                    <option value="">No special position</option>
+                                                    @foreach (\App\Http\Controllers\Chair\ChairFacultyLoadController::SPECIAL_POSITION_RANGES as $position => $range)
+                                                        <option value="{{ $position }}" data-min="{{ $range[0] }}" data-max="{{ $range[1] }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <input name="max_hours" data-position-hours type="number" min="1" max="30" step="1" value="{{ $fl['max_hours'] }}" aria-label="Special-position teaching-hour cap" class="w-14 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" {{ $fl['special_position'] ? '' : 'disabled' }}>
+                                                <span class="text-xs text-slate-500">h</span>
+                                                <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
+                                                @if ($fl['special_position_range'])
+                                                    <span class="w-full text-[10px] text-slate-400">Policy range: {{ $fl['special_position_range'][0] }}–{{ $fl['special_position_range'][1] }}h (defaults to upper end)</span>
+                                                @endif
+                                            </form>
+                                        </td>
                                         <td class="text-slate-500">{{ $fl['subjects'] }}</td>
                                         <td><span class="font-mono font-bold">{{ $fl['total_units'] }}u</span></td>
                                         <td><span class="font-mono font-bold">{{ $fl['total_hours'] }}h</span></td>
@@ -102,12 +127,12 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center py-8 text-slate-400">No faculty in this
+                                        <td colspan="8" class="text-center py-8 text-slate-400">No faculty in this
                                             department yet.</td>
                                     </tr>
                                 @endforelse
                                 <tr id="faculty-load-no-results" class="hidden">
-                                    <td colspan="7" class="text-center py-8 text-slate-400">No faculty loads match your search.</td>
+                                    <td colspan="8" class="text-center py-8 text-slate-400">No faculty loads match your search.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -135,6 +160,23 @@
         });
 
         (() => {
+            document.querySelectorAll('[data-position-select]').forEach(select => {
+                const form = select.form;
+                const hours = form.querySelector('[data-position-hours]');
+                const syncRange = (useUpperEnd = false) => {
+                    const option = select.selectedOptions[0];
+                    const min = Number(option.dataset.min || 1);
+                    const max = Number(option.dataset.max || 30);
+                    const enabled = Boolean(select.value);
+                    hours.disabled = !enabled;
+                    hours.min = min;
+                    hours.max = max;
+                    if (enabled && (useUpperEnd || Number(hours.value) < min || Number(hours.value) > max)) hours.value = max;
+                };
+                select.addEventListener('change', () => syncRange(true));
+                syncRange();
+            });
+
             const search = document.getElementById('faculty-load-search');
             const rows = [...document.querySelectorAll('[data-load-row]')];
             const noResults = document.getElementById('faculty-load-no-results');

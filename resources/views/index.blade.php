@@ -372,9 +372,9 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Department / Program <span class="text-red-500" aria-hidden="true">*</span></label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Department<span class="text-red-500" aria-hidden="true">*</span></label>
               <select id="register-department" name="dept_id" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
-                <option value="">Select program</option>@foreach(($departments ?? []) as $department)<option value="{{ $department->dept_id }}" data-college="{{ $department->dept_college_id }}" @selected(old('dept_id')===$department->dept_id)>{{ $department->dept_name }} ({{ $department->dept_code }})</option>@endforeach
+                <option value="">Select Departments</option>@foreach(($departments ?? []) as $department)<option value="{{ $department->dept_id }}" data-college="{{ $department->dept_college_id }}" @selected(old('dept_id')===$department->dept_id)>{{ $department->dept_name }} ({{ $department->dept_code }})</option>@endforeach
               </select>@error('dept_id')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
