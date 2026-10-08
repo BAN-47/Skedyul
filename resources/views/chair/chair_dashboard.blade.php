@@ -55,11 +55,9 @@
         </div>
         <div class="stat-card">
           <div class="stat-card-bar bg-red-600"></div>
-          <div class="stat-label">Conflicts</div>
-          <div class="stat-value" id="stat-conflicts">{{ $conflictsCount }}</div>
-          <div class="stat-sub" id="stat-conflicts-sub">
-            {{ $conflictsCount > 0 ? 'Requires resolution' : 'All clear' }}
-          </div>
+          <div class="stat-label">Faculty at Max Load</div>
+          <div class="stat-value">{{ $facultyAtMaxLoadCount }}</div>
+          <div class="stat-sub">{{ $facultyAtMaxLoadCount === 1 ? 'faculty member' : 'faculty members' }} at their weekly teaching-hour cap</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-bar bg-cyan-600"></div>

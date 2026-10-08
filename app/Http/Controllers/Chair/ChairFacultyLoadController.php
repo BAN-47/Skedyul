@@ -51,12 +51,21 @@ class ChairFacultyLoadController extends Controller
                 ->pluck('sl_fac_id')
             : collect();
 
-        $faculty = Faculty::where(function ($q) use ($deptChair) {
-                $q->where('fac_college_id', $deptChair->dc_college_id)
-                    ->when($deptChair->dc_dept_id, fn ($query) => $query->where('fac_dept_id', $deptChair->dc_dept_id));
+        // The program assignment is authoritative. Requiring both the college
+        // and program IDs excluded faculty whose college link was left stale.
+        // Also retain faculty assigned to one of this program's active sections.
+        $faculty = Faculty::where(function ($q) use ($deptChair, $assignedFacultyIds) {
+                if ($deptChair->dc_dept_id) {
+                    $q->where('fac_dept_id', $deptChair->dc_dept_id);
+                } else {
+                    $q->where('fac_college_id', $deptChair->dc_college_id);
+                }
+                if ($assignedFacultyIds->isNotEmpty()) {
+                    $q->orWhereIn('fac_id', $assignedFacultyIds);
+                }
             })
-            ->orWhereIn('fac_id', $assignedFacultyIds)
             ->orderBy('fac_first_name')
+            ->orderBy('fac_last_name')
             ->get();
 
         $facultyIds = $faculty->pluck('fac_id');
