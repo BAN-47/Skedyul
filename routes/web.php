@@ -33,6 +33,10 @@ use App\Models\Schedule;
 */
 
 Route::get('/', function () {
+    return view('homepage');
+});
+
+Route::get('/login', function () {
     return redirect()->route('login');
 });
 
