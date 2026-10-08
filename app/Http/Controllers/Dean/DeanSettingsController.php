@@ -68,7 +68,7 @@ class DeanSettingsController extends Controller
         $request->file('avatar')->move(public_path('images/dean_profile'), $filename);
         $dean->update(['dean_profile_image' => $filename]);
 
-        return response()->json(['success' => true, 'url' => asset('images/chair_profile/' . $filename)]);
+        return response()->json(['success' => true, 'url' => asset('images/dean_profile/' . $filename)]);
     }
 
     public function removeAvatar()

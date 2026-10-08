@@ -7,7 +7,11 @@
 
     <div class="sidebar-user">
         <div class="sidebar-avatar">
-            {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
+            @if($chairSidebarProfile?->dc_profile_image)
+                <img src="{{ asset('images/chair_profile/' . $chairSidebarProfile->dc_profile_image) }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
+            @else
+                {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
+            @endif
         </div>
         <div class="overflow-hidden">
             <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
