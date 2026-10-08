@@ -153,7 +153,7 @@
             </button>
           </div>
         </div>
-        <div class="overflow-x-auto"><table class="w-full border-collapse">
+        <div class="overflow-x-auto"><table class="w-full min-w-[760px] border-collapse">
           <thead>
             <tr>
               <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Code</th>

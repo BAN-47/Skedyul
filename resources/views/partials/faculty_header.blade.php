@@ -1,4 +1,8 @@
+<div id="faculty-mobile-nav-backdrop" class="faculty-mobile-nav-backdrop" onclick="closeFacultyMobileNav()" aria-hidden="true"></div>
 <div class="topbar">
+    <button type="button" class="faculty-mobile-menu-button" onclick="toggleFacultyMobileNav()" aria-label="Open navigation menu" aria-expanded="false" aria-controls="faculty-sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
     <div class="topbar-title">{{ $title ?? 'My Subjects' }}</div>
     <div class="flex items-center gap-2.5">
         @if(!empty($badgeText))
@@ -7,7 +11,7 @@
         <div id="topbar-notif-bell" class="relative">
             <button type="button" onclick="facultyHeaderToggleNotifDropdown()"
                 class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
-                Notifications
+                <span class="faculty-notification-label">Notifications</span>
                 <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     0
                 </span>
@@ -26,6 +30,36 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleFacultyMobileNav() {
+    const sidebar = document.getElementById('faculty-sidebar');
+    const backdrop = document.getElementById('faculty-mobile-nav-backdrop');
+    const button = document.querySelector('.faculty-mobile-menu-button');
+    if (!sidebar || !backdrop || !button) return;
+    const isOpen = sidebar.classList.toggle('faculty-mobile-nav-open');
+    backdrop.classList.toggle('faculty-mobile-nav-backdrop-open', isOpen);
+    button.setAttribute('aria-expanded', String(isOpen));
+    button.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+}
+
+function closeFacultyMobileNav() {
+    const sidebar = document.getElementById('faculty-sidebar');
+    const backdrop = document.getElementById('faculty-mobile-nav-backdrop');
+    const button = document.querySelector('.faculty-mobile-menu-button');
+    sidebar?.classList.remove('faculty-mobile-nav-open');
+    backdrop?.classList.remove('faculty-mobile-nav-backdrop-open');
+    button?.setAttribute('aria-expanded', 'false');
+    button?.setAttribute('aria-label', 'Open navigation menu');
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeFacultyMobileNav();
+});
+document.getElementById('faculty-sidebar')?.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', closeFacultyMobileNav);
+});
+</script>
 
 @php
     $facultyHeaderNotificationEndpoints = [
