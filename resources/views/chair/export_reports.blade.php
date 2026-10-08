@@ -1,157 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SKEDYUL — Export Reports</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+
 <body class="bg-slate-50 font-sans text-slate-900 antialiased">
+    <div class="flex h-screen overflow-hidden">
+        @include('partials.chair_sidebar')
 
-<div class="flex h-screen overflow-hidden">
-  @include('partials.chair_sidebar')
+        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            @include('partials.chair_header', [
+                'title' => 'Export Reports',
+                'badgeText' => 'Department Chair',
+            ])
 
-  <main class="flex-1 overflow-hidden">
-    @include('partials.chair_header', ['title' => 'Export Reports', 'badgeText' => 'BSIS Department'])
+            <div class="flex-1 overflow-y-auto p-6 lg:p-8">
+                <div class="mx-auto max-w-7xl">
+                    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
+                        <div>
+                            <p class="mb-1 text-sm font-semibold uppercase tracking-wide text-blue-600">
+                                Schedule documents
+                            </p>
+                            <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">
+                                Export Reports
+                            </h1>
+                            <p class="mt-1 max-w-2xl text-sm text-slate-500">
+                                Generate an individual Program by Teacher workbook from your department’s active
+                                schedule.
+                            </p>
+                        </div>
 
-    <div id="page-reports" class="page-content">
-      <div class="mb-5">
-        <div class="text-[20px] font-extrabold text-slate-900">Export Reports</div>
-        <div class="mt-1 text-[13px] text-slate-500">BSIS Department · AY 2025–2026 · 1st Semester</div>
-      </div>
+                        @if ($semester)
+                            <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+                                <div class="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                                    Active semester
+                                </div>
+                                <div class="mt-1 text-sm font-bold text-slate-800">
+                                    {{ $semester->sem_name }}
+                                    @if ($semester->academicYear?->ay_academic_year)
+                                        · AY {{ $semester->academicYear->ay_academic_year }}
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+                    </div>
 
-      <div class="mb-6 grid gap-4 md:grid-cols-3">
-        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
-          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-xl">📅</div>
-          <div class="mb-1 text-sm font-bold text-slate-900">Faculty Schedule</div>
-          <div class="mb-4 text-xs text-slate-500">Individual timetables per faculty member</div>
-          <div class="flex gap-2">
-            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Faculty Schedule','PDF')">PDF</button>
-            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Faculty Schedule','Excel')">Excel</button>
-          </div>
-        </div>
+                    @if ($errors->any())
+                        <div class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+                            role="alert">
+                            <ul class="list-inside list-disc space-y-1">
+                                @foreach ($errors->all() as $error)
+                                    <li>{{ $error }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
 
-        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
-          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-xl">📋</div>
-          <div class="mb-1 text-sm font-bold text-slate-900">Section Master List</div>
-          <div class="mb-4 text-xs text-slate-500">Complete schedule per section/class</div>
-          <div class="flex gap-2">
-            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Section Master List','PDF')">PDF</button>
-            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Section Master List','Excel')">Excel</button>
-          </div>
-        </div>
+                    <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty in
+                                department</div>
+                            <div class="mt-2 text-2xl font-extrabold text-slate-900">{{ $facultyMembers->count() }}
+                            </div>
+                            <div class="mt-1 text-xs text-slate-500">Available for individual PBT export</div>
+                        </div>
 
-        <div class="cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-[0_10px_30px_rgba(37,99,235,0.10)]" onmouseover="this.style.boxShadow='0 10px 30px rgba(37,99,235,.12)'" onmouseout="this.style.boxShadow=''">
-          <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-xl">📊</div>
-          <div class="mb-1 text-sm font-bold text-slate-900">Workload Summary</div>
-          <div class="mb-4 text-xs text-slate-500">Units per faculty with load breakdown</div>
-          <div class="flex gap-2">
-            <button class="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-blue-700" onclick="exportReport('Workload Summary','PDF')">PDF</button>
-            <button class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-700 transition hover:bg-slate-50" onclick="exportReport('Workload Summary','Excel')">Excel</button>
-          </div>
-        </div>
-      </div>
+                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Workbook sheets
+                            </div>
+                            <div class="mt-2 text-2xl font-extrabold text-slate-900">2</div>
+                            <div class="mt-1 text-xs text-slate-500">Day and Evening schedules</div>
+                        </div>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div class="mb-4 flex items-center justify-between">
-          <div>
-            <div class="text-[15px] font-bold text-slate-900">Recent Exports</div>
-            <div class="text-[12px] text-slate-500">Last generated reports this semester</div>
-          </div>
-        </div>
-        <div id="recent-exports-list" class="space-y-2">
-          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
-            <div class="h-2.5 w-2.5 rounded-full bg-blue-500"></div>
-            <div class="flex-1 text-sm text-slate-700">Faculty Schedule — PDF</div>
-            <div class="text-[11px] text-slate-500">Jun 20, 2026 · 10:34 AM</div>
-          </div>
-          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
-            <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
-            <div class="flex-1 text-sm text-slate-700">Section Master List — Excel</div>
-            <div class="text-[11px] text-slate-500">Jun 18, 2026 · 3:12 PM</div>
-          </div>
-          <div class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
-            <div class="h-2.5 w-2.5 rounded-full bg-amber-500"></div>
-            <div class="flex-1 text-sm text-slate-700">Workload Summary — PDF</div>
-            <div class="text-[11px] text-slate-500">Jun 15, 2026 · 9:00 AM</div>
-          </div>
-        </div>
-      </div>
+                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Download format
+                            </div>
+                            <div class="mt-2 text-2xl font-extrabold text-slate-900">Excel</div>
+                            <div class="mt-1 text-xs text-slate-500">Uses the provided PBT template</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-5 xl:grid-cols-5">
+                        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-3">
+                            <div class="mb-6">
+                                <div
+                                    class="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                                    <span class="text-sm font-extrabold">PBT</span>
+                                </div>
+                                <h2 class="text-lg font-bold text-slate-900">Faculty Program by Teacher</h2>
+                                <p class="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+                                    Select a faculty member to generate a workbook containing their course summary
+                                    and scheduled classes.
+                                </p>
+                            </div>
+
+                            @if (!$semester)
+                                <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                                    No active semester is set. Set an active semester before exporting a PBT workbook.
+                                </div>
+                            @elseif ($facultyMembers->isEmpty())
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                                    No faculty members are assigned to your department.
+                                </div>
+                            @else
+                                <form method="GET" action="{{ route('chair.export_reports.pbt') }}" class="space-y-5">
+                                    <div>
+                                        <label for="faculty_id" class="mb-2 block text-sm font-semibold text-slate-700">
+                                            Faculty member
+                                        </label>
+                                        <select id="faculty_id" name="faculty_id" required
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                            <option value="">Choose a faculty member</option>
+                                            @foreach ($facultyMembers as $faculty)
+                                                @php
+                                                    $facultyName =
+                                                        $faculty->user->usr_name ??
+                                                        trim(
+                                                            implode(
+                                                                ' ',
+                                                                array_filter([
+                                                                    $faculty->fac_first_name,
+                                                                    $faculty->fac_middle_name,
+                                                                    $faculty->fac_last_name,
+                                                                    $faculty->fac_suffix,
+                                                                ]),
+                                                            ),
+                                                        );
+                                                @endphp
+                                                <option value="{{ $faculty->fac_id }}" @selected(old('faculty_id') === $faculty->fac_id)>
+                                                    {{ $facultyName ?: 'Unnamed Faculty' }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <p class="mt-2 text-xs text-slate-500">
+                                            The selected faculty member appears in the PBT name field. The logged-in
+                                            Chair remains in the Prepared by signature.
+                                        </p>
+                                    </div>
+
+                                    <div
+                                        class="flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 pt-5">
+                                        <div>
+                                            <div class="text-sm font-semibold text-slate-700">Ready to export?</div>
+                                            <div class="mt-1 text-xs text-slate-500">
+                                                The workbook uses the current active semester.
+                                            </div>
+                                        </div>
+
+                                        <button type="submit"
+                                            class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                            Download PBT Excel
+                                        </button>
+                                    </div>
+                                </form>
+                            @endif
+                        </section>
+
+                        <aside
+                            class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
+                            <div class="bg-gradient-to-br from-blue-700 to-indigo-900 p-6 text-white">
+                                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">
+                                    Workbook preview
+                                </div>
+                                <h2 class="mt-2 text-lg font-bold">Program by Teacher</h2>
+                                <p class="mt-1 text-sm leading-6 text-blue-100">
+                                    Your download keeps the layout and branding of the supplied form.
+                                </p>
+
+                                <div class="mt-5 rounded-xl bg-white p-4 text-slate-800 shadow-lg">
+                                    <div class="flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                                        <div>
+                                            <div class="text-xs font-bold uppercase tracking-wide text-blue-700">SKEDYUL
+                                            </div>
+                                            <div class="mt-1 text-sm font-bold">Faculty Schedule</div>
+                                        </div>
+                                        <div
+                                            class="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                                            {{ $semester?->sem_name ?? 'Semester' }}
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-3 flex gap-2 text-xs font-semibold">
+                                        <span class="rounded-md bg-blue-600 px-3 py-1.5 text-white">Day</span>
+                                        <span class="rounded-md bg-slate-100 px-3 py-1.5 text-slate-500">Evening</span>
+                                    </div>
+
+                                    <div class="mt-3 grid grid-cols-5 gap-1.5" aria-hidden="true">
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-blue-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-emerald-100"></span>
+                                        <span class="h-7 rounded bg-blue-100"></span>
+                                        <span class="h-7 rounded bg-amber-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+
+                                        <span class="h-7 rounded bg-blue-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-slate-100"></span>
+                                        <span class="h-7 rounded bg-amber-100"></span>
+                                        <span class="h-7 rounded bg-emerald-100"></span>
+                                    </div>
+
+                                    <div
+                                        class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
+                                        <span class="font-semibold text-slate-600">Course summary and signatures</span>
+                                        <span
+                                            class="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">Excel
+                                            workbook</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4 p-6">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-800">Included in the workbook</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">
+                                        Faculty details, course and section summary, weekly timetable, workload totals,
+                                        and signature areas.
+                                    </p>
+                                </div>
+
+                                <div class="flex items-start gap-3 border-t border-slate-100 pt-4">
+                                    <span
+                                        class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">1</span>
+                                    <p class="text-sm text-slate-600">Choose a faculty member from your department.</p>
+                                </div>
+
+                                <div class="flex items-start gap-3">
+                                    <span
+                                        class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">2</span>
+                                    <p class="text-sm text-slate-600">Download and review the generated PBT workbook.
+                                    </p>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+
+                    <div class="mt-5 rounded-xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
+                        <span class="font-semibold text-slate-800">Note:</span>
+                        PDF export is not available yet. Download the Excel workbook first, then use Excel’s
+                        print or export-to-PDF option if you need a PDF copy.
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-  </main>
-</div>
-
-<div class="toast" id="toast"><span id="toast-msg"></span></div>
-
-<script>
-const CHAIR_NOTIFS = [
-  { dot:'var(--red)', text:'<b>Conflict Detected</b> — Maria Santos: GE 102 & IT 101 overlap Tue 7:00–8:30 AM.', time:'Today, 08:30 AM', unread:true },
-  { dot:'var(--amber)', text:'<b>Near Max Load</b> — Felicitas Lagman is at 27h/30h (3h remaining).', time:'Today, 08:00 AM', unread:true },
-  { dot:'var(--blue)', text:'<b>Reminder</b> — Schedule submission deadline is Friday.', time:'Yesterday, 4:00 PM', unread:false },
-];
-
-function renderNotifList() {
-  const list = document.getElementById('notif-list');
-  if (!list) return;
-  list.innerHTML = CHAIR_NOTIFS.map(n => `
-    <div class="flex items-start gap-3 border-b border-slate-100 px-4 py-3 ${n.unread ? 'bg-slate-50' : ''}" onclick="markRead(this)">
-      <div class="mt-1.5 h-2.5 w-2.5 rounded-full" style="background:${n.dot};"></div>
-      <div class="min-w-0 flex-1">
-        <div class="text-[12.5px] leading-relaxed text-slate-600">${n.text}</div>
-        <div class="mt-1 text-[11px] text-slate-400">${n.time}</div>
-      </div>
-    </div>`).join('');
-  updateNotifCount();
-}
-
-let notifOpen = false;
-function toggleNotifDropdown() {
-  notifOpen = !notifOpen;
-  const dd = document.getElementById('notif-dropdown');
-  if (dd) dd.style.display = notifOpen ? 'block' : 'none';
-}
-document.addEventListener('click', e => {
-  const bell = document.getElementById('topbar-notif-bell');
-  if (bell && !bell.contains(e.target)) {
-    notifOpen = false;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = 'none';
-  }
-});
-function markRead(el) { el.classList.remove('bg-slate-50'); updateNotifCount(); }
-function markAllRead() {
-  document.querySelectorAll('#notif-list > div').forEach(el => el.classList.remove('bg-slate-50'));
-  updateNotifCount();
-}
-function updateNotifCount() {
-  const unread = document.querySelectorAll('#notif-list > div.bg-slate-50').length;
-  const badge = document.getElementById('notif-count');
-  if (badge) { badge.textContent = unread; badge.style.display = unread > 0 ? 'inline-flex' : 'none'; }
-}
-renderNotifList();
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
-}
-
-const dotColors = { 'Faculty Schedule':'#3b82f6', 'Section Master List':'#10b981', 'Workload Summary':'#f59e0b' };
-
-function exportReport(name, format) {
-  showToast(name + ' — ' + format + ' generated successfully!');
-  const list = document.getElementById('recent-exports-list');
-  const now = new Date();
-  const time = now.toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
-  const item = document.createElement('div');
-  item.className = 'flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5';
-  item.innerHTML = `
-    <div class="h-2.5 w-2.5 rounded-full" style="background:${dotColors[name] || '#3b82f6'};"></div>
-    <div class="flex-1 text-sm text-slate-700">${name} — ${format}</div>
-    <div class="text-[11px] text-slate-500">${time}</div>`;
-  list.insertBefore(item, list.firstChild);
-}
-</script>
 </body>
+
 </html>
