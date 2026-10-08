@@ -1,4 +1,4 @@
-<div class="sidebar">
+<div class="sidebar" id="faculty-sidebar">
   <div class="sidebar-logo">
     <div class="sidebar-logo-text">SKED<span>YUL</span></div>
   </div>

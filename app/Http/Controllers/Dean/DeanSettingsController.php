@@ -12,6 +12,8 @@ use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class DeanSettingsController extends Controller
 {
@@ -112,14 +114,24 @@ class DeanSettingsController extends Controller
     public function updateContact(Request $request)
     {
         $data = $request->validate([
-            'dean_gmail' => 'required|email|max:150',
+            'usr_email' => [
+                'required', 'email', 'max:255',
+                Rule::unique('USER', 'usr_email')->ignore(Auth::id(), 'usr_id'),
+            ],
             'dean_phone_number' => 'nullable|string|max:30',
             'dean_office_address' => 'nullable|string|max:255',
             'dean_bio' => 'nullable|string|max:1000',
         ]);
 
         $dean = $this->currentDean();
-        $dean->update($data);
+        DB::transaction(function () use ($dean, $data) {
+            Auth::user()->update(['usr_email' => $data['usr_email']]);
+            $dean->update([
+                'dean_phone_number' => $data['dean_phone_number'] ?? null,
+                'dean_address' => $data['dean_office_address'] ?? null,
+                'dean_bio' => $data['dean_bio'] ?? null,
+            ]);
+        });
 
         return response()->json(['success' => true]);
     }

@@ -52,11 +52,18 @@ class ChairController extends Controller
             : collect();
 
         $faculty = Faculty::with('user')
-            ->where(function ($q) use ($deptId, $programId) {
-                $q->where('fac_college_id', $deptId)
-                    ->when($programId, fn ($query) => $query->where('fac_dept_id', $programId));
+            ->where(function ($q) use ($deptId, $programId, $assignedFacultyIds) {
+                if ($programId) {
+                    // Program assignment is authoritative; tolerate an outdated
+                    // college link, and include faculty actively assigned to the program.
+                    $q->where('fac_dept_id', $programId);
+                } else {
+                    $q->where('fac_college_id', $deptId);
+                }
+                if ($assignedFacultyIds->isNotEmpty()) {
+                    $q->orWhereIn('fac_id', $assignedFacultyIds);
+                }
             })
-            ->orWhereIn('fac_id', $assignedFacultyIds)
             ->get();
 
         $totalFaculty = $faculty->count();
@@ -129,9 +136,8 @@ class ChairController extends Controller
             ->get();
 
         $unreadCount    = $notifications->where('notif_is_read', false)->count();
-        $conflictsCount = $notifications
-            ->where('notif_type', 'conflict')
-            ->where('notif_is_read', false)
+        $facultyAtMaxLoadCount = $facultyLoad
+            ->filter(fn ($load) => $load['hours'] >= $load['max_hours'])
             ->count();
 
         $recentActivity = Audit_Log::where('al_usr_id', $user->usr_id)
@@ -153,7 +159,7 @@ class ChairController extends Controller
             'subjectsPlotted',
             'notifications',
             'unreadCount',
-            'conflictsCount',
+            'facultyAtMaxLoadCount',
             'recentActivity'
         ));
     }

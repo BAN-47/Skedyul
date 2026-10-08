@@ -89,7 +89,7 @@
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeModal('modal-notify')">Cancel</button>
-                    <button class="btn btn-primary" onclick="sendNotification()">Send Notification</button>
+                    <button id="send-notification-button" class="btn btn-primary" onclick="sendNotification()">Send Notification</button>
                 </div>
             </div>
         </div>
@@ -173,6 +173,7 @@
         // ── LOAD CHAIRS ───────────────────────────────────────────────────
         let chairsLoaded = false;
         const chairsUrl = "{{ route('dean.notifications') }}";
+        const sendNotificationUrl = "{{ route('dean.notifications.send') }}";
 
         async function loadChairs() {
             if (chairsLoaded) return;
@@ -245,11 +246,18 @@
             if (!message)          { showToast('Please enter a message.', '#dc2626'); return; }
             if (!selected.length)  { showToast('Select at least one chair.', '#dc2626'); return; }
 
+            const sendButton = document.getElementById('send-notification-button');
+            const buttonLabel = sendButton.textContent;
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending…';
+            sendButton.classList.add('opacity-70', 'cursor-wait');
+
             try {
-                const res  = await fetch('/dean/notifications/send', {
+                const res  = await fetch(sendNotificationUrl, {
                     method:  'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': CSRF,
                         'X-Requested-With': 'XMLHttpRequest',
                     },
@@ -257,17 +265,21 @@
                 });
                 const data = await res.json();
 
-                if (data.success) {
-                    addToRecentlySent({ title, type, count: data.sent });
-                    document.getElementById('notif-title').value   = '';
-                    document.getElementById('notif-message').value = '';
-                    showToast('✅ Sent to ' + data.sent + ' chair(s)!', '#16a34a');
-                    closeModal('modal-notify');
-                } else {
-                    showToast('Failed to send. Try again.', '#dc2626');
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to send. Please try again.');
                 }
-            } catch {
-                showToast('Network error. Try again.', '#dc2626');
+
+                addToRecentlySent({ title, type, count: data.sent });
+                document.getElementById('notif-title').value   = '';
+                document.getElementById('notif-message').value = '';
+                showToast('✅ Sent to ' + data.sent + ' chair(s)!', '#16a34a');
+                closeModal('modal-notify');
+            } catch (error) {
+                showToast(error.message || 'Network error. Try again.', '#dc2626');
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = buttonLabel;
+                sendButton.classList.remove('opacity-70', 'cursor-wait');
             }
         }
 

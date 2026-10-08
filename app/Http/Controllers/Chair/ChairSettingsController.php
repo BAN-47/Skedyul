@@ -9,6 +9,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class ChairSettingsController extends Controller
@@ -86,14 +88,24 @@ class ChairSettingsController extends Controller
     public function updateContact(Request $request)
     {
         $data = $request->validate([
-            'dc_gmail' => 'required|email|max:150',
+            'usr_email' => [
+                'required', 'email', 'max:255',
+                Rule::unique('USER', 'usr_email')->ignore(Auth::id(), 'usr_id'),
+            ],
             'dc_phone_number' => 'nullable|string|max:30',
             'dc_address' => 'nullable|string|max:255',
             'dc_bio' => 'nullable|string|max:1000',
         ]);
 
         $chair = $this->currentChair();
-        $chair->update($data);
+        DB::transaction(function () use ($chair, $data) {
+            Auth::user()->update(['usr_email' => $data['usr_email']]);
+            $chair->update([
+                'dc_phone_number' => $data['dc_phone_number'] ?? null,
+                'dc_address' => $data['dc_address'] ?? null,
+                'dc_bio' => $data['dc_bio'] ?? null,
+            ]);
+        });
 
         return response()->json(['success' => true]);
     }

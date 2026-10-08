@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
-use App\Models\Dept_Chair;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,23 +13,29 @@ class NotificationController extends Controller
     // GET /dean/notifications
     public function index()
     {
-        $chairs = Dept_Chair::with(['user', 'department'])
+        // Return only the fields used by the picker, in one database query.
+        $chairs = DB::table('department_chair as dc')
+            ->leftJoin(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
+            ->leftJoin('college as c', 'c.college_id', '=', 'dc.dc_college_id')
+            ->select([
+                'dc.dc_id',
+                'dc.dc_usr_id',
+                'dc.dc_first_name',
+                'dc.dc_last_name',
+                'u.usr_name',
+                'c.college_code as dept_code',
+            ])
+            ->orderBy('c.college_code')
             ->get()
-            ->sortBy(fn ($chair) => $chair->department?->dept_code ?? '')
             ->values()
             ->map(function ($chair) {
-                $name = $chair->user?->usr_name ?: $chair->full_name;
-                $first = $chair->dc_first_name ?? '';
-                $last  = $chair->dc_last_name ?? '';
-
+                $name = $chair->usr_name ?: trim(($chair->dc_first_name ?? '') . ' ' . ($chair->dc_last_name ?? ''));
                 return [
                     'dc_id'     => $chair->dc_id,
                     'dc_usr_id' => $chair->dc_usr_id,
                     'chair_name' => $name ?: 'Unnamed Chair',
-                    'initials'   => strtoupper(
-                    substr($first, 0, 1) . substr($last, 0, 1)
-                    ),
-                    'dept_code' => $chair->department?->dept_code ?? 'N/A',
+                    'initials'   => strtoupper(substr($chair->dc_first_name ?? '', 0, 1) . substr($chair->dc_last_name ?? '', 0, 1)),
+                    'dept_code' => $chair->dept_code ?? 'N/A',
                 ];
             });
 
@@ -41,56 +47,42 @@ class NotificationController extends Controller
     {
         $request->validate([
             'chair_ids'   => 'required|array|min:1',
-            'chair_ids.*' => 'required|string',
+            'chair_ids.*' => 'required|uuid|distinct',
             'title'       => 'required|string|max:200',
             'message'     => 'required|string|max:2000',
             'type'        => 'required|in:info,reminder,urgent,deadline',
         ]);
 
-        $sent = 0;
+        $chairIds = User::query()
+            ->whereIn('usr_id', $request->input('chair_ids'))
+            ->where('usr_role', 'department_chair')
+            ->pluck('usr_id');
 
-        try {
-            foreach ($request->chair_ids as $usrId) {
-                $exists = DB::table(DB::raw('"USER"'))
-                    ->where('usr_id', $usrId)
-                    ->where('usr_role', 'department_chair')
-                    ->exists();
-
-                if (!$exists) continue;
-
-                DB::table('notification')->insert([
-                    'notif_id'         => (string) Str::uuid(),
-                    'notif_usr_id'     => $usrId,
-                    'notif_title'      => $request->title,
-                    'notif_message'    => $request->message,
-                    'notif_type'       => $request->type,
-                    'notif_is_read'    => false,
-                    'notif_created_at' => now(),
-                    'notif_updated_at' => now(),
-                ]);
-
-                $sent++;
-            }
-        } catch (\Throwable $e) {
-            $message = strtolower($e->getMessage());
-
-            if ($e instanceof \Illuminate\Database\QueryException && ($e->getCode() === '23505' || str_contains($message, 'duplicate'))) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Duplicate notification entry detected. Please review the selected chairs and try again.',
-                ], 409);
-            }
-
+        if ($chairIds->count() !== count($request->input('chair_ids'))) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unable to send the notification because of a database error. Please try again.',
-            ], 500);
+                'message' => 'One or more selected recipients are no longer department chairs. Refresh the page and try again.',
+            ], 422);
         }
+
+        $now = now();
+        $rows = $chairIds->map(fn ($usrId) => [
+            'notif_id'         => (string) Str::uuid(),
+            'notif_usr_id'     => $usrId,
+            'notif_title'      => $request->input('title'),
+            'notif_message'    => $request->input('message'),
+            'notif_type'       => $request->input('type'),
+            'notif_is_read'    => false,
+            'notif_created_at' => $now,
+            'notif_updated_at' => $now,
+        ])->all();
+
+        DB::table('notification')->insert($rows);
 
         return response()->json([
             'success' => true,
-            'sent'    => $sent,
-            'message' => "Notification sent to {$sent} chair(s).",
+            'sent'    => count($rows),
+            'message' => 'Notification sent to ' . count($rows) . ' chair(s).',
         ]);
     }
 
