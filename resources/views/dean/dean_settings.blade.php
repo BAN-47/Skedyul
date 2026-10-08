@@ -130,11 +130,11 @@
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
-                  <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ $dean->dean_gmail }}"></div>
+                  <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ auth()->user()->usr_email }}"></div>
                   <div><label class="field-label">Phone Number</label><input class="field-input" id="pi-phone" value="{{ $dean->dean_phone_number }}"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
-                  <div><label class="field-label">Office Location</label><input class="field-input" id="pi-address" value="{{ $dean->dean_office_address }}"></div>
+                  <div><label class="field-label">Office Location</label><input class="field-input" id="pi-address" value="{{ $dean->dean_address }}"></div>
                   <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="CCICT" readonly></div>
                 </div>
                 <div class="mb-4">
@@ -648,7 +648,7 @@
 
     function saveContactInfo() {
       const payload = {
-        dean_gmail: document.getElementById('pi-gmail').value,
+        usr_email: document.getElementById('pi-gmail').value,
         dean_phone_number: document.getElementById('pi-phone').value,
         dean_office_address: document.getElementById('pi-address').value,
         dean_bio: document.getElementById('pi-bio').value,

@@ -132,7 +132,7 @@
                   </div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
-                  <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ $chair->dc_gmail }}"></div>
+                  <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ auth()->user()->usr_email }}"></div>
                   <div><label class="field-label">Phone Number</label><input class="field-input" id="pi-phone" value="{{ $chair->dc_phone_number }}"></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
@@ -548,7 +548,7 @@
 
     function saveContactInfo() {
       const payload = {
-        dc_gmail: document.getElementById('pi-gmail').value,
+        usr_email: document.getElementById('pi-gmail').value,
         dc_phone_number: document.getElementById('pi-phone').value,
         dc_address: document.getElementById('pi-address').value,
         dc_bio: document.getElementById('pi-bio').value,
