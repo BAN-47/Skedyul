@@ -27,7 +27,7 @@
 
       // day => [ hour => block ]   (block placed only on its start hour; rowspan covers the rest)
       $dayBlocks = [];
-      $hasNightSched = false; // true once any class starts at/after 4:30 PM (16:30)
+      $hasEveningSched = false; // true once any class starts at or after 4:00 PM
 
       // Left-side "Summary of Subjects" panel — one row per unique subject code
       $summaryRows = [];
@@ -80,13 +80,9 @@
               }
               $duration = max(1, $endHour - $startHour);
 
-              // Night table starts at 4:30 PM — treat 16:30+ (and any 16:xx class) as night
-              if ($startHour > 16 || ($startHour === 16 && (int) $startTs->format('i') >= 30)) {
-                  $hasNightSched = true;
-              }
-              // Classes that begin in the 4 PM hour land on the night grid (hour key 16)
-              if ($startHour === 16) {
-                  // keep startHour = 16 for night row placement
+              // Evening starts at 4:00 PM, matching the faculty schedule view.
+              if ($startHour >= 16) {
+                  $hasEveningSched = true;
               }
 
               $scheduleForJs[] = [
@@ -119,7 +115,7 @@
       $skipUntil = array_fill_keys($gridDays, 0);
 
       $dayRange   = range(7, 15);  // 7AM – 4PM (last row: 3–4 PM)
-      $nightRange = range(16, 21); // Night table: 4:30 PM – 10PM
+      $eveningRange = range(16, 21); // Evening table: 4 PM – 10 PM
     @endphp
 
     @include('partials.faculty_header', [
@@ -145,15 +141,15 @@
             </div>
           </div>
 
-          <!-- DAY / NIGHT TOGGLE -->
+          <!-- DAY / EVENING TOGGLE -->
           <div class="inline-flex items-center bg-gray-100 rounded-lg p-1 gap-1 shrink-0">
             <button id="btn-view-day" type="button" onclick="switchScheduleView('day')"
                     class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-white text-gray-900 shadow-sm">
               Day
             </button>
-            <button id="btn-view-night" type="button" onclick="switchScheduleView('night')"
+            <button id="btn-view-evening" type="button" onclick="switchScheduleView('evening')"
                     class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 text-gray-500">
-              Night
+              Evening
             </button>
           </div>
         </div>
@@ -272,13 +268,11 @@ function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, 
   openModal('modal-web-subject-detail');
 }
 
-// ── DAY / NIGHT SCHEDULE TOGGLE ─────────────────────────────────────────
+// ── DAY / EVENING SCHEDULE TOGGLE ───────────────────────────────────────
 function switchScheduleView(view) {
   const dayBtn   = document.getElementById('btn-view-day');
-  const nightBtn = document.getElementById('btn-view-night');
-  const dayGrid  = document.getElementById('view-day-grid');
-  const nightGrid = document.getElementById('view-night-grid');
-  if (!dayBtn || !nightBtn || !dayGrid || !nightGrid) return;
+  const eveningBtn = document.getElementById('btn-view-evening');
+  if (!dayBtn || !eveningBtn) return;
 
   const activeClasses   = ['bg-white', 'text-gray-900', 'shadow-sm'];
   const inactiveClasses = ['text-gray-500'];
@@ -286,16 +280,25 @@ function switchScheduleView(view) {
   const activate = (btn) => { btn.classList.add(...activeClasses); btn.classList.remove(...inactiveClasses); };
   const deactivate = (btn) => { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); };
 
-  if (view === 'night') {
-    dayGrid.classList.add('hidden');
-    nightGrid.classList.remove('hidden');
-    activate(nightBtn);
+  const showEvening = view === 'evening';
+  document.querySelectorAll('.subject-row').forEach(row => {
+    let visibleSchedules = 0;
+    row.querySelectorAll('.sched-row').forEach(schedule => {
+      const [hour, minute] = schedule.dataset.start.split(':').map(Number);
+      const isEvening = hour >= 16;
+      const visible = showEvening ? isEvening : !isEvening;
+      schedule.classList.toggle('hidden', !visible);
+      if (visible) visibleSchedules++;
+    });
+    row.classList.toggle('hidden', visibleSchedules === 0);
+  });
+
+  if (showEvening) {
+    activate(eveningBtn);
     deactivate(dayBtn);
   } else {
-    nightGrid.classList.add('hidden');
-    dayGrid.classList.remove('hidden');
     activate(dayBtn);
-    deactivate(nightBtn);
+    deactivate(eveningBtn);
   }
 }
 
@@ -356,11 +359,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateSubjectScheduleStatuses();
   setInterval(updateSubjectScheduleStatuses, 30000); // refresh every 30s
 
-  // Default view: Night if it's currently 4:30 PM or later, otherwise Day.
+  // Default view: Evening if it's currently 4:00 PM or later, otherwise Day.
   // The buttons always let the user override this manually.
   const now = new Date();
-  const isNightHours = now.getHours() > 16 || (now.getHours() === 16 && now.getMinutes() >= 30);
-  switchScheduleView(isNightHours ? 'night' : 'day');
+  const isEveningHours = now.getHours() >= 16;
+  switchScheduleView(isEveningHours ? 'evening' : 'day');
 });
 </script>
 </body>
