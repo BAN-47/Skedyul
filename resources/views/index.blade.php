@@ -22,7 +22,7 @@
     {{-- ═══════════════════════════════════════════════
          LEFT PANEL
     ════════════════════════════════════════════════ --}}
-    <div class="relative flex flex-1 flex-col justify-center overflow-hidden px-14 py-16"
+    <div id="auth-marketing-panel" class="relative flex flex-1 flex-col justify-center overflow-hidden px-14 py-16"
       style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1a2d5a 100%);">
 
       {{-- Background glow --}}
@@ -52,19 +52,19 @@
         </div>
 
         {{-- Tagline --}}
-        <div class="mb-10 text-xs font-bold uppercase tracking-widest text-white/40">
+        <div id="auth-tagline" class="mb-10 text-xs font-bold uppercase tracking-widest text-white/40">
           Faculty Scheduling System
         </div>
 
         {{-- Description --}}
-        <p class="mb-11 max-w-sm text-center text-[17px] leading-relaxed text-white/70">
+        <p id="auth-description" class="mb-11 max-w-sm text-center text-[17px] leading-relaxed text-white/70">
           A <b class="font-bold text-white">smart, centralized platform</b> built for all college departments —
           effortlessly manage class schedules, plot subjects,
           detect conflicts, and balance workloads all in one place.
         </p>
 
         {{-- Feature list --}}
-        <div class="flex w-full max-w-sm flex-col gap-3.5">
+        <div id="auth-feature-list" class="flex w-full max-w-sm flex-col gap-3.5">
 
           <div class="flex items-center gap-3.5">
             <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" style="background:#3C3489;">
@@ -109,7 +109,7 @@
         </div>
 
         {{-- Department badge --}}
-        <div class="mt-12 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-5 py-3.5 text-center">
+        <div id="auth-campus-badge" class="mt-12 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-5 py-3.5 text-center">
           <div class="text-[12px] font-extrabold leading-snug text-white">
             College of Computing, Information and<br>Communications Technology
           </div>
@@ -418,34 +418,109 @@
     }
 
     @media (max-width: 900px) {
+      body {
+        height: auto !important;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto !important;
+      }
+
+      #screen-login {
+        min-height: 100dvh;
+      }
+
       #auth-panel {
-        width: min(100%, 760px);
-        padding-left: 1.25rem;
-        padding-right: 1.25rem;
+        width: 100% !important;
+        min-width: 0;
+        min-height: calc(100dvh - 105px);
+        flex: 1 0 auto;
+        padding: 1.5rem 1.25rem;
       }
 
       #screen-login {
         flex-direction: column;
       }
 
-      #screen-login>div:first-child {
-        min-height: 210px;
-        padding: 2rem;
+      #auth-marketing-panel {
+        min-height: 105px;
+        flex: 0 0 auto;
+        padding: 1.25rem 1rem;
+      }
+
+      #auth-description,
+      #auth-feature-list,
+      #auth-campus-badge {
+        display: none;
+      }
+
+      #auth-marketing-panel .relative.z-10 {
+        margin-top: 0;
+      }
+
+      #auth-marketing-panel .text-5xl {
+        font-size: 2rem;
+      }
+
+      #auth-tagline {
+        margin-bottom: 0;
+        font-size: 9px;
       }
 
       #login-view,
       #register-view {
         max-width: 100%;
       }
+
+      #login-view {
+        max-width: 460px;
+        margin: 0 auto;
+      }
+
+      #register-view {
+        width: 100%;
+        max-width: 680px;
+        margin: 0 auto;
+      }
     }
 
     @media (max-width: 520px) {
+      #auth-marketing-panel {
+        min-height: 88px;
+        padding: 1rem;
+      }
+
+      #auth-panel {
+        min-height: calc(100dvh - 88px);
+        align-items: flex-start;
+        padding: 1.25rem 1rem;
+      }
+
+      #login-view > .text-5xl,
+      #register-view > .text-5xl {
+        font-size: 2.25rem;
+      }
+
       #register-view .grid-cols-2 {
         grid-template-columns: minmax(0, 1fr);
+        gap: .75rem;
       }
 
       #register-view .col-span-2 {
         grid-column: auto;
+      }
+
+      #register-view input:not([type="file"]),
+      #register-view select {
+        min-height: 42px;
+        font-size: 14px;
+      }
+
+      #login-view input {
+        min-height: 46px;
+      }
+
+      #login-view > .mb-9 {
+        margin-bottom: 1.5rem;
       }
     }
 

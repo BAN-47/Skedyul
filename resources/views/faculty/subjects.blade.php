@@ -157,7 +157,7 @@
             </button>
           </div>
         </div>
-        <div class="overflow-x-auto"><table class="w-full border-collapse">
+        <div class="overflow-x-auto"><table class="w-full min-w-[760px] border-collapse">
           <thead>
             <tr>
               <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Code</th>
@@ -276,9 +276,7 @@ function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, 
 function switchScheduleView(view) {
   const dayBtn   = document.getElementById('btn-view-day');
   const nightBtn = document.getElementById('btn-view-night');
-  const dayGrid  = document.getElementById('view-day-grid');
-  const nightGrid = document.getElementById('view-night-grid');
-  if (!dayBtn || !nightBtn || !dayGrid || !nightGrid) return;
+  if (!dayBtn || !nightBtn) return;
 
   const activeClasses   = ['bg-white', 'text-gray-900', 'shadow-sm'];
   const inactiveClasses = ['text-gray-500'];
@@ -286,14 +284,25 @@ function switchScheduleView(view) {
   const activate = (btn) => { btn.classList.add(...activeClasses); btn.classList.remove(...inactiveClasses); };
   const deactivate = (btn) => { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); };
 
-  if (view === 'night') {
-    dayGrid.classList.add('hidden');
-    nightGrid.classList.remove('hidden');
+  const showNight = view === 'night';
+  document.querySelectorAll('.subject-row').forEach(row => {
+    let hasVisibleSchedule = false;
+    row.querySelectorAll('.sched-row').forEach(schedule => {
+      const [hours] = (schedule.dataset.start || '00:00').split(':').map(Number);
+      const isNight = hours >= 16;
+      const visible = isNight === showNight;
+      schedule.classList.toggle('hidden', !visible);
+      if (visible) hasVisibleSchedule = true;
+    });
+
+    const schedules = row.querySelectorAll('.sched-row');
+    row.classList.toggle('hidden', schedules.length > 0 && !hasVisibleSchedule);
+  });
+
+  if (showNight) {
     activate(nightBtn);
     deactivate(dayBtn);
   } else {
-    nightGrid.classList.add('hidden');
-    dayGrid.classList.remove('hidden');
     activate(dayBtn);
     deactivate(nightBtn);
   }
