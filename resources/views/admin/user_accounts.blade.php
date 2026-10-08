@@ -97,6 +97,18 @@
                 $colors = ['#2563eb','#16a34a','#d97706','#0891b2','#7c3aed'];
                 $colorIndex = crc32($displayName) % count($colors);
                 $avatarColor = $colors[$colorIndex];
+                $avatarUrl = match ($user->usr_role) {
+                  'faculty' => $user->faculty?->fac_profile_image
+                    ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image)
+                    : null,
+                  'dean' => $user->dean?->dean_profile_image
+                    ? asset('images/dean_profile/' . $user->dean->dean_profile_image)
+                    : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                  'department_chair' => $user->deptChair?->dc_profile_image
+                    ? asset('images/chair_profile/' . $user->deptChair->dc_profile_image)
+                    : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                  default => null,
+                };
 
                 $roleLabels = [
                 'faculty' => 'Faculty',
@@ -122,9 +134,13 @@
                     <div class="flex items-center gap-2.5">
 
                       <div
-                        class="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-extrabold text-white flex-shrink-0"
+                        class="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-extrabold text-white flex-shrink-0 overflow-hidden"
                         style="background:{{ $avatarColor }};">
-                        {{ strtoupper(substr($displayName, 0, 1)) }}
+                        @if($avatarUrl)
+                          <img src="{{ $avatarUrl }}" alt="{{ $displayName }} profile photo" class="h-full w-full object-cover">
+                        @else
+                          {{ strtoupper(substr($displayName, 0, 1)) }}
+                        @endif
                       </div>
 
                       <button
@@ -1179,8 +1195,11 @@
         document.getElementById('edit-avatar').style.background =
           AVATAR_COLORS[colorIndex];
 
-        document.getElementById('edit-avatar').textContent =
-          getInitials(fullName);
+        const editAvatar = document.getElementById('edit-avatar');
+        editAvatar.style.backgroundImage = data.profile_image_url ? `url("${data.profile_image_url}")` : '';
+        editAvatar.style.backgroundSize = data.profile_image_url ? 'cover' : '';
+        editAvatar.style.backgroundPosition = data.profile_image_url ? 'center' : '';
+        editAvatar.textContent = data.profile_image_url ? '' : getInitials(fullName);
 
         document.getElementById('edit-avatar-name').textContent =
           fullName;
@@ -1232,11 +1251,12 @@
         const colorIndex =
           simpleHash(fullName) % AVATAR_COLORS.length;
 
-        document.getElementById('profile-avatar').textContent =
-          getInitials(fullName);
-
-        document.getElementById('profile-avatar').style.background =
-          AVATAR_COLORS[colorIndex];
+        const profileAvatar = document.getElementById('profile-avatar');
+        profileAvatar.style.background = AVATAR_COLORS[colorIndex];
+        profileAvatar.style.backgroundImage = data.profile_image_url ? `url("${data.profile_image_url}")` : '';
+        profileAvatar.style.backgroundSize = data.profile_image_url ? 'cover' : '';
+        profileAvatar.style.backgroundPosition = data.profile_image_url ? 'center' : '';
+        profileAvatar.textContent = data.profile_image_url ? '' : getInitials(fullName);
 
         document.getElementById('profile-name').textContent =
           fullName;

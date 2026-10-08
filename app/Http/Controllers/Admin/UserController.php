@@ -24,6 +24,8 @@ class UserController extends Controller
 
         $users = User::query()
             ->with([
+                'dean',
+                'deptChair',
                 'faculty.studyLoads.schedules.room' => function ($query) {
                     $query->select(
                         'room_id',
@@ -506,6 +508,19 @@ class UserController extends Controller
 
         $roleFields['special_position'] ??= $facultyProfile->fac_special_position ?? null;
 
+        $profileImageUrl = match ($user->usr_role) {
+            'faculty' => $profile?->fac_profile_image
+                ? asset('images/faculty_profile/' . $profile->fac_profile_image)
+                : null,
+            'dean' => $profile?->dean_profile_image
+                ? asset('images/dean_profile/' . $profile->dean_profile_image)
+                : null,
+            'department_chair' => $profile?->dc_profile_image
+                ? asset('images/chair_profile/' . $profile->dc_profile_image)
+                : null,
+            default => null,
+        };
+
         return response()->json(array_merge([
             'usr_id' => $user->usr_id,
             'usr_name' => $this->buildUserName([
@@ -521,6 +536,7 @@ class UserController extends Controller
             'usr_email' => $user->usr_email,
             'usr_role' => $user->usr_role,
             'usr_is_active' => (bool) $user->usr_is_active,
+            'profile_image_url' => $profileImageUrl,
         ], $roleFields));
     }
 
