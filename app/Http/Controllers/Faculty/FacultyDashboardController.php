@@ -15,6 +15,14 @@ class FacultyDashboardController extends Controller
     {
         $faculty = Faculty::where('fac_usr_id', auth()->id())->firstOrFail();
 
+        $facultyBios = Faculty::with('department')
+            ->where('fac_id', '!=', $faculty->fac_id)
+            ->whereNotNull('fac_bio')
+            ->whereRaw("TRIM(fac_bio) <> ''")
+            ->orderBy('fac_last_name')
+            ->orderBy('fac_first_name')
+            ->get();
+
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
         $totalHours = Study_Load::where('sl_fac_id', $faculty->fac_id)
@@ -37,7 +45,7 @@ class FacultyDashboardController extends Controller
         $todaySchedule = $schedules->where('sch_day', $today)->sortBy('sch_start_time')->values();
 
         return view('faculty.faculty_dashboard', compact(
-            'faculty', 'totalHours', 'maxHours', 'mySubjects', 'mySections', 'todaySchedule', 'today'
+            'faculty', 'facultyBios', 'totalHours', 'maxHours', 'mySubjects', 'mySections', 'todaySchedule', 'today'
         ));
     }
 }
