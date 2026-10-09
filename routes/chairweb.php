@@ -9,18 +9,19 @@ use App\Http\Controllers\Chair\ChairFacultyLoadController;
 use App\Http\Controllers\Chair\ChairSettingsController;
 use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbtController;
+use App\Http\Controllers\Chair\PbtExportController;
 use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 
 Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
-    // Chair dashboard index
+    // Chair dashboard
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
     Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
     Route::get('/notifications/unread-count', [ChairSettingsController::class, 'unreadNotificationsCount'])->name('chair.notifications.unread-count');
     Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');
     Route::post('/notifications/{notification}/read', [ChairController::class, 'markNotificationRead'])->name('chair.notifications.read');
 
-    // Chair Faculty Load
+    // Chair faculty load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
     Route::put('/faculty-load/{faculty}/special-position', [ChairFacultyLoadController::class, 'updateSpecialPosition'])->name('chair.faculty_load.special-position');
@@ -63,9 +64,9 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::get('/submit-dean', [ScheduleSubmissionController::class, 'index'])->name('chair.submit_dean');
     Route::post('/submit-dean', [ScheduleSubmissionController::class, 'store'])->name('chair.submit_dean.store');
 
-    Route::get('/export-reports', function () {
-        return view('chair.export_reports');
-    })->name('chair.export_reports');
+    // Export reports and faculty PBT workbook
+    Route::get('/export-reports', [PbtExportController::class, 'index'])->name('chair.export_reports');
+    Route::get('/export-reports/pbt', [PbtExportController::class, 'download'])->name('chair.export_reports.pbt');
 
     Route::get('/settings', function () {
         return view('chair.settings');
