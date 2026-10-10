@@ -125,6 +125,14 @@ class PbtExportController extends Controller
         $chairName = $chair->full_name
             ?: ($chair->user?->usr_name ?? 'Department Chair');
 
+        $normalizedChairName = mb_strtoupper(
+            preg_replace('/[^A-Z]/i', '', $chairName)
+        );
+
+        $chairSignature = $normalizedChairName === 'NOREENBFUENTES'
+            ? 'NOREEN B. FUENTES, Ph.D., DIT'
+            : mb_strtoupper($chairName);
+
         $academicYear = $semester->academicYear?->ay_academic_year
             ?? $semester->academicYear?->ay_year_label
             ?? '';
@@ -138,7 +146,7 @@ class PbtExportController extends Controller
             $daySheet,
             $faculty,
             $facultyName,
-            $chairName,
+            $chairSignature,
             $semesterLabel,
             $schedules
         );
@@ -147,7 +155,7 @@ class PbtExportController extends Controller
             $eveningSheet,
             $faculty,
             $facultyName,
-            $chairName,
+            $chairSignature,
             $semesterLabel,
             $schedules
         );
@@ -184,7 +192,7 @@ class PbtExportController extends Controller
         $sheet,
         Faculty $faculty,
         string $facultyName,
-        string $chairName,
+        string $chairSignature,
         string $semesterLabel,
         $schedules
     ): void {
@@ -199,7 +207,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('M11', '___ Contract of Service');
         $sheet->setCellValue('K12', '');
         $sheet->setCellValue('K13', '');
-        $sheet->setCellValue('A51', mb_strtoupper($chairName));
+        $sheet->setCellValue('A51', $chairSignature);
 
         $daySchedules = $schedules
             ->filter(fn($schedule) => $this->isDaySchedule($schedule))
@@ -239,7 +247,7 @@ class PbtExportController extends Controller
         $sheet,
         Faculty $faculty,
         string $facultyName,
-        string $chairName,
+        string $chairSignature,
         string $semesterLabel,
         $schedules
     ): void {
@@ -254,7 +262,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('M13', '___ Contract of Service');
         $sheet->setCellValue('K14', '');
         $sheet->setCellValue('K15', '');
-        $sheet->setCellValue('A52', mb_strtoupper($chairName));
+        $sheet->setCellValue('A52', $chairSignature);
 
         $eveningSchedules = $schedules
             ->filter(fn($schedule) => $this->isEveningSchedule($schedule))
