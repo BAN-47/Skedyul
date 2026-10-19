@@ -75,6 +75,52 @@
         </div>
       </div>
 
+      <!-- MOBILE APP DOWNLOAD -->
+      @php
+        $mobileApkAvailable = file_exists(public_path('downloads/skedyul-mobile.apk'));
+      @endphp
+      <section class="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-br from-[#10139a] via-blue-800 to-indigo-700 px-6 py-5 text-white shadow-lg shadow-blue-900/10" aria-labelledby="mobile-app-title">
+        <div class="absolute -right-12 -top-20 h-56 w-56 rounded-full border-[28px] border-white/[0.06]" aria-hidden="true"></div>
+        <div class="absolute -bottom-24 right-28 h-48 w-48 rounded-full bg-cyan-300/10 blur-2xl" aria-hidden="true"></div>
+        <div class="relative flex flex-col items-center justify-between gap-5 sm:flex-row sm:text-left">
+          <div class="flex min-w-0 items-center gap-4 text-center sm:text-left">
+            <div class="hidden h-[88px] w-[58px] shrink-0 rotate-[-5deg] rounded-[15px] border-2 border-white/70 bg-slate-950 p-1.5 shadow-xl sm:block" aria-hidden="true">
+              <div class="h-full rounded-[10px] bg-gradient-to-b from-white to-blue-50 p-1.5 text-left text-blue-950">
+                <div class="mx-auto mb-2 h-1 w-5 rounded-full bg-slate-300"></div>
+                <div class="text-[6px] font-extrabold tracking-wide">SKEDYUL</div>
+                <div class="mt-2 rounded bg-blue-100 p-1">
+                  <div class="h-1 w-6 rounded bg-blue-300"></div>
+                  <div class="mt-1 h-1 w-8 rounded bg-blue-200"></div>
+                </div>
+                <div class="mt-1.5 h-1 w-7 rounded bg-slate-200"></div>
+                <div class="mt-1 h-1 w-5 rounded bg-slate-200"></div>
+              </div>
+            </div>
+            <div>
+              <div class="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[1.4px] text-blue-100">
+                <span class="h-1.5 w-1.5 rounded-full bg-cyan-300"></span> SKEDYUL Mobile
+              </div>
+              <h2 id="mobile-app-title" class="text-xl font-extrabold tracking-tight sm:text-2xl">Your schedule, wherever you are.</h2>
+              <p class="mx-auto mt-1 max-w-lg text-sm leading-relaxed text-blue-100/90 sm:mx-0">Keep your classes and teaching details close at hand with the SKEDYUL mobile app.</p>
+            </div>
+          </div>
+          @if ($mobileApkAvailable)
+            <a href="{{ asset('downloads/skedyul-mobile.apk') }}" download="Skedyul.apk" class="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-800 shadow-md transition hover:-translate-y-0.5 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-800 sm:w-auto">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"></path></svg>
+              Download APK
+            </a>
+          @else
+            <button type="button" disabled aria-describedby="mobile-app-status" class="inline-flex w-full shrink-0 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/15 px-5 py-3 text-sm font-bold text-white/70 sm:w-auto">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"></path></svg>
+              Coming soon
+            </button>
+          @endif
+        </div>
+        @unless ($mobileApkAvailable)
+          <p id="mobile-app-status" class="relative mt-2 text-center text-[11px] text-blue-100/75 sm:text-right">Android app · APK download will be available here</p>
+        @endunless
+      </section>
+
       <!-- STAT CARDS (Tailwind) -->
       <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
