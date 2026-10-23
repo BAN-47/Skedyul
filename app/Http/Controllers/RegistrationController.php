@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\College;
 use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\FacultyAccountReview;
 use App\Models\Notification;
 use App\Models\User;
 use App\Services\ScheduleAssignmentService;
+use App\Services\CaptchaChallenge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -22,15 +22,20 @@ class RegistrationController extends Controller
 {
     public function create()
     {
-        return view('index', [
-            'colleges' => College::orderBy('college_name')->get(),
-            'departments' => Departments::orderBy('dept_name')->get(),
+        return view('login_register_page', [
+            'colleges' => [],
+            'departments' => [],
             'showRegister' => true,
+            'recaptchaSiteKey' => CaptchaChallenge::siteKey(),
         ]);
     }
 
     public function store(Request $request)
     {
+        if (!CaptchaChallenge::verify($request)) {
+            throw ValidationException::withMessages(['g-recaptcha-response' => 'Please complete the reCAPTCHA verification and try again.']);
+        }
+
         $data = $request->validate([
             'usr_first_name' => ['required', 'string', 'max:150'],
             'usr_middle_name' => ['required', 'string', 'max:150'],

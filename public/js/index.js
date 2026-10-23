@@ -1,8 +1,79 @@
 
     const loginPath = document.body.dataset.loginUrl;
     const registerPath = document.body.dataset.registerUrl;
+    const registrationOptionsPath = document.body.dataset.registrationOptionsUrl;
     const registerDraftKey = 'skedyul.register.draft.v1';
     let registerPhonePicker = null;
+    let registrationOptionsPromise = null;
+    let registrationDepartmentOptions = [];
+
+    function refreshRegistrationDepartmentOptions(preserveSelection = false) {
+      const college = document.getElementById('register-college');
+      const department = document.getElementById('register-department');
+      if (!college || !department) return;
+
+      const selectedDepartment = preserveSelection ? department.value : '';
+      const matchingDepartments = registrationDepartmentOptions
+        .filter((option) => option.dataset.college === college.value)
+        .map((option) => option.cloneNode(true));
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = !college.value
+        ? 'Select a college first'
+        : matchingDepartments.length
+          ? 'Select program'
+          : 'No programs available for this college';
+      placeholder.selected = true;
+
+      department.replaceChildren(placeholder, ...matchingDepartments);
+      department.disabled = !college.value || matchingDepartments.length === 0;
+
+      if (selectedDepartment && matchingDepartments.some((option) => option.value === selectedDepartment)) {
+        department.value = selectedDepartment;
+      }
+    }
+
+    function loadRegistrationOptions() {
+      const college = document.getElementById('register-college');
+      const department = document.getElementById('register-department');
+      if (!college || !department || college.options.length > 1) return Promise.resolve();
+      if (registrationOptionsPromise) return registrationOptionsPromise;
+      if (!registrationOptionsPath) return Promise.resolve();
+
+      registrationOptionsPromise = fetch(registrationOptionsPath, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error('Registration options could not be loaded.');
+          return response.json();
+        })
+        .then((data) => {
+          (data.colleges || []).forEach((item) => {
+            college.add(new Option(`${item.college_name} (${item.college_code})`, item.college_id));
+          });
+          (data.departments || []).forEach((item) => {
+            const option = new Option(`${item.dept_name} (${item.dept_code})`, item.dept_id);
+            option.dataset.college = item.dept_college_id;
+            department.add(option);
+          });
+          if (college.dataset.oldValue) college.value = college.dataset.oldValue;
+          if (department.dataset.oldValue) department.value = department.dataset.oldValue;
+          registrationDepartmentOptions = [...department.options]
+            .filter((option) => option.value)
+            .map((option) => option.cloneNode(true));
+          restoreRegisterDraft(document.getElementById('register-form'));
+          refreshRegistrationDepartmentOptions(true);
+        })
+        .catch((error) => {
+          registrationOptionsPromise = null;
+          const status = document.getElementById('register-draft-status');
+          if (status) status.textContent = 'Could not load colleges and departments. Please try again.';
+          console.error(error);
+        });
+
+      return registrationOptionsPromise;
+    }
 
     function saveRegisterDraft(form) {
       if (!form) return;
@@ -161,6 +232,7 @@
     }
 
     function setAuthView(register, updateUrl = true) {
+      if (register) loadRegistrationOptions();
       document.getElementById('login-view').hidden = register;
       document.getElementById('register-view').hidden = !register;
       const panel = document.getElementById('auth-panel');
@@ -241,7 +313,10 @@
         restoreRegisterDraft(form);
       }
 
-      if (!registerView.hidden) initRegisterPhonePicker();
+      if (!registerView.hidden) {
+        initRegisterPhonePicker();
+        loadRegistrationOptions();
+      }
 
       form?.addEventListener('input', () => saveRegisterDraft(form));
       form?.addEventListener('change', () => saveRegisterDraft(form));
@@ -249,38 +324,11 @@
       const college = document.getElementById('register-college');
       const department = document.getElementById('register-department');
       if (college && department) {
-        const selectedDepartment = department.value;
-        const departmentOptions = [...department.options]
+        registrationDepartmentOptions = [...department.options]
           .filter((option) => option.value)
           .map((option) => option.cloneNode(true));
-
-        const updateDepartmentOptions = (preserveSelection = false) => {
-          const matchingDepartments = departmentOptions.filter(
-            (option) => option.dataset.college === college.value
-          );
-          const placeholder = document.createElement('option');
-          placeholder.value = '';
-          placeholder.textContent = !college.value
-            ? 'Select a college first'
-            : matchingDepartments.length
-              ? 'Select program'
-              : 'No programs available for this college';
-          placeholder.selected = true;
-
-          department.replaceChildren(placeholder, ...matchingDepartments);
-          department.disabled = !college.value || matchingDepartments.length === 0;
-
-          if (preserveSelection && selectedDepartment) {
-            const previousSelection = matchingDepartments.find(
-              (option) => option.value === selectedDepartment
-            );
-
-            if (previousSelection) department.value = previousSelection.value;
-          }
-        };
-
-        college.addEventListener('change', () => updateDepartmentOptions());
-        updateDepartmentOptions(true);
+        college.addEventListener('change', () => refreshRegistrationDepartmentOptions());
+        refreshRegistrationDepartmentOptions(true);
       }
 
       const specialPosition = document.getElementById('register-special-position');

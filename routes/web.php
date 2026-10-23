@@ -33,11 +33,7 @@ use App\Models\Schedule;
 */
 
 Route::get('/', function () {
-    return view('homepage');
-});
-
-Route::get('/login', function () {
-    return redirect()->route('login');
+    return view('index');
 });
 
 
@@ -75,12 +71,35 @@ Route::get('/login', function () {
         };
     }
 
-    return view('index', [
-        'colleges' => \App\Models\College::orderBy('college_name')->get(),
-        'departments' => \App\Models\Departments::orderBy('dept_name')->get(),
+    return view('login_register_page', [
+        // The login screen does not need registration lookup data. Load it only
+        // if the visitor opens the registration form so login is not held up
+        // by extra database reads.
+        'colleges' => [],
+        'departments' => [],
         'showRegister' => false,
+        'recaptchaSiteKey' => \App\Services\CaptchaChallenge::siteKey(),
     ]);
 })->name('login');
+
+Route::get('/register/options', function () {
+    return response()->json([
+        'colleges' => \Illuminate\Support\Facades\Cache::remember(
+            'colleges',
+            3600,
+            fn () => \App\Models\College::query()->orderBy('college_name')->get([
+                'college_id', 'college_name', 'college_code',
+            ])
+        ),
+        'departments' => \Illuminate\Support\Facades\Cache::remember(
+            'departments',
+            3600,
+            fn () => \App\Models\Departments::query()->orderBy('dept_name')->get([
+                'dept_id', 'dept_name', 'dept_code', 'dept_college_id',
+            ])
+        ),
+    ]);
+})->name('register.options');
 
 Route::get('/register', [RegistrationController::class, 'create'])->name('register');
 Route::post('/register', [RegistrationController::class, 'store'])

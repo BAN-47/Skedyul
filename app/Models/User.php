@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
+    use HasApiTokens;
     protected $table = 'USER';
 
     protected $primaryKey = 'usr_id';
@@ -154,3 +156,4 @@ class User extends Authenticatable
         return $rooms?->implode('; ');
     }
 }
+
