@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 
 // Controllers
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\PasskeyAuthenticationController;
+use App\Http\Controllers\PasskeyRegistrationController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ActivityLogController;
@@ -109,8 +111,32 @@ Route::post('/register', [RegistrationController::class, 'store'])
 Route::post('/login', [LoginController::class, 'login'])
     ->name('login.authenticate');
 
+Route::post('/passkeys/authentication/options', [PasskeyAuthenticationController::class, 'options'])
+    ->middleware('throttle:10,1')
+    ->name('passkeys.authentication.options');
+
+Route::post('/passkeys/authentication/verify', [PasskeyAuthenticationController::class, 'verify'])
+    ->middleware('throttle:10,1')
+    ->name('passkeys.authentication.verify');
+
 Route::post('/logout', [LoginController::class, 'logout'])
     ->name('logout');
+
+Route::post('/passkeys/registration/options', [PasskeyRegistrationController::class, 'options'])
+    ->middleware(['auth', 'throttle:10,1'])
+    ->name('passkeys.registration.options');
+
+Route::post('/passkeys/registration/verify', [PasskeyRegistrationController::class, 'verify'])
+    ->middleware(['auth', 'throttle:10,1'])
+    ->name('passkeys.registration.verify');
+
+Route::get('/passkeys/credentials', [PasskeyRegistrationController::class, 'credentials'])
+    ->middleware(['auth', 'throttle:30,1'])
+    ->name('passkeys.credentials.index');
+
+Route::delete('/passkeys/credentials/{id}', [PasskeyRegistrationController::class, 'destroyCredential'])
+    ->middleware(['auth', 'throttle:10,1'])
+    ->name('passkeys.credentials.destroy');
 
 
 /*

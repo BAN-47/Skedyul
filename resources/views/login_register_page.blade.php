@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>SKEDYUL</title>
   @vite(['resources/css/app.css', 'resources/js/app.js'])
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.14.1/build/css/intlTelInput.css">
@@ -179,7 +180,11 @@
               <input id="login-password" type="password" name="password" placeholder="Enter your password" required
                 class="w-full rounded-[10px] border border-slate-200 bg-white px-3.5 py-3 pr-12 text-sm text-slate-900 placeholder-slate-400 outline-none transition focus:border-blue-600 focus:ring-[3px] focus:ring-blue-600/10">
               <button type="button" data-password-toggle data-target="login-password" aria-label="Show password" title="Show password" class="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-blue-600">
-                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/><path data-eye-slash class="hidden" d="m4 4 16 16"/></svg>
+                <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                  <circle cx="12" cy="12" r="2.6" />
+                  <path data-eye-slash class="hidden" d="m4 4 16 16" />
+                </svg>
               </button>
             </div>
             @error('password')
@@ -189,9 +194,9 @@
 
           <div class="mb-5">
             @if(!empty($recaptchaSiteKey))
-              <div class="g-recaptcha" data-sitekey="{{ $recaptchaSiteKey }}"></div>
+            <div class="g-recaptcha" data-sitekey="{{ $recaptchaSiteKey }}"></div>
             @else
-              <p class="text-xs text-red-600">reCAPTCHA is not configured. Add the Google reCAPTCHA keys to the application environment.</p>
+            <p class="text-xs text-red-600">reCAPTCHA is not configured. Add the Google reCAPTCHA keys to the application environment.</p>
             @endif
             @error('g-recaptcha-response')<div class="mt-1 text-xs text-red-500">{{ $message }}</div>@enderror
           </div>
@@ -204,6 +209,23 @@
             Sign In
           </button>
 
+          <div class="my-4 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400" aria-hidden="true">
+            <span class="h-px flex-1 bg-slate-200"></span><span>or</span><span class="h-px flex-1 bg-slate-200"></span>
+          </div>
+
+          <button type="button" data-passkey-login data-options-url="{{ route('passkeys.authentication.options') }}" data-verify-url="{{ route('passkeys.authentication.verify') }}" disabled
+            class="flex w-full items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white py-3.5 text-[15px] font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
+            <svg viewBox="0 0 24 24" class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <path d="M12 3c-4.4 0-7.5 3.4-7.5 7.7 0 3.1 1.1 5.9 2.7 8.3M12 6.2c-2.7 0-4.6 2-4.6 4.8 0 2.2.6 4.2 1.7 6.1M12 9c-1.1 0-1.8.8-1.8 2.1 0 1.4.3 2.7.9 3.9m2.9 3.1c2.5-2 3.8-5.2 3.8-9.1 0-2.8-1.5-4.8-3.8-4.8m-1 5.1c0 2.8.4 4.6 1.4 6.1m4.3-10.3c.8 1.1 1.2 2.4 1.2 4 0 3.5-.8 6.5-2.5 8.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Sign in with a passkey
+          </button>
+
+
+          <p data-passkey-status aria-live="polite" class="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs leading-relaxed text-slate-500">
+            Checking passkey support…
+          </p>
+          <p data-passkey-result role="status" aria-live="polite" class="mt-2 text-center text-xs text-slate-600"></p>
         </form>
 
         {{-- ═══════════════════════════════════════════════
@@ -221,7 +243,7 @@
       </div>
 
 
-        <!-- Register Submitted Show Message -->
+      <!-- Register Submitted Show Message -->
       @if(session('registration_submitted'))
       <div id="registration-success" class="w-full max-w-md animate-[fadeUp_.6s_ease] text-center" role="status" aria-live="polite">
         <div class="mb-3 text-5xl font-extrabold tracking-tight text-gray-400 leading-none">
@@ -232,7 +254,7 @@
           Your faculty account request and ID photo have been received for review.
         </p>
         <p class="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-slate-500">
-          An administrator will review your details and contact you about verification. 
+          An administrator will review your details and contact you about verification.
           Thank you for your patience and using SKEDYUL as your daily tool for class scheduling.
         </p>
         <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
@@ -285,7 +307,11 @@
               <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Password <span class="text-red-500" aria-hidden="true">*</span></label>
               <div class="relative">
                 <input id="register-password" type="password" name="password" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 pr-10 text-xs outline-none focus:border-blue-600">
-                <button type="button" data-password-toggle data-target="register-password" aria-label="Show password" title="Show password" class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-blue-600"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/><path data-eye-slash class="hidden" d="m4 4 16 16"/></svg></button>
+                <button type="button" data-password-toggle data-target="register-password" aria-label="Show password" title="Show password" class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-blue-600"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                    <circle cx="12" cy="12" r="2.6" />
+                    <path data-eye-slash class="hidden" d="m4 4 16 16" />
+                  </svg></button>
               </div>
               @error('password')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
@@ -294,7 +320,11 @@
               <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Confirm Password <span class="text-red-500" aria-hidden="true">*</span></label>
               <div class="relative">
                 <input id="confirm-password" type="password" name="password_confirmation" required minlength="8" autocomplete="new-password" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 pr-10 text-xs outline-none focus:border-blue-600">
-                <button type="button" data-password-toggle data-target="confirm-password" aria-label="Show confirm password" title="Show confirm password" class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-blue-600"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.6"/><path data-eye-slash class="hidden" d="m4 4 16 16"/></svg></button>
+                <button type="button" data-password-toggle data-target="confirm-password" aria-label="Show confirm password" title="Show confirm password" class="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-blue-600"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" />
+                    <circle cx="12" cy="12" r="2.6" />
+                    <path data-eye-slash class="hidden" d="m4 4 16 16" />
+                  </svg></button>
               </div>
               <p id="password-match" class="mt-1 min-h-3 text-[10px]" aria-live="polite">
               </p>
@@ -351,7 +381,7 @@
               <select id="register-special-position" name="special_position" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="">None</option>
                 @foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-                  <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(old('special_position') === $position)>{{ $position }}</option>
+                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(old('special_position')===$position)>{{ $position }}</option>
                 @endforeach
               </select>
               <p id="register-special-position-cap" class="mt-1 text-[10px] text-slate-500">Select a position only if it applies to you.</p>
@@ -403,9 +433,9 @@
             <div class="col-span-2 rounded-md bg-indigo-50 px-3 py-2 text-[10px] leading-relaxed text-indigo-800">Your account will remain pending until an administrator reviews your information and faculty ID photo.</div>
             <div class="col-span-2">
               @if(!empty($recaptchaSiteKey))
-                <div class="g-recaptcha" data-sitekey="{{ $recaptchaSiteKey }}"></div>
+              <div class="g-recaptcha" data-sitekey="{{ $recaptchaSiteKey }}"></div>
               @else
-                <p class="text-[10px] text-red-600">reCAPTCHA is not configured. Add the Google reCAPTCHA keys to the application environment.</p>
+              <p class="text-[10px] text-red-600">reCAPTCHA is not configured. Add the Google reCAPTCHA keys to the application environment.</p>
               @endif
               @error('g-recaptcha-response')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
@@ -513,8 +543,8 @@
         padding: 1.25rem 1rem;
       }
 
-      #login-view > .text-5xl,
-      #register-view > .text-5xl {
+      #login-view>.text-5xl,
+      #register-view>.text-5xl {
         font-size: 2.25rem;
       }
 
@@ -537,7 +567,7 @@
         min-height: 46px;
       }
 
-      #login-view > .mb-9 {
+      #login-view>.mb-9 {
         margin-bottom: 1.5rem;
       }
     }
@@ -576,7 +606,7 @@
   </style>
   <script src="{{ asset('js/index.js') }}" defer></script>
   @if(!empty($recaptchaSiteKey))
-    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   @endif
 
 </body>

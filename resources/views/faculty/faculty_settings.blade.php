@@ -159,6 +159,23 @@
                   <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSaveSecuritySettings()">Save Changes</button>
                 </div>
               </div>
+              <div class="rounded-[14px] border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+                <div class="mb-3">
+                  <div class="text-[15px] font-bold text-slate-900 dark:text-slate-100">Passkey Sign-in</div>
+                  <div class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Check whether this browser and device can use a passkey.</div>
+                </div>
+                <p data-passkey-status aria-live="polite" class="text-sm text-slate-500 dark:text-slate-400">Checking passkey support…</p>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" data-passkey-register data-options-url="{{ route('passkeys.registration.options') }}" data-verify-url="{{ route('passkeys.registration.verify') }}" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700">Register this device</button>
+                  <span data-passkey-result role="status" aria-live="polite" class="text-sm text-slate-500 dark:text-slate-400"></span>
+                </div>
+                <div class="mt-5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                  <div class="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Registered devices</div>
+                  <div data-passkey-list data-list-url="{{ route('passkeys.credentials.index') }}" data-delete-url-template="{{ route('passkeys.credentials.destroy', ['id' => '__CREDENTIAL_ID__']) }}" aria-live="polite" class="space-y-2">
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Loading registered passkeys…</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- NOTIFICATIONS SETTINGS -->

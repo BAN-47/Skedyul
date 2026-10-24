@@ -304,6 +304,25 @@
                   <button class="btn btn-primary" onclick="saveSecuritySettings()">Save Changes</button>
                 </div>
               </div>
+              <div class="card mt-4">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Passkey Sign-in</div>
+                    <div class="card-sub">Check whether this browser and device can use a passkey.</div>
+                  </div>
+                </div>
+                <p data-passkey-status aria-live="polite" class="text-sm text-slate-500">Checking passkey support…</p>
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" data-passkey-register data-options-url="{{ route('passkeys.registration.options') }}" data-verify-url="{{ route('passkeys.registration.verify') }}" class="btn btn-primary">Register this device</button>
+                  <span data-passkey-result role="status" aria-live="polite" class="text-sm text-slate-500"></span>
+                </div>
+                <div class="mt-5 border-t border-slate-100 pt-4">
+                  <div class="mb-2 text-sm font-semibold text-slate-700">Registered devices</div>
+                  <div data-passkey-list data-list-url="{{ route('passkeys.credentials.index') }}" data-delete-url-template="{{ route('passkeys.credentials.destroy', ['id' => '__CREDENTIAL_ID__']) }}" aria-live="polite" class="space-y-2">
+                    <p class="text-sm text-slate-500">Loading registered passkeys…</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {{-- SYSTEM INFO --}}
