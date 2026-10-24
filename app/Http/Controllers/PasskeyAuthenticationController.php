@@ -8,6 +8,7 @@ use App\Services\AuditActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use ParagonIE\ConstantTime\Base64UrlSafe;
 use Symfony\Component\Serializer\Encoder\JsonEncode;
 use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
@@ -18,6 +19,7 @@ use Webauthn\CeremonyStep\CeremonyStepManagerFactory;
 use Webauthn\CredentialRecord;
 use Webauthn\Denormalizer\WebauthnSerializerFactory;
 use Webauthn\PublicKeyCredential;
+use Webauthn\PublicKeyCredentialDescriptor;
 use Webauthn\PublicKeyCredentialRequestOptions;
 use Webauthn\Counter\CounterChecker;
 
@@ -32,14 +34,36 @@ class PasskeyAuthenticationController extends Controller
 
     public function options(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'email' => ['required', 'email', 'max:255'],
+        ]);
         $rpId = (string) config('webauthn.rp_id');
         abort_if($rpId === '', 500, 'Passkey site settings are incomplete.');
 
-        // Discoverable credentials let the authenticator identify the account without asking for email first.
+        // Restrict this request to the requested account so shared devices can select the right user.
+        $user = User::query()
+            ->whereRaw('LOWER(usr_email) = ?', [Str::lower(trim($validated['email']))])
+            ->first();
+        $credentials = $user
+            ? WebauthnCredential::query()->where('usr_id', $user->usr_id)->get(['credential_id', 'transports'])
+            : collect();
+
+        if ($credentials->isEmpty()) {
+            return response()->json([
+                'message' => 'No passkey is available for that account. Use your password or register a passkey in Settings.',
+            ], 422);
+        }
+
+        $allowCredentials = $credentials->map(fn (WebauthnCredential $credential) => PublicKeyCredentialDescriptor::create(
+            PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
+            Base64UrlSafe::decodeNoPadding($credential->credential_id),
+            $credential->transports ?? []
+        ))->all();
+
         $options = PublicKeyCredentialRequestOptions::create(
             random_bytes(32),
             $rpId,
-            [],
+            $allowCredentials,
             PublicKeyCredentialRequestOptions::USER_VERIFICATION_REQUIREMENT_REQUIRED,
             60000
         );
@@ -51,6 +75,8 @@ class PasskeyAuthenticationController extends Controller
 
         $request->session()->put('webauthn.authentication', [
             'options_json' => $optionsJson,
+            'expected_user_id' => (string) $user->usr_id,
+            'credential_ids' => $credentials->pluck('credential_id')->values()->all(),
             'expires_at' => now()->addMinutes(5)->timestamp,
         ]);
 
@@ -85,8 +111,13 @@ class PasskeyAuthenticationController extends Controller
             }
 
             $credentialId = Base64UrlSafe::encodeUnpadded($credential->rawId);
+            if (! in_array($credentialId, $ceremony['credential_ids'] ?? [], true)) {
+                return response()->json(['message' => 'That passkey does not match the email entered. Please try again.'], 401);
+            }
+
             $storedCredential = WebauthnCredential::query()
                 ->where('credential_id', $credentialId)
+                ->where('usr_id', $ceremony['expected_user_id'] ?? '')
                 ->first();
 
             if (! $storedCredential || ! is_array($storedCredential->credential_record)) {

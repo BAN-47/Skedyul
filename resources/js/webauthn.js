@@ -11,6 +11,13 @@ function setPasskeyText(selector, message) {
   });
 }
 
+function showLoginPasskeyError(message) {
+  const error = document.querySelector('[data-passkey-login-error]');
+  if (!error) return;
+  error.textContent = message;
+  error.hidden = !message;
+}
+
 function setPasskeyButtonsDisabled(disabled) {
   [...passkeyElements.buttons(), ...passkeyElements.loginButtons()].forEach((button) => {
     button.disabled = disabled;
@@ -281,13 +288,22 @@ async function registerPasskey(button) {
 
 async function signInWithPasskey(button) {
   const result = document.querySelector('[data-passkey-result]');
+  const emailField = document.querySelector('input[name="email"]');
+  const email = emailField?.value.trim() || '';
+  if (!email) {
+    showLoginPasskeyError('Enter your email address first, then try passkey sign-in.');
+    emailField?.focus();
+    return;
+  }
+
   const originalText = button.textContent.trim();
   button.disabled = true;
   button.textContent = 'Waiting for your device…';
   if (result) result.textContent = '';
+  showLoginPasskeyError('');
 
   try {
-    const options = await postJson(button.dataset.optionsUrl, {});
+    const options = await postJson(button.dataset.optionsUrl, { email });
     const credential = await navigator.credentials.get({ publicKey: prepareRequestOptions(options) });
     if (!credential) throw new Error('Passkey sign-in was cancelled.');
 
@@ -301,9 +317,9 @@ async function signInWithPasskey(button) {
     window.setTimeout(() => { window.location.assign(response.redirect); }, 900);
   } catch (error) {
     const message = error.name === 'NotAllowedError'
-      ? 'Passkey sign-in was cancelled or timed out. You can use your password or try again.'
+      ? 'No passkey is available for that account. Use your password or register a passkey in Settings.'
       : error.message || 'Could not sign in with this passkey. Please use your password or try again.';
-    if (result) result.textContent = message;
+    showLoginPasskeyError(message);
     const dialog = document.querySelector('[data-passkey-dialog]');
     if (dialog && !dialog.classList.contains('hidden')) {
       dialog.querySelector('[data-passkey-dialog-message]').textContent = 'Passkey sign-in did not finish';

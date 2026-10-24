@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  @include('partials.favicon')
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -153,6 +154,7 @@
             {{ session('error') }}
           </div>
           @endif
+          <div data-passkey-login-error role="alert" aria-live="assertive" hidden class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
 
           {{-- Email --}}
           <div class="mb-4">
