@@ -27,6 +27,7 @@ class Study_Load extends Model
         'sl_id',
         'sl_fac_id',
         'sl_course_id',
+        'sl_shift',
         'sl_subj_id',
         'sl_sec_id',
         'sl_sem_id',

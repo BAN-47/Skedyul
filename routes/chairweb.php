@@ -57,6 +57,8 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     // Rooms and schedules
     Route::get('/rooms', [ChairRoomController::class, 'index'])->name('chair.rooms');
     Route::post('/rooms', [ChairRoomController::class, 'store'])->name('chair.rooms.store');
+    Route::put('/rooms/{room}', [ChairRoomController::class, 'update'])->name('chair.rooms.update');
+    Route::delete('/rooms/{room}', [ChairRoomController::class, 'destroy'])->name('chair.rooms.destroy');
     Route::post('/schedules', [ChairRoomController::class, 'assignSchedule'])->name('chair.schedules.store');
     Route::put('/schedules/{schedule}', [ChairRoomController::class, 'updateSchedule'])->name('chair.schedules.update');
 

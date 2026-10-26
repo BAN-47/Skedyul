@@ -79,7 +79,7 @@
                         <div class="stat-card-bar bg-red-600"></div>
                         <div class="stat-label">Avg. Faculty Load</div>
                         <div class="stat-value">{{ $avgFacultyLoad ?? 0 }}h</div>
-                        <div class="stat-sub">FT max 30h · PT max 22h</div>
+                        <div class="stat-sub">Day follows designation · Evening max 30h</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-card-bar bg-green-600"></div>
@@ -169,8 +169,40 @@
                 <div class="card mt-4">
                     <div class="card-header">
                         <div>
+                            <div class="card-title">Campus Schedule Rhythm</div>
+                            <div class="card-sub">Active classes by weekday, separated by shift</div>
+                        </div>
+                        <div class="flex items-center gap-3 text-[11px] font-semibold text-slate-500">
+                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-blue-600"></i>Day</span>
+                            <span class="inline-flex items-center gap-1"><i class="h-2.5 w-2.5 rounded-sm bg-cyan-500"></i>Evening</span>
+                        </div>
+                    </div>
+                    @php $scheduleDayMax = max(1, $weeklyScheduleCounts->max(fn ($item) => $item['day_count'] + $item['evening_count'])); @endphp
+                    <div class="grid grid-cols-7 gap-3 pt-2" role="img" aria-label="Campus classes by weekday and shift">
+                        @foreach($weeklyScheduleCounts as $item)
+                            @php $dayHeight = $item['day_count'] ? max(7, round($item['day_count'] / $scheduleDayMax * 100)) : 0; $eveningHeight = $item['evening_count'] ? max(7, round($item['evening_count'] / $scheduleDayMax * 100)) : 0; @endphp
+                            <div class="flex h-36 flex-col items-center justify-end gap-2 rounded-xl bg-slate-50 px-2 pt-2">
+                                <span class="text-xs font-bold text-slate-600">{{ $item['day_count'] + $item['evening_count'] }}</span>
+                                <div class="flex h-24 w-full items-end justify-center gap-1">
+                                    <div class="w-1/3 rounded-t-md bg-blue-600" title="Day: {{ $item['day_count'] }}" style="height:{{ $dayHeight }}%"></div>
+                                    <div class="w-1/3 rounded-t-md bg-cyan-500" title="Evening: {{ $item['evening_count'] }}" style="height:{{ $eveningHeight }}%"></div>
+                                </div>
+                                <span class="text-[10px] font-semibold text-slate-500">{{ $item['day'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <div>
                             <div class="card-title">My Recent Activity</div>
                             <div class="card-sub">Your latest sign-ins and account changes</div>
+                        </div>
+                        <div id="dean-activity-pagination" class="flex items-center gap-2 text-xs text-slate-500">
+                            <span id="dean-activity-page-info" aria-live="polite"></span>
+                            <button type="button" id="dean-activity-prev" class="rounded-lg border border-slate-200 bg-white px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                            <button type="button" id="dean-activity-next" class="rounded-lg border border-slate-200 bg-white px-2 py-1 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
                         </div>
                     </div>
 
@@ -189,7 +221,7 @@
                                 $activityIsLogin = in_array($activity->al_action, ['Logged in', 'Logged out'], true);
                             @endphp
 
-                            <div class="flex items-start gap-3.5 border-b border-slate-100 py-3.5 last:border-b-0">
+                            <div data-dean-activity class="flex items-start gap-3.5 border-b border-slate-100 py-3.5 last:border-b-0">
                                 <div
                                     class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full {{ $activityIsLogin ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-600' }}">
                                     <i
@@ -225,6 +257,32 @@
 
     <script>
         const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+        (() => {
+            const rows = [...document.querySelectorAll('[data-dean-activity]')];
+            const pagination = document.getElementById('dean-activity-pagination');
+            const info = document.getElementById('dean-activity-page-info');
+            const previous = document.getElementById('dean-activity-prev');
+            const next = document.getElementById('dean-activity-next');
+            const pageSize = 4;
+            let page = 0;
+            if (!pagination || !info || !previous || !next) return;
+            pagination.classList.toggle('hidden', rows.length <= pageSize);
+
+            function renderPage() {
+                const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+                page = Math.min(Math.max(page, 0), pageCount - 1);
+                const start = page * pageSize;
+                rows.forEach((row, index) => row.classList.toggle('hidden', index < start || index >= start + pageSize));
+                info.textContent = rows.length ? `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length}` : 'No activity';
+                previous.disabled = page === 0;
+                next.disabled = page >= pageCount - 1;
+            }
+
+            previous.addEventListener('click', () => { page--; renderPage(); });
+            next.addEventListener('click', () => { page++; renderPage(); });
+            renderPage();
+        })();
 
         function showToast(msg) {
             const toast = document.getElementById('toast');

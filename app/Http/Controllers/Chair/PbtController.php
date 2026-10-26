@@ -47,21 +47,7 @@ class PbtController extends Controller
         $filters['semester'] = $activeSem->sem_id ?? null;
         $facultyId = $request->query('faculty');
 
-        $selectedFaculty = $facultyId
-            ? Faculty::whereKey($facultyId)
-                ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
-                ->first()
-            : null;
-
-        $schedules = collect();
-        if ($selectedFaculty) {
-            $schedules = Schedule::query()
-                ->where('sch_fac_id', $selectedFaculty->fac_id)
-                ->when(!empty($filters['semester']), fn ($q) => $q->where('sch_sem_id', $filters['semester']))
-                ->where('sch_is_active', true)
-                ->with(['subject', 'section', 'room'])
-                ->get();
-        }
+        $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
 
         $semName = strtolower((string) ($activeSem->sem_name ?? ''));
         $semNum = null;
@@ -79,28 +65,45 @@ class PbtController extends Controller
         // Build teacher groups (must be faculty rows for FK)
         $allFaculty = Faculty::query()
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->select('faculty.*')
+            ->addSelect([
+                'is_department_chair' => \App\Models\Dept_Chair::query()
+                    ->selectRaw('1')->whereColumn('dc_usr_id', 'faculty.fac_usr_id')->limit(1),
+                'is_dean' => Dean::query()
+                    ->selectRaw('1')->whereColumn('dean_usr_id', 'faculty.fac_usr_id')->limit(1),
+            ])
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
 
-        $chairUsrIds = \App\Models\Dept_Chair::pluck('dc_usr_id')->filter()->all();
-        $deanUsrIds  = Dean::pluck('dean_usr_id')->filter()->all();
+        // Reuse the eligible-faculty result for the selected teacher instead
+        // of issuing a second remote lookup to Supabase.
+        $selectedFaculty = $facultyId
+            ? $allFaculty->firstWhere('fac_id', $facultyId)
+            : null;
+
+        $schedules = collect();
+        if ($selectedFaculty) {
+            $schedules = Schedule::query()
+                ->where('sch_fac_id', $selectedFaculty->fac_id)
+                ->when(!empty($filters['semester']), fn ($q) => $q->where('sch_sem_id', $filters['semester']))
+                ->where('sch_is_active', true)
+                ->where('sch_shift', $shiftKey)
+                ->with(['subject', 'section', 'room'])
+                ->get();
+        }
 
         // Every active department chair with a Faculty row can be selected.
         // Schedules store fac_id, so chairs/deans without a Faculty row cannot
         // be scheduled as teachers until that linked row exists.
-        $facultyChairs = $allFaculty->filter(
-            fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true)
-        )->values();
+        $facultyChairs = $allFaculty->filter(fn ($f) => (bool) $f->is_department_chair)->values();
 
-        $deans = $allFaculty->filter(
-            fn ($f) => in_array($f->fac_usr_id, $deanUsrIds, true)
-        )->values();
+        $deans = $allFaculty->filter(fn ($f) => (bool) $f->is_dean)->values();
 
         // Keep chairs and deans in their own groups so every eligible person
         // is visible without listing the same person in multiple groups.
         $otherChairIds = $allFaculty
-            ->filter(fn ($f) => in_array($f->fac_usr_id, $chairUsrIds, true))
+            ->filter(fn ($f) => (bool) $f->is_department_chair)
             ->pluck('fac_id')
             ->all();
 
@@ -173,12 +176,14 @@ class PbtController extends Controller
             'filters'          => $filters,
             'selectedFaculty'  => $selectedFaculty,
             'selectedDate'     => $request->query('date'),
-            'loadStats'        => $this->loadStatsFor($selectedFaculty, $filters['semester'] ?? null),
+            'loadStats'        => $this->loadStatsFor($selectedFaculty, $filters['semester'] ?? null, $shiftKey),
+            'selectedShift'    => $shiftKey,
             'activeSemester'   => $activeSem ?? null,
+            'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
         ]);
     }
 
-    private function loadStatsFor(?Faculty $faculty, ?string $semId): array
+    private function loadStatsFor(?Faculty $faculty, ?string $semId, string $shift = 'day'): array
     {
         if (!$faculty) {
             return [
@@ -189,6 +194,7 @@ class PbtController extends Controller
 
         $loads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($semId, fn ($q) => $q->where('sl_sem_id', $semId))
+            ->where('sl_shift', $shift)
             ->with('subject', 'schedules')
             ->get();
 
@@ -209,7 +215,7 @@ class PbtController extends Controller
             'units'        => $units ?: null,
             'hours_week'   => $hoursPerWeek ?: null,
             'designation'  => $faculty->fac_special_position ?: $faculty->fac_rank,
-            'load_limit'   => \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty),
+            'load_limit'   => \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty, $shift),
             'production'   => null,
             'extension'    => null,
             'research'     => null,
@@ -232,9 +238,10 @@ class PbtController extends Controller
             'sem_id'     => 'nullable|uuid|exists:semester,sem_id',
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
-            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
-            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'start_time' => 'required|date_format:H:i',
             'end_time'   => 'required|date_format:H:i|after:start_time',
         ]);

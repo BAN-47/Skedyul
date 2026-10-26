@@ -105,18 +105,42 @@
                     <div class="stat-sub">This semester</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card-bar bg-red-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Schedule Conflicts</div>
-                    <div class="stat-value">{{ $scheduleConflicts }}</div>
-                    <div class="stat-sub">Needs resolution</div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-card-bar bg-cyan-600"></div>
                     <div class="stat-icon"></div>
                     <div class="stat-label">Rooms Available</div>
                     <div class="stat-value">{{ $roomsAvailable }}</div>
                     <div class="stat-sub">{{ $roomsOccupied }} currently occupied</div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Platform Record Mix</div>
+                        <div class="card-sub">A quick view of the main data groups managed by SKEDYUL</div>
+                    </div>
+                    <span class="badge badge-blue">{{ number_format($dbRecords) }} tracked records</span>
+                </div>
+                @php
+                    $recordGroups = [
+                        ['Users', $totalUsers, 'bg-blue-600'],
+                        ['Sections', $totalSections, 'bg-violet-600'],
+                        ['Courses', $subjectsOffered, 'bg-cyan-600'],
+                        ['Rooms', $totalRooms, 'bg-amber-500'],
+                    ];
+                @endphp
+                <div class="flex h-3 overflow-hidden rounded-full bg-slate-100" aria-label="Record groups distribution">
+                    @foreach($recordGroups as [$label, $count, $color])
+                        <div class="{{ $color }} transition-all" title="{{ $label }}: {{ $count }}" style="width:{{ $dbRecords > 0 ? ($count / $dbRecords * 100) : 0 }}%"></div>
+                    @endforeach
+                </div>
+                <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    @foreach($recordGroups as [$label, $count, $color])
+                        <div class="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                            <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ $color }}"></span>
+                            <div class="min-w-0"><div class="text-[11px] text-slate-500">{{ $label }}</div><div class="text-sm font-extrabold text-slate-800">{{ number_format($count) }}</div></div>
+                        </div>
+                    @endforeach
                 </div>
             </div>
 

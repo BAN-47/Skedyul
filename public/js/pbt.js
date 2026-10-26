@@ -158,6 +158,10 @@ function setShift(shift) {
   window.location.search = params.toString();
 }
 
+function getShiftValue() {
+  return new URLSearchParams(window.location.search).get('shift') === 'night' ? 'evening' : 'day';
+}
+
 function paintShift() {
   const shift = new URLSearchParams(window.location.search).get('shift') || 'day';
   const on  = 'px-2.5 py-1.5 text-[11px] font-bold uppercase bg-blue-600 text-white';
@@ -267,6 +271,7 @@ function submitAdd(keepOpen = false) {
     days:        [...document.querySelectorAll('.add-day-checkbox:checked')].map(input => input.value),
     start_time:  document.getElementById('add-start').value,
     end_time:    document.getElementById('add-end').value,
+    shift:       getShiftValue(),
     description: document.getElementById('add-description').value,
   };
 
@@ -341,6 +346,7 @@ function submitEdit() {
     day:         document.getElementById('edit-day').value,
     start_time:  document.getElementById('edit-start').value,
     end_time:    document.getElementById('edit-end').value,
+    shift:       getShiftValue(),
     description: document.getElementById('edit-description').value,
     _method:     'PUT',
   };
@@ -461,3 +467,47 @@ function clearAll() {
   })
   .catch(() => showToast('Something went wrong.'));
 }
+let scheduleSummaryCloseTimer;
+
+function toggleScheduleSummary() {
+    const modal = document.getElementById('schedule-summary-modal');
+    if (!modal) return;
+    modal.classList.contains('hidden') ? openScheduleSummary() : closeScheduleSummary();
+}
+
+function openScheduleSummary() {
+    const modal = document.getElementById('schedule-summary-modal');
+    const panel = document.getElementById('schedule-summary-panel');
+    const toggle = document.getElementById('schedule-summary-toggle');
+    if (!modal || !panel) return;
+    clearTimeout(scheduleSummaryCloseTimer);
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    requestAnimationFrame(() => {
+        modal.classList.remove('opacity-0');
+        modal.classList.add('opacity-100');
+        panel.classList.remove('scale-95');
+        panel.classList.add('scale-100');
+    });
+    toggle?.setAttribute('aria-expanded', 'true');
+}
+
+function closeScheduleSummary() {
+    const modal = document.getElementById('schedule-summary-modal');
+    const panel = document.getElementById('schedule-summary-panel');
+    const toggle = document.getElementById('schedule-summary-toggle');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.remove('opacity-100');
+    modal.classList.add('opacity-0');
+    panel?.classList.remove('scale-100');
+    panel?.classList.add('scale-95');
+    toggle?.setAttribute('aria-expanded', 'false');
+    scheduleSummaryCloseTimer = setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 200);
+}
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeScheduleSummary();
+});

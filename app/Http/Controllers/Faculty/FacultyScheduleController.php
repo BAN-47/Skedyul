@@ -31,7 +31,7 @@ class FacultyScheduleController extends Controller
         }
 
         $shift = $request->query('shift') === 'night' ? 'night' : 'day';
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
         $allSchedules = Schedule::with(['subject', 'section', 'room'])
             ->where('sch_fac_id', $faculty->fac_id)

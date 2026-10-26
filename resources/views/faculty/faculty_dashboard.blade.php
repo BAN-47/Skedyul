@@ -126,9 +126,15 @@
       <div class="grid grid-cols-3 gap-4 mb-6">
         <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
           <div class="absolute top-0 left-0 right-0 h-1 bg-blue-600"></div>
-          <div class="text-xs text-gray-500 font-semibold mb-1">Teaching Load</div>
-          <div class="text-2xl font-extrabold text-gray-900">{{ $totalHours }}h</div>
-          <div class="text-[11px] text-gray-400 mt-0.5">of {{ $maxHours }}h max</div>
+          <div class="text-xs text-gray-500 font-semibold mb-2">Teaching Load{{ auth()->user()->faculty->fac_employment_type === 'part_time' ? ' (Part-time)' : ' by Shift' }}</div>
+          @if (auth()->user()->faculty->fac_employment_type === 'part_time')
+            <div><div class="text-[10px] uppercase font-bold tracking-wide text-slate-400">Total</div><div class="text-xl font-extrabold text-gray-900">{{ $dayHours }}h <span class="text-xs font-medium text-slate-400">/ {{ $dayMaxHours }}h</span></div><div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-cyan-600" style="width:{{ min(100, round($dayHours / max(1, $dayMaxHours) * 100)) }}%"></div></div><div class="text-[11px] text-slate-500 mt-1">{{ max(0, $dayMaxHours - $dayHours) }} teaching hours remaining</div></div>
+          @else
+            <div class="grid grid-cols-2 gap-3">
+              <div><div class="text-[10px] uppercase font-bold tracking-wide text-slate-400">Day</div><div class="text-xl font-extrabold text-gray-900">{{ $dayHours }}h <span class="text-xs font-medium text-slate-400">/ {{ $dayMaxHours }}h</span></div><div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-blue-600" style="width:{{ min(100, round($dayHours / max(1, $dayMaxHours) * 100)) }}%"></div></div></div>
+              <div><div class="text-[10px] uppercase font-bold tracking-wide text-slate-400">Evening</div><div class="text-xl font-extrabold text-gray-900">{{ $eveningHours }}h <span class="text-xs font-medium text-slate-400">/ {{ $eveningMaxHours }}h</span></div><div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-cyan-500" style="width:{{ min(100, round($eveningHours / max(1, $eveningMaxHours) * 100)) }}%"></div></div></div>
+            </div>
+          @endif
         </div>
         <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
           <div class="absolute top-0 left-0 right-0 h-1 bg-green-600"></div>
@@ -143,6 +149,23 @@
           <div class="text-[11px] text-gray-400 mt-0.5">{{ collect($mySections)->implode(', ') ?: 'None assigned' }}</div>
         </div>
       </div>
+
+      <section class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="faculty-week-chart-title">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div><h2 id="faculty-week-chart-title" class="text-base font-bold text-gray-900">My Teaching Week</h2><p class="mt-0.5 text-xs text-gray-500">Scheduled classes by day for the current semester</p></div>
+          <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{{ $weeklyScheduleCounts->sum('count') }} classes / week</span>
+        </div>
+        @php $facultyWeekMax = max(1, $weeklyScheduleCounts->max('count')); @endphp
+        <div class="grid grid-cols-7 gap-2" role="img" aria-label="My weekly classes by day">
+          @foreach($weeklyScheduleCounts as $item)
+            <div class="flex h-28 flex-col items-center justify-end gap-1.5 rounded-xl bg-slate-50 px-1.5 py-2">
+              <span class="text-xs font-bold text-slate-600">{{ $item['count'] }}</span>
+              <div class="flex h-14 w-full items-end justify-center"><div class="w-2/5 rounded-t-md bg-blue-600" style="height:{{ $item['count'] ? max(8, round($item['count'] / $facultyWeekMax * 100)) : 0 }}%"></div></div>
+              <span class="text-[10px] font-semibold text-slate-500">{{ $item['day'] }}</span>
+            </div>
+          @endforeach
+        </div>
+      </section>
 
       <div class="flex gap-5 items-start flex-wrap">
 

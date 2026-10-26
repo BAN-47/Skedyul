@@ -83,7 +83,17 @@
                                     @endforelse
                                     @if($roomSchedules->count() > 2)<div class="text-[11px] text-slate-400">+{{ $roomSchedules->count() - 2 }} more</div>@endif
                                 </td>
-                                <td><button type="button" class="btn btn-secondary text-[11px] px-3 py-1.5" onclick="viewChairRoom('{{ $room->room_id }}')">View</button></td>
+                                <td>
+                                    <div class="flex items-center gap-1.5">
+                                        <button type="button" class="btn btn-secondary text-[11px] px-3 py-1.5" onclick="openChairEditRoom('{{ $room->room_id }}')">Edit</button>
+                                        <button type="button" class="btn btn-secondary text-[11px] px-3 py-1.5" onclick="viewChairRoom('{{ $room->room_id }}')">View</button>
+                                        <form method="POST" action="{{ route('chair.rooms.destroy', $room->room_id) }}" onsubmit="return confirm('Delete {{ addslashes($room->room_name) }}? Rooms with schedule records cannot be deleted.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-secondary text-[11px] px-3 py-1.5 text-red-600">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="text-center py-6 text-slate-400">No rooms assigned to your college yet. Use Add Room to create one.</td></tr>
@@ -158,9 +168,41 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="chair-room-edit-modal">
+    <div class="modal-box w-[520px] max-w-[94vw]">
+        <form id="chair-room-edit-form" method="POST">
+            @csrf
+            @method('PUT')
+            <div class="modal-header">
+                <div><div class="modal-title">Edit Room</div><div class="text-xs text-slate-400">Update this room for your college.</div></div>
+                <button type="button" onclick="closeChairEditRoom()" class="modal-close">✕</button>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div><label class="field-label">Room Name / Number</label><input id="chair-room-edit-name" name="room_name" required maxlength="100" class="field-input"></div>
+                <div>
+                    <label class="field-label">Room Type</label>
+                    <select id="chair-room-edit-type" name="room_type" required class="field-input">
+                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room'] as $type)<option value="{{ $type }}">{{ $type }}</option>@endforeach
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div><label class="field-label">Capacity</label><input id="chair-room-edit-capacity" type="number" name="room_capacity" min="1" required class="field-input"></div>
+                <div><label class="field-label">Building</label><input id="chair-room-edit-building" name="room_building" required maxlength="100" class="field-input"></div>
+            </div>
+            <div class="mb-4"><label class="field-label">Location / Floor</label><input id="chair-room-edit-location" name="room_location" maxlength="150" class="field-input"></div>
+            <div class="modal-footer">
+                <button type="button" onclick="closeChairEditRoom()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function openChairAddRoom() { document.getElementById('chair-room-add-modal').classList.add('active'); }
 function closeChairAddRoom() { document.getElementById('chair-room-add-modal').classList.remove('active'); }
+function closeChairEditRoom() { document.getElementById('chair-room-edit-modal').classList.remove('active'); }
 const chairRooms = {
     @foreach($roomData as $item)
     @php
@@ -176,11 +218,24 @@ const chairRooms = {
         })->values();
     @endphp
     @json($room->room_id): {
-        name: @json($room->room_name), building: @json($room->room_building), type: @json($room->room_type), capacity: @json($room->room_capacity),
+        name: @json($room->room_name), building: @json($room->room_building), location: @json($room->room_location), type: @json($room->room_type), capacity: @json($room->room_capacity),
         schedules: @json($scheduledClasses),
     },
     @endforeach
 };
+
+function openChairEditRoom(roomId) {
+    const room = chairRooms[roomId];
+    if (!room) return;
+    const form = document.getElementById('chair-room-edit-form');
+    form.action = @json(url('/chair/rooms')) + '/' + encodeURIComponent(roomId);
+    document.getElementById('chair-room-edit-name').value = room.name || '';
+    document.getElementById('chair-room-edit-building').value = room.building || '';
+    document.getElementById('chair-room-edit-location').value = room.location || '';
+    document.getElementById('chair-room-edit-type').value = room.type || 'Lecture';
+    document.getElementById('chair-room-edit-capacity').value = room.capacity || 1;
+    document.getElementById('chair-room-edit-modal').classList.add('active');
+}
 
 const roomRows = [...document.querySelectorAll('[data-chair-room-row]')];
 const roomSearch = document.getElementById('chair-room-search');

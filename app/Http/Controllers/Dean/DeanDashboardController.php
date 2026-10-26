@@ -10,6 +10,7 @@ use App\Models\Course;
 use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\Schedule_Submission;
+use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\User;
@@ -17,9 +18,6 @@ use Illuminate\Support\Facades\Auth;
 
 class DeanDashboardController extends Controller
 {
-    const FULL_TIME_MAX_HOURS = 30;
-    const PART_TIME_MAX_HOURS = 22;
-
     public function index()
     {
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
@@ -34,23 +32,29 @@ class DeanDashboardController extends Controller
             ->groupBy('sl_fac_id');
 
         $facultyLoads = $faculty->map(function ($member) use ($studyLoadsByFaculty) {
-            $maxHours = $member->fac_employment_type === 'part_time'
-                ? self::PART_TIME_MAX_HOURS
-                : self::FULL_TIME_MAX_HOURS;
-
-            $hours = (float) $studyLoadsByFaculty
-                ->get($member->fac_id, collect())
-                ->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $loads = $studyLoadsByFaculty->get($member->fac_id, collect());
+            $dayHours = (float) $loads->where('sl_shift', 'day')
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $eveningHours = (float) $loads->where('sl_shift', 'evening')
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $dayMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'day');
+            $eveningMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'evening');
+            $hours = $dayHours + $eveningHours;
+            $maxHours = $dayMaxHours + $eveningMaxHours;
+            $dayStatus = $dayHours > $dayMaxHours ? 'Overload' : ($dayHours >= $dayMaxHours - 3 ? 'Near Max' : 'Available');
+            $eveningStatus = $eveningHours > $eveningMaxHours ? 'Overload' : ($eveningHours >= $eveningMaxHours - 3 ? 'Near Max' : 'Available');
 
             return [
                 'faculty' => $member,
                 'hours' => $hours,
                 'max_hours' => $maxHours,
-                'status' => match (true) {
-                    $hours > $maxHours => 'Overload',
-                    $hours >= $maxHours - 3 => 'Near Max',
-                    default => 'Available',
-                },
+                'day_hours' => $dayHours,
+                'day_max_hours' => $dayMaxHours,
+                'evening_hours' => $eveningHours,
+                'evening_max_hours' => $eveningMaxHours,
+                'status' => in_array('Overload', [$dayStatus, $eveningStatus], true)
+                    ? 'Overload'
+                    : (in_array('Near Max', [$dayStatus, $eveningStatus], true) ? 'Near Max' : 'Available'),
             ];
         });
 
@@ -110,6 +114,20 @@ class DeanDashboardController extends Controller
 
         $subjectsTotal = Course::count();
         $subjectsPlotted = Course::whereHas('studyLoads')->count();
+
+        $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $scheduleCountsByShift = Schedule::query()
+            ->where('sch_is_active', true)
+            ->when($semester, fn ($query) => $query->where('sch_sem_id', $semester->sem_id))
+            ->select('sch_day', 'sch_shift', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
+            ->groupBy('sch_day', 'sch_shift')
+            ->get()
+            ->groupBy('sch_day');
+        $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
+            'day' => substr($day, 0, 3),
+            'day_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'day')->total ?? 0),
+            'evening_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'evening')->total ?? 0),
+        ]);
 
         $pendingQuery = Schedule_Submission::with([
             'department',
@@ -172,6 +190,7 @@ class DeanDashboardController extends Controller
             'deptSummary',
             'subjectsTotal',
             'subjectsPlotted',
+            'weeklyScheduleCounts',
             'pendingApprovals',
             'scheduledApprovedCount',
             'pendingDeptCount',

@@ -93,12 +93,12 @@
                     </table>
                 </div>
 
-                <div class="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div id="activity-page-info" class="text-xs text-slate-400" aria-live="polite"></div>
-                    <nav class="flex items-center gap-1.5" aria-label="Activity log pagination">
-                        <button type="button" id="activity-prev" class="rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">← Prev</button>
-                        <div id="activity-page-numbers" class="flex items-center gap-1.5"></div>
-                        <button type="button" id="activity-next" class="rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next →</button>
+                <div class="mt-4 flex min-w-0 flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div id="activity-page-info" class="shrink-0 text-xs text-slate-400" aria-live="polite"></div>
+                    <nav class="flex min-w-0 max-w-full items-center gap-1" aria-label="Activity log pagination">
+                        <button type="button" id="activity-prev" class="h-10 shrink-0 rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">← Prev</button>
+                        <div id="activity-page-numbers" class="flex min-w-0 items-center gap-1 overflow-x-auto py-1"></div>
+                        <button type="button" id="activity-next" class="h-10 shrink-0 rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next →</button>
                     </nav>
                 </div>
             </div>
@@ -119,7 +119,7 @@
     const noResults = document.getElementById('activity-no-results');
     const pageSize = 10;
     let currentPage = 1;
-    const pageButton = 'min-w-[48px] rounded-xl px-4 py-3 text-sm font-semibold transition';
+    const pageButton = 'h-10 min-w-[40px] shrink-0 rounded-lg px-2 text-sm font-semibold transition';
 
     function renderPage() {
         const query = search.value.trim().toLowerCase();
@@ -144,7 +144,17 @@
         next.disabled = currentPage === totalPages || matches.length === 0;
         pageNumbers.replaceChildren();
 
-        for (let page = 1; page <= totalPages; page++) {
+        const visiblePages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+        const pages = [...visiblePages].filter(page => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+        let previousPage = 0;
+        for (const page of pages) {
+            if (previousPage && page - previousPage > 1) {
+                const ellipsis = document.createElement('span');
+                ellipsis.textContent = '…';
+                ellipsis.setAttribute('aria-hidden', 'true');
+                ellipsis.className = 'shrink-0 px-1 text-slate-400';
+                pageNumbers.appendChild(ellipsis);
+            }
             const button = document.createElement('button');
             button.type = 'button';
             button.textContent = String(page);
@@ -153,6 +163,7 @@
             button.className = `${pageButton} ${page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
             button.addEventListener('click', () => { currentPage = page; renderPage(); });
             pageNumbers.appendChild(button);
+            previousPage = page;
         }
     }
 

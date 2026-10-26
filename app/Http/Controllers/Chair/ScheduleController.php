@@ -67,7 +67,7 @@ class ScheduleController extends Controller
                 ->get();
         }
 
-        $days  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        $days  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $slots = $this->hourlySlots();
 
         return view('chair.schedule_plotter', compact(

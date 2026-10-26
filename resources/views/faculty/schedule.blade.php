@@ -26,7 +26,7 @@
 
 <body class="bg-slate-50 font-sans text-slate-900">
   @php
-    $days = $days ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    $days = $days ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     $shift = $shift ?? 'day';
     $gridStart = $shift === 'night' ? 16 * 60 : 7 * 60;
     $gridEnd = $shift === 'night' ? 21 * 60 : 16 * 60;

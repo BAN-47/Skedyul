@@ -31,7 +31,7 @@
   $activeSemester   = $activeSemester   ?? null;
   $selectedSection  = $selectedSection  ?? null;
 
-  $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   // Grid range depends on the Day/Evening shift toggle:
   //   Day   → 7:00 AM–4:00 PM, includes the noon break
@@ -99,12 +99,22 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 xl:grid-cols-[200px_1fr] gap-4">
+      <div class="flex justify-start -mt-2 mb-3">
+        <button type="button" id="schedule-summary-toggle" aria-expanded="false" aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()" class="btn btn-secondary inline-flex items-center gap-2">
+          <span>Summary</span><span aria-hidden="true">▦</span>
+        </button>
+      </div>
+
+      <div class="w-full">
 
                         {{-- ══════════ SUMMARY OF COURSES ══════════ --}}
-        <aside class="card !p-0 overflow-hidden self-start">
-          <div class="bg-blue-600 text-white text-center text-[12px] font-extrabold px-3 py-2.5 tracking-wide">
+        <div id="schedule-summary-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/40 p-4 opacity-0 transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="schedule-summary-title" onclick="if(event.target === this) closeScheduleSummary()">
+        <aside id="schedule-summary-panel" class="card !p-0 w-[min(900px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto self-center shadow-2xl scale-95 transition-transform duration-200">
+          <div class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">
+            <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">
             SUMMARY OF COURSES
+            </span>
+            <button type="button" onclick="closeScheduleSummary()" class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20" aria-label="Close summary">✕</button>
           </div>
           @php
             $studentCount = optional($selectedSection)->sec_no_of_student
@@ -183,6 +193,7 @@
             </div>
           @endif
         </aside>
+        </div>
 
         {{-- ══════════ PLOTTER ══════════ --}}
         <section class="card !p-0 overflow-hidden">
@@ -367,6 +378,26 @@
           </div>
 
         </section>
+      </div>
+      <div class="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm print:break-inside-avoid">
+        <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+          <div class="flex min-h-28 flex-col justify-between text-center">
+            <div class="text-left text-xs font-bold text-slate-700">Prepared by:</div>
+            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">{{ $signoff['prepared_by'] ?? 'Chair name unavailable' }}</div>
+            <div class="text-xs text-slate-600">Program Coordinator / Chair</div>
+          </div>
+          <div class="flex min-h-28 flex-col justify-between text-center">
+            <div class="text-left text-xs font-bold text-slate-700">Reviewed, Certified True and Correct:</div>
+            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">{{ $signoff['reviewed_by'] ?? 'CCICT Dean not assigned' }}</div>
+            <div class="text-xs text-slate-600">Director / Dean, CCICT</div>
+          </div>
+          <div class="flex min-h-28 flex-col justify-between text-center">
+            <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
+            <input id="campus-director-name" type="text" maxlength="120" placeholder="Enter campus director name"
+              class="w-full border-0 border-b border-slate-700 bg-transparent px-1 pb-1 text-center text-sm font-bold uppercase outline-none focus:ring-0">
+            <div class="text-xs text-slate-600">Campus Director</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -680,6 +711,7 @@
   window.PBS_SELECTED_DATE = @json($selectedDate->toDateString());
 </script>
 <script src="{{ asset('js/pbs.js') }}" defer></script>
+<script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
 @if(session('error') || session('success'))
 <script>

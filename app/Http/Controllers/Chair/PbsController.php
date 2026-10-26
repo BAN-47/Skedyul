@@ -99,6 +99,7 @@ class PbsController extends Controller
                 'chairDepartment'  => null,
                 'activeSemester'   => $this->activeSemester(),
                 'selectedSection'  => null,
+                'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
                 'error'            => 'Your account is not linked to a department. Contact the system administrator.',
             ]);
         }
@@ -111,6 +112,7 @@ class PbsController extends Controller
         // Semester is FIXED from Admin → Academic Year settings (not user-selectable)
         $activeSem = $this->activeSemester();
         $filters['semester'] = $activeSem->sem_id ?? null;
+        $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
 
         // Sections for this chair's program only.
         // Year is already in the name (BSIS 1-A, BSIS IV-A) — no year-level filter.
@@ -131,6 +133,7 @@ class PbsController extends Controller
                         fn ($q) => $q->where('sch_sem_id', $filters['semester'])
                     )
                     ->where('sch_is_active', true)
+                    ->where('sch_shift', $shiftKey)
                     ->with(['subject', 'faculty', 'section', 'room', 'semester'])
                     ->orderBy('sch_day')
                     ->orderBy('sch_start_time')
@@ -216,8 +219,10 @@ class PbsController extends Controller
             'selectedDate'  => $request->query('date'),
             'chairProgram'     => $programs->first(),
             'chairDepartment'  => $programs->first(),
-            'activeSemester'   => $activeSem ?? $this->activeSemester(),
+            'activeSemester'   => $activeSem,
             'selectedSection'  => $selectedSection,
+            'selectedShift'    => $shiftKey,
+            'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
         ]);
     }
 
@@ -229,9 +234,10 @@ class PbsController extends Controller
             'sec_id'     => 'required|uuid|exists:section,sec_id',
             'room_id'    => 'required|uuid|exists:room,room_id',
             'sem_id'     => 'required|uuid|exists:semester,sem_id',
-            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
-            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+            'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'start_time' => 'required|date_format:H:i',
             'end_time'   => 'required|date_format:H:i|after:start_time',
         ]);

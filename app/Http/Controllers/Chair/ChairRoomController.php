@@ -19,6 +19,18 @@ use Illuminate\Support\Facades\Schema;
 
 class ChairRoomController extends Controller
 {
+    private function roomForChair(Dept_Chair $chair, string $roomId): Room
+    {
+        $query = Room::whereKey($roomId);
+        if (Schema::hasColumn('room', 'room_college_id')) {
+            $query->where('room_college_id', $chair->dc_college_id);
+        } else {
+            $query->where('room_building', 'CCICT Building');
+        }
+
+        return $query->firstOrFail();
+    }
+
     public function index()
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
@@ -136,6 +148,46 @@ class ChairRoomController extends Controller
         }
 
         return redirect()->route('chair.rooms')->with('success', 'Room added and assigned to your college.');
+    }
+
+    public function update(Request $request, string $roomId)
+    {
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $room = $this->roomForChair($chair, $roomId);
+        $validated = $request->validate([
+            'room_name' => 'required|string|max:100',
+            'room_type' => 'required|string|max:50',
+            'room_capacity' => 'required|integer|min:1',
+            'room_building' => 'required|string|max:100',
+            'room_location' => 'nullable|string|max:150',
+        ]);
+
+        $duplicate = Room::query()
+            ->where('room_id', '!=', $room->room_id)
+            ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
+            ->when(Schema::hasColumn('room', 'room_college_id'), fn ($query) => $query->where('room_college_id', $chair->dc_college_id))
+            ->exists();
+        if ($duplicate) {
+            return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+        }
+
+        $room->update($validated);
+
+        return redirect()->route('chair.rooms')->with('success', 'Room updated successfully.');
+    }
+
+    public function destroy(string $roomId)
+    {
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $room = $this->roomForChair($chair, $roomId);
+
+        if ($room->schedules()->exists()) {
+            return back()->with('error', 'This room has schedule records. Remove or reassign those schedules before deleting the room.');
+        }
+
+        $room->delete();
+
+        return redirect()->route('chair.rooms')->with('success', 'Room deleted successfully.');
     }
 
     public function assignSchedule(Request $request)

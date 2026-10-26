@@ -95,10 +95,6 @@ class DashboardController extends Controller
             ->orderBy('course_code')
             ->get();
         $subjectsOffered   = $subjectAll->count();
-        $scheduleConflicts = $subjectAll->filter(function ($c) {
-            $active = $c->course_is_active ?? $c->subj_is_active ?? true;
-            return !$active;
-        })->count();
         // Full list for client-side JS pagination (8 per page)
         $subject = $subjectAll;
 
@@ -156,7 +152,6 @@ class DashboardController extends Controller
             'unscheduledCount',
             'subject',
             'subjectsOffered',
-            'scheduleConflicts',
             'room',
             'totalRooms',
             'roomsInUse',

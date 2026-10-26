@@ -55,11 +55,9 @@
                             @if ($program)
                                 &middot; {{ $program->dept_code ?? $program->prog_code }}
                             @endif
-                            &middot; Full-time max
-                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_HOURS }} teaching hours
-                            &middot; Part-time max
-                            {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_HOURS }} teaching hours
-                            &middot; Special-position limits follow the faculty policy ranges
+                            &middot; Day limits follow faculty designation
+                            &middot; Evening limit {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_HOURS }} teaching hours
+                            &middot; Part-time limit {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_HOURS }} hours per shift
                         </div>
                     </div>
                 </div>
@@ -85,14 +83,14 @@
                         <table class="data-table" id="faculty-load-table">
                             <thead>
                                 <tr>
-                                    @foreach (['Faculty', 'Employment', 'Special Position / Limit', 'Course Code', 'Academic Units', 'Teaching Hours', 'Hours Left', 'Status'] as $h)
+                                    @foreach (['Faculty', 'Employment', 'Special Position / Limit', 'Course Code', 'Academic Units', 'Day Teaching Hours', 'Evening Teaching Hours', 'Status'] as $h)
                                         <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($facultyLoad as $fl)
-                                    <tr data-load-row data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['status_label']) }}">
+                                    <tr data-load-row data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['day']['status_label'].' '.$fl['evening']['status_label']) }}">
                                         <td class="font-semibold">{{ $fl['name'] }}</td>
                                         <td>{{ $fl['employment'] === 'part_time' ? 'Part-time' : 'Full-time' }}</td>
                                         <td class="min-w-[260px]">
@@ -105,22 +103,35 @@
                                                         <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
                                                     @endforeach
                                                 </select>
-                                                <span data-position-cap class="text-xs text-slate-500 {{ $fl['special_position'] ? '' : 'hidden' }}">{{ $fl['special_position_max_hours'] ? 'Fixed limit: '.$fl['special_position_max_hours'].'h/week' : '' }}</span>
+                                                <span data-position-cap class="text-xs text-slate-500">{{ $fl['special_position_max_hours'] ? 'Day cap: '.$fl['special_position_max_hours'].'h' : 'Day cap: 30h' }} · Evening cap: 30h</span>
                                                 <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
                                             </form>
                                         </td>
                                         <td class="text-slate-500">{{ $fl['subjects'] }}</td>
                                         <td><span class="font-mono font-bold">{{ $fl['total_units'] }}u</span></td>
-                                        <td><span class="font-mono font-bold">{{ $fl['total_hours'] }}h</span></td>
-                                        <td>
-                                            <span class="badge {{ $fl['status_badge'] }}">{{ $fl['remaining'] }}h
-                                                left</span>
-                                            <span class="text-[10px] text-slate-400 ml-1">/
-                                                {{ $fl['max_hours'] }}h</span>
-                                        </td>
-                                        <td><span
-                                                class="badge {{ $fl['status_badge'] }}">{{ $fl['status_label'] }}</span>
-                                        </td>
+                                        @if ($fl['employment'] === 'part_time')
+                                            @php
+                                                $partTimeHours = $fl['day']['total_hours'] + $fl['evening']['total_hours'];
+                                                $partTimeRemaining = max(0, 30 - $partTimeHours);
+                                                $partTimeStatus = $partTimeHours >= 30 ? ['Full', 'badge-red'] : ($partTimeHours >= 27 ? ['Near Max', 'badge-amber'] : ['Part-time', 'badge-teal']);
+                                            @endphp
+                                            <td colspan="2">
+                                                <div class="font-mono font-bold">{{ $partTimeHours }}h <span class="text-xs font-normal text-slate-400">/ 30h</span></div>
+                                                <div class="text-xs text-slate-500">{{ $partTimeRemaining }}h left</div>
+                                            </td>
+                                            <td><span class="badge {{ $partTimeStatus[1] }}">{{ $partTimeStatus[0] }}</span></td>
+                                        @else
+                                            @foreach (['day', 'evening'] as $shift)
+                                                <td>
+                                                    <div class="font-mono font-bold">{{ $fl[$shift]['total_hours'] }}h <span class="text-xs font-normal text-slate-400">/ {{ $fl[$shift]['max_hours'] }}h</span></div>
+                                                    <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div>
+                                                </td>
+                                            @endforeach
+                                            <td>
+                                                <div><span class="badge {{ $fl['day']['status_badge'] }}">Day: {{ $fl['day']['status_label'] }}</span></div>
+                                                <div class="mt-1"><span class="badge {{ $fl['evening']['status_badge'] }}">Evening: {{ $fl['evening']['status_label'] }}</span></div>
+                                            </td>
+                                        @endif
                                     </tr>
                                 @empty
                                     <tr>
@@ -162,8 +173,7 @@
                 const syncCap = () => {
                     const option = select.selectedOptions[0];
                     const maxHours = option.dataset.maxHours;
-                    cap.textContent = maxHours ? `Fixed limit: ${maxHours}h/week` : '';
-                    cap.classList.toggle('hidden', !maxHours);
+                    cap.textContent = `Day cap: ${maxHours || 30}h · Evening cap: 30h`;
                 };
                 select.addEventListener('change', syncCap);
                 syncCap();

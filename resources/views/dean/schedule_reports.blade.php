@@ -34,7 +34,7 @@
             <thead><tr><th>Dept</th><th>Section</th><th>Subject</th><th>Faculty</th><th>Day & Time</th></tr></thead>
             <tbody>
               @forelse ($byDepartment as $sl)
-                <tr>
+                <tr data-dept-report-row>
                   <td><span class="badge badge-blue">{{ $sl->section->program->department->dept_code ?? 'N/A' }}</span></td>
                   <td>{{ $sl->section->sec_name ?? 'N/A' }}</td>
                   <td>{{ $sl->subject->subj_code ?? '' }} — {{ $sl->subject->subj_name ?? 'N/A' }}</td>
@@ -46,6 +46,11 @@
               @endforelse
             </tbody>
           </table>
+          <div id="dept-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+            <span id="dept-report-page-info" aria-live="polite"></span>
+            <button type="button" id="dept-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <button type="button" id="dept-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
 
@@ -55,7 +60,7 @@
             <thead><tr><th>Faculty</th><th>Subjects</th><th>Load</th></tr></thead>
             <tbody>
               @forelse ($byFaculty as $f)
-                <tr>
+                <tr data-faculty-report-row>
                   <td><b>{{ $f['name'] }}</b></td>
                   <td>{{ $f['subjects'] ?: '—' }}</td>
                   <td style="{{ $f['hours'] > 24 ? 'color:var(--red);font-weight:700' : '' }}">{{ $f['hours'] }}h</td>
@@ -65,6 +70,11 @@
               @endforelse
             </tbody>
           </table>
+          <div id="faculty-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+            <span id="faculty-report-page-info" aria-live="polite"></span>
+            <button type="button" id="faculty-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <button type="button" id="faculty-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
 
@@ -74,7 +84,7 @@
             <thead><tr><th>Section</th><th>Program</th><th>Year</th></tr></thead>
             <tbody>
               @forelse ($sections as $sec)
-                <tr>
+                <tr data-section-report-row>
                   <td>{{ $sec->sec_name }}</td>
                   <td>{{ $sec->program->prog_code ?? 'N/A' }}</td>
                   <td>{{ $sec->sec_year_level }}</td>
@@ -84,6 +94,11 @@
               @endforelse
             </tbody>
           </table>
+          <div id="section-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+            <span id="section-report-page-info" aria-live="polite"></span>
+            <button type="button" id="section-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <button type="button" id="section-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
         </div>
       </div>
     </div>
@@ -294,6 +309,36 @@ function switchTab(barId, panelId, btn) {
   const target = document.getElementById(panelId);
   if (target) target.classList.remove('hidden');
 }
+
+function setupReportPagination(key, rowSelector) {
+  const rows = [...document.querySelectorAll(rowSelector)];
+  const wrapper = document.getElementById(`${key}-pagination`);
+  const info = document.getElementById(`${key}-page-info`);
+  const previous = document.getElementById(`${key}-prev`);
+  const next = document.getElementById(`${key}-next`);
+  const pageSize = 10;
+  let page = 0;
+  if (!wrapper || !info || !previous || !next) return;
+  wrapper.classList.toggle('hidden', rows.length <= pageSize);
+
+  function renderPage() {
+    const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+    page = Math.min(Math.max(page, 0), pageCount - 1);
+    const start = page * pageSize;
+    rows.forEach((row, index) => row.classList.toggle('hidden', index < start || index >= start + pageSize));
+    info.textContent = rows.length ? `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length}` : 'No records';
+    previous.disabled = page === 0;
+    next.disabled = page >= pageCount - 1;
+  }
+
+  previous.addEventListener('click', () => { page--; renderPage(); });
+  next.addEventListener('click', () => { page++; renderPage(); });
+  renderPage();
+}
+
+setupReportPagination('dept-report', '[data-dept-report-row]');
+setupReportPagination('faculty-report', '[data-faculty-report-row]');
+setupReportPagination('section-report', '[data-section-report-row]');
 
 // Replaces hardcoded deptData + openDept()
 async function openDept(deptId, deptCode, deptName) {

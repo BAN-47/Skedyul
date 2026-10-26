@@ -25,12 +25,27 @@ class FacultyDashboardController extends Controller
 
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
-        $totalHours = Study_Load::where('sl_fac_id', $faculty->fac_id)
+        $facultyLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($activeSemester, fn ($q) => $q->where('sl_sem_id', $activeSemester->sem_id))
             ->with('subject')
-            ->get()
-            ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
-        $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty);
+            ->get();
+        if ($faculty->fac_employment_type === 'part_time') {
+            $dayHours = (float) $facultyLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $eveningHours = 0;
+            $dayMaxHours = 30;
+            $eveningMaxHours = 0;
+            $totalHours = $dayHours;
+            $maxHours = 30;
+        } else {
+            $dayHours = (float) $facultyLoads->where('sl_shift', 'day')
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $eveningHours = (float) $facultyLoads->where('sl_shift', 'evening')
+                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $dayMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty, 'day');
+            $eveningMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty, 'evening');
+            $totalHours = $dayHours + $eveningHours;
+            $maxHours = $dayMaxHours + $eveningMaxHours;
+        }
 
         $schedules = Schedule::with(['subject', 'section', 'room'])
             ->where('sch_fac_id', $faculty->fac_id)
@@ -43,9 +58,16 @@ class FacultyDashboardController extends Controller
 
         $today = Carbon::now()->format('l');
         $todaySchedule = $schedules->where('sch_day', $today)->sortBy('sch_start_time')->values();
+        $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
+            'day' => substr($day, 0, 3),
+            'count' => $schedules->where('sch_day', $day)->count(),
+        ]);
 
         return view('faculty.faculty_dashboard', compact(
-            'faculty', 'facultyBios', 'totalHours', 'maxHours', 'mySubjects', 'mySections', 'todaySchedule', 'today'
+            'faculty', 'facultyBios', 'totalHours', 'maxHours', 'dayHours', 'dayMaxHours',
+            'eveningHours', 'eveningMaxHours', 'weeklyScheduleCounts',
+            'mySubjects', 'mySections', 'todaySchedule', 'today'
         ));
     }
 }

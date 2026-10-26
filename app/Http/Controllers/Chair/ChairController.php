@@ -75,31 +75,41 @@ class ChairController extends Controller
             ->groupBy('sl_fac_id');
 
         $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
-            $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f);
-            $totalHours = (float) $studyLoadsByFaculty->get($f->fac_id, collect())
-                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
-            $remaining  = max(0, $maxHours - $totalHours);
-            $percent    = min(100, (int) round(($totalHours / $maxHours) * 100));
+            $allLoads = $studyLoadsByFaculty->get($f->fac_id, collect());
 
-            $status = match (true) {
-                $totalHours >= $maxHours => 'Full',
-                $totalHours >= $maxHours - 3 => 'Near Max',
-                $f->fac_employment_type === 'part_time' => 'Part-time',
-                default => 'OK',
-            };
+            $shifts = collect(['day', 'evening'])->mapWithKeys(function ($shift) use ($f, $allLoads) {
+                $loads = $allLoads->where('sl_shift', $shift);
+                $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f, $shift);
+                $totalHours = (float) $loads->sum(
+                    fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
+                );
+                $remaining = max(0, $maxHours - $totalHours);
+                $percent = min(100, (int) round(($totalHours / max(1, $maxHours)) * 100));
+                $status = match (true) {
+                    $totalHours >= $maxHours => 'Full',
+                    $totalHours >= $maxHours - 3 => 'Near Max',
+                    $f->fac_employment_type === 'part_time' => 'Part-time',
+                    default => 'OK',
+                };
+
+                return [$shift => [
+                    'hours' => $totalHours,
+                    'remaining' => $remaining,
+                    'percent' => $percent,
+                    'max_hours' => $maxHours,
+                    'status' => $status,
+                ]];
+            });
 
             return [
-                'fac_id'     => $f->fac_id,
-                'name'       => trim($f->fac_first_name . ' ' . $f->fac_last_name),
-                'hours'      => $totalHours,
-                'remaining'  => $remaining,
-                'percent'    => $percent,
-                'max_hours'  => $maxHours,
-                'status'     => $status,
+                'fac_id' => $f->fac_id,
+                'name' => trim($f->fac_first_name . ' ' . $f->fac_last_name),
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
+                'day' => $shifts['day'],
+                'evening' => $shifts['evening'],
             ];
-        });
+        })->values();
 
         // ---------- SECTIONS IN THIS DEPARTMENT'S PROGRAMS ----------
         // Also narrowed to the chair's specific program when they have one,
@@ -129,6 +139,19 @@ class ChairController extends Controller
 
         $subjectsPlotted = $plottedSubjIds->count();
 
+        $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $scheduleCountsByDay = Schedule::query()
+            ->whereIn('sch_fac_id', $faculty->pluck('fac_id'))
+            ->where('sch_is_active', true)
+            ->when($semester, fn ($query) => $query->where('sch_sem_id', $semester->sem_id))
+            ->select('sch_day', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
+            ->groupBy('sch_day')
+            ->pluck('total', 'sch_day');
+        $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
+            'day' => substr($day, 0, 3),
+            'count' => (int) ($scheduleCountsByDay[$day] ?? 0),
+        ]);
+
         // ---------- NOTIFICATIONS (drives the bell panel + Conflicts stat) ----------
         $notifications = Notification::where('notif_usr_id', $user->usr_id)
             ->orderByDesc('notif_created_at')
@@ -137,7 +160,10 @@ class ChairController extends Controller
 
         $unreadCount    = $notifications->where('notif_is_read', false)->count();
         $facultyAtMaxLoadCount = $facultyLoad
-            ->filter(fn ($load) => $load['hours'] >= $load['max_hours'])
+            ->filter(fn ($load) =>
+                $load['day']['hours'] >= $load['day']['max_hours']
+                || $load['evening']['hours'] >= $load['evening']['max_hours']
+            )
             ->count();
 
         $recentActivity = Audit_Log::where('al_usr_id', $user->usr_id)
@@ -152,6 +178,7 @@ class ChairController extends Controller
             'faculty',
             'totalFaculty',
             'facultyLoad',
+            'weeklyScheduleCounts',
             'section',
             'totalSections',
             'subject',
