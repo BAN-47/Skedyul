@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL</title>
@@ -40,7 +40,7 @@
         <div class="relative z-10">
 
             {{-- HEADER --}}
-            <header class="fixed inset-x-0 top-0 z-50 -mb-20 border-b border-white/10 bg-[#A9A9A9] backdrop-blur-md">
+            <header class="sticky top-0 z-50 border-b border-white/10 bg-[#A9A9A9]/95 backdrop-blur-md">
                 <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                     <a href="#skedyul" class="text-3xl font-extrabold leading-none tracking-tight text-white sm:text-4xl lg:text-5xl">
                         SKED<span class="text-blue-400">YUL</span>
@@ -59,9 +59,9 @@
             </header>
 
             {{-- HERO --}}
-            <div class="mx-auto grid max-w-7xl items-center gap-12 px-4 pt-20 pb-4 sm:px-6 lg:grid-cols-2 lg:px-8 lg:pt-28 lg:pb-6" id="home">
+            <div class="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:py-20" id="home">
                 <div>
-                    <h1 class="font-['Google_Sans_Flex',sans-serif] text-5xl font-bold uppercase leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
+                    <h1 class="font-['Google_Sans_Flex',sans-serif] text-4xl font-bold uppercase leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
                         Academic<br>
                         <span class="bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">Scheduling.</span>
                     </h1>
@@ -76,31 +76,33 @@
                         <span class="font-semibold text-blue-300">with ease.</span>
                     </p>
 
-                    <a href="#" class="mt-8 inline-flex items-center rounded-lg bg-blue-600 px-6 py-3 text-lg font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900">
-                        Get Started with Us
-                    </a>
-                    <a href="#" class="mt-8 ml-6 inline-flex items-center rounded-lg bg-gray-400 px-6 py-3 text-lg font-semibold text-[#FFFFFF] shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900">
-                        See how it works
-                    </a>
+                    <div class="mt-8 flex flex-wrap gap-3">
+                        <a href="#" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
+                            Get Started with Us
+                        </a>
+                        <a href="#" class="inline-flex items-center justify-center rounded-lg bg-gray-400 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
+                            See how it works
+                        </a>
+                    </div>
                 </div>
 
                 {{-- RIGHT: put your content here --}}
-                <div class="flex ml-10 items-center justify-center animate-slide-in">
-                    <div class="animate-float">
-                        <img src="/images/skedyul calendar.svg" alt="Hero Image" class="w-full rounded-lg">
+                <div class="flex w-full items-center justify-center animate-slide-in">
+                    <div class="w-full max-w-xl animate-float">
+                        <img src="/images/skedyul calendar.svg" alt="Hero Image" class="h-auto w-full rounded-lg">
                     </div>
                 </div>
 
             </div>
 
             <section id="features" class="mx-auto max-w-7xl scroll-mt-24 px-4 pb-16 sm:px-6 lg:px-8">
-                <hr class="mb-8 border-t-[15px] border-white/20 sm:mb-12 lg:mb-16" id="features">
+                <hr class="mb-8 border-t-[15px] border-white/20 sm:mb-12 lg:mb-16">
 
                 <h2 class="font-['Montserrat',sans-serif] -mt-8 text-2xl font-semibold uppercase tracking-widest text-white/80 underline underline-offset-8 sm:text-2xl lg:text-3xl">
                     CORE FEATURES
                 </h2>
 
-                <p class="mt-6 border-l-4 border-blue-400 pl-5 text-justify max-w-l font-['Montserrat',sans-serif] text-base leading-relaxed text-white/70 sm:text-lg">
+                <p class="mt-6 max-w-3xl border-l-4 border-blue-400 pl-5 text-justify font-['Montserrat',sans-serif] text-base leading-relaxed text-white/70 sm:text-lg">
                     These core features are designed to enhance your academic scheduling experience, promising efficiency between faculty and students.
                     With SKEDYUL, you can easily manage your schedules, ensuring that everyone stays on track and informed.
                 </p>
@@ -122,7 +124,7 @@
                         class="-mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth py-16 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
                         {{-- Card 1 --}}
-                        <div data-card class="flex h-[500px] w-[300px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px] lg:h-[450px] sm:w-[500px] lg:w-[500px]">
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
                             <div class="h-3/5 w-full overflow-hidden">
                                 <img src="{{ asset('images/PBS schedule plotter.jpe') }}" alt="PBS Schedule Plotter" class="h-full w-full object-cover">
                             </div>
@@ -133,7 +135,7 @@
                         </div>
 
                         {{-- Card 2 --}}
-                        <div data-card class="flex h-[500px] w-[300px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px] lg:h-[450px] sm:w-[500px] lg:w-[500px]">
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
                             <div class="h-3/5 w-full overflow-hidden">
                                 <img src="{{ asset('images/PBT schedule.jpe') }}" alt="PBT Schedule" class="h-full w-full object-cover">
                             </div>
@@ -144,7 +146,7 @@
                         </div>
 
                         {{-- Card 3 --}}
-                        <div data-card class="flex h-[500px] w-[300px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px] lg:h-[450px] sm:w-[500px] lg:w-[500px]">
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
                             <div class="h-3/5 w-full overflow-hidden">
                                 <img src="{{ asset('images/MIS class.jpe') }}" alt="MIS Class" class="h-full w-full object-cover">
                             </div>
@@ -155,7 +157,7 @@
                         </div>
 
                         {{-- Card 4 --}}
-                        <div data-card class="flex h-[500px] w-[300px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px] lg:h-[450px] sm:w-[500px] lg:w-[500px]">
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
                             <div class="h-3/5 w-full overflow-hidden">
                                 <img src="{{ asset('images/faculty load.jpe') }}" alt="Faculty Load" class="h-full w-full object-cover">
                             </div>
@@ -165,18 +167,40 @@
                             </div>
                         </div>
 
+                        {{-- Card 5 --}}
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
+                            <div class="h-3/5 w-full overflow-hidden">
+                                <img src="{{ asset('images/pending approvals.png') }}" alt="PBT Schedule" class="h-full w-full object-cover">
+                            </div>
+                            <div class="flex h-2/5 flex-col overflow-hidden p-5 text-center">
+                                <h3 class="font-['Montserrat',sans-serif] text-base font-bold text-white">Dean's Pending Approvals Page</h3>
+                                <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-white/60">Review, approve, or return faculty schedules from Department Chairpersons and subject assignments submitted for the Dean's action.</p>
+                            </div>
+                        </div>
+
+                        {{-- Card 6 --}}
+                        <div data-card class="flex h-[420px] w-[82vw] max-w-[500px] shrink-0 cursor-pointer snap-center scale-90 flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[.06] opacity-50 backdrop-blur transition-all duration-300 sm:h-[450px]">
+                            <div class="h-3/5 w-full overflow-hidden">
+                                <img src="{{ asset('images/myschedule faculty.png') }}" alt="PBT Schedule" class="h-full w-full object-cover">
+                            </div>
+                            <div class="flex h-2/5 flex-col overflow-hidden p-5 text-center">
+                                <h3 class="font-['Montserrat',sans-serif] text-base font-bold text-white">Faculty Schedule Viewing</h3>
+                                <p class="mt-1.5 line-clamp-3 text-sm leading-relaxed text-white/60">View your assigned subjects, class times, and rooms for the semester in one place. Check your weekly teaching load and stay updated on any schedule changes made by your department.</p>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </section>
 
-            <section id="features" class="mx-auto max-w-7xl -mt-15 scroll-mt-24 px-4 pb-16 sm:px-6 lg:px-8">
-                <hr class="mb-8 border-t-[15px] border-white/20 sm:mb-12 lg:mb-16" id="about">
+            <section id="about" class="mx-auto max-w-7xl scroll-mt-24 px-4 pb-16 sm:px-6 lg:px-8">
+                <hr class="mb-8 border-t-[15px] border-white/20 sm:mb-12 lg:mb-16">
 
                 <h2 class="font-['Montserrat',sans-serif] -mt-8 text-2xl font-semibold uppercase tracking-widest text-white/80 underline underline-offset-8 sm:text-2xl lg:text-3xl">
                     ABOUT US
                 </h2>
 
-                <div class="flex items-center justify-between gap-6 mt-10">
+                <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="flex flex-col items-center text-center">
                         <div class="flex h-52 w-52 items-center justify-center overflow-hidden rounded-full border-[10px] border-blue-600 bg-white shadow-xl shadow-blue-600/30 transition duration-300 hover:-translate-y-2 hover:border-blue-400">
                             <img src="{{ asset('images/about.png') }}" alt="About SKEDYUL" class="h-35 w-35 object-contain">
