@@ -76,6 +76,8 @@ class PbtExportController extends Controller
 
     public function downloadAll()
     {
+        set_time_limit(300);
+
         $dean = $this->dean();
         $semester = $this->activeSemester();
 
@@ -101,29 +103,62 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $tempDirectory = storage_path('app/temp/pbt-' . uniqid());
+        $batchId = now()->format('Ymd_His') . '_' . bin2hex(random_bytes(4));
+        $tempDirectory = storage_path('app/temp/pbt-' . $batchId);
+        $zipDirectory = storage_path('app/temp');
+        $zipPath = $zipDirectory . '/Faculty_PBTs_' . $batchId . '.zip';
+
+        File::ensureDirectoryExists($zipDirectory);
         File::ensureDirectoryExists($tempDirectory);
 
-        $zipPath = $tempDirectory . '/Faculty_PBTs_' . now()->format('Ymd_His') . '.zip';
         $zip = new ZipArchive();
+        $zipOpened = false;
 
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+        try {
+            if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+                throw ValidationException::withMessages([
+                    'faculty_id' => 'The ZIP file could not be created.',
+                ]);
+            }
+
+            $zipOpened = true;
+
+            foreach ($facultyMembers as $faculty) {
+                $spreadsheet = $this->makeWorkbook($faculty, $semester);
+                $xlsxPath = $tempDirectory . '/' . $this->filenameFor($faculty);
+
+                (new Xlsx($spreadsheet))->save($xlsxPath);
+
+                if (!$zip->addFile($xlsxPath, basename($xlsxPath))) {
+                    throw ValidationException::withMessages([
+                        'faculty_id' => 'A faculty PBT workbook could not be added to the ZIP file.',
+                    ]);
+                }
+
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet);
+            }
+
+            if (!$zip->close()) {
+                $zipOpened = false;
+
+                throw ValidationException::withMessages([
+                    'faculty_id' => 'The ZIP file could not be finalized.',
+                ]);
+            }
+
+            $zipOpened = false;
+        } catch (\Throwable $exception) {
+            if ($zipOpened) {
+                $zip->close();
+            }
+
+            File::delete($zipPath);
+
+            throw $exception;
+        } finally {
             File::deleteDirectory($tempDirectory);
-
-            throw ValidationException::withMessages([
-                'faculty_id' => 'The ZIP file could not be created.',
-            ]);
         }
-
-        foreach ($facultyMembers as $faculty) {
-            $spreadsheet = $this->makeWorkbook($faculty, $semester);
-            $xlsxPath = $tempDirectory . '/' . $this->filenameFor($faculty);
-
-            (new Xlsx($spreadsheet))->save($xlsxPath);
-            $zip->addFile($xlsxPath, basename($xlsxPath));
-        }
-
-        $zip->close();
 
         return response()->download($zipPath, basename($zipPath), [
             'Content-Type' => 'application/zip',
@@ -287,6 +322,7 @@ class PbtExportController extends Controller
         } else {
             $this->clearDayCalendar($sheet);
         }
+
         for ($row = $firstCourseRow; $row <= $lastCourseRow; $row++) {
             foreach (['A', 'B', 'D', 'E'] as $column) {
                 $sheet->setCellValue($column . $row, null);
@@ -340,6 +376,36 @@ class PbtExportController extends Controller
         return 'C' . $row;
     }
 
+    private function clearRange($sheet, string $range): void
+    {
+        [$startCell, $endCell] = explode(':', $range, 2);
+
+        [$startColumn, $startRow] = Coordinate::coordinateFromString($startCell);
+        [$endColumn, $endRow] = Coordinate::coordinateFromString($endCell);
+
+        $startColumnIndex = Coordinate::columnIndexFromString($startColumn);
+        $endColumnIndex = Coordinate::columnIndexFromString($endColumn);
+
+        $rowCount = $endRow - $startRow + 1;
+        $columnCount = $endColumnIndex - $startColumnIndex + 1;
+
+        $blankValues = array_fill(
+            0,
+            $rowCount,
+            array_fill(0, $columnCount, null)
+        );
+
+        $sheet->fromArray($blankValues, null, $startCell);
+        $sheet->getStyle($range)->applyFromArray([
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => [
+                    'rgb' => 'FFFFFF',
+                ],
+            ],
+        ]);
+    }
+
     private function clearDayCalendar($sheet): void
     {
         $protectedMerges = [
@@ -366,19 +432,16 @@ class PbtExportController extends Controller
             }
         }
 
-        for ($row = 15; $row <= 45; $row++) {
-            for ($column = 11; $column <= 16; $column++) {
-                $coordinate = Coordinate::stringFromColumnIndex($column) . $row;
-
-                if ($this->isProtectedDayCell($coordinate)) {
-                    continue;
-                }
-
-                $sheet->setCellValue($coordinate, null);
-                $sheet->getStyle($coordinate)->getFill()
-                    ->setFillType(Fill::FILL_SOLID)
-                    ->getStartColor()->setRGB('FFFFFF');
-            }
+        foreach (
+            [
+                'K15:N29',
+                'P15:P29',
+                'K33:N42',
+                'P33:P42',
+                'K43:P45',
+            ] as $range
+        ) {
+            $this->clearRange($sheet, $range);
         }
     }
 
@@ -416,18 +479,16 @@ class PbtExportController extends Controller
             }
         }
 
-        foreach ([[11, 15], [17, 18]] as [$firstColumn, $lastColumn]) {
-            for ($row = 17; $row <= 46; $row++) {
-                for ($column = $firstColumn; $column <= $lastColumn; $column++) {
-                    $coordinate = Coordinate::stringFromColumnIndex($column) . $row;
-                    $sheet->setCellValue($coordinate, null);
-                    $sheet->getStyle($coordinate)->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('FFFFFF');
-                }
-            }
+        foreach (
+            [
+                'K17:O46',
+                'Q17:R46',
+            ] as $range
+        ) {
+            $this->clearRange($sheet, $range);
         }
     }
+
     private function writeSchedule($sheet, Schedule $schedule, bool $evening): void
     {
         $day = strtolower((string) $schedule->sch_day);

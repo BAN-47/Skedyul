@@ -100,6 +100,10 @@
                 <div class="flex items-center justify-between gap-3 mb-4">
                     <div class="text-[19px] font-extrabold text-slate-900">PBT Schedule Plotter</div>
                     <div class="flex items-center gap-2">
+                        @if ($selectedFaculty)
+                            <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id]) }}"
+                                class="btn btn-primary">Download PBT Excel</a>
+                        @endif
                         <button type="button" onclick="saveDraft()" class="btn btn-secondary">Save Draft</button>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
                     </div>
