@@ -53,7 +53,7 @@
                 <div class="flex items-center gap-3 mb-6">
                     <div class="flex-1">
                         <div class="text-[22px] font-extrabold">
-                            {{ $greeting ?? 'Hello' }}, {{ $greetingName ?? 'Dean' }}
+                            Hello, Dean {{ $greetingName ?? 'Dean' }}
                         </div>
                         <div class="text-[13px] text-slate-400 mt-0.5">
                             AY {{ $ayLabel ?? '—' }} · {{ $semLabel ?? '—' }} · CCICT Overview

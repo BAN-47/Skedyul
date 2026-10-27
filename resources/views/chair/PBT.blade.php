@@ -826,6 +826,211 @@
                     <span class="font-mono font-bold text-slate-900" id="delete-code"></span>
                     in the box below:
                 </p>
+                {{-- ── SUBJECT (auto-filtered by section year level; REC only if no section) ── --}}
+                <div class="flex flex-col gap-3 mb-3">
+                    <div>
+                        <label class="field-label">Subject</label>
+                        <select id="add-subject" class="field-input">
+                            <option value="">-- Select Subject --</option>
+                            @foreach ($subjects as $sub)
+                                <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code }}"
+                                    data-year-level="{{ $sub->course_year_level ?? '' }}"
+                                    data-semester="{{ $sub->course_semester ?? '' }}"
+                                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                                    {{ $sub->course_code ?? $sub->subj_code }} —
+                                    {{ $sub->course_name ?? $sub->subj_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="field-label">Room</label>
+                        <select id="add-room" class="field-input">
+                            <option value="">-- Select Room --</option>
+                            @foreach ($rooms ?? collect() as $r)
+                                <option value="{{ $r->room_id }}">
+                                    {{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <input type="text" id="delete-confirm" autocomplete="off" oninput="validateDeleteCode()"
+                    class="field-input text-center font-mono mb-3">
+
+                <p class="text-[11.5px] text-slate-500 mb-1">
+                    Note: When confirmed, this schedule won't be retrieved in any way.
+                </p>
+
+                <div id="delete-error"
+                    class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 text-left">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modal-delete-schedule')"
+                    class="btn btn-secondary">Cancel</button>
+                <button type="button" id="delete-submit" disabled onclick="submitDelete()"
+                    class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
+            </div>
+        </div>
+    </div>
+
+
+    {{-- TOAST --}}
+    <div class="toast" id="toast"><span id="toast-msg"></span></div>
+
+    <script>
+        window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
+        window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
+    </script>
+    <script src="{{ asset('js/pbt.js') }}" defer></script>
+    <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
+
+    @if (session('error') || session('success'))
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                showToast(@json(session('error') ?? session('success')));
+            });
+        </script>
+    @endif
+    <div class="max-h-[62vh] overflow-y-auto pr-1">
+        <div id="edit-error"
+            class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
+        {{-- FIXED FIELDS --}}
+        <div class="mb-3">
+            <label class="field-label">Semester</label>
+            <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                {{ optional($activeSemester)->label ?? 'No active semester' }}
+            </div>
+            <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
+        </div>
+
+        <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
+            Teacher: <span
+                class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
+        </div>
+
+        <div class="mb-3">
+            <label class="field-label">Department</label>
+            @if (!empty($chairDepartment))
+                <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                    {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
+                    {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
+                </div>
+                <input type="hidden" id="edit-program"
+                    value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
+            @else
+                <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
+                <input type="hidden" id="edit-program" value="">
+            @endif
+        </div>
+
+        <input type="hidden" id="edit-id">
+
+        {{-- SECTION (triggers subject filter) --}}
+        <div class="mb-3">
+            <label class="field-label">Section</label>
+            <select id="edit-section" class="field-input">
+                <option value="">-- Select Section --</option>
+                @foreach ($sections as $sec)
+                    <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
+                        {{ $sec->sec_name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        {{-- SUBJECT (auto-filtered by section year level) --}}
+        <div class="flex flex-col gap-3 mb-3">
+            <div>
+                <label class="field-label">Subject</label>
+                <select id="edit-subject" class="field-input">
+                    <option value="">-- Select Subject --</option>
+                    @foreach ($subjects as $sub)
+                        <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                            data-year-level="{{ $sub->course_year_level ?? '' }}"
+                            data-semester="{{ $sub->course_semester ?? '' }}"
+                            data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                            data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                            {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="field-label">Room</label>
+                <select id="edit-room" class="field-input">
+                    <option value="">-- Select Room --</option>
+                    @foreach ($rooms ?? collect() as $r)
+                        <option value="{{ $r->room_id }}">
+                            {{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="field-label">Day</label>
+            <select id="edit-day" class="field-input">
+                <option value="">-- Select Day --</option>
+                @foreach ($days as $d)
+                    <option value="{{ $d }}">{{ $d }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <div>
+                <label class="field-label">Start Time</label>
+                <input type="time" id="edit-start" step="1800" class="field-input">
+            </div>
+            <div>
+                <label class="field-label">End Time</label>
+                <input type="time" id="edit-end" step="1800" class="field-input">
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="field-label">Description (optional)</label>
+            <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
+        </div>
+
+    </div>
+
+    <div class="modal-footer">
+        <button type="button" onclick="closeModal('modal-edit-schedule')" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="edit-submit" onclick="submitEdit()" class="btn btn-primary">Edit
+            Schedule</button>
+    </div>
+    </div>
+    </div>
+
+
+    {{-- ══════════════ MODAL: DELETE ══════════════ --}}
+    <div class="modal-overlay" id="modal-delete-schedule">
+        <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
+            <div class="modal-header">
+                <div class="modal-title text-red-600">Delete Schedule</div>
+                <button type="button" onclick="closeModal('modal-delete-schedule')" class="modal-close">✕</button>
+            </div>
+
+            <div class="text-center">
+                <input type="hidden" id="delete-id">
+
+                <p class="text-[13px] font-semibold text-slate-700 mb-3">
+                    Are you sure you want to delete this specific schedule?
+                </p>
+
+                <p class="text-[12.5px] text-slate-600 mb-2">
+                    To confirm, please type
+                    <span class="font-mono font-bold text-slate-900" id="delete-code"></span>
+                    in the box below:
+                </p>
 
                 <input type="text" id="delete-confirm" autocomplete="off" oninput="validateDeleteCode()"
                     class="field-input text-center font-mono mb-3">
