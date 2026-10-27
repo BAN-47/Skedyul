@@ -8,10 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('room', function (Blueprint $table) {
-            // Keep existing rooms intact; admins can assign their colleges in Room Management.
-            $table->uuid('room_college_id')->nullable();
-        });
+        if (!Schema::hasColumn('room', 'room_college_id')) {
+            Schema::table('room', function (Blueprint $table) {
+                $table->uuid('room_college_id')->nullable();
+            });
+        }
     }
 
     public function down(): void

@@ -136,9 +136,11 @@ class ChairRoomController extends Controller
             $duplicate = Room::query()
                 ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
                 ->where('room_college_id', $chair->dc_college_id)
+                ->where('room_location', $validated['room_location'] ?? null)
+                ->where('room_building', $validated['room_building'] ?? null)
                 ->exists();
             if ($duplicate) {
-                return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+                return back()->withInput()->withErrors(['room_name' => 'A room with this name, floor, and building already exists for your college.']);
             }
 
             Room::create($validated);
@@ -165,10 +167,12 @@ class ChairRoomController extends Controller
         $duplicate = Room::query()
             ->where('room_id', '!=', $room->room_id)
             ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
-            ->when(Schema::hasColumn('room', 'room_college_id'), fn ($query) => $query->where('room_college_id', $chair->dc_college_id))
+            ->where('room_college_id', $chair->dc_college_id)
+            ->where('room_location', $validated['room_location'] ?? null)
+            ->where('room_building', $validated['room_building'] ?? null)
             ->exists();
         if ($duplicate) {
-            return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+            return back()->withInput()->withErrors(['room_name' => 'A room with this name, floor, and building already exists for your college.']);
         }
 
         $room->update($validated);

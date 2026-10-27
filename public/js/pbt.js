@@ -207,12 +207,20 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
       return;
     }
     const subYear = opt.getAttribute('data-year-level') || '';
-    const match = !yearLevel || !subYear || String(subYear) === String(yearLevel);
-    opt.hidden = !match;
-    opt.style.display = match ? '' : 'none';
+    const courseCode = opt.getAttribute('data-course-code') || '';
+    
+    if (!yearLevel) {
+      const showRec = courseCode === 'REC';
+      opt.hidden = !showRec;
+      opt.style.display = showRec ? '' : 'none';
+    } else {
+      const match = !subYear || String(subYear) === String(yearLevel);
+      const hideRec = courseCode === 'REC';
+      opt.hidden = !match || hideRec;
+      opt.style.display = (match && !hideRec) ? '' : 'none';
+    }
   });
 
-  // Reset subject if current selection is no longer visible
   const current = subSel.options[subSel.selectedIndex];
   if (current && current.hidden) {
     subSel.value = '';
@@ -261,13 +269,21 @@ function openAddModal(day, startTime) {
 
 function submitAdd(keepOpen = false) {
   clearInlineError('add-error');
+  const subjId = document.getElementById('add-subject').value;
+  const secId = document.getElementById('add-section').value;
+  const roomId = document.getElementById('add-room').value;
+  
+  const subjSel = document.getElementById('add-subject');
+  const selectedOpt = subjSel.options[subjSel.selectedIndex];
+  const isRec = selectedOpt ? (selectedOpt.getAttribute('data-course-code') === 'REC') : false;
+
   const payload = {
-    subj_id:     document.getElementById('add-subject').value,
+    subj_id:     subjId,
     fac_id:      SELECTED_TEACHER,
     sem_id:      document.getElementById('add-semester').value,
     prog_id:     document.getElementById('add-program').value,
-    sec_id:      document.getElementById('add-section').value,
-    room_id:     document.getElementById('add-room').value,
+    sec_id:      secId || null,
+    room_id:     roomId || null,
     days:        [...document.querySelectorAll('.add-day-checkbox:checked')].map(input => input.value),
     start_time:  document.getElementById('add-start').value,
     end_time:    document.getElementById('add-end').value,
@@ -275,8 +291,12 @@ function submitAdd(keepOpen = false) {
     description: document.getElementById('add-description').value,
   };
 
-  if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id || !payload.days.length || !payload.start_time || !payload.end_time) {
-    showToast('Please select the course, section, room, at least one day, and both times.');
+  if (!payload.subj_id || !payload.fac_id || !payload.days.length || !payload.start_time || !payload.end_time) {
+    showToast('Please select the course, at least one day, and both times.');
+    return;
+  }
+  if (!isRec && (!payload.sec_id || !payload.room_id)) {
+    showToast('Please select section and room (not required for REC).');
     return;
   }
   if (payload.end_time <= payload.start_time) {

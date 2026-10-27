@@ -123,9 +123,16 @@
         <input id="add-room-building" placeholder="e.g. ICT Building" class="field-input">
       </div>
     </div>
-    <div class="mb-4">
+<div class="mb-4">
       <label class="field-label">Location / Floor</label>
-      <input id="add-room-location" placeholder="e.g. 2nd Floor" class="field-input">
+      <select id="add-room-location" class="field-input">
+        <option value="">Select floor</option>
+        @for ($i = 1; $i <= 15; $i++)
+          <option value="{{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}">
+            {{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}
+          </option>
+        @endfor
+      </select>
     </div>
     <div class="modal-footer">
       <button onclick="closeModal('modal-add-room')" class="btn btn-secondary">Cancel</button>
@@ -218,7 +225,14 @@
       </div>
       <div>
         <label class="field-label">Location / Floor</label>
-        <input id="edit-room-location" placeholder="e.g. 2nd Floor" class="field-input">
+        <select id="edit-room-location" class="field-input">
+          <option value="">Select floor</option>
+          @for ($i = 1; $i <= 15; $i++)
+            <option value="{{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}">
+              {{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}
+            </option>
+          @endfor
+        </select>
       </div>
     </div>
     <div class="mb-3">

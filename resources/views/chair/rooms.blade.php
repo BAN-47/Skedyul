@@ -140,10 +140,18 @@
                     <input name="room_building" value="{{ old('room_building') }}" required maxlength="100" placeholder="e.g. CCICT Building" class="field-input">
                 </div>
             </div>
-            <div class="mb-4">
-                <label class="field-label">Location / Floor <span class="font-normal normal-case text-slate-400">(optional)</span></label>
-                <input name="room_location" value="{{ old('room_location') }}" maxlength="150" placeholder="e.g. 2nd Floor" class="field-input">
-            </div>
+<div class="mb-4">
+      <label class="field-label">Location / Floor</label>
+      <select name="room_location" class="field-input">
+        <option value="">Select floor</option>
+        @for ($i = 1; $i <= 15; $i++)
+          <option value="{{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}"
+            @selected(old('room_location') == ($i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor'))>
+            {{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}
+          </option>
+        @endfor
+      </select>
+    </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeChairAddRoom()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Room</button>
@@ -190,7 +198,17 @@
                 <div><label class="field-label">Capacity</label><input id="chair-room-edit-capacity" type="number" name="room_capacity" min="1" required class="field-input"></div>
                 <div><label class="field-label">Building</label><input id="chair-room-edit-building" name="room_building" required maxlength="100" class="field-input"></div>
             </div>
-            <div class="mb-4"><label class="field-label">Location / Floor</label><input id="chair-room-edit-location" name="room_location" maxlength="150" class="field-input"></div>
+            <div class="mb-4">
+      <label class="field-label">Location / Floor</label>
+      <select id="chair-room-edit-location" name="room_location" class="field-input">
+        <option value="">Select floor</option>
+        @for ($i = 1; $i <= 15; $i++)
+          <option value="{{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}">
+            {{ $i . ($i === 1 ? 'st' : ($i === 2 ? 'nd' : ($i === 3 ? 'rd' : 'th'))) . ' Floor' }}
+          </option>
+        @endfor
+      </select>
+    </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeChairEditRoom()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Changes</button>

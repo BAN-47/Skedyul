@@ -47,6 +47,18 @@ class RoomController extends Controller
         $validated['room_is_available'] = $validated['room_is_available'] ?? true;
 
         try {
+            $duplicate = Room::where('room_name', $validated['room_name'])
+                ->where('room_college_id', $validated['room_college_id'])
+                ->where('room_location', $validated['room_location'] ?? null)
+                ->where('room_building', $validated['room_building'] ?? null)
+                ->exists();
+            if ($duplicate) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A room with this name, floor, and building already exists for this college.',
+                ], 409);
+            }
+
             $room = Room::create($validated);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23505') {

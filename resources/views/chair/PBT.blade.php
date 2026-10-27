@@ -496,33 +496,34 @@
         </select>
       </div>
 
-      {{-- ── SUBJECT (auto-filtered by section year level) ── --}}
-      <div class="flex flex-col gap-3 mb-3">
-      <div>
-        <label class="field-label">Subject</label>
-        <select id="add-subject" class="field-input">
-          <option value="">-- Select Subject --</option>
-          @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                    data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}"
-                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-              {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-            </option>
-          @endforeach
-        </select>
-      </div>
+       {{-- ── SUBJECT (auto-filtered by section year level; REC only if no section) ── --}}
+       <div class="flex flex-col gap-3 mb-3">
+       <div>
+         <label class="field-label">Subject</label>
+         <select id="add-subject" class="field-input">
+           <option value="">-- Select Subject --</option>
+           @foreach($subjects as $sub)
+             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                     data-course-code="{{ $sub->course_code ?? $sub->subj_code }}"
+                     data-year-level="{{ $sub->course_year_level ?? '' }}"
+                     data-semester="{{ $sub->course_semester ?? '' }}"
+                     data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                     data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+             </option>
+           @endforeach
+         </select>
+       </div>
 
-      <div>
-        <label class="field-label">Room</label>
-        <select id="add-room" class="field-input">
-          <option value="">-- Select Room --</option>
-          @foreach(($rooms ?? collect()) as $r)
-            <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
-          @endforeach
-        </select>
-      </div>
+       <div>
+         <label class="field-label">Room</label>
+         <select id="add-room" class="field-input">
+           <option value="">-- Select Room --</option>
+           @foreach(($rooms ?? collect()) as $r)
+             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+           @endforeach
+         </select>
+       </div>
       </div>
 
       <div>
@@ -630,15 +631,15 @@
           @endforeach
         </select>
       </div>
-      <div>
-        <label class="field-label">Room</label>
-        <select id="edit-room" class="field-input">
-          <option value="">-- Select Room --</option>
-          @foreach(($rooms ?? collect()) as $r)
-            <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
-          @endforeach
-        </select>
-      </div>
+       <div>
+         <label class="field-label">Room</label>
+         <select id="edit-room" class="field-input">
+           <option value="">-- Select Room --</option>
+           @foreach(($rooms ?? collect()) as $r)
+             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+           @endforeach
+         </select>
+       </div>
       </div>
 
       <div class="mb-3">

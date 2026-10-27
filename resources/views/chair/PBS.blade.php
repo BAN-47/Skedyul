@@ -496,15 +496,15 @@
       </div>
       </div>
 
-      <div>
-        <label class="field-label">Room</label>
-        <select id="add-room" class="field-input">
-          <option value="">-- Select Room --</option>
-          @foreach($rooms as $r)
-            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
-          @endforeach
-        </select>
-      </div>
+       <div>
+         <label class="field-label">Room</label>
+         <select id="add-room" class="field-input">
+           <option value="">-- Select Room --</option>
+           @foreach($rooms as $r)
+             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+           @endforeach
+         </select>
+       </div>
 
       <div class="mb-3">
         <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
@@ -618,15 +618,15 @@
         </select>
       </div>
 
-      <div class="mb-3">
-        <label class="field-label">Room</label>
-        <select id="edit-room" class="field-input">
-          <option value="">-- Select Room --</option>
-          @foreach($rooms as $r)
-            <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_building) ? ' — '.$r->room_building : '' }}</option>
-          @endforeach
-        </select>
-      </div>
+       <div class="mb-3">
+         <label class="field-label">Room</label>
+         <select id="edit-room" class="field-input">
+           <option value="">-- Select Room --</option>
+           @foreach($rooms as $r)
+             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+           @endforeach
+         </select>
+       </div>
 
       <div class="mb-3">
         <label class="field-label">Day</label>
