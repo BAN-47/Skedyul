@@ -59,7 +59,7 @@
             </header>
 
             {{-- HERO --}}
-            <div class="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:py-20" id="home">
+            <div class="mx-auto grid -mt-9 max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:py-20" id="home">
                 <div>
                     <h1 class="font-['Google_Sans_Flex',sans-serif] text-4xl font-bold uppercase leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-7xl">
                         Academic<br>
@@ -102,7 +102,7 @@
                     CORE FEATURES
                 </h2>
 
-                <p class="mt-6 max-w-3xl border-l-4 border-blue-400 pl-5 text-justify font-['Montserrat',sans-serif] text-base leading-relaxed text-white/70 sm:text-lg">
+                <p class="mt-6 border-l-4 border-blue-400 pl-5 text-justify font-['Montserrat',sans-serif] text-base leading-relaxed text-white/70 sm:text-lg">
                     These core features are designed to enhance your academic scheduling experience, promising efficiency between faculty and students.
                     With SKEDYUL, you can easily manage your schedules, ensuring that everyone stays on track and informed.
                 </p>
@@ -286,7 +286,7 @@
 
                         <div class="mt-2 flex items-center gap-2 text-sm text-slate-700">
                             <span class="text-xl font-bold text-slate-900">✉:</span>
-                            <span></span>
+                            <p>skedyul.official@gmail.com</p>
                         </div>
                     </div>
 
