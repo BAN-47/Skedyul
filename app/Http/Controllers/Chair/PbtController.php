@@ -194,7 +194,7 @@ class PbtController extends Controller
 
         $loads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($semId, fn ($q) => $q->where('sl_sem_id', $semId))
-            ->where('sl_shift', $shift)
+            ->when($faculty->fac_employment_type !== 'part_time', fn ($q) => $q->where('sl_shift', $shift))
             ->with('subject', 'schedules')
             ->get();
 

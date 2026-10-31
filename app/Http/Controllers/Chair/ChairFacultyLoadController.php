@@ -89,9 +89,10 @@ class ChairFacultyLoadController extends Controller
             $shifts = collect(['day', 'evening'])->mapWithKeys(function (string $shift) use ($f, $allLoads) {
                 $loads = $allLoads->where('sl_shift', $shift);
                 $totalUnits = $loads->sum(fn ($sl) => (float) ($sl->subject?->course_units ?? 0));
-                $totalHours = $loads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
-                $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)->filter()->unique()->implode(', ');
                 $isPartTime = $f->fac_employment_type === 'part_time';
+                $shiftHours = $loads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
+                $totalHours = $shiftHours;
+                $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)->filter()->unique()->implode(', ');
                 $maxHours = ScheduleAssignmentService::facultyMaxHours($f, $shift);
                 $remaining = max(0, $maxHours - $totalHours);
                 $nearMaxBuffer = min(self::NEAR_MAX_BUFFER, max(1, $maxHours * 0.2));
@@ -198,12 +199,8 @@ class ChairFacultyLoadController extends Controller
         }
 
         // Current load from study_load (source of truth)
-        $currentHours = Study_Load::where('sl_fac_id', $data['fac_id'])
-            ->where('sl_sem_id', $data['sem_id'])
-            ->where('sl_shift', $data['shift'])
-            ->with('subject')
-            ->get()
-            ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
+        $currentHours = app(ScheduleAssignmentService::class)
+            ->facultyHoursForShift($data['fac_id'], $data['sem_id'], $data['shift']);
 
         if (($currentHours + $subjectHours) > $maxHours) {
             $label = $isPartTime ? 'part-time' : 'full-time';
