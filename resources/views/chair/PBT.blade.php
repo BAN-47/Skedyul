@@ -101,8 +101,13 @@
                     <div class="text-[19px] font-extrabold text-slate-900">PBT Schedule Plotter</div>
                     <div class="flex items-center gap-2">
                         @if ($selectedFaculty)
+                            @if ($activeSemester)
+                                <button type="button" onclick="openModal('modal-submit-dean')" class="btn btn-primary">
+                                    Submit to Dean
+                                </button>
+                            @endif
                             <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id]) }}"
-                                class="btn btn-primary">Download PBT Excel</a>
+                                class="btn btn-secondary">Download PBT Excel</a>
                         @endif
                         <button type="button" onclick="saveDraft()" class="btn btn-secondary">Save Draft</button>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
@@ -280,8 +285,8 @@
                                         <span
                                             class="block truncate text-[13px] font-semibold text-slate-800">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : 'Choose a teacher' }}</span>
                                     </span>
-                                    <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor"
-                                        aria-hidden="true">
+                                    <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20"
+                                        fill="currentColor" aria-hidden="true">
                                         <path fill-rule="evenodd"
                                             d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z"
                                             clip-rule="evenodd" />
@@ -991,97 +996,106 @@
             </select>
         </div>
 
-      <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
-        Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : '—' }}</span>
-      </div>
-
-      <div>
-        <label class="field-label">Department</label>
-        @if(!empty($chairDepartment))
-          <div class="field-input bg-slate-100 font-semibold text-slate-700">
-            {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} — {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-          </div>
-          <input type="hidden" id="add-program" value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
-        @else
-          <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-          <input type="hidden" id="add-program" value="">
-        @endif
-      </div>
-
-      {{-- ── SECTION (triggers subject filter) ── --}}
-      <div class="mb-3">
-        <label class="field-label">Section</label>
-        <select id="add-section" class="field-input">
-          <option value="">-- Select Section --</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-       {{-- ── SUBJECT (auto-filtered by section year level; REC only if no section) ── --}}
-       <div class="flex flex-col gap-3 mb-3">
-       <div>
-         <label class="field-label">Subject</label>
-         <select id="add-subject" class="field-input">
-           <option value="">-- Select Subject --</option>
-           @foreach($subjects as $sub)
-             <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                     data-course-code="{{ $sub->course_code ?? $sub->subj_code }}"
-                     data-year-level="{{ $sub->course_year_level ?? '' }}"
-                     data-semester="{{ $sub->course_semester ?? '' }}"
-                     data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                     data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-               {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-             </option>
-           @endforeach
-         </select>
-       </div>
-
-       <div>
-         <label class="field-label">Room</label>
-         <select id="add-room" class="field-input">
-           <option value="">-- Select Room --</option>
-           @foreach(($rooms ?? collect()) as $r)
-              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-           @endforeach
-         </select>
-       </div>
-      </div>
-
-      <div>
-        <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
-        <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          @foreach($days as $d)
-            <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
-              <input type="checkbox" name="add-days[]" value="{{ $d }}" class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-              <span>{{ $d }}</span>
-            </label>
-          @endforeach
-        <div class="grid grid-cols-2 gap-3 mb-3">
-            <div>
-                <label class="field-label">Start Time</label>
-                <input type="time" id="edit-start" step="1800" class="field-input">
-            </div>
-            <div>
-                <label class="field-label">End Time</label>
-                <input type="time" id="edit-end" step="1800" class="field-input">
-            </div>
+        <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
+            Teacher: <span
+                class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
         </div>
 
+        <div>
+            <label class="field-label">Department</label>
+            @if (!empty($chairDepartment))
+                <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                    {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
+                    {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
+                </div>
+                <input type="hidden" id="add-program"
+                    value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
+            @else
+                <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
+                <input type="hidden" id="add-program" value="">
+            @endif
+        </div>
+
+        {{-- ── SECTION (triggers subject filter) ── --}}
         <div class="mb-3">
-            <label class="field-label">Description (optional)</label>
-            <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
+            <label class="field-label">Section</label>
+            <select id="add-section" class="field-input">
+                <option value="">-- Select Section --</option>
+                @foreach ($sections as $sec)
+                    <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
+                        {{ $sec->sec_name }}</option>
+                @endforeach
+            </select>
         </div>
 
-    </div>
+        {{-- ── SUBJECT (auto-filtered by section year level; REC only if no section) ── --}}
+        <div class="flex flex-col gap-3 mb-3">
+            <div>
+                <label class="field-label">Subject</label>
+                <select id="add-subject" class="field-input">
+                    <option value="">-- Select Subject --</option>
+                    @foreach ($subjects as $sub)
+                        <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                            data-course-code="{{ $sub->course_code ?? $sub->subj_code }}"
+                            data-year-level="{{ $sub->course_year_level ?? '' }}"
+                            data-semester="{{ $sub->course_semester ?? '' }}"
+                            data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                            data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                            {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
 
-    <div class="modal-footer">
-        <button type="button" onclick="closeModal('modal-edit-schedule')" class="btn btn-secondary">Cancel</button>
-        <button type="button" id="edit-submit" onclick="submitEdit()" class="btn btn-primary">Edit
-            Schedule</button>
-    </div>
-    </div>
+            <div>
+                <label class="field-label">Room</label>
+                <select id="add-room" class="field-input">
+                    <option value="">-- Select Room --</option>
+                    @foreach ($rooms ?? collect() as $r)
+                        <option value="{{ $r->room_id }}">
+                            {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
+        <div>
+            <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or
+                    more)</span></span>
+            <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                @foreach ($days as $d)
+                    <label
+                        class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
+                        <input type="checkbox" name="add-days[]" value="{{ $d }}"
+                            class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                        <span>{{ $d }}</span>
+                    </label>
+                @endforeach
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="field-label">Start Time</label>
+                        <input type="time" id="edit-start" step="1800" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">End Time</label>
+                        <input type="time" id="edit-end" step="1800" class="field-input">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Description (optional)</label>
+                    <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modal-edit-schedule')"
+                    class="btn btn-secondary">Cancel</button>
+                <button type="button" id="edit-submit" onclick="submitEdit()" class="btn btn-primary">Edit
+                    Schedule</button>
+            </div>
+        </div>
     </div>
 
 
@@ -1126,94 +1140,152 @@
             </div>
         </div>
         <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-      </div>
+    </div>
 
-      <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
-        Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? ($selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name) : '—' }}</span>
-      </div>
+    <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
+        Teacher: <span
+            class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
+    </div>
 
-      <div class="mb-3">
+    <div class="mb-3">
         <label class="field-label">Department</label>
-        @if(!empty($chairDepartment))
-          <div class="field-input bg-slate-100 font-semibold text-slate-700">
-            {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} — {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-          </div>
-          <input type="hidden" id="edit-program" value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
+        @if (!empty($chairDepartment))
+            <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
+                {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
+            </div>
+            <input type="hidden" id="edit-program"
+                value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
         @else
-          <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-          <input type="hidden" id="edit-program" value="">
+            <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
+            <input type="hidden" id="edit-program" value="">
         @endif
-      </div>
+    </div>
 
-      <input type="hidden" id="edit-id">
+    <input type="hidden" id="edit-id">
 
-      {{-- SECTION (triggers subject filter) --}}
-      <div class="mb-3">
+    {{-- SECTION (triggers subject filter) --}}
+    <div class="mb-3">
         <label class="field-label">Section</label>
         <select id="edit-section" class="field-input">
-          <option value="">-- Select Section --</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
-          @endforeach
+            <option value="">-- Select Section --</option>
+            @foreach ($sections as $sec)
+                <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
+                    {{ $sec->sec_name }}</option>
+            @endforeach
         </select>
-      </div>
+    </div>
 
-      {{-- SUBJECT (auto-filtered by section year level) --}}
-      <div class="flex flex-col gap-3 mb-3">
-      <div>
-        <label class="field-label">Subject</label>
-        <select id="edit-subject" class="field-input">
-          <option value="">-- Select Subject --</option>
-          @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                    data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}"
-                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-              {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-            </option>
-          @endforeach
-        </select>
-      </div>
-       <div>
-         <label class="field-label">Room</label>
-         <select id="edit-room" class="field-input">
-           <option value="">-- Select Room --</option>
-           @foreach(($rooms ?? collect()) as $r)
-              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-           @endforeach
-         </select>
-       </div>
-      </div>
+    {{-- SUBJECT (auto-filtered by section year level) --}}
+    <div class="flex flex-col gap-3 mb-3">
+        <div>
+            <label class="field-label">Subject</label>
+            <select id="edit-subject" class="field-input">
+                <option value="">-- Select Subject --</option>
+                @foreach ($subjects as $sub)
+                    <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                        data-year-level="{{ $sub->course_year_level ?? '' }}"
+                        data-semester="{{ $sub->course_semester ?? '' }}"
+                        data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                        data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                        {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        <div>
+            <label class="field-label">Room</label>
+            <select id="edit-room" class="field-input">
+                <option value="">-- Select Room --</option>
+                @foreach ($rooms ?? collect() as $r)
+                    <option value="{{ $r->room_id }}">
+                        {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+                @endforeach
+            </select>
+        </div>
+    </div>
 
-      <div class="mb-3">
+    <div class="mb-3">
         <label class="field-label">Day</label>
         <select id="edit-day" class="field-input">
-          <option value="">-- Select Day --</option>
-          @foreach($days as $d)
-            <option value="{{ $d }}">{{ $d }}</option>
-          @endforeach
+            <option value="">-- Select Day --</option>
+            @foreach ($days as $d)
+                <option value="{{ $d }}">{{ $d }}</option>
+            @endforeach
         </select>
-      </div>
+    </div>
 
-      <div class="grid grid-cols-2 gap-3 mb-3">
+    <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="field-label">Start Time</label>
-          <input type="time" id="edit-start" step="1800" class="field-input">
+            <label class="field-label">Start Time</label>
+            <input type="time" id="edit-start" step="1800" class="field-input">
         </div>
         <div>
-          <label class="field-label">End Time</label>
-          <input type="time" id="edit-end" step="1800" class="field-input">
+            <label class="field-label">End Time</label>
+            <input type="time" id="edit-end" step="1800" class="field-input">
         </div>
-      </div>
+    </div>
 
-      <div class="mb-3">
+    <div class="mb-3">
         <label class="field-label">Description (optional)</label>
         <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
-      </div>
+    </div>
 
     </div>
 
+
+    {{-- ══════════════ MODAL: SUBMIT PBT TO DEAN ══════════════ --}}
+    @if ($selectedFaculty && $activeSemester)
+        <div class="modal-overlay" id="modal-submit-dean">
+            <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]" role="dialog" aria-modal="true"
+                aria-labelledby="submit-dean-modal-title">
+                <div class="modal-header">
+                    <div class="modal-title text-indigo-700" id="submit-dean-modal-title">Submit PBT to Dean</div>
+                    <button type="button" onclick="closeModal('modal-submit-dean')" class="modal-close"
+                        aria-label="Close submit confirmation">✕</button>
+                </div>
+
+                <div class="max-h-[62vh] overflow-y-auto pr-1">
+                    <div class="mb-3">
+                        <label class="field-label">Semester</label>
+                        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                            {{ $activeSemester->label ?? ($activeSemester->sem_name ?? 'Active semester') }}
+                        </div>
+                    </div>
+
+                    <div
+                        class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
+                        Faculty:
+                        <span class="font-bold text-slate-900">
+                            {{ $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name }}
+                        </span>
+                    </div>
+
+                    <div
+                        class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-800">
+                        This will send this faculty member’s active-semester PBT schedule to the Dean for review.
+                        The system will block submission if required schedule details are missing or schedule conflicts
+                        are found.
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ route('chair.submit_dean.store') }}"
+                    class="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                    @csrf
+                    <input type="hidden" name="faculty_id" value="{{ $selectedFaculty->fac_id }}">
+                    <input type="hidden" name="return_to_pbt" value="1">
+                    <input type="hidden" name="shift" value="{{ $shift }}">
+
+                    <button type="button" onclick="closeModal('modal-submit-dean')" class="btn btn-secondary">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Confirm &amp; Submit to Dean
+                    </button>
+                </form>
+            </div>
+        </div>
+    @endif
 
     {{-- TOAST --}}
     <div class="toast" id="toast"><span id="toast-msg"></span></div>

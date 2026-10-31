@@ -12,8 +12,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.14.1/build/js/intlTelInput.min.js"></script>
 </head>
 
-<body class="{{ ($showRegister ?? false) ? 'min-h-screen overflow-y-auto' : 'h-screen overflow-hidden' }} font-sans"
-  data-login-url="{{ route('login') }}"
+<body class="h-screen overflow-hidden font-sans" data-login-url="{{ route('login') }}"
   data-register-url="{{ route('register') }}"
   data-registration-options-url="{{ route('register.options') }}">
 
@@ -47,7 +46,7 @@
       <div class="pointer-events-none absolute bottom-48 left-8 h-20 w-20 rounded-full border border-white/[.07] bg-white/[.04]"></div>
 
       {{-- Content --}}
-      <div class="relative z-10 flex flex-col items-center text-center -mt-3">
+      <div class="relative z-10 flex w-full flex-col items-center text-center">
 
         {{-- Logo --}}
         <div class="mb-1 text-5xl font-extrabold tracking-tight text-white leading-none">
@@ -218,7 +217,7 @@
           <button type="button" data-passkey-login data-options-url="{{ route('passkeys.authentication.options') }}" data-verify-url="{{ route('passkeys.authentication.verify') }}" disabled
             class="flex w-full items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white py-3.5 text-[15px] font-bold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">
             <svg viewBox="0 0 24 24" class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <path d="M12 3c-4.4 0-7.5 3.4-7.5 7.7 0 3.1 1.1 5.9 2.7 8.3M12 6.2c-2.7 0-4.6 2-4.6 4.8 0 2.2.6 4.2 1.7 6.1M12 9c-1.1 0-1.8.8-1.8 2.1 0 1.4.3 2.7.9 3.9m2.9 3.1c2.5-2 3.8-5.2 3.8-9.1 0-2.8-1.5-4.8-3.8-4.8m-1 5.1c0 2.8.4 4.6 1.4 6.1m4.3-10.3c.8 1.1 1.2 2.4 1.2 4 0 3.5-.8 6.5-2.5 8.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 3c-4.4 0-7.5 3.4-7.5 7.7 0 3.1 1.1 5.9 2.7 8.3M12 6.2c-2.7 0-4.6 2-4.6 4.8 0 2.2.6 4.2 1.7 6.1M12 9c-1.1 0-1.8.8-1.8 2.1 0 1.4.3 2.7.9 3.9m2.9 3.1c2.5-2 3.8-5.2 3.8-9.1 0-2.8-1.5-4.8-3.8-4.8m-1 5.1c0 2.8.4 4.6 1.4 6.1m4.3-10.3c.8 1.1 1.2 2.4 1.2 4 0 3.5-.8 6.5-2.5 8.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             Sign in with a passkey
           </button>
@@ -455,6 +454,37 @@
 
   {{-- Fade-up animation --}}
   <style>
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    #screen-login {
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #auth-marketing-panel {
+      min-width: 0;
+    }
+
+    #auth-panel {
+      height: 100dvh;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+    }
+
+    #auth-panel > :not([hidden]) {
+      margin-block: auto;
+    }
+
     @keyframes fadeUp {
       from {
         opacity: 0;
@@ -469,42 +499,38 @@
 
     @media (max-width: 900px) {
       body {
-        height: auto !important;
-        min-height: 100dvh;
-        overflow-x: hidden;
-        overflow-y: auto !important;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
       }
 
       #screen-login {
-        min-height: 100dvh;
+        height: 100dvh;
+        min-height: 0;
+        flex-direction: column;
       }
 
       #auth-panel {
         width: 100% !important;
         min-width: 0;
-        min-height: calc(100dvh - 105px);
-        flex: 1 0 auto;
+        height: auto;
+        min-height: 0;
+        flex: 1 1 0%;
         padding: 1.5rem 1.25rem;
       }
 
-      #screen-login {
-        flex-direction: column;
-      }
-
       #auth-marketing-panel {
+        height: 105px;
         min-height: 105px;
-        flex: 0 0 auto;
+        flex: 0 0 105px;
         padding: 1.25rem 1rem;
+        align-items: center;
       }
 
       #auth-description,
       #auth-feature-list,
       #auth-campus-badge {
         display: none;
-      }
-
-      #auth-marketing-panel .relative.z-10 {
-        margin-top: 0;
       }
 
       #auth-marketing-panel .text-5xl {
@@ -535,12 +561,15 @@
 
     @media (max-width: 520px) {
       #auth-marketing-panel {
+        height: 88px;
         min-height: 88px;
+        flex-basis: 88px;
         padding: 1rem;
       }
 
       #auth-panel {
-        min-height: calc(100dvh - 88px);
+        height: auto;
+        min-height: 0;
         align-items: flex-start;
         padding: 1.25rem 1rem;
       }

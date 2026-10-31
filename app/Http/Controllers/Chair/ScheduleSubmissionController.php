@@ -208,12 +208,22 @@ class ScheduleSubmissionController extends Controller
             ->first();
 
         if ($submission && $submission->schsub_status !== 'returned') {
+            $message = 'This PBT has already been submitted and is ' . $submission->schsub_status . '.';
+
+            if ($request->boolean('return_to_pbt')) {
+                $shift = $request->input('shift') === 'night' ? 'night' : 'day';
+
+                return redirect()
+                    ->route('chair.pbt', [
+                        'faculty' => $faculty->fac_id,
+                        'shift' => $shift,
+                    ])
+                    ->with('error', $message);
+            }
+
             return redirect()
                 ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
-                ->with(
-                    'error',
-                    'This PBT has already been submitted and is ' . $submission->schsub_status . '.'
-                );
+                ->with('error', $message);
         }
 
         $facultyName = $faculty->user->usr_name
@@ -262,6 +272,17 @@ class ScheduleSubmissionController extends Controller
                 Schedule_Submission::create($values);
             }
         });
+
+        if ($request->boolean('return_to_pbt')) {
+            $shift = $request->input('shift') === 'night' ? 'night' : 'day';
+
+            return redirect()
+                ->route('chair.pbt', [
+                    'faculty' => $faculty->fac_id,
+                    'shift' => $shift,
+                ])
+                ->with('success', 'This faculty PBT was submitted to the dean for review.');
+        }
 
         return redirect()
             ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
