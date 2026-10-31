@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\RegistrationReceivedMail;
 use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\FacultyAccountReview;
@@ -12,6 +13,8 @@ use App\Services\CaptchaChallenge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -87,6 +90,12 @@ class RegistrationController extends Controller
         }
 
         $photoPath = $request->file('faculty_id_photo')->store('faculty-id-verification', 'local');
+        $fullName = trim(implode(' ', array_filter([
+            $data['usr_first_name'],
+            $data['usr_middle_name'] ?? null,
+            $data['usr_last_name'],
+            $data['usr_suffix'] ?? null,
+        ])));
 
         try {
             DB::transaction(function () use ($data, $email, $photoPath) {
@@ -158,6 +167,12 @@ class RegistrationController extends Controller
         } catch (Throwable $exception) {
             Storage::disk('local')->delete($photoPath);
             throw $exception;
+        }
+
+        try {
+            Mail::to($email)->send(new RegistrationReceivedMail($fullName, $email));
+        } catch (Throwable $exception) {
+            Log::warning('Registration confirmation email failed.', ['email' => $email, 'exception' => $exception->getMessage()]);
         }
 
         return redirect()->route('login')->with('registration_submitted', true);

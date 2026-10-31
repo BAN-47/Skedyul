@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Dean;
 
 use App\Models\Dean;
+use App\Models\Faculty;
 use App\Models\SystemSetting;
 use App\Models\Schedule;
 use App\Http\Controllers\Controller;
@@ -26,6 +27,7 @@ class DeanSettingsController extends Controller
 
         return view('dean.dean_settings', [
             'dean' => $this->currentDean(),
+            'faculty' => Faculty::where('fac_usr_id', Auth::id())->first(),
             'academicYear' => $academicYear,
             'activeSemester' => $activeSemester,
             'notificationPreferences' => [
@@ -102,10 +104,20 @@ class DeanSettingsController extends Controller
             'dean_civil_status' => 'nullable|string|max:30',
             'dean_dob' => 'nullable|date',
             'dean_nationality' => 'nullable|string|max:100',
+            'fac_bachelors_degree' => 'nullable|string|max:255',
+            'fac_masters_degree' => 'nullable|string|max:255',
+            'fac_doctorate_degree' => 'nullable|string|max:255',
         ]);
 
         $dean = $this->currentDean();
-        $dean->update($data);
+        $dean->update(collect($data)->except([
+            'fac_bachelors_degree', 'fac_masters_degree', 'fac_doctorate_degree',
+        ])->all());
+        Faculty::where('fac_usr_id', Auth::id())->update([
+            'fac_bachelors_degree' => $data['fac_bachelors_degree'] ?? null,
+            'fac_masters_degree' => $data['fac_masters_degree'] ?? null,
+            'fac_doctorate_degree' => $data['fac_doctorate_degree'] ?? null,
+        ]);
 
         return response()->json(['success' => true]);
     }

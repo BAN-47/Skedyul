@@ -256,8 +256,8 @@
           Your faculty account request and ID photo have been received for review.
         </p>
         <p class="mx-auto mb-6 max-w-sm text-sm leading-relaxed text-slate-500">
-          An administrator will review your details and contact you about verification.
-          Thank you for your patience and using SKEDYUL as your daily tool for class scheduling.
+          An administrator will review your details. We will contact you by email once your account is approved.
+          Thank you for your patience and for using SKEDYUL for class scheduling.
         </p>
         <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700">
           Back to Log In
@@ -299,7 +299,7 @@
 
             <div class="col-span-2">
               <div class="mb-1 flex items-center justify-between">
-                <label class="text-[10px] font-bold uppercase text-slate-700">Email Address <span class="text-red-500" aria-hidden="true">*</span></label>
+                <label class="text-[10px] font-bold uppercase text-slate-700">Gmail Address <span class="text-red-500" aria-hidden="true">*</span></label>
                 <span class="rounded-full bg-indigo-50 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-indigo-700">Faculty Role</span>
               </div>
               <input type="email" name="usr_email" value="{{ old('usr_email') }}" required autocomplete="email" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600">@error('usr_email')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror

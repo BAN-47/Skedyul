@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
+use App\Models\Faculty;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -77,10 +78,20 @@ class ChairSettingsController extends Controller
             'dc_civil_status' => 'nullable|string|max:30',
             'dc_dob' => 'nullable|date',
             'dc_nationality' => 'nullable|string|max:100',
+            'fac_bachelors_degree' => 'nullable|string|max:255',
+            'fac_masters_degree' => 'nullable|string|max:255',
+            'fac_doctorate_degree' => 'nullable|string|max:255',
         ]);
 
         $chair = $this->currentChair();
-        $chair->update($data);
+        $chair->update(collect($data)->except([
+            'fac_bachelors_degree', 'fac_masters_degree', 'fac_doctorate_degree',
+        ])->all());
+        Faculty::where('fac_usr_id', Auth::id())->update([
+            'fac_bachelors_degree' => $request->input('fac_bachelors_degree'),
+            'fac_masters_degree' => $request->input('fac_masters_degree'),
+            'fac_doctorate_degree' => $request->input('fac_doctorate_degree'),
+        ]);
 
         return response()->json(['success' => true]);
     }
@@ -174,6 +185,7 @@ class ChairSettingsController extends Controller
 
         return view('chair.chair_settings', [
             'chair' => $chair,
+            'faculty' => Faculty::where('fac_usr_id', Auth::id())->first(),
             'departmentName' => $chair->department->dept_name ?? 'Not assigned',
             'academicYear' => \App\Models\AcademicYear::where('ay_is_active', true)->first(),
             'activeSemester' => \App\Models\Semester::where('sem_is_active', true)->first(),

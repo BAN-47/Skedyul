@@ -8,6 +8,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PasskeyAuthenticationController;
 use App\Http\Controllers\PasskeyRegistrationController;
 use App\Http\Controllers\RegistrationController;
+use App\Http\Controllers\FacultyEducationController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\UserController;
@@ -105,8 +106,13 @@ Route::get('/register/options', function () {
 
 Route::get('/register', [RegistrationController::class, 'create'])->name('register');
 Route::post('/register', [RegistrationController::class, 'store'])
-    ->middleware('throttle:5,1')
-    ->name('register.store');
+     ->middleware('throttle:5,1')
+     ->name('register.store');
+
+Route::get('/faculty/education/{facultyId}', [FacultyEducationController::class, 'edit'])
+    ->name('faculty.education.edit');
+Route::post('/faculty/education/{facultyId}', [FacultyEducationController::class, 'update'])
+    ->name('faculty.education.update');
 
 Route::post('/login', [LoginController::class, 'login'])
     ->name('login.authenticate');

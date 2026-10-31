@@ -116,6 +116,11 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
+                        <button type="button" id="schedule-summary-toggle" aria-expanded="false"
+                            aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()"
+                            class="btn btn-secondary inline-flex items-center gap-2">
+                            <span>Summary</span><span aria-hidden="true">▦</span>
+                        </button>
                         <a href="{{ route('faculty.pbt_export') }}"
                             class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
                             Download PBT Excel
@@ -126,24 +131,32 @@
                     </div>
                 </div>
 
-                <div class="schedule-layout grid grid-cols-1 gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
-                    <aside class="print-card card !p-0 self-start overflow-hidden">
-                        <div
-                            class="bg-blue-600 px-3 py-2.5 text-center text-[12px] font-extrabold tracking-wide text-white">
-                            Summary of Courses
+                {{-- SUMMARY MODAL (PBT STYLE) --}}
+                <div id="schedule-summary-modal"
+                    class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/40 p-4 opacity-0 transition-opacity duration-200"
+                    role="dialog" aria-modal="true" aria-labelledby="schedule-summary-title"
+                    onclick="if(event.target === this) closeScheduleSummary()">
+                    <aside id="schedule-summary-panel"
+                        class="card !p-0 w-[min(1100px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto self-center shadow-2xl scale-95 transition-transform duration-200">
+                        <div class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">
+                            <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">
+                                Summary of Courses
+                            </span>
+                            <button type="button" onclick="closeScheduleSummary()"
+                                class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20"
+                                aria-label="Close summary">✕</button>
                         </div>
 
                         <div class="overflow-x-auto">
-                            <table class="w-full border-collapse text-[10px]">
+                            <table class="w-full text-[10px] border-collapse">
                                 <thead>
-                                    <tr class="bg-slate-100 text-left text-[9px] font-bold uppercase text-slate-600">
-                                        <th class="border-b border-slate-200 px-1.5 py-2">Course Code</th>
-                                        <th class="border-b border-l border-slate-200 px-1.5 py-2">Descriptive Title
-                                        </th>
-                                        <th class="border-b border-l border-slate-200 px-1.5 py-2">Degree Yr. &amp; Sec.
-                                        </th>
-                                        <th class="border-b border-l border-slate-200 px-1.5 py-2 text-center">Students
-                                        </th>
+                                    <tr class="bg-slate-100 text-slate-600 uppercase font-bold">
+                                        <th class="px-1.5 py-1.5 text-left border-b border-slate-200">Course Code</th>
+                                        <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Descriptive Title</th>
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Units</th>
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Scheduled<br>Hours</th>
+                                        <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">Degree<br>Yr. &amp; Sec.</th>
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Total<br>No. of Students</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -151,55 +164,43 @@
                                         @php
                                             $course = $schedule->subject;
                                             $section = $schedule->section;
+                                            $courseHours = \App\Services\ScheduleAssignmentService::courseHours($course);
+                                            $courseMeetings = $allSchedules->where('sch_course_id', $schedule->sch_course_id)->where('sch_sec_id', $schedule->sch_sec_id);
+                                            $meetingHours = fn($m) => \Illuminate\Support\Carbon::parse($m->sch_start_time)->diffInMinutes(\Illuminate\Support\Carbon::parse($m->sch_end_time)) / 60;
+                                            $scheduledHours = $courseMeetings->sum($meetingHours);
                                         @endphp
                                         <tr class="border-b border-slate-100 text-slate-700">
-                                            <td class="whitespace-nowrap px-1.5 py-2 font-bold text-slate-800">
-                                                {{ $course->course_code ?? '—' }}</td>
-                                            <td class="border-l border-slate-100 px-1.5 py-2 leading-snug">
-                                                {{ $course->course_name ?? '—' }}</td>
-                                            <td class="whitespace-nowrap border-l border-slate-100 px-1.5 py-2">
-                                                {{ $section->sec_name ?? '—' }}</td>
-                                            <td class="border-l border-slate-100 px-1.5 py-2 text-center">
-                                                {{ $section->sec_no_of_student ?? ($section->sec_max_capacity ?? '—') }}
-                                            </td>
+                                            <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">{{ $course->course_code ?? '—' }}</td>
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 leading-snug">{{ $course->course_name ?? '—' }}</td>
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 text-center">{{ $course->course_units ?? 0 }}</td>
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 text-center" title="{{ $scheduledHours }} of {{ $courseHours }} total hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</td>
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 whitespace-nowrap">{{ $section->sec_name ?? '—' }}</td>
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 text-center font-semibold">{{ $section->sec_no_of_student ?? ($section->sec_max_capacity ?? '—') }}</td>
                                         </tr>
                                     @empty
                                         <tr>
-                                            <td colspan="4" class="px-2 py-4 text-center italic text-slate-400">No
-                                                courses assigned this semester.</td>
+                                            <td colspan="6" class="px-2 py-4 text-center italic text-slate-400">No courses assigned this semester.</td>
                                         </tr>
                                     @endforelse
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="space-y-1.5 border-t border-slate-200 p-3 text-[11px] text-slate-700">
-                            <div class="flex justify-between gap-2"><span class="font-bold">No. of
-                                    Preparations:</span><span>{{ $loadStats['preparations'] ?? 0 }}</span></div>
-                            <div class="flex justify-between gap-2"><span class="font-bold">No. of
-                                    Units:</span><span>{{ $loadStats['units'] ?? 0 }}</span></div>
-                            <div class="flex justify-between gap-2"><span class="font-bold">No. of
-                                    Hours/Week:</span><span>{{ $loadStats['hours_week'] ?? 0 }}</span></div>
-                            <div class="flex justify-between gap-2"><span class="font-bold">Teaching Load
-                                    Limit:</span><span>{{ isset($loadStats['load_limit']) ? rtrim(rtrim(number_format((float) $loadStats['load_limit'], 2), '0'), '.') . 'h' : '—' }}</span>
-                            </div>
-                            <div class="flex justify-between gap-2"><span class="font-bold">Administrative
-                                    Designation:</span><span
-                                    class="text-right">{{ $loadStats['designation'] ?: '—' }}</span></div>
-                            <div class="my-1.5 border-t border-slate-100"></div>
-                            <div class="flex justify-between gap-2"><span
-                                    class="font-bold">Production:</span><span>{{ $loadStats['production'] ?? '—' }}</span>
-                            </div>
-                            <div class="flex justify-between gap-2"><span
-                                    class="font-bold">Extension:</span><span>{{ $loadStats['extension'] ?? '—' }}</span>
-                            </div>
-                            <div class="flex justify-between gap-2"><span
-                                    class="font-bold">Research:</span><span>{{ $loadStats['research'] ?? '—' }}</span>
-                            </div>
+                        <div class="border-t border-slate-200 p-3 text-[11px] text-slate-700 space-y-1">
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of Preparations:</span><span>{{ $loadStats['preparations'] ?? 0 }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of Units:</span><span>{{ $loadStats['units'] ?? 0 }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of Hours/Week:</span><span>{{ $loadStats['hours_week'] ?? 0 }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">Teaching Load Limit:</span><span>{{ isset($loadStats['load_limit']) ? rtrim(rtrim(number_format((float) $loadStats['load_limit'], 2), '0'), '.') . 'h' : '—' }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">Administrative Designation:</span><span class="text-right">{{ $loadStats['designation'] ?: '—' }}</span></div>
+                            <div class="border-t border-slate-100 my-1.5"></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">Production:</span><span>{{ $loadStats['production'] ?? '—' }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">Extension:</span><span>{{ $loadStats['extension'] ?? '—' }}</span></div>
+                            <div class="flex justify-between gap-2"><span class="font-bold">Research:</span><span>{{ $loadStats['research'] ?? '—' }}</span></div>
                         </div>
                     </aside>
+                </div>
 
-                    <section class="print-card card !p-0 overflow-hidden">
+                <section class="print-card card !p-0 overflow-hidden w-full">
                         <div
                             class="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5">
                             <div
@@ -316,7 +317,6 @@
                             </div>
                         @endif
                     </section>
-                </div>
 
                 <section class="signature-card card mt-4 overflow-x-auto print-card">
                     <table class="w-full min-w-[720px] border-collapse text-center text-[12px]">
@@ -354,6 +354,40 @@
             </main>
         </div>
     </div>
+    <script>
+        function toggleScheduleSummary() {
+            const modal = document.getElementById('schedule-summary-modal');
+            const panel = document.getElementById('schedule-summary-panel');
+            const button = document.getElementById('schedule-summary-toggle');
+            const open = modal.classList.contains('hidden');
+            modal.classList.toggle('hidden', !open);
+            modal.classList.toggle('flex', open);
+            requestAnimationFrame(() => {
+                modal.classList.toggle('opacity-0', !open);
+                panel.classList.toggle('scale-95', !open);
+                panel.classList.toggle('scale-100', open);
+            });
+            button.setAttribute('aria-expanded', String(open));
+        }
+
+        function closeScheduleSummary() {
+            const modal = document.getElementById('schedule-summary-modal');
+            const panel = document.getElementById('schedule-summary-panel');
+            const button = document.getElementById('schedule-summary-toggle');
+            modal.classList.add('opacity-0');
+            panel.classList.add('scale-95');
+            panel.classList.remove('scale-100');
+            button.setAttribute('aria-expanded', 'false');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }, 200);
+        }
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') closeScheduleSummary();
+        });
+    </script>
 </body>
 
 </html>

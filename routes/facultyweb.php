@@ -12,6 +12,7 @@ Route::middleware('auth')
     ->name('faculty.')
     ->group(function () {
         Route::get('/dashboard', [FacultyDashboardController::class, 'index'])
+            ->middleware('faculty.education')
             ->name('dashboard');
 
         Route::get('/subjects', [FacultySubjectsController::class, 'index'])

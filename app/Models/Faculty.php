@@ -48,6 +48,9 @@ class Faculty extends Model
         'fac_rank',
         'fac_special_position',
         'fac_special_position_max_hours',
+        'fac_bachelors_degree',
+        'fac_masters_degree',
+        'fac_doctorate_degree',
 
         // Profile
         'fac_profile_image',

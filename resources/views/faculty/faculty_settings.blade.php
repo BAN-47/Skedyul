@@ -92,6 +92,11 @@
                   <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Date of Birth</label><input id="fac-dob" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" type="date" value="{{ $faculty->fac_dob ? \Carbon\Carbon::parse($faculty->fac_dob)->format('Y-m-d') : '' }}"></div>
                   <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Nationality</label><input id="fac-nationality" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_nationality }}"></div>
                 </div>
+                <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Bachelor's Degree</label><input id="fac-bachelors" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_bachelors_degree }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Master's Degree</label><input id="fac-masters" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_masters_degree }}"></div>
+                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Doctorate Degree</label><input id="fac-doctorate" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_degree }}"></div>
+                </div>
                 <div class="mt-1 flex justify-end">
                   <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSavePersonalInfo()">Save Changes</button>
                 </div>
@@ -1601,7 +1606,7 @@
       }
     }
 
-    function facSavePersonalInfo() {
+function facSavePersonalInfo() {
       return facSaveRequest(FAC_SETTINGS_ENDPOINTS.personalInfo, {
         fac_first_name: document.getElementById('fac-first-name').value.trim(),
         fac_last_name: document.getElementById('fac-last-name').value.trim(),
@@ -1612,6 +1617,9 @@
         fac_civil_status: document.getElementById('fac-civil-status').value,
         fac_dob: document.getElementById('fac-dob').value,
         fac_nationality: document.getElementById('fac-nationality').value.trim(),
+        fac_bachelors_degree: document.getElementById('fac-bachelors').value.trim(),
+        fac_masters_degree: document.getElementById('fac-masters').value.trim(),
+        fac_doctorate_degree: document.getElementById('fac-doctorate').value.trim(),
       }, 'Personal information saved.');
     }
 
