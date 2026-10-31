@@ -21,7 +21,6 @@ class Room extends Model
         'room_name',
         'room_college_id',
         'room_building',
-        'room_location',
         'room_type',
         'room_capacity',
         'room_is_available',
@@ -30,6 +29,25 @@ class Room extends Model
     protected $casts = [
         'room_is_available' => 'boolean',
     ];
+
+    public function getRoomLocationLabelAttribute(): ?string
+    {
+        if (!preg_match('/(\d{2,})\s*$/', (string) $this->room_name, $matches)) {
+            return null;
+        }
+
+        $number = $matches[1];
+        $floor = (int) substr($number, 0, 1);
+        $roomNumber = substr($number, 1);
+        $suffix = match ($floor % 10) {
+            1 => 'st',
+            2 => 'nd',
+            3 => 'rd',
+            default => 'th',
+        };
+
+        return "{$floor}{$suffix} Floor, Room {$roomNumber}";
+    }
 
     public function schedules()
     {

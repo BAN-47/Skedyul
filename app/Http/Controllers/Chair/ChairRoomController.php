@@ -122,7 +122,6 @@ class ChairRoomController extends Controller
             'room_type' => 'required|string|max:50',
             'room_capacity' => 'required|integer|min:1',
             'room_building' => 'required|string|max:100',
-            'room_location' => 'nullable|string|max:150',
         ]);
 
         if (!Schema::hasColumn('room', 'room_college_id')) {
@@ -136,9 +135,10 @@ class ChairRoomController extends Controller
             $duplicate = Room::query()
                 ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
                 ->where('room_college_id', $chair->dc_college_id)
+                ->where('room_building', $validated['room_building'] ?? null)
                 ->exists();
             if ($duplicate) {
-                return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+                return back()->withInput()->withErrors(['room_name' => 'A room with this name and building already exists for your college.']);
             }
 
             Room::create($validated);
@@ -159,16 +159,16 @@ class ChairRoomController extends Controller
             'room_type' => 'required|string|max:50',
             'room_capacity' => 'required|integer|min:1',
             'room_building' => 'required|string|max:100',
-            'room_location' => 'nullable|string|max:150',
         ]);
 
         $duplicate = Room::query()
             ->where('room_id', '!=', $room->room_id)
             ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
-            ->when(Schema::hasColumn('room', 'room_college_id'), fn ($query) => $query->where('room_college_id', $chair->dc_college_id))
+            ->where('room_college_id', $chair->dc_college_id)
+            ->where('room_building', $validated['room_building'] ?? null)
             ->exists();
         if ($duplicate) {
-            return back()->withInput()->withErrors(['room_name' => 'A room with this name already exists for your college.']);
+            return back()->withInput()->withErrors(['room_name' => 'A room with this name and building already exists for your college.']);
         }
 
         $room->update($validated);

@@ -20,6 +20,16 @@ class DeanDashboardController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+        $dean = $user?->dean;
+        $greetingName = collect([
+            $dean?->dean_first_name,
+            $dean?->dean_middle_name,
+            $dean?->dean_last_name,
+            $dean?->dean_suffix,
+        ])->filter(fn ($part) => filled($part))->implode(' ');
+        $greetingName = $greetingName ?: ($user?->usr_name ?: 'Dean');
+
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester = Semester::where('sem_is_active', true)->first();
 
@@ -194,7 +204,8 @@ class DeanDashboardController extends Controller
             'pendingApprovals',
             'scheduledApprovedCount',
             'pendingDeptCount',
-            'recentActivity'
+            'recentActivity',
+            'greetingName'
         ));
     }
 

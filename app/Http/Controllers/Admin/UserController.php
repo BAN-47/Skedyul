@@ -30,8 +30,7 @@ class UserController extends Controller
                     $query->select(
                         'room_id',
                         'room_name',
-                        'room_building',
-                        'room_location'
+                        'room_building'
                     );
                 },
             ])

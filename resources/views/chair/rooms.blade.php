@@ -140,10 +140,6 @@
                     <input name="room_building" value="{{ old('room_building') }}" required maxlength="100" placeholder="e.g. CCICT Building" class="field-input">
                 </div>
             </div>
-            <div class="mb-4">
-                <label class="field-label">Location / Floor <span class="font-normal normal-case text-slate-400">(optional)</span></label>
-                <input name="room_location" value="{{ old('room_location') }}" maxlength="150" placeholder="e.g. 2nd Floor" class="field-input">
-            </div>
             <div class="modal-footer">
                 <button type="button" onclick="closeChairAddRoom()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Room</button>
@@ -190,7 +186,6 @@
                 <div><label class="field-label">Capacity</label><input id="chair-room-edit-capacity" type="number" name="room_capacity" min="1" required class="field-input"></div>
                 <div><label class="field-label">Building</label><input id="chair-room-edit-building" name="room_building" required maxlength="100" class="field-input"></div>
             </div>
-            <div class="mb-4"><label class="field-label">Location / Floor</label><input id="chair-room-edit-location" name="room_location" maxlength="150" class="field-input"></div>
             <div class="modal-footer">
                 <button type="button" onclick="closeChairEditRoom()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -218,7 +213,7 @@ const chairRooms = {
         })->values();
     @endphp
     @json($room->room_id): {
-        name: @json($room->room_name), building: @json($room->room_building), location: @json($room->room_location), type: @json($room->room_type), capacity: @json($room->room_capacity),
+        name: @json($room->room_name), building: @json($room->room_building), type: @json($room->room_type), capacity: @json($room->room_capacity),
         schedules: @json($scheduledClasses),
     },
     @endforeach
@@ -231,7 +226,6 @@ function openChairEditRoom(roomId) {
     form.action = @json(url('/chair/rooms')) + '/' + encodeURIComponent(roomId);
     document.getElementById('chair-room-edit-name').value = room.name || '';
     document.getElementById('chair-room-edit-building').value = room.building || '';
-    document.getElementById('chair-room-edit-location').value = room.location || '';
     document.getElementById('chair-room-edit-type').value = room.type || 'Lecture';
     document.getElementById('chair-room-edit-capacity').value = room.capacity || 1;
     document.getElementById('chair-room-edit-modal').classList.add('active');

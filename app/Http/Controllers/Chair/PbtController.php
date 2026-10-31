@@ -132,7 +132,7 @@ class PbtController extends Controller
         return view('chair.pbt', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
-                ->when($deptId, fn ($q) => $q->where('course_dept_id', $deptId))
+                ->when($deptId, fn ($q) => $q->where(fn($q) => $q->where('course_dept_id', $deptId)->orWhere('course_code', 'REC')))
                 ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum))
                 ->orderBy('course_code')
                 ->get(),
@@ -194,7 +194,7 @@ class PbtController extends Controller
 
         $loads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($semId, fn ($q) => $q->where('sl_sem_id', $semId))
-            ->where('sl_shift', $shift)
+            ->when($faculty->fac_employment_type !== 'part_time', fn ($q) => $q->where('sl_shift', $shift))
             ->with('subject', 'schedules')
             ->get();
 
@@ -236,8 +236,8 @@ class PbtController extends Controller
             'subj_id'    => 'required|uuid|exists:course,course_id',
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
             'sem_id'     => 'nullable|uuid|exists:semester,sem_id',
-            'sec_id'     => 'required|uuid|exists:section,sec_id',
-            'room_id'    => 'required|uuid|exists:room,room_id',
+            'sec_id'     => 'nullable|uuid|exists:section,sec_id',
+            'room_id'    => 'nullable|uuid|exists:room,room_id',
             'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',

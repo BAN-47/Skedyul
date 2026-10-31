@@ -104,23 +104,32 @@ class ScheduleAssignmentService
             return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
         }
 
-        if ($conflict = $this->findConflict($data)) {
+        $course = Course::findOrFail($data['subj_id']);
+        $isRec = $course->course_code === 'REC';
+
+        if ($conflict = $this->findConflict($data, $isRec)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
 
         try {
             $result = DB::transaction(function () use ($data, $syncWorkload) {
                 $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
-                // One study load can have several meeting sessions (for example,
-                // the same course/section on different weekdays).
-                $loadQuery = Study_Load::where([
-                    'sl_fac_id' => $data['fac_id'], 'sl_course_id' => $data['subj_id'],
-                    'sl_sec_id' => $data['sec_id'], 'sl_sem_id' => $data['sem_id'],
-                ]);
-                $studyLoad = $loadQuery->withExists('schedules')->first();
                 $course = Course::findOrFail($data['subj_id']);
+                $isRec = $course->course_code === 'REC';
+                
+                $loadQuery = Study_Load::where([
+                    'sl_fac_id' => $data['fac_id'], 
+                    'sl_course_id' => $data['subj_id'],
+                    'sl_sem_id' => $data['sem_id'],
+                ]);
+                if (!$isRec) {
+                    $loadQuery->where('sl_sec_id', $data['sec_id']);
+                }
+                $studyLoad = $loadQuery->withExists('schedules')->first();
                 $courseHours = self::courseHours($course);
-                $this->assertCourseHoursAvailable($data, $course);
+                if (!$isRec) {
+                    $this->assertCourseHoursAvailable($data, $course);
+                }
 
                 $shift = $data['shift'] ?? 'day';
                 if ($studyLoad && $studyLoad->schedules_exists && $studyLoad->sl_shift && $studyLoad->sl_shift !== $shift) {
@@ -139,7 +148,7 @@ class ScheduleAssignmentService
                         'sl_fac_id' => $data['fac_id'],
                         'sl_course_id' => $data['subj_id'],
                         'sl_shift' => $shift,
-                        'sl_sec_id' => $data['sec_id'],
+                        'sl_sec_id' => $data['sec_id'] ?? null,
                         'sl_sem_id' => $data['sem_id'],
                         'sl_assigned_by' => Auth::id(),
                         'sl_status'      => 'approved',
@@ -253,7 +262,8 @@ class ScheduleAssignmentService
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
-                    if ($replacingSameFacultyLoad && $willRemoveOldLoad && $schedule->sch_shift === $shift) {
+                    if ($replacingSameFacultyLoad && $willRemoveOldLoad
+                        && ($faculty->fac_employment_type === 'part_time' || $schedule->sch_shift === $shift)) {
                         $oldCourse = Course::find($schedule->sch_course_id);
                         $currentHours -= $oldCourse ? self::courseHours($oldCourse) : 0;
                     }
@@ -333,10 +343,12 @@ class ScheduleAssignmentService
 
     public function facultyHoursForShift(string $facultyId, string $semesterId, string $shift): float
     {
+        $faculty = Faculty::find($facultyId);
+
         return (float) Study_Load::query()
             ->where('sl_fac_id', $facultyId)
             ->where('sl_sem_id', $semesterId)
-            ->where('sl_shift', $shift)
+            ->when($faculty?->fac_employment_type !== 'part_time', fn ($query) => $query->where('sl_shift', $shift))
             ->with('subject')
             ->get()
             ->sum(fn ($load) => self::courseHours($load->subject));
@@ -414,7 +426,7 @@ class ScheduleAssignmentService
      * semester, overlapping time range. Returns a human-readable conflict
      * message, or null when the slot is free.
      */
-    private function findConflict(array $data, ?string $excludeScheduleId = null): ?string
+    private function findConflict(array $data, bool $isRec = false, ?string $excludeScheduleId = null): ?string
     {
         $base = Schedule::query()
             ->where('sch_sem_id', $data['sem_id'])
@@ -436,19 +448,25 @@ class ScheduleAssignmentService
             return "Professor {$professor} already has {$this->codeOf($facultyClash)} with {$section} on {$data['day']} ({$facultyClash->sch_start_time}–{$facultyClash->sch_end_time}), which overlaps this time.";
         }
 
-        $roomClash = (clone $base)->where('sch_room_id', $data['room_id'])
-            ->with(['subject', 'section', 'faculty', 'room'])
-            ->first();
-        if ($roomClash) {
-            $room = $roomClash->room->room_name ?? 'the selected room';
-            return "Room {$room} is already used by {$this->professorName($roomClash)} for {$this->codeOf($roomClash)} with {$this->sectionName($roomClash)} on {$data['day']} ({$roomClash->sch_start_time}–{$roomClash->sch_end_time}).";
+        if (!$isRec && !empty($data['room_id'])) {
+            $roomClash = (clone $base)->where('sch_room_id', $data['room_id'])
+                ->with(['subject', 'section', 'faculty', 'room'])
+                ->first();
+            if ($roomClash) {
+                $room = $roomClash->room->room_name ?? 'the selected room';
+                return "Room {$room} is already used by {$this->professorName($roomClash)} for {$this->codeOf($roomClash)} with {$this->sectionName($roomClash)} on {$data['day']} ({$roomClash->sch_start_time}–{$roomClash->sch_end_time}).";
+            }
         }
 
-        $sectionClash = (clone $base)->where('sch_sec_id', $data['sec_id'])
-            ->with(['subject', 'section', 'faculty'])
-            ->first();
-        if ($sectionClash) {
-            return "Section {$this->sectionName($sectionClash)} already has {$this->codeOf($sectionClash)} with {$this->professorName($sectionClash)} on {$data['day']} ({$sectionClash->sch_start_time}–{$sectionClash->sch_end_time}), which overlaps this time.";
+        if (!$isRec && !empty($data['sec_id'])) {
+            $sectionClash = (clone $base)->where('sch_sec_id', $data['sec_id'])
+                ->with(['subject', 'section', 'faculty'])
+                ->first();
+            if ($sectionClash) {
+                $professor = $this->professorName($sectionClash);
+                $section = $this->sectionName($sectionClash);
+                return "Section {$section} already has {$this->codeOf($sectionClash)} with {$professor} on {$data['day']} ({$sectionClash->sch_start_time}–{$sectionClash->sch_end_time}).";
+            }
         }
 
         return null;

@@ -80,9 +80,12 @@ class ChairController extends Controller
             $shifts = collect(['day', 'evening'])->mapWithKeys(function ($shift) use ($f, $allLoads) {
                 $loads = $allLoads->where('sl_shift', $shift);
                 $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f, $shift);
-                $totalHours = (float) $loads->sum(
+                $shiftHours = (float) $loads->sum(
                     fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
                 );
+                $totalHours = $f->fac_employment_type === 'part_time'
+                    ? (float) $allLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
+                    : $shiftHours;
                 $remaining = max(0, $maxHours - $totalHours);
                 $percent = min(100, (int) round(($totalHours / max(1, $maxHours)) * 100));
                 $status = match (true) {

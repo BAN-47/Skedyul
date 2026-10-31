@@ -144,7 +144,6 @@ class User extends Authenticatable
                 return collect([
                     $room->room_name,
                     $room->room_building,
-                    $room->room_location,
                 ])
                     ->filter()
                     ->implode(', ');

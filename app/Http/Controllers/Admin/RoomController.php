@@ -41,12 +41,22 @@ class RoomController extends Controller
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',
             'room_building'     => 'nullable|string|max:150',
-            'room_location'     => 'nullable|string|max:150',
         ]);
 
         $validated['room_is_available'] = $validated['room_is_available'] ?? true;
 
         try {
+            $duplicate = Room::where('room_name', $validated['room_name'])
+                ->where('room_college_id', $validated['room_college_id'])
+                ->where('room_building', $validated['room_building'] ?? null)
+                ->exists();
+            if ($duplicate) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A room with this name and building already exists for this college.',
+                ], 409);
+            }
+
             $room = Room::create($validated);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23505') {
@@ -97,7 +107,6 @@ class RoomController extends Controller
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',
             'room_building'     => 'nullable|string|max:150',
-            'room_location'     => 'nullable|string|max:150',
         ]);
 
         try {

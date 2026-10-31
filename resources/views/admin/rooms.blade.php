@@ -123,10 +123,6 @@
         <input id="add-room-building" placeholder="e.g. ICT Building" class="field-input">
       </div>
     </div>
-    <div class="mb-4">
-      <label class="field-label">Location / Floor</label>
-      <input id="add-room-location" placeholder="e.g. 2nd Floor" class="field-input">
-    </div>
     <div class="modal-footer">
       <button onclick="closeModal('modal-add-room')" class="btn btn-secondary">Cancel</button>
       <button onclick="saveAddRoom()" class="btn btn-primary">Add Room</button>
@@ -163,10 +159,6 @@
     <div class="bg-slate-50 rounded-lg p-3.5 mb-3.5">
       <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Assigned College</div>
       <div id="vr-college" class="text-[13px] font-semibold text-slate-900">—</div>
-    </div>
-    <div class="bg-slate-50 rounded-lg p-3.5 mb-5">
-      <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Location / Floor</div>
-      <div id="vr-location" class="text-[13px] font-semibold text-slate-900">—</div>
     </div>
     <div class="modal-footer">
       <button onclick="closeModal('modal-view-room')" class="btn btn-secondary">Close</button>
@@ -215,10 +207,6 @@
       <div>
         <label class="field-label">Building</label>
         <input id="edit-room-building" placeholder="e.g. ICT Building" class="field-input">
-      </div>
-      <div>
-        <label class="field-label">Location / Floor</label>
-        <input id="edit-room-location" placeholder="e.g. 2nd Floor" class="field-input">
       </div>
     </div>
     <div class="mb-3">
@@ -271,7 +259,6 @@ const ROOMS_DATA = {
     capacity: {{ $room->room_capacity }},
     available: {{ $room->room_is_available ? 'true' : 'false' }},
     building: @json($room->room_building),
-    location: @json($room->room_location)
   },
   @endforeach
 };
@@ -321,7 +308,6 @@ async function saveAddRoom() {
   const type       = document.getElementById('add-room-type').value;
   const capacity   = document.getElementById('add-room-capacity').value;
   const building   = document.getElementById('add-room-building').value.trim();
-  const location   = document.getElementById('add-room-location').value.trim();
   const collegeId  = document.getElementById('add-room-college').value;
 
   if (!capacity) { showErrorModal('Please enter a capacity.'); return; }
@@ -341,8 +327,7 @@ async function saveAddRoom() {
         room_type: type,
         room_capacity: capacity,
         room_is_available: true,
-        room_building: building || null,
-        room_location: location || null
+        room_building: building || null
       })
     });
 
@@ -363,7 +348,6 @@ async function saveAddRoom() {
       capacity: room.room_capacity,
       available: room.room_is_available,
       building: room.room_building,
-      location: room.room_location
     };
 
     const tbody = document.getElementById('rooms-table');
@@ -388,7 +372,7 @@ async function saveAddRoom() {
 
     refreshStats();
     closeModal('modal-add-room');
-    ['add-room-name','add-room-capacity','add-room-building','add-room-location','add-room-college'].forEach(id => {
+    ['add-room-name','add-room-capacity','add-room-building','add-room-college'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
@@ -410,7 +394,6 @@ function openViewRoom(roomId) {
   document.getElementById('vr-capacity').textContent = room.capacity;
   document.getElementById('vr-college').textContent = room.collegeName || 'Unassigned';
   document.getElementById('vr-building').textContent = room.building || '—';
-  document.getElementById('vr-location').textContent = room.location || '—';
   const status = room.available ? 'Available' : 'In Use';
   const badgeClass = room.available ? 'badge badge-green' : 'badge badge-amber';
   document.getElementById('vr-status-badge').innerHTML = `<span class="${badgeClass}">${status}</span>`;
@@ -427,7 +410,6 @@ function openEditRoom(roomId) {
   document.getElementById('edit-room-name').value       = room.name;
   document.getElementById('edit-room-capacity').value   = room.capacity;
   document.getElementById('edit-room-building').value   = room.building || '';
-  document.getElementById('edit-room-location').value   = room.location || '';
   document.getElementById('edit-room-college').value    = room.collegeId || '';
   setSelectValue('edit-room-type', room.type);
   setSelectValue('edit-room-status', room.available ? '1' : '0');
@@ -440,7 +422,6 @@ async function saveEditRoom() {
   const capacity = document.getElementById('edit-room-capacity').value;
   const available = document.getElementById('edit-room-status').value === '1';
   const building = document.getElementById('edit-room-building').value.trim();
-  const location = document.getElementById('edit-room-location').value.trim();
   const collegeId = document.getElementById('edit-room-college').value;
 
   if (!name || !capacity) { showErrorModal('Please fill in all required fields.'); return; }
@@ -460,8 +441,7 @@ async function saveEditRoom() {
         room_type: type,
         room_capacity: capacity,
         room_is_available: available,
-        room_building: building || null,
-        room_location: location || null
+        room_building: building || null
       })
     });
 
@@ -482,7 +462,6 @@ async function saveEditRoom() {
       capacity: room.room_capacity,
       available: room.room_is_available,
       building: room.room_building,
-      location: room.room_location
     };
 
     const row = document.querySelector(`tr[data-room-id="${room.room_id}"]`);
