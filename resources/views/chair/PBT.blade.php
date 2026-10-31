@@ -90,7 +90,7 @@
   <div class="app-main">
 
     {{-- TOPBAR --}}
-    @include('partials.chair_header')
+    @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
 
     <div class="page-content" id="page-pbt">
 

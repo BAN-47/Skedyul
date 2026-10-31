@@ -18,7 +18,7 @@
 <div class="app-main relative">
 
     @include('partials.chair_header', [
-        'title' => 'Department Chair Dashboard',
+        'title' => 'Dashboard',
         'badgeText' => trim(collect([
             $deptChair->program->prog_code ?? $deptChair->department->dept_code ?? 'DEPT',
             $academicYear?->ay_academic_year,

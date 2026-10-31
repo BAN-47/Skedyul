@@ -13,7 +13,7 @@
     @include('partials.chair_sidebar')
     <div class="app-main">
         @include('partials.chair_header', [
-            'title' => 'Room Management',
+            'title' => 'Rooms',
             'badgeText' => trim(collect([$academicYear->ay_academic_year ?? 'No AY', $semester->sem_name ?? 'No Semester'])->filter()->implode(' · '))
         ])
 
