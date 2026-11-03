@@ -21,6 +21,7 @@ use ZipArchive;
 class MisController extends Controller
 {
     private const DEFAULT_MIS_INSTRUCTOR_TITLE = 'Prof.';
+    private const DOCTORATE_MIS_INSTRUCTOR_TITLE = 'Dr.';
 
     private function chairRecord(): ?Dept_Chair
     {
@@ -119,6 +120,7 @@ class MisController extends Controller
                 'chairDepartment' => null,
                 'filters' => ['section' => null, 'shift' => $shift],
                 'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
+                'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
                 'signatories' => [
                     'chair_name' => $chairName,
                     'chair_title' => 'Dept. Chair',
@@ -185,6 +187,7 @@ class MisController extends Controller
                 'shift' => $shift,
             ],
             'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
+            'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
             'signatories' => [
                 'chair_name' => $chairName,
                 'chair_title' => 'Chair, ' . ($chairDepartment->dept_code ?? 'Department'),
@@ -396,8 +399,8 @@ class MisController extends Controller
         }
     }
     /**
-     * Format an MIS export instructor using the surname and the default title.
-     * Keep the title in one constant so it is easy to change later.
+     * Format an MIS export instructor using the surname and degree information.
+     * A saved doctorate degree uses Dr.; otherwise the default Prof. title is used.
      */
     private function misInstructorName(?object $faculty): string
     {
@@ -407,7 +410,12 @@ class MisController extends Controller
             return '—';
         }
 
-        return self::DEFAULT_MIS_INSTRUCTOR_TITLE . ' ' . $lastName;
+        $doctorateDegree = trim((string) ($faculty?->fac_doctorate_degree ?? ''));
+        $title = $doctorateDegree !== ''
+            ? self::DOCTORATE_MIS_INSTRUCTOR_TITLE
+            : self::DEFAULT_MIS_INSTRUCTOR_TITLE;
+
+        return $title . ' ' . $lastName;
     }
     private function replaceScheduleRows(
         DOMXPath $xpath,
