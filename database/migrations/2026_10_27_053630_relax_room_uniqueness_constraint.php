@@ -12,10 +12,10 @@ return new class extends Migration
         // Drop old unique constraint on room_name alone
         DB::statement('ALTER TABLE room DROP CONSTRAINT IF EXISTS room_room_name_key');
         
-        // Add composite unique constraint: same name OK if different floor or building
+        // Add composite unique constraint: same name OK if it is in a different building
         DB::statement('
             CREATE UNIQUE INDEX room_name_location_building_unique 
-            ON room (room_name, COALESCE(room_location, \'\'), COALESCE(room_building, \'\'))
+            ON room (room_name, COALESCE(room_building, \'\'))
         ');
     }
 

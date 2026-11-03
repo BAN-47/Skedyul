@@ -73,7 +73,8 @@ class LoginController extends Controller
             $request->ip()
         );
 
-        return $this->redirectForRole($user->usr_role);
+        return $this->redirectForRole($user->usr_role)
+            ->withCookie(cookie('skedyul_login', '1', 5, '/', null, false, false, false, 'Lax'));
     }
 
     private function redirectForRole(?string $role)

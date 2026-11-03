@@ -45,6 +45,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
 
     // MIS — Class Program for MIS
     Route::get('/mis', [MisController::class, 'index'])->name('chair.mis');
+    Route::get('/mis/export/word', [MisController::class, 'exportWord'])->name('chair.mis.word');
     Route::put('/mis/{id}/code', [MisController::class, 'updateMisCode'])->name('chair.mis.code');
     Route::put('/mis/campus-director', [MisController::class, 'updateCampusDirector'])->name('chair.mis.campus-director');
 

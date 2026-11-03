@@ -99,24 +99,35 @@ class FacultySettingsController extends Controller
         $faculty = Faculty::where('fac_usr_id', $user->usr_id)->firstOrFail();
 
         $data = $request->validate([
-            'fac_first_name'   => ['required', 'string', 'max:255'],
-            'fac_last_name'    => ['required', 'string', 'max:255'],
-            'fac_middle_name'  => ['nullable', 'string', 'max:255'],
-            'fac_suffix'       => ['nullable', 'string', 'max:50'],
-            'fac_employee_id'  => [
+            'fac_first_name'     => ['required', 'string', 'max:255'],
+            'fac_last_name'      => ['required', 'string', 'max:255'],
+            'fac_middle_name'    => ['nullable', 'string', 'max:255'],
+            'fac_suffix'         => ['nullable', 'string', 'max:50'],
+            'fac_employee_id'    => [
                 'nullable',
                 'string',
                 'max:50',
                 Rule::unique('faculty', 'fac_employee_id')->ignore($faculty->fac_id, 'fac_id')
             ],
-            'fac_gender'       => ['nullable', 'in:Male,Female,Prefer not to say'],
-            'fac_civil_status' => ['nullable', 'in:Single,Married,Widowed'],
-            'fac_dob'          => ['nullable', 'date'],
-            'fac_nationality'  => ['nullable', 'string', 'max:100'],
+            'fac_gender'         => ['nullable', 'in:Male,Female,Prefer not to say'],
+            'fac_civil_status'   => ['nullable', 'in:Single,Married,Widowed'],
+            'fac_dob'            => ['nullable', 'date'],
+            'fac_nationality'    => ['nullable', 'string', 'max:100'],
+            'fac_bachelors_degree' => ['nullable', 'string', 'max:255'],
+            'fac_masters_degree'   => ['nullable', 'string', 'max:255'],
+            'fac_doctorate_degree' => ['nullable', 'string', 'max:255'],
         ]);
 
         DB::transaction(function () use ($user, $faculty, $data) {
-            $faculty->update($data);
+            $faculty->update([
+                'fac_first_name'       => $data['fac_first_name'],
+                'fac_middle_name'      => $data['fac_middle_name'] ?? null,
+                'fac_last_name'        => $data['fac_last_name'],
+                'fac_suffix'           => $data['fac_suffix'] ?? null,
+                'fac_bachelors_degree' => $data['fac_bachelors_degree'] ?? null,
+                'fac_masters_degree'   => $data['fac_masters_degree'] ?? null,
+                'fac_doctorate_degree' => $data['fac_doctorate_degree'] ?? null,
+            ]);
 
             $user->update([
                 'usr_first_name'  => $data['fac_first_name'],

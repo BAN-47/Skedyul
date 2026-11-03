@@ -262,7 +262,8 @@ class ScheduleAssignmentService
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
-                    if ($replacingSameFacultyLoad && $willRemoveOldLoad && $schedule->sch_shift === $shift) {
+                    if ($replacingSameFacultyLoad && $willRemoveOldLoad
+                        && ($faculty->fac_employment_type === 'part_time' || $schedule->sch_shift === $shift)) {
                         $oldCourse = Course::find($schedule->sch_course_id);
                         $currentHours -= $oldCourse ? self::courseHours($oldCourse) : 0;
                     }
@@ -342,10 +343,12 @@ class ScheduleAssignmentService
 
     public function facultyHoursForShift(string $facultyId, string $semesterId, string $shift): float
     {
+        $faculty = Faculty::find($facultyId);
+
         return (float) Study_Load::query()
             ->where('sl_fac_id', $facultyId)
             ->where('sl_sem_id', $semesterId)
-            ->where('sl_shift', $shift)
+            ->when($faculty?->fac_employment_type !== 'part_time', fn ($query) => $query->where('sl_shift', $shift))
             ->with('subject')
             ->get()
             ->sum(fn ($load) => self::courseHours($load->subject));

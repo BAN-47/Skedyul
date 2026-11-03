@@ -32,7 +32,8 @@ function showToast(msg) {
 function showInlineError(boxId, msg) {
   const box = document.getElementById(boxId);
   if (!box) return;
-  box.textContent = msg;
+  const msgEl = box.querySelector('[id$="-msg"]') || box;
+  msgEl.textContent = msg;
   box.classList.remove('hidden');
 }
 function clearInlineError(boxId) {
@@ -72,15 +73,13 @@ function handleScheduleError(data, inlineBoxId) {
   if (data.conflict) {
     const message = data.message || 'Conflict: that slot is already taken.';
     showToast(message);
+    showInlineError(inlineBoxId, message);
     return;
   }
   const firstValidationError = data.errors ? Object.values(data.errors).flat()[0] : null;
   const message = data.message || firstValidationError || 'Something went wrong.';
-  if (inlineBoxId === 'add-error' || /overextension/i.test(message)) {
-    showToast(message);
-  } else {
-    showInlineError(inlineBoxId, message);
-  }
+  showToast(message);
+  showInlineError(inlineBoxId, message);
 }
 
 /* ── clock ── */
@@ -160,6 +159,36 @@ function setShift(shift) {
 
 function getShiftValue() {
   return new URLSearchParams(window.location.search).get('shift') === 'night' ? 'evening' : 'day';
+}
+
+// Shift grid ranges in minutes since midnight.
+// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:00 PM.
+function getShiftGridRange() {
+  return getShiftValue() === 'evening'
+    ? { start: 16 * 60, end: 21 * 60, label: 'Evening (4:00 PM–9:00 PM)' }
+    : { start: 7 * 60,  end: 16 * 60, label: 'Day (7:00 AM–4:00 PM)' };
+}
+
+// Returns an error message string if start/end fall outside the shift grid, otherwise null.
+function validateTimeInRange(startTime, endTime) {
+  const range = getShiftGridRange();
+  const toMinutes = hhmm => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const sMin = toMinutes(startTime);
+  const eMin = toMinutes(endTime);
+  if (sMin < range.start || eMin > range.end) {
+    const fmt = mins => {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+    };
+    return `This time is outside the ${range.label} window (${fmt(range.start)}–${fmt(range.end)}). Switch to the other shift or pick a time within range.`;
+  }
+  return null;
 }
 
 function paintShift() {
@@ -292,15 +321,27 @@ function submitAdd(keepOpen = false) {
   };
 
   if (!payload.subj_id || !payload.fac_id || !payload.days.length || !payload.start_time || !payload.end_time) {
-    showToast('Please select the course, at least one day, and both times.');
+    const m = 'Please select the course, at least one day, and both times.';
+    showToast(m);
+    showInlineError('add-error', m);
     return;
   }
   if (!isRec && (!payload.sec_id || !payload.room_id)) {
-    showToast('Please select section and room (not required for REC).');
+    const m = 'Please select section and room (not required for REC).';
+    showToast(m);
+    showInlineError('add-error', m);
     return;
   }
   if (payload.end_time <= payload.start_time) {
-    showToast('End time must be later than start time.');
+    const m = 'End time must be later than start time.';
+    showToast(m);
+    showInlineError('add-error', m);
+    return;
+  }
+  const rangeError = validateTimeInRange(payload.start_time, payload.end_time);
+  if (rangeError) {
+    showToast(rangeError);
+    showInlineError('add-error', rangeError);
     return;
   }
 
@@ -373,6 +414,11 @@ function submitEdit() {
 
   if (payload.end_time <= payload.start_time) {
     showInlineError('edit-error', 'End time must be later than start time.');
+    return;
+  }
+  const editRangeError = validateTimeInRange(payload.start_time, payload.end_time);
+  if (editRangeError) {
+    showToast(editRangeError);
     return;
   }
 

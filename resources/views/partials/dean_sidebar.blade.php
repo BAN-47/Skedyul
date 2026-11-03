@@ -6,8 +6,9 @@
 
     <div class="sidebar-user">
         <div class="sidebar-avatar">
-            @if(Auth::user()->dean?->dean_profile_image)
-                <img src="{{ asset('images/dean_profile/' . Auth::user()->dean->dean_profile_image) }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
+            @if (Auth::user()->dean?->dean_profile_image)
+                <img src="{{ asset('images/dean_profile/' . Auth::user()->dean->dean_profile_image) }}"
+                    alt="Profile photo" class="h-full w-full rounded-full object-cover">
             @else
                 {{ strtoupper(substr(Auth::user()->dean->dean_first_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_middle_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_last_name ?? '', 0, 1)) }}
             @endif
@@ -44,6 +45,10 @@
         <a href="{{ route('dean.schedule_reports') }}"
             class="nav-item {{ request()->routeIs('dean.schedule_reports') ? 'active' : '' }}">
             <span class="nav-icon"></span> Schedule Reports
+        </a>
+        <a href="{{ route('dean.pbt_export') }}"
+            class="nav-item {{ request()->routeIs('dean.pbt_export*') ? 'active' : '' }}">
+            <span class="nav-icon"></span> Faculty PBT Exports
         </a>
 
         <div class="nav-section-label">System</div>

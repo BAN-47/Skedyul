@@ -501,7 +501,7 @@
          <select id="add-room" class="field-input">
            <option value="">-- Select Room --</option>
            @foreach($rooms as $r)
-             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
            @endforeach
          </select>
        </div>
@@ -534,6 +534,13 @@
         <textarea id="add-description" rows="3" class="field-input resize-y"></textarea>
       </div>
 
+    </div>
+
+    <div id="add-error" class="hidden mx-4 mb-3 rounded-lg border-2 border-red-400 bg-red-50 px-4 py-3">
+      <div class="flex items-start gap-2">
+        <span class="mt-0.5 text-red-500 font-bold text-lg leading-none">⚠</span>
+        <span id="add-error-msg" class="text-sm font-medium text-red-700 leading-snug"></span>
+      </div>
     </div>
 
     <div class="modal-footer">
@@ -623,7 +630,7 @@
          <select id="edit-room" class="field-input">
            <option value="">-- Select Room --</option>
            @foreach($rooms as $r)
-             <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
            @endforeach
          </select>
        </div>

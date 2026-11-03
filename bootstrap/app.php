@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\PreventBackHistory::class);
         $middleware->alias([
             'audit.activity' => \App\Http\Middleware\AuditActivityMiddleware::class,
+             'faculty.education' => \App\Http\Middleware\EnsureFacultyEducationComplete::class,
         ]);
     })
     

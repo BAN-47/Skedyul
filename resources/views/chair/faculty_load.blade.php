@@ -103,7 +103,7 @@
                                                         <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
                                                     @endforeach
                                                 </select>
-                                                <span data-position-cap class="text-xs text-slate-500">{{ $fl['special_position_max_hours'] ? 'Day cap: '.$fl['special_position_max_hours'].'h' : 'Day cap: 30h' }} · Evening cap: 30h</span>
+                                                <span data-position-cap class="text-xs text-slate-500">{{ $fl['employment'] === 'part_time' ? 'Day + evening cap: 30h' : ($fl['special_position_max_hours'] ? 'Day cap: '.$fl['special_position_max_hours'].'h' : 'Day cap: 30h').' · Evening cap: 30h' }}</span>
                                                 <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
                                             </form>
                                         </td>
@@ -173,7 +173,9 @@
                 const syncCap = () => {
                     const option = select.selectedOptions[0];
                     const maxHours = option.dataset.maxHours;
-                    cap.textContent = `Day cap: ${maxHours || 30}h · Evening cap: 30h`;
+                    cap.textContent = select.form.closest('tr').querySelector('td:nth-child(2)')?.textContent.trim() === 'Part-time'
+                        ? 'Day + evening cap: 30h'
+                        : `Day cap: ${maxHours || 30}h · Evening cap: 30h`;
                 };
                 select.addEventListener('change', syncCap);
                 syncCap();

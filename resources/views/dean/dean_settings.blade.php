@@ -115,6 +115,11 @@
                   </div>
                   <div><label class="field-label">Nationality</label><input class="field-input" id="pi-nat" value="{{ $dean->dean_nationality }}"></div>
                 </div>
+                <div class="grid grid-cols-3 gap-3 mb-3">
+                  <div><label class="field-label">Bachelor's Degree</label><input class="field-input" id="pi-bachelors" value="{{ $faculty?->fac_bachelors_degree }}"></div>
+                  <div><label class="field-label">Master's Degree</label><input class="field-input" id="pi-masters" value="{{ $faculty?->fac_masters_degree }}"></div>
+                  <div><label class="field-label">Doctorate Degree</label><input class="field-input" id="pi-doctorate" value="{{ $faculty?->fac_doctorate_degree }}"></div>
+                </div>
                 <div class="grid grid-cols-2 gap-3 mb-1">
                   <div><label class="field-label">Date of Birth</label><input class="field-input" type="date" id="pi-dob" value="{{ $dean->dean_dob?->format('Y-m-d') }}"></div>
                 </div>
@@ -626,7 +631,7 @@
         .catch(() => showToast('Remove failed. Please try again.'));
     }
 
-    function savePersonalInfo() {
+function savePersonalInfo() {
       const payload = {
         dean_first_name: document.getElementById('pi-first').value,
         dean_last_name: document.getElementById('pi-last').value,
@@ -637,6 +642,9 @@
         dean_civil_status: document.getElementById('pi-civil').value,
         dean_dob: document.getElementById('pi-dob').value || null,
         dean_nationality: document.getElementById('pi-nat').value,
+        fac_bachelors_degree: document.getElementById('pi-bachelors').value,
+        fac_masters_degree: document.getElementById('pi-masters').value,
+        fac_doctorate_degree: document.getElementById('pi-doctorate').value,
       };
 
       fetch("{{ route('dean.profile.personal-info.update') }}", {
