@@ -91,6 +91,8 @@
         {{-- ══════════ MAIN ══════════ --}}
         <div class="app-main">
 
+    {{-- TOPBAR --}}
+    @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
             {{-- TOPBAR --}}
             @include('partials.chair_header')
 
