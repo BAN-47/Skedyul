@@ -1,6 +1,51 @@
 // SELECTED_DATE is set by a small inline <script> in pbs.blade.php
 const SELECTED_DATE = window.PBS_SELECTED_DATE;
 
+function filterSubjectsByCategory() {
+    const catSel = document.getElementById('add-category');
+    const subSel = document.getElementById('add-subject');
+    const secSel = document.getElementById('add-section');
+    const deptSel = document.getElementById('add-department');
+    if (!catSel || !subSel) return;
+
+    const selectedCat = catSel.value;
+    const deptId = deptSel ? deptSel.value : '';
+    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+    const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
+
+    let subjectsToLoad = [];
+    if (selectedCat) {
+        // Global mode: fetch all courses everywhere matching this category
+        const globalList = window.ALL_SUBJECTS_LIST || [];
+        subjectsToLoad = globalList.filter(s => String(s.cat) === String(selectedCat));
+    } else {
+        // Standard mode: fetch department subjects matching department & year
+        const deptList = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
+        subjectsToLoad = deptList;
+    }
+
+    subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+    subjectsToLoad.forEach(sub => {
+        const opt = document.createElement('option');
+        opt.value = sub.id;
+        opt.textContent = sub.code + ' — ' + sub.name;
+        opt.dataset.yearLevel = sub.year || '';
+        opt.dataset.semester = sub.sem || '';
+        opt.dataset.category = sub.cat || '';
+        opt.dataset.lectureHours = sub.lecHours || 0;
+        opt.dataset.labHours = sub.labHours || 0;
+        
+        const yearMatch = selectedCat || !yearLevel || !sub.year || String(sub.year) === String(yearLevel);
+        const semesterMatch = selectedCat || !activeSemester || !sub.sem || String(sub.sem) === activeSemester;
+        if (!yearMatch || !semesterMatch) {
+            opt.hidden = true;
+            opt.style.display = 'none';
+        }
+        subSel.appendChild(opt);
+    });
+}
+
 /* ── modal helpers ── */
 function openModal(id)  { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -211,8 +256,8 @@ function applyFilters() {
     // Program locked server-side; semester label includes academic year.
     // Semester is fixed by admin settings — do not put it in the URL
     const map = {
-        program:       'filter-program',
-        section:       'filter-section',
+        department: 'filter-department',
+        section:    'filter-section',
     };
 
     Object.entries(map).forEach(([key, id]) => {
@@ -274,19 +319,97 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     }
 }
 
-// Wire up section → subject filter for Add + Edit modals
 document.addEventListener('DOMContentLoaded', () => {
+    const headerDept = document.getElementById('filter-department');
+    const headerSection = document.getElementById('filter-section');
+    if (headerDept && headerSection) {
+        const filterSections = () => {
+            const deptId = headerDept.value;
+            Array.from(headerSection.options).forEach(option => {
+                if (!option.value) return;
+                const show = !deptId || option.dataset.deptId === deptId;
+                option.hidden = !show;
+                option.style.display = show ? '' : 'none';
+            });
+            if (headerSection.selectedOptions[0]?.hidden) headerSection.value = '';
+        };
+        headerDept.addEventListener('change', filterSections);
+        filterSections();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const addDept = document.getElementById('add-department');
+    if (addDept) {
+        addDept.addEventListener('change', () => {
+            const deptId = addDept.value;
+            const sectionSelect = document.getElementById('add-section');
+            const subjectSelect = document.getElementById('add-subject');
+            const categorySelect = document.getElementById('add-category');
+            const sections = (window.COLLEGE_SECTIONS && window.COLLEGE_SECTIONS[deptId]) || [];
+            const subjects = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
+            const allCategories = window.ALL_CATEGORIES || [];
+            
+            sectionSelect.innerHTML = '<option value="">-- Select Section --</option>';
+            sections.forEach(sec => {
+                const opt = document.createElement('option');
+                opt.value = sec.id;
+                opt.textContent = sec.name;
+                opt.dataset.yearLevel = sec.year;
+                sectionSelect.appendChild(opt);
+            });
+            
+            subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            subjects.forEach(sub => {
+                const opt = document.createElement('option');
+                opt.value = sub.id;
+                opt.textContent = sub.code + ' — ' + sub.name;
+                opt.dataset.yearLevel = sub.year;
+                opt.dataset.semester = sub.sem;
+                opt.dataset.category = sub.cat;
+                opt.dataset.lectureHours = sub.lecHours;
+                opt.dataset.labHours = sub.labHours;
+                subjectSelect.appendChild(opt);
+            });
+
+            categorySelect.innerHTML = '<option value="">-- All --</option>';
+            allCategories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                categorySelect.appendChild(opt);
+            });
+
+            filterSubjectsBySection('add-section', 'add-subject');
+            filterSubjectsByCategory();
+        });
+    }
+
     const addSec = document.getElementById('add-section');
     if (addSec) {
         addSec.addEventListener('change', () => {
             filterSubjectsBySection('add-section', 'add-subject');
+            filterSubjectsByCategory();
         });
     }
+    
+    const addCat = document.getElementById('add-category');
+    if (addCat) {
+        addCat.addEventListener('change', () => {
+            filterSubjectsByCategory();
+        });
+    }
+    
     const editSec = document.getElementById('edit-section');
     if (editSec) {
         editSec.addEventListener('change', () => {
             filterSubjectsBySection('edit-section', 'edit-subject');
         });
+    }
+    
+    // Trigger initial filter based on default department
+    if (addDept) {
+        addDept.dispatchEvent(new Event('change'));
     }
 });
 

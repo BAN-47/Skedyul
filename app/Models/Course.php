@@ -44,6 +44,7 @@ class Course extends Model
         'course_year_level',
         'course_semester',
         'course_is_active',
+        'course_category',
         'subj_dept_id',
         'subj_prog_id',
         'subj_code',

@@ -362,12 +362,14 @@
                             </div>
 
 
-                            <span
+<span
                                 class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
                                 {{ optional($activeSemester)->label ?? 'No active semester' }}
                             </span>
                             <input type="hidden" id="filter-semester"
                                 value="{{ optional($activeSemester)->sem_id ?? '' }}">
+
+                            <input type="hidden" id="filter-department" value="{{ $selectedDeptId }}">
 
                             <div class="flex rounded-md overflow-hidden border border-slate-300">
                                 <button type="button" id="shift-day" onclick="setShift('day')"
@@ -586,25 +588,22 @@
                         class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
                 </div>
 
-                <div>
+                <div class="mb-3">
                     <label class="field-label">Department</label>
-                    @if (!empty($chairDepartment))
-                        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                            {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
-                            {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-                        </div>
-                        <input type="hidden" id="add-program"
-                            value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
-                    @else
-                        <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-                        <input type="hidden" id="add-program" value="">
-                    @endif
+                    <select id="add-department" class="field-input w-full">
+                        <option value="">-- Select Department --</option>
+                        @foreach($allDepartments as $dept)
+                            <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
+                                {{ $dept->dept_name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 {{-- ── SECTION (triggers subject filter) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input">
+                    <select id="add-section" class="field-input" onchange="filterSubjectsByCategory()">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
                             <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
@@ -613,9 +612,9 @@
                     </select>
                 </div>
 
-                {{-- ── SUBJECT (auto-filtered by section year level) ── --}}
-                <div class="flex flex-col gap-3 mb-3">
-                    <div>
+                {{-- ── SUBJECT + CATEGORY (side by side) ── --}}
+                <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-[3]">
                         <label class="field-label">Subject</label>
                         <select id="add-subject" class="field-input">
                             <option value="">-- Select Subject --</option>
@@ -623,6 +622,7 @@
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
+                                    data-category="{{ $sub->course_category ?? '' }}"
                                     data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
                                     data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
                                     {{ $sub->course_code ?? $sub->subj_code }} —
@@ -631,16 +631,25 @@
                             @endforeach
                         </select>
                     </div>
-
-                    <div>
-                        <label class="field-label">Room</label>
-                        <select id="add-room" class="field-input">
-                            <option value="">-- Select Room --</option>
-                            @foreach ($rooms ?? collect() as $r)
-                                <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
+                    <div class="flex-1">
+                        <label class="field-label">Cate</label>
+                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Room</label>
+                    <select id="add-room" class="field-input">
+                        <option value="">-- Select Room --</option>
+                        @foreach ($rooms ?? collect() as $r)
+                            <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div>
@@ -893,23 +902,7 @@
     </div>
 
 
-    {{-- TOAST --}}
-    <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
-    <script>
-        window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
-        window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
-    </script>
-    <script src="{{ asset('js/pbt.js') }}" defer></script>
-    <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
-
-    @if (session('error') || session('success'))
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                showToast(@json(session('error') ?? session('success')));
-            });
-        </script>
-    @endif
     <div class="max-h-[62vh] overflow-y-auto pr-1">
         <div id="edit-error"
             class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
@@ -1001,22 +994,20 @@
                 class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
         </div>
 
-        <div>
+        {{-- ── DEPARTMENT ── --}}
+        <div class="mb-3">
             <label class="field-label">Department</label>
-            @if (!empty($chairDepartment))
-                <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                    {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
-                    {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-                </div>
-                <input type="hidden" id="add-program"
-                    value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
-            @else
-                <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-                <input type="hidden" id="add-program" value="">
-            @endif
+            <select id="add-department" class="field-input">
+                <option value="">-- Select Department --</option>
+                @foreach($allDepartments as $dept)
+                    <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
+                        {{ $dept->dept_code ?? $dept->dept_name }}
+                    </option>
+                @endforeach
+            </select>
         </div>
 
-        {{-- ── SECTION (triggers subject filter) ── --}}
+        {{-- ── SECTION ── --}}
         <div class="mb-3">
             <label class="field-label">Section</label>
             <select id="add-section" class="field-input">
@@ -1149,17 +1140,14 @@
 
     <div class="mb-3">
         <label class="field-label">Department</label>
-        @if (!empty($chairDepartment))
-            <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
-                {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-            </div>
-            <input type="hidden" id="edit-program"
-                value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
-        @else
-            <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-            <input type="hidden" id="edit-program" value="">
-        @endif
+        <select id="edit-department" class="field-input">
+            <option value="">-- Select Department --</option>
+            @foreach($allDepartments as $dept)
+                <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
+                    {{ $dept->dept_code ?? $dept->dept_name }}
+                </option>
+            @endforeach
+        </select>
     </div>
 
     <input type="hidden" id="edit-id">
@@ -1293,6 +1281,31 @@
     <script>
         window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
         window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
+        window.COLLEGE_SECTIONS = {
+            @foreach ($allDepartments as $dept)
+                "{{ $dept->dept_id }}": [
+                    @php $deptSections = $sections->where('sec_dept_id', $dept->dept_id); @endphp
+                    @foreach ($deptSections as $sec)
+                        { id: "{{ $sec->sec_id }}", name: "{{ $sec->sec_name }}", year: "{{ $sec->sec_year_level }}" },
+                    @endforeach
+                ],
+            @endforeach
+        };
+        window.COLLEGE_SUBJECTS = {
+            @foreach ($allDepartments as $dept)
+                "{{ $dept->dept_id }}": [
+                    @foreach ($subjects->where('course_dept_id', $dept->dept_id) as $sub)
+                        { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+                    @endforeach
+                ],
+            @endforeach
+        };
+        window.ALL_SUBJECTS_LIST = [
+            @foreach ($allSubjects as $sub)
+                { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", dept: "{{ $sub->course_dept_id ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+            @endforeach
+        ];
+        window.ALL_CATEGORIES = @json($categories ?? []);
     </script>
     <script src="{{ asset('js/pbt.js') }}" defer></script>
     <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>

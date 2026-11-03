@@ -9,6 +9,8 @@ use App\Models\Schedule;
 use App\Models\Study_Load;
 use App\Models\Course;
 use App\Models\Departments;
+use App\Models\College;
+use App\Models\Section;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use App\Models\Semester;
@@ -58,9 +60,10 @@ class PbtController extends Controller
         }
 
         $chairDepartment = $deptId ? Departments::where('dept_id', $deptId)->first() : null;
-        $deptCollection = $chairDepartment
-            ? collect([$chairDepartment])
-            : collect();
+
+        // Get all departments in the chair's college for department selector
+        $collegeId = $chairDepartment?->dept_college_id;
+        $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
 
         // Build teacher groups (must be faculty rows for FK)
         $allFaculty = Faculty::query()
@@ -132,22 +135,27 @@ class PbtController extends Controller
         return view('chair.pbt', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
-                ->when($deptId, fn ($q) => $q->where(fn($q) => $q->where('course_dept_id', $deptId)->orWhere('course_code', 'REC')))
+                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
                 ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum))
                 ->orderBy('course_code')
                 ->get(),
+            'allSubjects'      => Course::where('course_is_active', true)->orderBy('course_code')->get(),
             'facultyFullTime'  => $facultyFullTime,
             'facultyPartTime'  => $facultyPartTime,
             'facultyChairs'    => $facultyChairs,
             'deans'            => $deans,
 
-            // BSIS chair → only BSIS sections; BSIT chair → only BSIT sections
-            'sections'         => DB::table('section')
-                ->when($deptId, fn ($q) => $q->where('sec_dept_id', $deptId))
-                ->orderBy('sec_name')
-                ->get(),
-            'programs'         => $deptCollection,
-            'departments'      => $deptCollection,
+            'allDepartments'   => $allDepartments,
+            'selectedDeptId'   => $request->query('department', $deptId),
+            'sections'         => Section::whereIn('sec_dept_id', $allDepartments->pluck('dept_id'))->orderBy('sec_name')->get(),
+            'categories'       => Course::where('course_is_active', true)
+                ->whereNotNull('course_category')
+                ->where('course_category', '!=', '')
+                ->distinct()
+                ->orderBy('course_category')
+                ->pluck('course_category'),
+            'programs'         => $allDepartments,
+            'departments'      => $allDepartments,
             'chairDepartment'  => $chairDepartment,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
@@ -181,6 +189,20 @@ class PbtController extends Controller
             'activeSemester'   => $activeSem ?? null,
             'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
         ]);
+    }
+
+    private function getSectionsForDepartment(Request $request, ?string $defaultDeptId)
+    {
+        $selectedDeptId = $request->query('department', $defaultDeptId);
+        $sectionsQuery = DB::table('section')
+            ->when($selectedDeptId, fn ($q) => $q->where('sec_dept_id', $selectedDeptId))
+            ->orderBy('sec_name');
+
+        if ($request->filled('section')) {
+            $sectionsQuery->orWhere('sec_id', $request->query('section'));
+        }
+
+        return $sectionsQuery->get();
     }
 
     private function loadStatsFor(?Faculty $faculty, ?string $semId, string $shift = 'day'): array

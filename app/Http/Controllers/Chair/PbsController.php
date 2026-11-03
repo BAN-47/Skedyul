@@ -81,6 +81,12 @@ class PbsController extends Controller
     public function index(Request $request)
     {
         $progId = $this->chairProgramId();
+        $dept = Departments::find($progId);
+        $collegeId = $dept?->dept_college_id;
+        $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
+
+        // Use selected department or default to chair's department
+        $selectedDeptId = $request->query('department');
 
         if (!$progId) {
             return view('chair.pbs', [
@@ -105,20 +111,16 @@ class PbsController extends Controller
         }
 
         $filters = $request->only(['section']);
-
-        // Program is locked to the chair's program — never from the query string
-        $filters['program'] = $progId;
+        $filters['department'] = $selectedDeptId;
 
         // Semester is FIXED from Admin → Academic Year settings (not user-selectable)
         $activeSem = $this->activeSemester();
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
 
-        // Sections for this chair's program only.
-        // Year is already in the name (BSIS 1-A, BSIS IV-A) — no year-level filter.
-        // Do not filter by sec_ay_id; null values would empty the dropdown.
+        // Sections for all departments in college (so department switcher in modal works)
         $sections = Section::query()
-            ->where('sec_dept_id', $progId)
+            ->whereIn('sec_dept_id', $allDepartments->pluck('dept_id'))
             ->orderBy('sec_name')
             ->get();
 
@@ -148,30 +150,47 @@ class PbsController extends Controller
             $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
         }
 
-        // Courses for this department, filtered by section year + active semester
+        // Courses for this department, filtered by section year + active semester + category
         // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
+        $selectedCategory = $request->query('category');
+
+        $subjectDeptId = $selectedDeptId ?: $progId;
         $subjectsQuery = Course::query()
             ->where('course_is_active', true)
-            ->where('course_dept_id', $progId)
             ->orderBy('course_code');
 
-        if (!empty($selectedSection?->sec_year_level)) {
-            $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
-        }
+        if (!empty($selectedCategory)) {
+            // Category selected: show ALL courses in this category (global, no dept/year/semester filter)
+            $subjectsQuery->where('course_category', $selectedCategory);
+        } else {
+            // No category: filter by selected department + year level + semester
+            $subjectsQuery->where('course_dept_id', $subjectDeptId);
 
-        // Map active semester name → 1 or 2
-        $semNum = null;
-        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
-        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
-            $semNum = 2;
-        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
-            $semNum = 1;
-        }
-        if ($semNum !== null) {
-            $subjectsQuery->where('course_semester', $semNum);
+            if (!empty($selectedSection?->sec_year_level)) {
+                $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
+            }
+
+            $semNum = null;
+            $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+            if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+                $semNum = 2;
+            } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+                $semNum = 1;
+            }
+            if ($semNum !== null) {
+                $subjectsQuery->where('course_semester', $semNum);
+            }
         }
 
         $subjects = $subjectsQuery->get();
+
+        // Get ALL unique categories in DB (global, no semester filter)
+        $categories = Course::where('course_is_active', true)
+            ->whereNotNull('course_category')
+            ->where('course_category', '!=', '')
+            ->distinct()
+            ->orderBy('course_category')
+            ->pluck('course_category');
 
         $prog = $programs->first();
         // All teachers who can be assigned (faculty table only — needed for FK).
@@ -185,10 +204,15 @@ class PbsController extends Controller
         return view('chair.pbs', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
+            'allSubjects'      => Course::where('course_is_active', true)->orderBy('course_code')->get(),
             'faculty'          => $faculty,
             'sections'         => $sections,
-            'programs'         => $programs,
-            'departments'      => $programs, // same collection (department = old program)
+            'programs'         => $allDepartments,
+            'departments'      => $allDepartments,
+            'allDepartments'   => $allDepartments,
+            'selectedDeptId'   => $selectedDeptId,
+            'categories'       => $categories,
+            'selectedCategory' => $selectedCategory,
             'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),
             // Labels like "2026-2027 1st Sem"
             'semesters'     => DB::table('semester as s')
@@ -217,8 +241,8 @@ class PbsController extends Controller
             'rooms'         => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
             'filters'       => $filters,
             'selectedDate'  => $request->query('date'),
-            'chairProgram'     => $programs->first(),
-            'chairDepartment'  => $programs->first(),
+            'chairProgram'     => $allDepartments->first(),
+            'chairDepartment'  => $allDepartments->first(),
             'activeSemester'   => $activeSem,
             'selectedSection'  => $selectedSection,
             'selectedShift'    => $shiftKey,

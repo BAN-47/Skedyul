@@ -4,6 +4,61 @@
 const SELECTED_DATE    = window.PBT_SELECTED_DATE;
 const SELECTED_TEACHER = window.PBT_SELECTED_TEACHER;
 
+function filterSubjectsByCategory() {
+  const catSel = document.getElementById('add-category');
+  const subSel = document.getElementById('add-subject');
+  const secSel = document.getElementById('add-section');
+  const deptSel = document.getElementById('add-department');
+  if (!catSel || !subSel) return;
+
+  const selectedCat = catSel.value;
+  const deptId = deptSel ? deptSel.value : '';
+  const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+  const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+
+  let subjectsToLoad = [];
+  if (selectedCat) {
+    const globalList = window.ALL_SUBJECTS_LIST || [];
+    subjectsToLoad = globalList.filter(s => String(s.cat) === String(selectedCat));
+  } else {
+    Array.from(subSel.options).forEach(opt => {
+      if (!opt.value) return;
+      const subYear = opt.getAttribute('data-year-level') || '';
+      const show = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+      opt.hidden = !show;
+      opt.style.display = show ? '' : 'none';
+    });
+    if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+    return;
+  }
+
+  subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+  subjectsToLoad.forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub.id;
+    opt.textContent = sub.code + ' — ' + sub.name;
+    opt.dataset.yearLevel = sub.year || '';
+    opt.dataset.semester = sub.sem || '';
+    opt.dataset.category = sub.cat || '';
+    opt.dataset.courseCode = sub.code || '';
+    opt.dataset.lectureHours = sub.lecHours || 0;
+    opt.dataset.labHours = sub.labHours || 0;
+    
+    if (!selectedCat) {
+      if (!yearLevel) {
+        if (sub.code !== 'REC') {
+          opt.hidden = true;
+          opt.style.display = 'none';
+        }
+      } else if (sub.year && String(sub.year) !== String(yearLevel)) {
+        opt.hidden = true;
+        opt.style.display = 'none';
+      }
+    }
+    subSel.appendChild(opt);
+  });
+}
+
 /* ── modal helpers (same pattern as PBS / other chair pages) ── */
 function openModal(id)  { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -258,17 +313,78 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
 
 // Wire up section → subject filter for Add + Edit modals
 document.addEventListener('DOMContentLoaded', () => {
+  const addDept = document.getElementById('add-department');
+  if (addDept) {
+    addDept.addEventListener('change', () => {
+      const deptId = addDept.value;
+      const sectionSelect = document.getElementById('add-section');
+      const subjectSelect = document.getElementById('add-subject');
+      const categorySelect = document.getElementById('add-category');
+      const sections = (window.COLLEGE_SECTIONS && window.COLLEGE_SECTIONS[deptId]) || [];
+      const subjects = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
+      const allCategories = window.ALL_CATEGORIES || [];
+      
+      sectionSelect.innerHTML = '<option value="">-- Select Section --</option>';
+      sections.forEach(sec => {
+        const opt = document.createElement('option');
+        opt.value = sec.id;
+        opt.textContent = sec.name;
+        opt.dataset.yearLevel = sec.year;
+        sectionSelect.appendChild(opt);
+      });
+      
+      subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+      subjects.forEach(sub => {
+        const opt = document.createElement('option');
+        opt.value = sub.id;
+        opt.textContent = sub.code + ' — ' + sub.name;
+        opt.dataset.yearLevel = sub.year;
+        opt.dataset.semester = sub.sem;
+        opt.dataset.category = sub.cat;
+        opt.dataset.courseCode = sub.code;
+        opt.dataset.lectureHours = sub.lecHours;
+        opt.dataset.labHours = sub.labHours;
+        subjectSelect.appendChild(opt);
+      });
+      
+      categorySelect.innerHTML = '<option value="">-- All --</option>';
+      allCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+      });
+      
+      filterSubjectsBySection('add-section', 'add-subject');
+      filterSubjectsByCategory();
+    });
+  }
+
   const addSec = document.getElementById('add-section');
   if (addSec) {
     addSec.addEventListener('change', () => {
       filterSubjectsBySection('add-section', 'add-subject');
+      filterSubjectsByCategory();
     });
   }
+  
+  const addCat = document.getElementById('add-category');
+  if (addCat) {
+    addCat.addEventListener('change', () => {
+      filterSubjectsByCategory();
+    });
+  }
+  
   const editSec = document.getElementById('edit-section');
   if (editSec) {
     editSec.addEventListener('change', () => {
       filterSubjectsBySection('edit-section', 'edit-subject');
     });
+  }
+
+  // Trigger initial filter based on default department
+  if (addDept) {
+    addDept.dispatchEvent(new Event('change'));
   }
 });
 
