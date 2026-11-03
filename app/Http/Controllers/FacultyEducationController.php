@@ -21,7 +21,7 @@ class FacultyEducationController extends Controller
         abort_unless($request->hasValidSignature(), 403);
         $data = $request->validate([
             'fac_bachelors_degree' => ['required', 'string', 'max:255'],
-            'fac_masters_degree' => ['required', 'string', 'max:255'],
+            'fac_masters_degree' => ['nullable', 'string', 'max:255'],
             'fac_doctorate_degree' => ['nullable', 'string', 'max:255'],
         ]);
 

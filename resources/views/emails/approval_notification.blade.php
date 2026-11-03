@@ -5,7 +5,7 @@ Hello **{{ $name }}**,
 
 Your SKEDYUL faculty account has been approved successfully.
 
-Before you can access your dashboard, complete your required education information: Bachelor's, Master's, and Doctorate degree fields.
+Before you can access your dashboard, complete your required education information: Bachelor's degree (required), Master's and Doctorate degrees (optional).
 
 <x-mail::button :url="$continuationUrl">
 Continue to Complete Profile
