@@ -8,24 +8,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SKEDYUL — Class Program for MIS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <style>
-        @media print {
-            .no-print {
-                display: none !important;
-            }
 
-            .app-shell,
-            .app-main,
-            .page-content {
-                overflow: visible !important;
-                height: auto !important;
-            }
-
-            body {
-                background: white !important;
-            }
-        }
-    </style>
 </head>
 
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
@@ -41,6 +24,8 @@
         $shift = $filters['shift'] ?? 'day';
     @endphp
 
+
+
     <div class="app-shell">
         @include('partials.chair_sidebar')
 
@@ -49,13 +34,14 @@
 
             <div class="page-content" id="page-mis">
 
+
                 <div class="flex items-center justify-between gap-3 mb-4 no-print">
                     <div class="text-[19px] font-extrabold text-slate-900">Class Program for MIS</div>
                     <div class="flex items-center gap-2">
                         <a href="{{ route('chair.mis.word', request()->query()) }}" class="btn btn-primary">
-                            Download Word
+                            Download DOCX
                         </a>
-                        <button type="button" onclick="window.print()" class="btn btn-secondary">Print</button>
+
                     </div>
                 </div>
 
@@ -102,7 +88,7 @@
                 </div>
 
                 {{-- TITLE --}}
-                <div class="text-center mb-3">
+                <div class="text-center mb-3 ">
                     <div class="text-[14px] font-extrabold tracking-wide text-slate-800">CLASS PROGRAM FOR MIS</div>
                     <div class="text-[12px] font-semibold text-slate-600">
                         {{ optional($activeSemester)->label ?? '—' }}
@@ -115,7 +101,7 @@
                             class="px-3 py-2 bg-slate-100 border-b border-slate-200 text-[13px] font-extrabold text-slate-800">
                             {{ $sectionName }}
                         </div>
-                        <div class="overflow-x-auto">
+                        <div class="overflow-x-auto ">
                             <table class="w-full text-[11px] border-collapse min-w-[900px]">
                                 <thead>
                                     <tr class="bg-slate-50 text-slate-600 uppercase font-bold text-[10px]">
@@ -162,13 +148,16 @@
                                             }
                                             $day = $s->sch_day ?? '—';
                                             $room = optional($s->room)->room_name ?? '—';
-                                            $inst = $s->faculty
-                                                ? trim(
-                                                    ($s->faculty->fac_first_name ?? '') .
-                                                        ' ' .
-                                                        ($s->faculty->fac_last_name ?? ''),
-                                                )
-                                                : '—';
+                                            $faculty = $s->faculty;
+                                            $lastName = trim((string) (optional($faculty)->fac_last_name ?? ''));
+                                            $doctorateDegree = trim(
+                                                (string) (optional($faculty)->fac_doctorate_degree ?? ''),
+                                            );
+                                            $teacherTitle =
+                                                $doctorateDegree !== ''
+                                                    ? trim((string) ($doctorateInstructorTitle ?? 'Dr.'))
+                                                    : trim((string) ($instructorTitle ?? 'Prof.'));
+                                            $inst = $lastName !== '' ? $teacherTitle . ' ' . $lastName : '—';
                                         @endphp
                                         <tr class="border-b border-slate-100 hover:bg-slate-50/80">
                                             <td class="px-2 py-1.5 align-top">
@@ -176,7 +165,8 @@
                                                     class="w-full min-w-[72px] rounded border border-slate-300 px-1.5 py-1 text-[11px] font-mono"
                                                     value="{{ $s->sch_mis_code ?? '' }}" placeholder="—"
                                                     data-sch-id="{{ $s->sch_id }}" onchange="saveMisCode(this)"
-                                                    onblur="saveMisCode(this)">
+                                                    onblur="saveMisCode(this)"><span
+                                                    class="hidden">{{ $s->sch_mis_code ?: '—' }}</span>
                                             </td>
                                             <td
                                                 class="px-2 py-1.5 font-bold text-slate-800 whitespace-nowrap border-l border-slate-100">
@@ -223,7 +213,8 @@
                         <thead>
                             <tr class="text-slate-500 font-bold uppercase text-[10px]">
                                 <th class="px-3 py-2 text-left border-b border-slate-200 w-1/3">Prepared by:</th>
-                                <th class="px-3 py-2 text-left border-b border-slate-200 w-1/3">Reviewed &amp; Certified
+                                <th class="px-3 py-2 text-left border-b border-slate-200 w-1/3">Reviewed &amp;
+                                    Certified
                                     True and Correct:</th>
                                 <th class="px-3 py-2 text-left border-b border-slate-200 w-1/3">APPROVED:</th>
                             </tr>
@@ -262,8 +253,9 @@
                                         <div class="text-slate-500 text-[10px] mt-1">Campus Director (click to edit)
                                         </div>
                                     </div>
-                                    <div class="hidden print:block">
-                                        <div class="font-bold text-[12px]">{{ $signatories['campus_director'] ?: '—' }}
+                                    <div class="hidden">
+                                        <div class="font-bold text-[12px]">
+                                            {{ $signatories['campus_director'] ?: '—' }}
                                         </div>
                                         <div class="text-slate-500 text-[10px] mt-1">Campus Director</div>
                                     </div>

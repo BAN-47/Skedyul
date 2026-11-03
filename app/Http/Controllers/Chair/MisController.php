@@ -20,6 +20,9 @@ use ZipArchive;
 
 class MisController extends Controller
 {
+    private const DEFAULT_MIS_INSTRUCTOR_TITLE = 'Prof.';
+    private const DOCTORATE_MIS_INSTRUCTOR_TITLE = 'Dr.';
+
     private function chairRecord(): ?Dept_Chair
     {
         $user = Auth::user();
@@ -116,6 +119,8 @@ class MisController extends Controller
                 'activeSemester' => $activeSem,
                 'chairDepartment' => null,
                 'filters' => ['section' => null, 'shift' => $shift],
+                'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
+                'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
                 'signatories' => [
                     'chair_name' => $chairName,
                     'chair_title' => 'Dept. Chair',
@@ -181,6 +186,8 @@ class MisController extends Controller
                 'section' => $sectionId,
                 'shift' => $shift,
             ],
+            'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
+            'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
             'signatories' => [
                 'chair_name' => $chairName,
                 'chair_title' => 'Chair, ' . ($chairDepartment->dept_code ?? 'Department'),
@@ -320,6 +327,8 @@ class MisController extends Controller
             }
         }
 
+        $this->removeEmptyBodyParagraphs($xpath);
+
         $this->updateTemplateProgramLine(
             $xpath,
             $filters,
@@ -350,6 +359,64 @@ class MisController extends Controller
             ->deleteFileAfterSend(true);
     }
 
+    /**
+     * Remove blank paragraphs left behind after the sample template tables
+     * are removed. Those empty paragraphs can spill onto a second blank page.
+     */
+    private function removeEmptyBodyParagraphs(DOMXPath $xpath): void
+    {
+        $body = $xpath->query('/w:document/w:body')?->item(0);
+
+        if (!$body instanceof DOMNode) {
+            return;
+        }
+
+        $children = [];
+
+        foreach ($body->childNodes as $child) {
+            $children[] = $child;
+        }
+
+        foreach ($children as $child) {
+            if (!$child instanceof \DOMElement || $child->localName !== 'p') {
+                continue;
+            }
+
+            if ($this->nodeText($xpath, $child) !== '') {
+                continue;
+            }
+
+            $meaningfulNodes = $xpath->query(
+                './/w:drawing | .//w:pict | .//w:object | .//w:br | .//w:tab | .//w:fldChar | .//w:instrText',
+                $child
+            );
+
+            if ($meaningfulNodes !== false && $meaningfulNodes->length > 0) {
+                continue;
+            }
+
+            $body->removeChild($child);
+        }
+    }
+    /**
+     * Format an MIS export instructor using the surname and degree information.
+     * A saved doctorate degree uses Dr.; otherwise the default Prof. title is used.
+     */
+    private function misInstructorName(?object $faculty): string
+    {
+        $lastName = trim((string) ($faculty?->fac_last_name ?? ''));
+
+        if ($lastName === '') {
+            return '—';
+        }
+
+        $doctorateDegree = trim((string) ($faculty?->fac_doctorate_degree ?? ''));
+        $title = $doctorateDegree !== ''
+            ? self::DOCTORATE_MIS_INSTRUCTOR_TITLE
+            : self::DEFAULT_MIS_INSTRUCTOR_TITLE;
+
+        return $title . ' ' . $lastName;
+    }
     private function replaceScheduleRows(
         DOMXPath $xpath,
         DOMNode $table,
@@ -403,13 +470,7 @@ class MisController extends Controller
                 );
             }
 
-            $instructor = $schedule->faculty
-                ? trim(
-                    ($schedule->faculty->fac_first_name ?? '')
-                        . ' '
-                        . ($schedule->faculty->fac_last_name ?? '')
-                )
-                : '—';
+            $instructor = $this->misInstructorName($schedule->faculty);
 
             $values = [
                 $schedule->sch_mis_code ?? '',
