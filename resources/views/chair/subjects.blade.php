@@ -23,7 +23,7 @@
 
         <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
             @include('partials.chair_header', [
-                'title' => 'Course Management',
+                'title' => 'Courses',
                 'badgeText' => ($programName ?? 'BSIS') . ' Department',
             ])
 
