@@ -20,7 +20,7 @@
     @include('partials.chair_sidebar')
 
     <div class="app-main">
-      @include('partials.chair_header', ['title' => 'Department Chair Settings'])
+      @include('partials.chair_header', ['title' => 'Settings'])
 
       <div class="page-content">
         <div class="grid grid-cols-[220px_1fr] gap-6 items-start">

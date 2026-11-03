@@ -19,7 +19,7 @@
         <div class="app-main relative">
 
             <div class="topbar">
-                <div class="topbar-title">Faculty Load Management</div>
+                <div class="topbar-title">Faculty Load</div>
                 <div class="flex items-center gap-2.5">
                     <span class="badge badge-blue text-[11px]">
                         {{ $program->prog_code ?? ($department->dept_code ?? 'DEPT') }}

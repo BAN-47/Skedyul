@@ -86,7 +86,7 @@
   <div class="app-main">
 
     {{-- TOPBAR --}}
-@include('partials.chair_header')
+@include('partials.chair_header', ['title' => 'Program by Section (PBS)'])
 
     <div class="page-content" id="page-pbs">
 

@@ -91,6 +91,8 @@
         {{-- ══════════ MAIN ══════════ --}}
         <div class="app-main">
 
+    {{-- TOPBAR --}}
+    @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
             {{-- TOPBAR --}}
             @include('partials.chair_header')
 
@@ -107,7 +109,7 @@
                                 </button>
                             @endif
                             <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id]) }}"
-                                class="btn btn-secondary">Download PBT Excel</a>
+                                class="btn btn-secondary">Download XLSX</a>
                         @endif
                         <button type="button" onclick="saveDraft()" class="btn btn-secondary">Save Draft</button>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
