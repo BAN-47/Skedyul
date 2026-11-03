@@ -583,6 +583,27 @@ class UserController extends Controller
                 );
         }
 
+        // Enforce one dean per college when changing an existing account's role.
+        // Excluding this account lets the current dean save edits to their own profile.
+        if (($data['usr_role'] ?? '') === 'dean' && $request->filled('college_id')) {
+            $existingDean = Dean::where('dean_college_id', $request->college_id)
+                ->where('dean_usr_id', '!=', $user->usr_id)
+                ->first();
+
+            if ($existingDean) {
+                $collegeLabel = College::where('college_id', $request->college_id)
+                    ->value('college_code')
+                    ?? 'the selected college';
+
+                return redirect()->route('admin.users')
+                    ->with(
+                        'error',
+                        "Cannot assign this account as the {$collegeLabel} dean. "
+                        . 'That college already has an active dean. The account role was not changed; edit or remove the current dean first, or select another college.'
+                    );
+            }
+        }
+
         // Enforce one chair per program when changing an existing account's role.
         // Excluding this account lets the current chair save edits to their own profile.
         if (($data['usr_role'] ?? '') === 'department_chair' && $request->filled('dept_id')) {

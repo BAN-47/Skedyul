@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class PendingFacultyAccountController extends Controller
 {
@@ -116,27 +117,27 @@ class PendingFacultyAccountController extends Controller
             $review->fvr_reviewed_by = auth()->id();
             $review->fvr_reviewed_at = now();
             $review->save();
+
+            try {
+                $faculty = Faculty::where('fac_usr_id', $approvedUser->usr_id)->first();
+                if ($faculty) {
+                    $continuationUrl = URL::temporarySignedRoute('faculty.education.edit', now()->addDays(7), ['facultyId' => $faculty->fac_id]);
+                    $name = trim(implode(' ', array_filter([
+                        $faculty->fac_first_name,
+                        $faculty->fac_middle_name,
+                        $faculty->fac_last_name,
+                        $faculty->fac_suffix,
+                    ]))) ?: $approvedUser->usr_name;
+                    Mail::to($approvedUser->usr_email)->send(new ApprovalNotificationMail($name, $approvedUser->usr_email, $continuationUrl));
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Approval notification email failed.', ['user_id' => $approvedUser->usr_id, 'exception' => $exception->getMessage()]);
+            }
         });
 
         return redirect()
             ->route('admin.pending-accounts')
             ->with('success', 'Faculty account approved. The faculty member can now sign in.');
-
-        try {
-            $faculty = Faculty::where('fac_usr_id', $approvedUser->usr_id)->first();
-            if ($faculty) {
-                $continuationUrl = URL::temporarySignedRoute('faculty.education.edit', now()->addDays(7), ['facultyId' => $faculty->fac_id]);
-                $name = trim(implode(' ', array_filter([
-                    $faculty->fac_first_name,
-                    $faculty->fac_middle_name,
-                    $faculty->fac_last_name,
-                    $faculty->fac_suffix,
-                ]))) ?: $approvedUser->usr_name;
-                Mail::to($approvedUser->usr_email)->send(new ApprovalNotificationMail($name, $approvedUser->usr_email, $continuationUrl));
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('Approval notification email failed.', ['user_id' => $approvedUser->usr_id, 'exception' => $exception->getMessage()]);
-        }
     }
 
     public function reject(\Illuminate\Http\Request $request, string $id)
