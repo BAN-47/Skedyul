@@ -394,9 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headerDept.addEventListener('change', filterSections);
         filterSections();
     }
-});
 
-document.addEventListener('DOMContentLoaded', () => {
     const addDept = document.getElementById('add-department');
     if (addDept) {
         addDept.addEventListener('change', () => {
@@ -429,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 opt.dataset.labHours = sub.labHours;
                 subjectSelect.appendChild(opt);
             });
-
+            
             categorySelect.innerHTML = '<option value="">-- All --</option>';
             allCategories.forEach(cat => {
                 const opt = document.createElement('option');
@@ -437,9 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 opt.textContent = cat;
                 categorySelect.appendChild(opt);
             });
-
+            
             filterSubjectsBySection('add-section', 'add-subject');
-            filterSubjectsBySection();
         });
     }
 
@@ -447,7 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addSec) {
         addSec.addEventListener('change', () => {
             filterSubjectsBySection('add-section', 'add-subject');
-            filterSubjectsBySection();
         });
     }
     
