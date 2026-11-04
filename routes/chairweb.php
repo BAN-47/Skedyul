@@ -34,6 +34,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::post('/pbs/save-draft', [PbsController::class, 'saveDraft'])->name('chair.pbs.save-draft');
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
+    Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
 
     // PBT — Program by Teacher
     Route::get('/pbt', [PbtController::class, 'index'])->name('chair.pbt');

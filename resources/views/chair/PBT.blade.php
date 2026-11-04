@@ -612,7 +612,7 @@
                 {{-- ── SECTION (triggers subject filter) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input" onchange="filterSubjectsBySection()">
+                    <select id="add-section" class="field-input" onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
                             <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
@@ -642,7 +642,7 @@
                     </div>
                     <div class="flex-1">
                         <label class="field-label">Cate</label>
-                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsBySection()">
+                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
                             <option value="">-- All --</option>
                             @foreach($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>

@@ -46,6 +46,7 @@ function filterSubjectsByCategory() {
     
     if (!selectedCat) {
       if (!yearLevel) {
+        // REC is always visible globally, other courses need section/year
         if (sub.code !== 'REC') {
           opt.hidden = true;
           opt.style.display = 'none';
@@ -336,16 +337,16 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     }
     const subYear = opt.getAttribute('data-year-level') || '';
     const courseCode = opt.getAttribute('data-course-code') || '';
+    const isRec = courseCode === 'REC';
     
     if (!yearLevel) {
-      const showRec = courseCode === 'REC';
-      opt.hidden = !showRec;
-      opt.style.display = showRec ? '' : 'none';
+      // Always show REC globally, hide other courses until section selected
+      opt.hidden = !isRec;
+      opt.style.display = isRec ? '' : 'none';
     } else {
       const match = !subYear || String(subYear) === String(yearLevel);
-      const hideRec = courseCode === 'REC';
-      opt.hidden = !match || hideRec;
-      opt.style.display = (match && !hideRec) ? '' : 'none';
+      opt.hidden = !match;
+      opt.style.display = match ? '' : 'none';
     }
   });
 

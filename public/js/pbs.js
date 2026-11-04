@@ -36,11 +36,18 @@ function filterSubjectsByCategory() {
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
         
+        // REC is always visible globally, other courses follow year/semester filters
+        const isRec = sub.code === 'REC';
         const yearMatch = selectedCat || !yearLevel || !sub.year || String(sub.year) === String(yearLevel);
         const semesterMatch = selectedCat || !activeSemester || !sub.sem || String(sub.sem) === activeSemester;
         if (!yearMatch || !semesterMatch) {
             opt.hidden = true;
             opt.style.display = 'none';
+        }
+        // Always show REC regardless of filters
+        if (isRec) {
+            opt.hidden = false;
+            opt.style.display = '';
         }
         subSel.appendChild(opt);
     });
@@ -61,12 +68,15 @@ function filterEditSubjectsByCategory() {
     const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
 
     if (!selectedCat) {
-        // reset to department mode: filter by section year level
+        // reset to department mode: filter by section year level and semester
         Array.from(subSel.options).forEach(opt => {
             if (!opt.value) return;
             const subYear = opt.getAttribute('data-year-level') || '';
             const subSem = opt.getAttribute('data-semester') || '';
-            const show = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+            const isRec = opt.getAttribute('data-course-code') === 'REC';
+            const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
+            const semMatch = isRec || !activeSemester || !subSem || String(subSem) === String(activeSemester);
+            const show = yearMatch && semMatch;
             opt.hidden = !show;
             opt.style.display = show ? '' : 'none';
         });
@@ -87,7 +97,9 @@ function filterEditSubjectsByCategory() {
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
         
-        const show = !yearLevel || (sub.year && String(sub.year) === String(yearLevel));
+        const yearMatch = !yearLevel || (sub.year && String(sub.year) === String(yearLevel));
+        const semMatch = !activeSemester || !sub.sem || String(sub.sem) === activeSemester;
+        const show = yearMatch && semMatch;
         if (show) subSel.appendChild(opt);
     });
     if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
@@ -299,23 +311,17 @@ paintShift();
 /* ── filters / date nav ── */
 function applyFilters() {
     const params = new URLSearchParams(window.location.search);
+    const department = document.getElementById('filter-department')?.value || '';
+    const section = document.getElementById('filter-section')?.value || '';
 
-    // Program locked server-side; semester label includes academic year.
-    // Semester is fixed by admin settings — do not put it in the URL
-    const map = {
-        department: 'filter-department',
-        section:    'filter-section',
-    };
+    department ? params.set('department', department) : params.delete('department');
+    section ? params.set('section', section) : params.delete('section');
+    params.set('shift', getCurrentShift());
 
-    Object.entries(map).forEach(([key, id]) => {
-        const el  = document.getElementById(id);
-        const val = el ? el.value : '';
-        val ? params.set(key, val) : params.delete(key);
-    });
-
-    if (!params.has('shift')) params.set('shift', getCurrentShift());
     window.location.search = params.toString();
 }
+
+
 
 function shiftDate(delta) {
     const d = new Date(SELECTED_DATE + 'T00:00:00');
@@ -336,8 +342,9 @@ function addMinutesToTime(hhmm, minutesToAdd) {
 }
 
 /**
- * Filter subject dropdown options by the year level of the selected section.
+ * Filter subject dropdown options by the year level and semester of the selected section.
  * e.g. Section "1-A" (year_level=1) → only show 1st-year subjects.
+ * Also respects active semester filter.
  */
 function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     const secSel = document.getElementById(sectionSelectId);
@@ -346,6 +353,7 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
 
     const selectedOpt = secSel.options[secSel.selectedIndex];
     const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
 
     Array.from(subSel.options).forEach(opt => {
         if (!opt.value) {
@@ -354,7 +362,10 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
             return;
         }
         const subYear = opt.getAttribute('data-year-level') || '';
-        const match = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+        const subSem = opt.getAttribute('data-semester') || '';
+        const yearMatch = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+        const semMatch = !activeSemester || !opt.getAttribute('data-semester') || opt.getAttribute('data-semester') === activeSemester;
+        const match = yearMatch && semMatch;
         opt.hidden = !match;
         opt.style.display = match ? '' : 'none';
     });
@@ -443,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const addCat = document.getElementById('add-category');
     if (addCat) {
         addCat.addEventListener('change', () => {
-            filterSubjectsBySection();
+            filterSubjectsByCategory();
         });
     }
     
@@ -496,14 +507,30 @@ function openAddModal(day, startTime) {
     document.getElementById('add-start').value = startTime || '';
     document.getElementById('add-end').value   = startTime ? addMinutesToTime(startTime, 60) : '';
 
-    // Pre-fill section from current page filter when available
+    // Pre-fill department and section from current page filters when available
     const params = new URLSearchParams(window.location.search);
+    const filterDept = params.get('department');
     const filterSection = params.get('section');
+    
+    // Pre-fill department
+    if (filterDept) {
+        const deptEl = document.getElementById('add-department');
+        if (deptEl) {
+            deptEl.value = filterDept;
+            // Trigger department change to load sections for that department
+            deptEl.dispatchEvent(new Event('change'));
+        }
+    }
+    
+    // Pre-fill section (after department change has loaded sections)
     if (filterSection) {
-        const el = document.getElementById('add-section');
-        if (el) {
-            el.value = filterSection;
-            filterSubjectsBySection('add-section', 'add-subject');
+        const sectionEl = document.getElementById('add-section');
+        if (sectionEl) {
+            // Small delay to allow department change to populate sections
+            setTimeout(() => {
+                sectionEl.value = filterSection;
+                filterSubjectsBySection('add-section', 'add-subject');
+            }, 100);
         }
     }
 

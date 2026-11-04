@@ -85,8 +85,8 @@ class PbsController extends Controller
         $collegeId = $dept?->dept_college_id;
         $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
 
-        // Use selected department or default to chair's department
-        $selectedDeptId = $request->query('department');
+        // Default to logged-in chair's department unless they select another one.
+        $selectedDeptId = $request->query('department', $progId);
 
         if (!$progId) {
             return view('chair.pbs', [
@@ -400,6 +400,84 @@ class PbsController extends Controller
             'success' => true,
             'message' => 'Number of students saved for ' . ($section->sec_name ?? 'section') . '.',
             'sec_no_of_student' => (int) $section->sec_no_of_student,
+        ]);
+    }
+
+    /**
+     * Fetch schedules for a department+section+shift (AJAX for PBS grid).
+     */
+    public function fetchSchedules(Request $request)
+    {
+        $progId = $this->chairProgramId();
+        if (!$progId) {
+            return response()->json(['success' => false, 'message' => 'Not linked to a department.'], 403);
+        }
+
+        $data = $request->validate([
+            'department' => 'required|uuid|exists:department,dept_id',
+            'section'    => 'required|uuid|exists:section,sec_id',
+            'shift'      => 'required|in:day,evening',
+        ]);
+
+        $dept = Departments::find($data['department']);
+        $section = Section::find($data['section']);
+
+        if (!$dept || !$section) {
+            return response()->json(['success' => false, 'message' => 'Department or section not found.'], 404);
+        }
+
+        if ($section->sec_dept_id !== $dept->dept_id) {
+            return response()->json(['success' => false, 'message' => 'Section does not belong to selected department.'], 403);
+        }
+
+        // Verify chair has access to this department's college
+        $chair = \App\Models\Dept_Chair::where('dc_usr_id', auth()->id())->first();
+        if ($chair && $chair->dc_college_id !== $dept->dept_college_id) {
+            return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
+        }
+
+        $activeSem = $this->activeSemester();
+        if (!$activeSem) {
+            return response()->json(['success' => false, 'message' => 'No active semester set.'], 422);
+        }
+
+        $shiftKey = $request->input('shift');
+
+        $schedules = Schedule::query()
+            ->where('sch_sec_id', $data['section'])
+            ->when(
+                $activeSem,
+                fn ($q) => $q->where('sch_sem_id', $activeSem->sem_id),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->where('sch_is_active', true)
+            ->where('sch_shift', $shiftKey)
+            ->with(['subject', 'faculty', 'section', 'room', 'semester'])
+            ->orderBy('sch_day')
+            ->orderBy('sch_start_time')
+            ->get()
+            ->map(function ($sch) {
+                return [
+                    'id'           => $sch->sch_id,
+                    'course_code'  => $sch->subject?->course_code ?? '',
+                    'course_name'  => $sch->subject?->course_name ?? '',
+                    'faculty_name' => $sch->faculty ? trim("{$sch->faculty->fac_first_name} {$sch->faculty->fac_last_name}") : '',
+                    'room_name'    => $sch->room?->room_name ?? '',
+                    'day'          => $sch->sch_day,
+                    'start_time'   => $sch->sch_start_time ? substr($sch->sch_start_time, 0, 5) : '',
+                    'end_time'     => $sch->sch_end_time ? substr($sch->sch_end_time, 0, 5) : '',
+                    'shift'        => $sch->sch_shift,
+                ];
+            });
+
+        return response()->json([
+            'success'   => true,
+            'schedules' => $schedules,
+            'section'   => [
+                'id'          => $section->sec_id,
+                'name'        => $section->sec_name,
+                'year_level'  => $section->sec_year_level,
+            ],
         ]);
     }
 }

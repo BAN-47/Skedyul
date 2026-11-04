@@ -251,7 +251,7 @@
               </div>
 
               {{-- body --}}
-              <div class="grid relative"
+              <div class="grid relative pbs-grid-body"
                    style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));
                           grid-template-rows: repeat({{ $slotCount }}, 26px);">
 
@@ -431,7 +431,7 @@
       {{-- ── SECTION (triggers subject filter by year level) ── --}}
       <div class="mb-3">
         <label class="field-label">Section</label>
-        <select id="add-section" class="field-input" onchange="filterSubjectsByCategory()">
+        <select id="add-section" class="field-input" onchange="filterSubjectsBySection('add-section', 'add-subject')">
           <option value="">-- Select Section --</option>
           @foreach($sections as $sec)
             <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">{{ $sec->sec_name }}</option>
