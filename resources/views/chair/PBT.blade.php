@@ -91,10 +91,7 @@
         {{-- ══════════ MAIN ══════════ --}}
         <div class="app-main">
 
-    {{-- TOPBAR --}}
-    @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
-            {{-- TOPBAR --}}
-            @include('partials.chair_header')
+            @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
 
             <div class="page-content" id="page-pbt">
 
@@ -278,8 +275,13 @@
                                 <button type="button" id="teacher-picker-btn" onclick="toggleTeacherPicker()"
                                     aria-haspopup="listbox" aria-expanded="false"
                                     class="inline-flex min-w-[230px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-indigo-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-200">
-                                    <span
-                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">{{ $selectedFaculty ? strtoupper(substr($selectedFaculty->fac_first_name, 0, 1) . substr($selectedFaculty->fac_last_name, 0, 1)) : '👤' }}</span>
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
+                                        @if($selectedFaculty?->fac_profile_image)
+                                            <img src="{{ asset('images/faculty_profile/' . $selectedFaculty->fac_profile_image) }}" class="h-full w-full object-cover" alt="{{ $selectedFaculty->fac_first_name }} profile photo">
+                                        @else
+                                            {{ $selectedFaculty ? strtoupper(substr($selectedFaculty->fac_first_name, 0, 1) . substr($selectedFaculty->fac_last_name, 0, 1)) : '👤' }}
+                                        @endif
+                                    </span>
                                     <span class="min-w-0 flex-1">
                                         <span
                                             class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing
@@ -340,8 +342,13 @@
                                                         data-name="{{ strtolower($pname) }}"
                                                         data-role="{{ $groupLabel }}"
                                                         onclick="selectTeacher('{{ $pid }}')">
-                                                        <span
-                                                            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">{{ strtoupper(substr($pname, 0, 1)) }}</span>
+                                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                                                            @if($person->fac_profile_image)
+                                                                <img src="{{ asset('images/faculty_profile/' . $person->fac_profile_image) }}" class="h-full w-full object-cover" alt="{{ $pname }} profile photo">
+                                                            @else
+                                                                {{ strtoupper(substr($pname, 0, 1)) }}
+                                                            @endif
+                                                        </span>
                                                         <span class="min-w-0 flex-1"><span
                                                                 class="block truncate text-[13px] font-semibold text-slate-800">{{ $pname }}</span><span
                                                                 class="block text-[11px] text-slate-500">{{ ucwords(strtolower($groupLabel)) }}</span></span>
