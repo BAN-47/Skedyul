@@ -598,21 +598,33 @@
         </select>
       </div>
 
-      {{-- SUBJECT (auto-filtered by section year level) --}}
-      <div class="mb-3">
-        <label class="field-label">Subject</label>
-        <select id="edit-subject" class="field-input">
-          <option value="">-- Select Subject --</option>
-          @foreach($subjects as $sub)
-            <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                    data-year-level="{{ $sub->course_year_level ?? '' }}"
-                    data-semester="{{ $sub->course_semester ?? '' }}"
-                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-              {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-            </option>
-          @endforeach
-        </select>
+      {{-- SUBJECT + CATEGORY --}}
+      <div class="flex items-end gap-2 mb-3">
+        <div class="flex-[3]">
+          <label class="field-label">Subject/Course</label>
+          <select id="edit-subject" class="field-input">
+            <option value="">-- Select Subject --</option>
+            @foreach($subjects as $sub)
+              <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                      data-year-level="{{ $sub->course_year_level ?? '' }}"
+                      data-category="{{ $sub->course_category ?? '' }}"
+                      data-semester="{{ $sub->course_semester ?? '' }}"
+                      data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                      data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
+              </option>
+            @endforeach
+          </select>
+        </div>
+        <div class="flex-1">
+          <label class="field-label">Cate</label>
+          <select id="edit-category" class="field-input !py-[9px]" onchange="filterEditSubjectsByCategory()">
+            <option value="">-- All --</option>
+            @foreach($categories as $cat)
+              <option value="{{ $cat }}">{{ $cat }}</option>
+            @endforeach
+          </select>
+        </div>
       </div>
 
       <div class="mb-3">

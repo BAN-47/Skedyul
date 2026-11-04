@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Models\Schedule;
+use App\Models\Study_Load;
+use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Carbon\Carbon;
 
 /**
  * Admin Settings — Academic period
@@ -185,5 +189,102 @@ class AcademicYearController extends Controller
         $value = preg_replace('/\s*-\s*/', '-', $value);
 
         return $value;
+    }
+
+    /**
+     * Switch semester if end date passed.
+     * If enabled in settings:
+     *  - 1st → 2nd when 1st end date passes
+     *  - 2nd → reset: archive schedules, deactivate, leave admin to set next AY
+     */
+    public function autoSwitchSemester(): ?string
+    {
+        $enabled = (bool) \App\Models\SystemSetting::get('auto_switch_semester', true);
+        if (!$enabled) {
+            return null;
+        }
+
+        try {
+            $active = DB::table('semester')->where('sem_is_active', true)->first();
+            if (!$active || empty($active->sem_end_date)) {
+                return null;
+            }
+
+            $today = Carbon::now()->startOfDay();
+            $end   = Carbon::parse($active->sem_end_date)->startOfDay();
+
+            if ($today->lte($end)) {
+                return null;
+            }
+
+            // Past end date
+            if (str_contains(strtolower($active->sem_name), '1st') || str_contains(strtolower($active->sem_name), 'first')) {
+                // 1st → 2nd
+                DB::table('semester')->update(['sem_is_active' => false]);
+                $second = DB::table('semester')->where('sem_name', '2nd Semester')->first();
+                if ($second) {
+                    DB::table('semester')->where('sem_id', $second->sem_id)->update(['sem_is_active' => true]);
+                    return 'Auto-switched to 2nd Semester.';
+                }
+                return '2nd Semester not found.';
+            }
+
+            // 2nd ended → archive schedules, reset active semester, leave admin to set next AY
+            $this->archiveSemesterSchedules($active->sem_id, $active->sem_ay_id ?? null);
+            DB::table('semester')->update(['sem_is_active' => false]);
+
+            return '2nd Semester ended. Schedules archived. Please set the next academic year in Settings.';
+        } catch (\Throwable $e) {
+            report($e);
+            return 'Auto-switch failed: ' . $e->getMessage();
+        }
+    }
+
+    /**
+     * Archive schedules + study_loads for ended semester.
+     */
+    protected function archiveSemesterSchedules(string $semId, ?string $ayId): void
+    {
+        $schedules = Schedule::where('sch_sem_id', $semId)
+            ->where('sch_is_active', true)
+            ->with(['section', 'faculty', 'room', 'course'])
+            ->get();
+
+        if ($schedules->isEmpty()) {
+            return;
+        }
+
+        DB::transaction(function () use ($schedules, $semId, $ayId) {
+            foreach ($schedules as $sch) {
+                DB::table('schedule_archives')->insert([
+                    'sar_id'         => (string) Str::uuid(),
+                    'sar_sch_id'     => $sch->sch_id,
+                    'sar_sem_id'     => $semId,
+                    'sar_ay_id'      => $ayId,
+                    'sar_fac_id'     => $sch->sch_fac_id,
+                    'sar_course_id'  => $sch->sch_course_id,
+                    'sar_sec_id'     => $sch->sch_sec_id,
+                    'sar_room_id'    => $sch->sch_room_id,
+                    'sar_day'        => $sch->sch_day,
+                    'sar_start_time' => $sch->sch_start_time,
+                    'sar_end_time'   => $sch->sch_end_time,
+                    'sar_shift'      => $sch->sch_shift,
+                    'sar_status'     => $sch->sch_status,
+                    'sar_is_active'  => $sch->sch_is_active,
+                    'sar_description'=> $sch->sch_description ?? null,
+                    'sar_created_by' => $sch->sch_created_by,
+                    'sar_updated_by' => $sch->sch_updated_by,
+                    'sar_archived_at'=> now(),
+                ]);
+            }
+
+            // Deactivate schedules & study_loads
+            Schedule::where('sch_sem_id', $semId)->update(['sch_is_active' => false]);
+            Study_Load::where('sl_sem_id', $semId)->update(['sl_status' => 'archived']);
+
+            // Reset section student counts if needed
+            Section::whereIn('sec_id', $schedules->pluck('sch_sec_id')->unique())
+                ->update(['sec_no_of_student' => 0]);
+        });
     }
 }

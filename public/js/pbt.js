@@ -59,6 +59,50 @@ function filterSubjectsByCategory() {
   });
 }
 
+function filterEditSubjectsByCategory() {
+  const catSel = document.getElementById('edit-category');
+  const subSel = document.getElementById('edit-subject');
+  const secSel = document.getElementById('edit-section');
+  const deptSel = document.getElementById('edit-department');
+  if (!catSel || !subSel) return;
+
+  const selectedCat = catSel.value;
+  const deptId = deptSel ? deptSel.value : '';
+  const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+  const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+
+  if (!selectedCat) {
+    Array.from(subSel.options).forEach(opt => {
+      if (!opt.value) return;
+      const subYear = opt.getAttribute('data-year-level') || '';
+      const show = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+      opt.hidden = !show;
+      opt.style.display = show ? '' : 'none';
+    });
+    if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+    return;
+  }
+
+  const filtered = window.ALL_SUBJECTS_LIST || [];
+  subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+  filtered.filter(s => String(s.cat) === String(selectedCat)).forEach(sub => {
+    const opt = document.createElement('option');
+    opt.value = sub.id;
+    opt.textContent = sub.code + ' — ' + sub.name;
+    opt.dataset.yearLevel = sub.year || '';
+    opt.dataset.semester = sub.sem || '';
+    opt.dataset.category = sub.cat || '';
+    opt.dataset.courseCode = sub.code || '';
+    opt.dataset.lectureHours = sub.lecHours || 0;
+    opt.dataset.labHours = sub.labHours || 0;
+    
+    if (!yearLevel || (sub.year && String(sub.year) === String(yearLevel))) {
+      subSel.appendChild(opt);
+    }
+  });
+  if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+}
+
 /* ── modal helpers (same pattern as PBS / other chair pages) ── */
 function openModal(id)  { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -356,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       
       filterSubjectsBySection('add-section', 'add-subject');
-      filterSubjectsByCategory();
+      filterSubjectsBySection();
     });
   }
 
@@ -364,14 +408,40 @@ document.addEventListener('DOMContentLoaded', () => {
   if (addSec) {
     addSec.addEventListener('change', () => {
       filterSubjectsBySection('add-section', 'add-subject');
+      filterSubjectsBySection();
+    });
+  }
+  
+const addCat = document.getElementById('add-category');
+  if (addCat) {
+    addCat.addEventListener('change', () => {
       filterSubjectsByCategory();
     });
   }
   
-  const addCat = document.getElementById('add-category');
-  if (addCat) {
-    addCat.addEventListener('change', () => {
-      filterSubjectsByCategory();
+  const editDept = document.getElementById('edit-department');
+  if (editDept) {
+    editDept.addEventListener('change', () => {
+      const deptId = editDept.value;
+      const sectionSelect = document.getElementById('edit-section');
+      const sections = (window.COLLEGE_SECTIONS && window.COLLEGE_SECTIONS[deptId]) || [];
+      
+      sectionSelect.innerHTML = '<option value="">-- Select Section --</option>';
+      sections.forEach(sec => {
+        const opt = document.createElement('option');
+        opt.value = sec.id;
+        opt.textContent = sec.name;
+        opt.dataset.yearLevel = sec.year;
+        sectionSelect.appendChild(opt);
+      });
+      filterSubjectsBySection('edit-section', 'edit-subject');
+    });
+  }
+  
+  const editCat = document.getElementById('edit-category');
+  if (editCat) {
+    editCat.addEventListener('change', () => {
+      filterEditSubjectsByCategory();
     });
   }
   
@@ -381,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
       filterSubjectsBySection('edit-section', 'edit-subject');
     });
   }
-
+  
   // Trigger initial filter based on default department
   if (addDept) {
     addDept.dispatchEvent(new Event('change'));
@@ -426,7 +496,7 @@ function submitAdd(keepOpen = false) {
     subj_id:     subjId,
     fac_id:      SELECTED_TEACHER,
     sem_id:      document.getElementById('add-semester').value,
-    prog_id:     document.getElementById('add-program').value,
+    prog_id:     document.getElementById('add-department')?.value || document.getElementById('add-program')?.value || '',
     sec_id:      secId || null,
     room_id:     roomId || null,
     days:        [...document.querySelectorAll('.add-day-checkbox:checked')].map(input => input.value),
@@ -517,7 +587,7 @@ function submitEdit() {
     subj_id:     document.getElementById('edit-subject').value,
     fac_id:      SELECTED_TEACHER,
     sem_id:      document.getElementById('edit-semester').value,
-    prog_id:     document.getElementById('edit-program').value,
+    prog_id:     document.getElementById('edit-program')?.value || document.getElementById('edit-department')?.value || '',
     sec_id:      document.getElementById('edit-section').value,
     room_id:     document.getElementById('edit-room').value,
     day:         document.getElementById('edit-day').value,

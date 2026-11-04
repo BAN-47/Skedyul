@@ -612,7 +612,7 @@
                 {{-- ── SECTION (triggers subject filter) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input" onchange="filterSubjectsByCategory()">
+                    <select id="add-section" class="field-input" onchange="filterSubjectsBySection()">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
                             <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
@@ -642,7 +642,7 @@
                     </div>
                     <div class="flex-1">
                         <label class="field-label">Cate</label>
-                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
+                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsBySection()">
                             <option value="">-- All --</option>
                             @foreach($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
@@ -769,15 +769,16 @@
                     </select>
                 </div>
 
-                {{-- SUBJECT (auto-filtered by section year level) --}}
-                <div class="flex flex-col gap-3 mb-3">
-                    <div>
+                {{-- SUBJECT + CATEGORY --}}
+                <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-[3]">
                         <label class="field-label">Subject</label>
                         <select id="edit-subject" class="field-input">
                             <option value="">-- Select Subject --</option>
                             @foreach ($subjects as $sub)
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
+                                    data-category="{{ $sub->course_category ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
                                     data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
                                     data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
@@ -787,15 +788,24 @@
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label class="field-label">Room</label>
+                    <div class="flex-1">
+                        <label class="field-label">Cate</label>
+                        <select id="edit-category" class="field-input !py-[9px]" onchange="filterEditSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat }}">{{ $cat }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="field-label">Room</label>
                         <select id="edit-room" class="field-input">
                             <option value="">-- Select Room --</option>
                             @foreach ($rooms ?? collect() as $r)
                                 <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
                             @endforeach
-                        </select>
-                    </div>
+                    </select>
                 </div>
 
                 <div class="mb-3">
@@ -836,83 +846,9 @@
     </div>
 
 
-    {{-- ══════════════ MODAL: DELETE ══════════════ --}}
-    <div class="modal-overlay" id="modal-delete-schedule">
-        <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
-            <div class="modal-header">
-                <div class="modal-title text-red-600">Delete Schedule</div>
-                <button type="button" onclick="closeModal('modal-delete-schedule')" class="modal-close">✕</button>
-            </div>
 
-            <div class="text-center">
-                <input type="hidden" id="delete-id">
-
-                <p class="text-[13px] font-semibold text-slate-700 mb-3">
-                    Are you sure you want to delete this specific schedule?
-                </p>
-
-                <p class="text-[12.5px] text-slate-600 mb-2">
-                    To confirm, please type
-                    <span class="font-mono font-bold text-slate-900" id="delete-code"></span>
-                    in the box below:
-                </p>
-                {{-- ── SUBJECT (auto-filtered by section year level; REC only if no section) ── --}}
-                <div class="flex flex-col gap-3 mb-3">
-                    <div>
-                        <label class="field-label">Subject</label>
-                        <select id="add-subject" class="field-input">
-                            <option value="">-- Select Subject --</option>
-                            @foreach ($subjects as $sub)
-                                <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code }}"
-                                    data-year-level="{{ $sub->course_year_level ?? '' }}"
-                                    data-semester="{{ $sub->course_semester ?? '' }}"
-                                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-                                    {{ $sub->course_code ?? $sub->subj_code }} —
-                                    {{ $sub->course_name ?? $sub->subj_name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="field-label">Room</label>
-                        <select id="add-room" class="field-input">
-                            <option value="">-- Select Room --</option>
-                            @foreach ($rooms ?? collect() as $r)
-                                <option value="{{ $r->room_id }}">
-                                    {{ $r->room_name }}{{ !empty($r->room_location) ? ', ' . $r->room_location : '' }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <input type="text" id="delete-confirm" autocomplete="off" oninput="validateDeleteCode()"
-                    class="field-input text-center font-mono mb-3">
-
-                <p class="text-[11.5px] text-slate-500 mb-1">
-                    Note: When confirmed, this schedule won't be retrieved in any way.
-                </p>
-
-                <div id="delete-error"
-                    class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 text-left">
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" onclick="closeModal('modal-delete-schedule')"
-                    class="btn btn-secondary">Cancel</button>
-                <button type="button" id="delete-submit" disabled onclick="submitDelete()"
-                    class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
-            </div>
-        </div>
-    </div>
-
-
-
-    <div class="max-h-[62vh] overflow-y-auto pr-1">
+    @if(false)
+    <div class="hidden max-h-[62vh] overflow-y-auto pr-1">
         <div id="edit-error"
             class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
         {{-- FIXED FIELDS --}}
@@ -1006,7 +942,7 @@
         {{-- ── DEPARTMENT ── --}}
         <div class="mb-3">
             <label class="field-label">Department</label>
-            <select id="add-department" class="field-input">
+            <select id="edit-department" class="field-input">
                 <option value="">-- Select Department --</option>
                 @foreach($allDepartments as $dept)
                     <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
@@ -1019,7 +955,7 @@
         {{-- ── SECTION ── --}}
         <div class="mb-3">
             <label class="field-label">Section</label>
-            <select id="add-section" class="field-input">
+            <select id="edit-section" class="field-input">
                 <option value="">-- Select Section --</option>
                 @foreach ($sections as $sec)
                     <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
@@ -1097,7 +1033,7 @@
             </div>
         </div>
     </div>
-
+    @endif
 
     {{-- ══════════════ MODAL: DELETE ══════════════ --}}
     <div class="modal-overlay" id="modal-delete-schedule">

@@ -46,6 +46,53 @@ function filterSubjectsByCategory() {
     });
 }
 
+/* ── Edit modal category filter ── */
+function filterEditSubjectsByCategory() {
+    const catSel = document.getElementById('edit-category');
+    const subSel = document.getElementById('edit-subject');
+    const secSel = document.getElementById('edit-section');
+    const deptSel = document.getElementById('edit-department');
+    if (!catSel || !subSel) return;
+
+    const selectedCat = catSel.value;
+    const deptId = deptSel ? deptSel.value : '';
+    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+    const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
+
+    if (!selectedCat) {
+        // reset to department mode: filter by section year level
+        Array.from(subSel.options).forEach(opt => {
+            if (!opt.value) return;
+            const subYear = opt.getAttribute('data-year-level') || '';
+            const subSem = opt.getAttribute('data-semester') || '';
+            const show = !yearLevel || !subYear || String(subYear) === String(yearLevel);
+            opt.hidden = !show;
+            opt.style.display = show ? '' : 'none';
+        });
+        if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+        return;
+    }
+
+    // Filter by category across all departments
+    const filtered = window.ALL_SUBJECTS_LIST || [];
+    subSel.innerHTML = '<option value="">-- Select Subject --</option>';
+    filtered.filter(s => String(s.cat) === String(selectedCat)).forEach(sub => {
+        const opt = document.createElement('option');
+        opt.value = sub.id;
+        opt.textContent = sub.code + ' — ' + sub.name;
+        opt.dataset.yearLevel = sub.year || '';
+        opt.dataset.semester = sub.sem || '';
+        opt.dataset.category = sub.cat || '';
+        opt.dataset.lectureHours = sub.lecHours || 0;
+        opt.dataset.labHours = sub.labHours || 0;
+        
+        const show = !yearLevel || (sub.year && String(sub.year) === String(yearLevel));
+        if (show) subSel.appendChild(opt);
+    });
+    if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+}
+
 /* ── modal helpers ── */
 function openModal(id)  { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
@@ -381,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             filterSubjectsBySection('add-section', 'add-subject');
-            filterSubjectsByCategory();
+            filterSubjectsBySection();
         });
     }
 
@@ -389,14 +436,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addSec) {
         addSec.addEventListener('change', () => {
             filterSubjectsBySection('add-section', 'add-subject');
-            filterSubjectsByCategory();
+            filterSubjectsBySection();
         });
     }
     
     const addCat = document.getElementById('add-category');
     if (addCat) {
         addCat.addEventListener('change', () => {
-            filterSubjectsByCategory();
+            filterSubjectsBySection();
         });
     }
     
@@ -404,6 +451,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (editSec) {
         editSec.addEventListener('change', () => {
             filterSubjectsBySection('edit-section', 'edit-subject');
+        });
+    }
+    
+    const editCat = document.getElementById('edit-category');
+    if (editCat) {
+        editCat.addEventListener('change', () => {
+            filterSubjectsByCategory();
         });
     }
     
