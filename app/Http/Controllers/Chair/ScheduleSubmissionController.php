@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Schedule_Submission;
 use App\Models\Semester;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -129,6 +130,25 @@ class ScheduleSubmissionController extends Controller
             }
         }
 
+        $facultyPerPage = 6;
+        $facultyCount = $facultyOptions->count();
+        $requestedFacultyPage = LengthAwarePaginator::resolveCurrentPage('faculty_page');
+        $lastFacultyPage = max(1, (int) ceil($facultyCount / $facultyPerPage));
+        $currentFacultyPage = min(max(1, $requestedFacultyPage), $lastFacultyPage);
+
+        $facultyOptions = new LengthAwarePaginator(
+            $facultyOptions
+                ->forPage($currentFacultyPage, $facultyPerPage)
+                ->values(),
+            $facultyCount,
+            $facultyPerPage,
+            $currentFacultyPage,
+            [
+                'path' => $request->url(),
+                'pageName' => 'faculty_page',
+            ]
+        );
+        $facultyOptions->appends($request->except('faculty_page'));
         return view('chair.submit_dean', compact(
             'semester',
             'facultyOptions',

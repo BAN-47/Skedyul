@@ -25,14 +25,11 @@
     @endphp
 
 
-  <div class="app-main">
-    @include('partials.chair_header', ['title' => 'MIS Code'])
-
     <div class="app-shell">
         @include('partials.chair_sidebar')
 
         <div class="app-main">
-            @include('partials.chair_header')
+            @include('partials.chair_header', ['title' => 'MIS Code'])
 
             <div class="page-content" id="page-mis">
 

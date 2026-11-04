@@ -1,274 +1,477 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  @include('partials.favicon')
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="csrf-token" content="{{ csrf_token() }}">
-<title>SKEDYUL — Schedule Reports</title>
-@vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.favicon')
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>SKEDYUL — Schedule Reports</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+
 <body class="h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
 
-<div id="screen-app" class="screen active flex-row">
+    <div id="screen-app" class="screen active flex-row">
 
 
-  <div class="main">
-@include('partials.dean_header', ['title' => 'Dean Schedule Reports Overview'])
+        <div class="main">
+            @include('partials.dean_header', ['title' => 'Dean Schedule Reports Overview'])
 
-    <div id="page-reports" class="page active">
-      <div class="mb-5 flex items-center justify-between">
-        <div class="text-xl font-extrabold">Schedule Reports</div>
-        <button class="topbar-btn btn-primary" onclick="openModal('modal-export')">Export All</button>
-      </div>
-
-      <div class="mb-5 flex gap-1 border-b-2 border-slate-200" id="reports-tabs">
-        <button class="border-b-2 border-blue-600 px-4 py-2.5 text-[13px] font-semibold text-blue-600" onclick="switchTab('reports-tabs','tab-by-dept',this)">By Department</button>
-        <button class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600" onclick="switchTab('reports-tabs','tab-by-faculty',this)">By Faculty</button>
-        <button class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600" onclick="switchTab('reports-tabs','tab-by-section',this)">By Section</button>
-      </div>
-
-      <div id="tab-by-dept" class="block">
-        <div class="card overflow-x-auto">
-          <table>
-            <thead><tr><th>Dept</th><th>Section</th><th>Subject</th><th>Faculty</th><th>Day & Time</th></tr></thead>
-            <tbody>
-              @forelse ($byDepartment as $sl)
-                <tr data-dept-report-row>
-                  <td><span class="badge badge-blue">{{ $sl->section->program->department->dept_code ?? 'N/A' }}</span></td>
-                  <td>{{ $sl->section->sec_name ?? 'N/A' }}</td>
-                  <td>{{ $sl->subject->subj_code ?? '' }} — {{ $sl->subject->subj_name ?? 'N/A' }}</td>
-                  <td>{{ $sl->faculty->user->usr_name ?? $sl->faculty->full_name ?? 'Unassigned' }}</td>
-                  <td>{{ $sl->sch_day }} {{ $sl->sch_start_time }}–{{ $sl->sch_end_time }}</td>
-                </tr>
-              @empty
-                <tr><td colspan="5" class="text-center">No schedule data found.</td></tr>
-              @endforelse
-            </tbody>
-          </table>
-          <div id="dept-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-            <span id="dept-report-page-info" aria-live="polite"></span>
-            <button type="button" id="dept-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-            <button type="button" id="dept-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="tab-by-faculty" class="hidden">
-        <div class="card overflow-x-auto">
-          <table>
-            <thead><tr><th>Faculty</th><th>Subjects</th><th>Load</th></tr></thead>
-            <tbody>
-              @forelse ($byFaculty as $f)
-                <tr data-faculty-report-row>
-                  <td><b>{{ $f['name'] }}</b></td>
-                  <td>{{ $f['subjects'] ?: '—' }}</td>
-                  <td style="{{ $f['hours'] > 24 ? 'color:var(--red);font-weight:700' : '' }}">{{ $f['hours'] }}h</td>
-                </tr>
-              @empty
-                <tr><td colspan="3" class="text-center">No faculty found.</td></tr>
-              @endforelse
-            </tbody>
-          </table>
-          <div id="faculty-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-            <span id="faculty-report-page-info" aria-live="polite"></span>
-            <button type="button" id="faculty-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-            <button type="button" id="faculty-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="tab-by-section" class="hidden">
-        <div class="card overflow-x-auto">
-          <table>
-            <thead><tr><th>Section</th><th>Program</th><th>Year</th></tr></thead>
-            <tbody>
-              @forelse ($sections as $sec)
-                <tr data-section-report-row>
-                  <td>{{ $sec->sec_name }}</td>
-                  <td>{{ $sec->program->prog_code ?? 'N/A' }}</td>
-                  <td>{{ $sec->sec_year_level }}</td>
-                </tr>
-              @empty
-                <tr><td colspan="3" class="text-center">No sections found.</td></tr>
-              @endforelse
-            </tbody>
-          </table>
-          <div id="section-report-pagination" class="mt-3 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-            <span id="section-report-page-info" aria-live="polite"></span>
-            <button type="button" id="section-report-prev" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-            <button type="button" id="section-report-next" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: EXPORT -->
-<div class="modal-overlay p-5" id="modal-export">
-  <div class="modal w-[440px]">
-    <div class="modal-header"><div class="modal-title">Export Report</div><button class="modal-close" onclick="closeModal('modal-export')">✕</button></div>
-    <div class="modal-body">
-      <div class="field-group" style="margin-bottom:14px;">
-        <label class="field-label">Report Type</label>
-        <select class="field-select">
-          <option>Master Schedule</option>
-          <option>Faculty Workload Report</option>
-          <option>Faculty Deployment Report</option>
-          <option>Department Summary</option>
-        </select>
-      </div>
-      <div class="field-group" style="margin-bottom:14px;">
-        <label class="field-label">Department</label>
-        <select class="field-select">
-          <option value="">All Departments</option>
-        </select>
-      </div>
-      <div class="field-group">
-        <label class="field-label">Format</label>
-        <select class="field-select"><option>PDF</option><option>Excel (.xlsx)</option><option>Word (.docx)</option></select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-export')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="closeModal('modal-export');showToast('Report exported!')">Download</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: NOTIFY CHAIRS -->
-<div class="modal-overlay p-5" id="modal-notify">
-  <div class="modal w-[520px]">
-    <div class="modal-header">
-      <div class="modal-title">Send Notification to Chairs</div>
-      <button class="modal-close" onclick="closeModal('modal-notify')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="margin-bottom:16px;">
-        <div class="field-label" style="margin-bottom:8px;">Recipients</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-            <input type="checkbox" id="notif-all" checked onchange="toggleAllChairs(this)" style="width:15px;height:15px;accent-color:var(--blue);">
-            <span style="font-size:13px;font-weight:700;color:var(--text);">All Department Chairs</span>
-          </label>
-          <div style="display:flex;flex-direction:column;gap:6px;padding-left:12px;">
-            @foreach ($chairs as $chair)
-              <label style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-                <input type="checkbox" class="chair-check" value="{{ $chair->usr_id }}" checked onchange="syncAllChairs()" style="width:14px;height:14px;accent-color:var(--blue);">
-                <div style="display:flex;align-items:center;gap:8px;">
-                  <div style="width:28px;height:28px;border-radius:50%;background:#{{ substr(md5($chair->usr_id), 0, 6) }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
-                    {{ collect(explode(' ', $chair->usr_name))->map(fn($n) => $n[0] ?? '')->implode('') }}
-                  </div>
-                  <div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text);">{{ $chair->usr_name }}</div>
-                    <div style="font-size:11px;color:var(--text3);">Chair · {{ $chair->department->dept_code ?? 'N/A' }}</div>
-                  </div>
+            <div id="page-reports" class="page active">
+                <div class="mb-5 flex items-center justify-between">
+                    <div class="text-xl font-extrabold">Schedule Reports</div>
                 </div>
-              </label>
-            @endforeach
-          </div>
+
+                <div class="mb-5 flex gap-1 border-b-2 border-slate-200" id="reports-tabs">
+                    <button class="border-b-2 border-blue-600 px-4 py-2.5 text-[13px] font-semibold text-blue-600"
+                        onclick="switchTab('reports-tabs','tab-by-dept',this)">By Department</button>
+                    <button
+                        class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600"
+                        onclick="switchTab('reports-tabs','tab-by-faculty',this)">By Faculty</button>
+                    <button
+                        class="border-b-2 border-transparent px-4 py-2.5 text-[13px] font-semibold text-slate-400 hover:text-slate-600"
+                        onclick="switchTab('reports-tabs','tab-by-section',this)">By Section</button>
+                </div>
+
+                <div id="tab-by-dept" class="block">
+                    @forelse ($byDepartment as $departmentGroup)
+                        <section class="card mb-4 overflow-hidden !p-0" data-department-report-group>
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-lg font-extrabold text-slate-900">
+                                            {{ $departmentGroup['department']?->dept_code ?? 'Unassigned Department' }}
+                                        </h3>
+                                        <span class="badge badge-blue">
+                                            {{ $departmentGroup['college']?->college_code ?? ($college?->college_code ?? 'N/A') }}
+                                        </span>
+                                    </div>
+                                    @if ($departmentGroup['department']?->dept_name)
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            {{ $departmentGroup['department']->dept_name }}
+                                        </p>
+                                    @endif
+                                </div>
+                                <span class="text-sm font-semibold text-slate-500">
+                                    {{ $departmentGroup['schedules']->count() }}
+                                    {{ $departmentGroup['schedules']->count() === 1 ? 'scheduled class' : 'scheduled classes' }}
+                                </span>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Section</th>
+                                            <th>Subject</th>
+                                            <th>Faculty</th>
+                                            <th>Day &amp; Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach ($departmentGroup['schedules'] as $sl)
+                                            <tr data-dept-report-row>
+                                                <td>{{ $sl->section?->sec_name ?? 'N/A' }}</td>
+                                                <td>
+                                                    {{ $sl->subject?->course_code ?? '—' }} —
+                                                    {{ $sl->subject?->course_name ?? 'N/A' }}
+                                                </td>
+                                                <td>{{ $sl->faculty?->user?->usr_name ?? ($sl->faculty?->full_name ?? 'Unassigned') }}
+                                                </td>
+                                                <td>{{ $sl->sch_day }}
+                                                    {{ $sl->sch_start_time }}–{{ $sl->sch_end_time }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div data-report-pagination
+                                class="hidden mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+                                <span data-report-page-info aria-live="polite"></span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" data-report-prev
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                                    <button type="button" data-report-next
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                                </div>
+                            </div>
+                        </section>
+                    @empty
+                        <div class="card text-center text-sm text-slate-500">
+                            No schedule data found for this college.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div id="tab-by-faculty" class="hidden">
+                    @forelse ($byFaculty as $facultyGroup)
+                        <section class="card mb-4 overflow-hidden !p-0" data-faculty-report-group>
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-lg font-extrabold text-slate-900">
+                                            {{ $facultyGroup['department']?->dept_code ?? 'Unassigned Department' }}
+                                        </h3>
+                                        <span class="badge badge-blue">
+                                            {{ $facultyGroup['college']?->college_code ?? ($college?->college_code ?? 'N/A') }}
+                                        </span>
+                                    </div>
+                                    @if ($facultyGroup['department']?->dept_name)
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            {{ $facultyGroup['department']->dept_name }}</p>
+                                    @endif
+                                </div>
+                                <span class="text-sm font-semibold text-slate-500">
+                                    {{ $facultyGroup['faculty']->count() }}
+                                    {{ $facultyGroup['faculty']->count() === 1 ? 'faculty member' : 'faculty members' }}
+                                </span>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Faculty</th>
+                                            <th>Subjects</th>
+                                            <th>Load</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($facultyGroup['faculty'] as $f)
+                                            <tr data-faculty-report-row>
+                                                <td><b>{{ $f['name'] }}</b></td>
+                                                <td>{{ $f['subjects'] ?: '—' }}</td>
+                                                <td
+                                                    style="{{ $f['hours'] > 24 ? 'color:var(--red);font-weight:700' : '' }}">
+                                                    {{ $f['hours'] }}h
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="3" class="text-center text-slate-500">No faculty
+                                                    assigned to this department.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div data-report-pagination
+                                class="hidden mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+                                <span data-report-page-info aria-live="polite"></span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" data-report-prev
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                                    <button type="button" data-report-next
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                                </div>
+                            </div>
+                        </section>
+                    @empty
+                        <div class="card text-center text-sm text-slate-500">No departments found for this college.
+                        </div>
+                    @endforelse
+                </div>
+
+                <div id="tab-by-section" class="hidden">
+                    @forelse ($sectionsByDepartment as $sectionGroup)
+                        <section class="card mb-4 overflow-hidden !p-0" data-section-report-group>
+                            <div
+                                class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="text-lg font-extrabold text-slate-900">
+                                            {{ $sectionGroup['department']?->dept_code ?? 'Unassigned Department' }}
+                                        </h3>
+                                        <span class="badge badge-blue">
+                                            {{ $sectionGroup['college']?->college_code ?? ($college?->college_code ?? 'N/A') }}
+                                        </span>
+                                    </div>
+                                    @if ($sectionGroup['department']?->dept_name)
+                                        <p class="mt-1 text-xs text-slate-500">
+                                            {{ $sectionGroup['department']->dept_name }}</p>
+                                    @endif
+                                </div>
+                                <span class="text-sm font-semibold text-slate-500">
+                                    {{ $sectionGroup['sections']->count() }}
+                                    {{ $sectionGroup['sections']->count() === 1 ? 'section' : 'sections' }}
+                                </span>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Section</th>
+                                            <th>Year Level</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse ($sectionGroup['sections'] as $sec)
+                                            <tr data-section-report-row>
+                                                <td>{{ $sec->sec_name }}</td>
+                                                <td>{{ $sec->sec_year_level ?? '—' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="2" class="text-center text-slate-500">No sections found
+                                                    in this department.</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div data-report-pagination
+                                class="hidden mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 text-xs text-slate-500">
+                                <span data-report-page-info aria-live="polite"></span>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" data-report-prev
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                                    <button type="button" data-report-next
+                                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+                                </div>
+                            </div>
+                        </section>
+                    @empty
+                        <div class="card text-center text-sm text-slate-500">No departments found for this college.
+                        </div>
+                    @endforelse
+                </div>
+            </div>
         </div>
-      </div>
+    </div>
 
-      <div class="field-group" style="margin-bottom:14px;">
-        <label class="field-label">Notification Type</label>
-        <select class="field-select" id="notif-type">
-          <option value="info">General Info</option>
-          <option value="reminder">Reminder</option>
-          <option value="urgent">Urgent</option>
-          <option value="deadline">Deadline Notice</option>
-        </select>
-      </div>
-
-      <div class="field-group" style="margin-bottom:14px;">
-        <label class="field-label">Title</label>
-        <input class="field-input" id="notif-title" placeholder="e.g. Schedule Submission Reminder">
-      </div>
-
-      <div class="field-group" style="margin-bottom:14px;">
-        <label class="field-label">Message</label>
-        <textarea class="field-input" id="notif-message" rows="4" style="resize:vertical;" placeholder="Write your message to the chairs..."></textarea>
-      </div>
-
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">Recently Sent</div>
-        <div id="notif-history" style="display:flex;flex-direction:column;gap:6px;">
-          <div style="font-size:12px;color:var(--text3);padding:8px;text-align:center;">No notifications sent yet this session.</div>
+    <!-- MODAL: EXPORT -->
+    <div class="modal-overlay p-5" id="modal-export">
+        <div class="modal w-[440px]">
+            <div class="modal-header">
+                <div class="modal-title">Export Report</div><button class="modal-close"
+                    onclick="closeModal('modal-export')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group" style="margin-bottom:14px;">
+                    <label class="field-label">Report Type</label>
+                    <select class="field-select">
+                        <option>Master Schedule</option>
+                        <option>Faculty Workload Report</option>
+                        <option>Faculty Deployment Report</option>
+                        <option>Department Summary</option>
+                    </select>
+                </div>
+                <div class="field-group" style="margin-bottom:14px;">
+                    <label class="field-label">Department</label>
+                    <select class="field-select">
+                        <option value="">All Departments</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label class="field-label">Format</label>
+                    <select class="field-select">
+                        <option>PDF</option>
+                        <option>Excel (.xlsx)</option>
+                        <option>Word (.docx)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="topbar-btn btn-secondary" onclick="closeModal('modal-export')">Cancel</button>
+                <button class="topbar-btn btn-primary"
+                    onclick="closeModal('modal-export');showToast('Report exported!')">Download</button>
+            </div>
         </div>
-      </div>
     </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-notify')">Cancel</button>
-      <button class="topbar-btn btn-primary" onclick="sendNotifToChairs()">Send Notification</button>
+
+    <!-- MODAL: NOTIFY CHAIRS -->
+    <div class="modal-overlay p-5" id="modal-notify">
+        <div class="modal w-[520px]">
+            <div class="modal-header">
+                <div class="modal-title">Send Notification to Chairs</div>
+                <button class="modal-close" onclick="closeModal('modal-notify')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:16px;">
+                    <div class="field-label" style="margin-bottom:8px;">Recipients</div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <label
+                            style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
+                            <input type="checkbox" id="notif-all" checked onchange="toggleAllChairs(this)"
+                                style="width:15px;height:15px;accent-color:var(--blue);">
+                            <span style="font-size:13px;font-weight:700;color:var(--text);">All Department
+                                Chairs</span>
+                        </label>
+                        <div style="display:flex;flex-direction:column;gap:6px;padding-left:12px;">
+                            @foreach ($chairs as $chair)
+                                <label
+                                    style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
+                                    <input type="checkbox" class="chair-check" value="{{ $chair->usr_id }}" checked
+                                        onchange="syncAllChairs()"
+                                        style="width:14px;height:14px;accent-color:var(--blue);">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div
+                                            style="width:28px;height:28px;border-radius:50%;background:#{{ substr(md5($chair->usr_id), 0, 6) }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
+                                            {{ collect(explode(' ', $chair->usr_name))->map(fn($n) => $n[0] ?? '')->implode('') }}
+                                        </div>
+                                        <div>
+                                            <div style="font-size:13px;font-weight:600;color:var(--text);">
+                                                {{ $chair->usr_name }}</div>
+                                            <div style="font-size:11px;color:var(--text3);">Chair ·
+                                                {{ $chair->department->dept_code ?? 'N/A' }}</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                <div class="field-group" style="margin-bottom:14px;">
+                    <label class="field-label">Notification Type</label>
+                    <select class="field-select" id="notif-type">
+                        <option value="info">General Info</option>
+                        <option value="reminder">Reminder</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="deadline">Deadline Notice</option>
+                    </select>
+                </div>
+
+                <div class="field-group" style="margin-bottom:14px;">
+                    <label class="field-label">Title</label>
+                    <input class="field-input" id="notif-title" placeholder="e.g. Schedule Submission Reminder">
+                </div>
+
+                <div class="field-group" style="margin-bottom:14px;">
+                    <label class="field-label">Message</label>
+                    <textarea class="field-input" id="notif-message" rows="4" style="resize:vertical;"
+                        placeholder="Write your message to the chairs..."></textarea>
+                </div>
+
+                <div>
+                    <div
+                        style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;">
+                        Recently Sent</div>
+                    <div id="notif-history" style="display:flex;flex-direction:column;gap:6px;">
+                        <div style="font-size:12px;color:var(--text3);padding:8px;text-align:center;">No notifications
+                            sent yet this session.</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="topbar-btn btn-secondary" onclick="closeModal('modal-notify')">Cancel</button>
+                <button class="topbar-btn btn-primary" onclick="sendNotifToChairs()">Send Notification</button>
+            </div>
+        </div>
     </div>
-  </div>
-</div>
 
-<!-- MODAL: REVIEW (populated dynamically via openReview()) -->
-<div class="modal-overlay p-5" id="modal-review">
-  <div class="modal w-[560px]">
-    <div class="modal-header"><div class="modal-title" id="review-title">Schedule Review</div><button class="modal-close" onclick="closeModal('modal-review')">✕</button></div>
-    <div class="modal-body" id="review-body">
-      <!-- filled by openReview() -->
+    <!-- MODAL: REVIEW (populated dynamically via openReview()) -->
+    <div class="modal-overlay p-5" id="modal-review">
+        <div class="modal w-[560px]">
+            <div class="modal-header">
+                <div class="modal-title" id="review-title">Schedule Review</div><button class="modal-close"
+                    onclick="closeModal('modal-review')">✕</button>
+            </div>
+            <div class="modal-body" id="review-body">
+                <!-- filled by openReview() -->
+            </div>
+            <div class="modal-footer">
+                <button class="topbar-btn btn-secondary" onclick="closeModal('modal-review')">Close</button>
+                <button class="topbar-btn" style="background:var(--red-light);color:var(--red);"
+                    onclick="closeModal('modal-review');showToast('Schedule returned.')">Return to Chair</button>
+            </div>
+        </div>
     </div>
-    <div class="modal-footer">
-      <button class="topbar-btn btn-secondary" onclick="closeModal('modal-review')">Close</button>
-      <button class="topbar-btn" style="background:var(--red-light);color:var(--red);" onclick="closeModal('modal-review');showToast('Schedule returned.')">Return to Chair</button>
-    </div>
-  </div>
-</div>
 
-<div class="toast" id="toast"><span id="toast-msg"></span></div>
+    <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
-<script>
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-document.addEventListener('DOMContentLoaded', function() {
-  document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
-});
+    <script>
+        function openModal(id) {
+            document.getElementById(id).classList.add('open');
+        }
 
-function toggleAllChairs(master) {
-  document.querySelectorAll('.chair-check').forEach(c => c.checked = master.checked);
-}
-function syncAllChairs() {
-  const checks = document.querySelectorAll('.chair-check');
-  document.getElementById('notif-all').checked = Array.from(checks).every(c => c.checked);
-}
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('open');
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => {
+                if (e.target === m) m.classList.remove('open');
+            }));
+        });
 
-async function sendNotifToChairs() {
-  const title = document.getElementById('notif-title').value.trim();
-  const message = document.getElementById('notif-message').value.trim();
-  const type = document.getElementById('notif-type').value;
-  const selected = Array.from(document.querySelectorAll('.chair-check:checked')).map(c => c.value);
+        function toggleAllChairs(master) {
+            document.querySelectorAll('.chair-check').forEach(c => c.checked = master.checked);
+        }
 
-  if (!title) { showToast('Please enter a notification title.'); return; }
-  if (!message) { showToast('Please enter a message.'); return; }
-  if (selected.length === 0) { showToast('Please select at least one recipient.'); return; }
+        function syncAllChairs() {
+            const checks = document.querySelectorAll('.chair-check');
+            document.getElementById('notif-all').checked = Array.from(checks).every(c => c.checked);
+        }
 
-  try {
-    const res = await fetch('{{ route("dean.notifications.send") }}', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-      },
-      body: JSON.stringify({ title, message, type, recipients: selected }),
-    });
+        async function sendNotifToChairs() {
+            const title = document.getElementById('notif-title').value.trim();
+            const message = document.getElementById('notif-message').value.trim();
+            const type = document.getElementById('notif-type').value;
+            const selected = Array.from(document.querySelectorAll('.chair-check:checked')).map(c => c.value);
 
-    if (!res.ok) throw new Error('Request failed');
+            if (!title) {
+                showToast('Please enter a notification title.');
+                return;
+            }
+            if (!message) {
+                showToast('Please enter a message.');
+                return;
+            }
+            if (selected.length === 0) {
+                showToast('Please select at least one recipient.');
+                return;
+            }
 
-    const typeLabels = { info: 'Info', reminder: 'Reminder', urgent: 'Urgent', deadline: 'Deadline' };
-    const typeColors = { info: 'badge-blue', reminder: 'badge-amber', urgent: 'badge-red', deadline: 'badge-purple' };
-    const timeStr = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            try {
+                const res = await fetch('{{ route('dean.notifications.send') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({
+                        title,
+                        message,
+                        type,
+                        recipients: selected
+                    }),
+                });
 
-    const historyEl = document.getElementById('notif-history');
-    const empty = historyEl.querySelector('div[style*="text-align:center"]');
-    if (empty) empty.remove();
+                if (!res.ok) throw new Error('Request failed');
 
-    const item = document.createElement('div');
-    item.style.cssText = 'background:var(--grey);border-radius:8px;padding:10px 12px;border:1px solid var(--border);';
-    item.innerHTML = `
+                const typeLabels = {
+                    info: 'Info',
+                    reminder: 'Reminder',
+                    urgent: 'Urgent',
+                    deadline: 'Deadline'
+                };
+                const typeColors = {
+                    info: 'badge-blue',
+                    reminder: 'badge-amber',
+                    urgent: 'badge-red',
+                    deadline: 'badge-purple'
+                };
+                const timeStr = new Date().toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+
+                const historyEl = document.getElementById('notif-history');
+                const empty = historyEl.querySelector('div[style*="text-align:center"]');
+                if (empty) empty.remove();
+
+                const item = document.createElement('div');
+                item.style.cssText =
+                    'background:var(--grey);border-radius:8px;padding:10px 12px;border:1px solid var(--border);';
+                item.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
         <div style="display:flex;align-items:center;gap:7px;">
           <span class="badge ${typeColors[type]}">${typeLabels[type]}</span>
@@ -277,75 +480,107 @@ async function sendNotifToChairs() {
         <span style="font-size:11px;color:var(--text3);">Sent ${timeStr}</span>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">${message}</div>`;
-    historyEl.prepend(item);
+                historyEl.prepend(item);
 
-    document.getElementById('notif-title').value = '';
-    document.getElementById('notif-message').value = '';
-    document.getElementById('notif-type').value = 'info';
+                document.getElementById('notif-title').value = '';
+                document.getElementById('notif-message').value = '';
+                document.getElementById('notif-type').value = 'info';
 
-    showToast('Notification sent to ' + selected.length + ' chair' + (selected.length > 1 ? 's' : '') + '!');
-  } catch (e) {
-    showToast('Failed to send notification.');
-  }
-}
+                showToast('Notification sent to ' + selected.length + ' chair' + (selected.length > 1 ? 's' : '') +
+                    '!');
+            } catch (e) {
+                showToast('Failed to send notification.');
+            }
+        }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 3000);
-}
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
 
-function switchTab(barId, panelId, btn) {
-  const bar = document.getElementById(barId); if (!bar) return;
-  bar.querySelectorAll('button').forEach(b => {
-    b.classList.remove('border-blue-600', 'text-blue-600');
-    b.classList.add('border-transparent', 'text-slate-400');
-  });
-  btn.classList.remove('border-transparent', 'text-slate-400');
-  btn.classList.add('border-blue-600', 'text-blue-600');
-  ['tab-by-dept', 'tab-by-faculty', 'tab-by-section'].forEach(p => {
-    const el = document.getElementById(p); if (el) el.classList.add('hidden');
-  });
-  const target = document.getElementById(panelId);
-  if (target) target.classList.remove('hidden');
-}
+        function switchTab(barId, panelId, btn) {
+            const bar = document.getElementById(barId);
+            if (!bar) return;
+            bar.querySelectorAll('button').forEach(b => {
+                b.classList.remove('border-blue-600', 'text-blue-600');
+                b.classList.add('border-transparent', 'text-slate-400');
+            });
+            btn.classList.remove('border-transparent', 'text-slate-400');
+            btn.classList.add('border-blue-600', 'text-blue-600');
+            ['tab-by-dept', 'tab-by-faculty', 'tab-by-section'].forEach(p => {
+                const el = document.getElementById(p);
+                if (el) el.classList.add('hidden');
+            });
+            const target = document.getElementById(panelId);
+            if (target) target.classList.remove('hidden');
+        }
 
-function setupReportPagination(key, rowSelector) {
-  const rows = [...document.querySelectorAll(rowSelector)];
-  const wrapper = document.getElementById(`${key}-pagination`);
-  const info = document.getElementById(`${key}-page-info`);
-  const previous = document.getElementById(`${key}-prev`);
-  const next = document.getElementById(`${key}-next`);
-  const pageSize = 10;
-  let page = 0;
-  if (!wrapper || !info || !previous || !next) return;
-  wrapper.classList.toggle('hidden', rows.length <= pageSize);
+        function setupReportPagination(key, rowSelector, scope = document) {
+            const rows = [...scope.querySelectorAll(rowSelector)];
+            const departmentGroup = scope !== document;
+            const wrapper = departmentGroup ?
+                scope.querySelector('[data-report-pagination]') :
+                document.getElementById(`${key}-pagination`);
+            const info = departmentGroup ?
+                scope.querySelector('[data-report-page-info]') :
+                document.getElementById(`${key}-page-info`);
+            const previous = departmentGroup ?
+                scope.querySelector('[data-report-prev]') :
+                document.getElementById(`${key}-prev`);
+            const next = departmentGroup ?
+                scope.querySelector('[data-report-next]') :
+                document.getElementById(`${key}-next`);
+            const pageSize = 10;
+            let page = 0;
 
-  function renderPage() {
-    const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-    page = Math.min(Math.max(page, 0), pageCount - 1);
-    const start = page * pageSize;
-    rows.forEach((row, index) => row.classList.toggle('hidden', index < start || index >= start + pageSize));
-    info.textContent = rows.length ? `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length}` : 'No records';
-    previous.disabled = page === 0;
-    next.disabled = page >= pageCount - 1;
-  }
+            if (!wrapper || !info || !previous || !next) return;
+            wrapper.classList.toggle('hidden', rows.length <= pageSize);
 
-  previous.addEventListener('click', () => { page--; renderPage(); });
-  next.addEventListener('click', () => { page++; renderPage(); });
-  renderPage();
-}
+            function renderPage() {
+                const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+                page = Math.min(Math.max(page, 0), pageCount - 1);
+                const start = page * pageSize;
+                rows.forEach((row, index) => {
+                    row.classList.toggle('hidden', index < start || index >= start + pageSize);
+                });
+                info.textContent = rows.length ?
+                    `Showing ${start + 1}–${Math.min(start + pageSize, rows.length)} of ${rows.length}` :
+                    'No records';
+                previous.disabled = page === 0;
+                next.disabled = page >= pageCount - 1;
+            }
 
-setupReportPagination('dept-report', '[data-dept-report-row]');
-setupReportPagination('faculty-report', '[data-faculty-report-row]');
-setupReportPagination('section-report', '[data-section-report-row]');
+            previous.addEventListener('click', () => {
+                page--;
+                renderPage();
+            });
+            next.addEventListener('click', () => {
+                page++;
+                renderPage();
+            });
+            renderPage();
+        }
 
-// Replaces hardcoded deptData + openDept()
-async function openDept(deptId, deptCode, deptName) {
-  const res = await fetch(`/dean/reports/department/${deptId}`);
-  const d = await res.json();
+        document.querySelectorAll('[data-department-report-group]').forEach((group, index) => {
+            setupReportPagination(`department-report-${index}`, '[data-dept-report-row]', group);
+        });
 
-  const facultyRows = d.faculty.map(f => `
+        document.querySelectorAll('[data-faculty-report-group]').forEach((group, index) => {
+            setupReportPagination(`faculty-report-${index}`, '[data-faculty-report-row]', group);
+        });
+
+        document.querySelectorAll('[data-section-report-group]').forEach((group, index) => {
+            setupReportPagination(`section-report-${index}`, '[data-section-report-row]', group);
+        });
+
+        // Replaces hardcoded deptData + openDept()
+        async function openDept(deptId, deptCode, deptName) {
+            const res = await fetch(`/dean/reports/department/${deptId}`);
+            const d = await res.json();
+
+            const facultyRows = d.faculty.map(f => `
     <tr>
       <td><b>${f.name}</b></td>
       <td>${f.rank}</td>
@@ -354,7 +589,7 @@ async function openDept(deptId, deptCode, deptName) {
       <td><span class="badge">${f.status}</span></td>
     </tr>`).join('');
 
-  document.getElementById('dept-detail-content').innerHTML = `
+            document.getElementById('dept-detail-content').innerHTML = `
     <div style="margin-bottom:20px;">
       <div style="font-size:22px;font-weight:800;">${deptCode}</div>
       <div style="font-size:14px;color:var(--text3);margin-top:2px;">${deptName}</div>
@@ -366,49 +601,51 @@ async function openDept(deptId, deptCode, deptName) {
       </table>
     </div>`;
 
-  document.getElementById('dept-list-view').style.display = 'none';
-  document.getElementById('dept-detail-view').style.display = 'block';
-}
+            document.getElementById('dept-list-view').style.display = 'none';
+            document.getElementById('dept-detail-view').style.display = 'block';
+        }
 
-function closeDept() {
-  document.getElementById('dept-list-view').style.display = 'block';
-  document.getElementById('dept-detail-view').style.display = 'none';
-}
+        function closeDept() {
+            document.getElementById('dept-list-view').style.display = 'block';
+            document.getElementById('dept-detail-view').style.display = 'none';
+        }
 
-// Replaces hardcoded conflict modal
-async function openReview(sectionId, sectionLabel) {
-  const res = await fetch(`/dean/reports/conflicts/${sectionId}`);
-  const conflicts = await res.json();
+        // Replaces hardcoded conflict modal
+        async function openReview(sectionId, sectionLabel) {
+            const res = await fetch(`/dean/reports/conflicts/${sectionId}`);
+            const conflicts = await res.json();
 
-  document.getElementById('review-title').textContent = `Schedule Review — ${sectionLabel}`;
+            document.getElementById('review-title').textContent = `Schedule Review — ${sectionLabel}`;
 
-  let html = '';
-  if (conflicts.length > 0) {
-    html += `<div style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;">
+            let html = '';
+            if (conflicts.length > 0) {
+                html += `<div style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;">
       <strong>${conflicts.length} Conflict(s) Detected</strong></div>`;
-  }
+            }
 
-  html += `<table><thead><tr><th>Faculty</th><th>Subjects</th><th>Day & Time</th><th>Issue</th></tr></thead><tbody>`;
-  conflicts.forEach(c => {
-    html += `<tr>
+            html +=
+                `<table><thead><tr><th>Faculty</th><th>Subjects</th><th>Day & Time</th><th>Issue</th></tr></thead><tbody>`;
+            conflicts.forEach(c => {
+                html += `<tr>
       <td><b>${c.faculty}</b></td>
       <td>${c.subject_a} / ${c.subject_b}</td>
       <td>${c.day} ${c.time}</td>
       <td><span class="badge badge-red">Conflict</span></td>
     </tr>`;
-  });
-  if (conflicts.length === 0) {
-    html += `<tr><td colspan="4" class="text-center">No conflicts found.</td></tr>`;
-  }
-  html += `</tbody></table>
+            });
+            if (conflicts.length === 0) {
+                html += `<tr><td colspan="4" class="text-center">No conflicts found.</td></tr>`;
+            }
+            html += `</tbody></table>
     <div class="field-group" style="margin-top:16px;">
       <label class="field-label">Return Note</label>
       <textarea class="field-input" rows="3" placeholder="Notes for the chair..."></textarea>
     </div>`;
 
-  document.getElementById('review-body').innerHTML = html;
-  openModal('modal-review');
-}
-</script>
+            document.getElementById('review-body').innerHTML = html;
+            openModal('modal-review');
+        }
+    </script>
 </body>
+
 </html>

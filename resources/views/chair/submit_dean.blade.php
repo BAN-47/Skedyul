@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL — PBT Submission</title>
@@ -75,7 +75,7 @@
                                         };
                                     @endphp
 
-                                    <a href="{{ route('chair.submit_dean', ['faculty' => $option['id']]) }}"
+                                    <a href="{{ route('chair.submit_dean', ['faculty' => $option['id'], 'faculty_page' => $facultyOptions->currentPage()]) }}"
                                         class="rounded-xl border p-4 transition hover:border-blue-400 hover:bg-blue-50
                                             {{ $isSelected ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-slate-200 bg-white' }}">
                                         <div class="flex items-start justify-between gap-3">
@@ -100,6 +100,46 @@
                                         @endif
                                     </a>
                                 @endforeach
+                            </div>
+                        @endif
+
+                        @if ($facultyOptions->hasPages())
+                            <div
+                                class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+                                <p class="text-sm text-slate-500">
+                                    Showing {{ $facultyOptions->firstItem() }}–{{ $facultyOptions->lastItem() }}
+                                    of {{ $facultyOptions->total() }} faculty members
+                                </p>
+
+                                <div class="flex items-center gap-2">
+                                    @if ($facultyOptions->onFirstPage())
+                                        <span
+                                            class="cursor-not-allowed rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                                            Previous
+                                        </span>
+                                    @else
+                                        <a href="{{ $facultyOptions->previousPageUrl() }}"
+                                            class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                            Previous
+                                        </a>
+                                    @endif
+
+                                    <span class="px-2 text-sm text-slate-500">
+                                        Page {{ $facultyOptions->currentPage() }} of {{ $facultyOptions->lastPage() }}
+                                    </span>
+
+                                    @if ($facultyOptions->hasMorePages())
+                                        <a href="{{ $facultyOptions->nextPageUrl() }}"
+                                            class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                                            Next
+                                        </a>
+                                    @else
+                                        <span
+                                            class="cursor-not-allowed rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-400">
+                                            Next
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
                         @endif
                     </section>
