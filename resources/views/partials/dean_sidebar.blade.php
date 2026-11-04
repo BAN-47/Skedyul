@@ -41,6 +41,14 @@
             @endif
         </a>
 
+        <div class="nav-section-label">Schedule Views</div>
+        <a href="{{ route('dean.pbs') }}" class="nav-item {{ request()->routeIs('dean.pbs*') ? 'active' : '' }}">
+            <span class="nav-icon"></span> Program by Section (PBS)
+        </a>
+        <a href="{{ route('dean.pbt') }}" class="nav-item {{ request()->routeIs('dean.pbt') ? 'active' : '' }}">
+            <span class="nav-icon"></span> Program by Teacher (PBT)
+        </a>
+
         <div class="nav-section-label">Reports</div>
         <a href="{{ route('dean.schedule_reports') }}"
             class="nav-item {{ request()->routeIs('dean.schedule_reports') ? 'active' : '' }}">

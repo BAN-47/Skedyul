@@ -10,6 +10,7 @@ use App\Http\Controllers\Dean\NotificationController;
 use App\Http\Controllers\Dean\ScheduleReportsController;
 use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Dean\PbtExportController;
+use App\Http\Controllers\Dean\DeanScheduleViewerController;
 use App\Http\Controllers\Admin\AdminProfileController;
 
 /*
@@ -42,6 +43,15 @@ Route::middleware(['auth', 'audit.activity'])
 
         Route::post('/pending-approvals/{id}/return', [PendingApprovalsController::class, 'returnToChair'])
             ->name('pending_approvals.return');
+
+        Route::get('/pbs', [DeanScheduleViewerController::class, 'pbs'])
+            ->name('pbs');
+
+        Route::get('/pbs/export', [DeanScheduleViewerController::class, 'exportPbs'])
+            ->name('pbs.export');
+
+        Route::get('/pbt', [DeanScheduleViewerController::class, 'pbt'])
+            ->name('pbt');
 
         Route::get('/schedule-reports', [ScheduleReportsController::class, 'index'])
             ->name('schedule_reports');
