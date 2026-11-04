@@ -16,8 +16,7 @@ class EnsureFacultyEducationComplete
 
         if ($faculty && collect([
             $faculty->fac_bachelors_degree,
-            $faculty->fac_masters_degree,
-            $faculty->fac_doctorate_degree,
+            $faculty->fac_employment_type === 'full_time' ? $faculty->fac_masters_degree : null,
         ])->contains(fn ($degree) => blank($degree))) {
             return redirect()->to(URL::temporarySignedRoute(
                 'faculty.education.edit',

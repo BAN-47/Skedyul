@@ -11,7 +11,10 @@
     <div class="flex min-h-[calc(100vh-2rem)] items-center justify-center sm:min-h-[calc(100vh-4rem)]">
         <main class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
             <div class="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-7 text-white sm:px-9">
-                <div class="text-xs font-bold uppercase tracking-[.25em] text-blue-200">SKEDYUL Faculty Portal</div>
+                <div class="flex items-start justify-between gap-4">
+                    <div class="text-xs font-bold uppercase tracking-[.25em] text-blue-200">SKEDYUL Faculty Portal</div>
+                    <div class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">{{ $faculty->fac_employment_type === 'full_time' ? 'Full-Time' : 'Part-Time' }}</div>
+                </div>
                 <h1 class="mt-2 text-2xl font-extrabold sm:text-3xl">Complete your profile</h1>
                 <p class="mt-2 text-sm leading-relaxed text-blue-100">Your account is approved. Save your education information before entering your dashboard.</p>
             </div>
@@ -25,7 +28,7 @@
                     'fac_doctorate_degree' => ["Doctorate Degree", 'e.g. Doctor of Information Technology'],
                 ] as $field => [$label, $placeholder])
                     <label class="block text-sm font-bold text-slate-700">{{ $label }}
-                        <input name="{{ $field }}" value="{{ old($field, $faculty->{$field}) }}" placeholder="{{ $placeholder }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-medium outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" required>
+                        <input name="{{ $field }}" value="{{ old($field, $faculty->{$field}) }}" placeholder="{{ $placeholder }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-medium outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" @if($field === 'fac_bachelors_degree' || ($field === 'fac_masters_degree' && $faculty->fac_employment_type === 'full_time')) required @endif>
                     </label>
                 @endforeach
                 <button class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">Save and Continue</button>
