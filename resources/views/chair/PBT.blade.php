@@ -47,7 +47,7 @@
 
         if ($shift === 'night') {
             $gridStart = 16 * 60; // 4:00 PM
-            $gridEnd = 21 * 60; // 9:00 PM
+            $gridEnd = 21 * 60; // 9:30 PM
         } else {
             $gridStart = 7 * 60; // 7:00 AM
             $gridEnd = 16 * 60; // 4:00 PM
@@ -275,9 +275,12 @@
                                 <button type="button" id="teacher-picker-btn" onclick="toggleTeacherPicker()"
                                     aria-haspopup="listbox" aria-expanded="false"
                                     class="inline-flex min-w-[230px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-indigo-300 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-200">
-                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
-                                        @if($selectedFaculty?->fac_profile_image)
-                                            <img src="{{ asset('images/faculty_profile/' . $selectedFaculty->fac_profile_image) }}" class="h-full w-full object-cover" alt="{{ $selectedFaculty->fac_first_name }} profile photo">
+                                    <span
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
+                                        @if ($selectedFaculty?->fac_profile_image)
+                                            <img src="{{ asset('images/faculty_profile/' . $selectedFaculty->fac_profile_image) }}"
+                                                class="h-full w-full object-cover"
+                                                alt="{{ $selectedFaculty->fac_first_name }} profile photo">
                                         @else
                                             {{ $selectedFaculty ? strtoupper(substr($selectedFaculty->fac_first_name, 0, 1) . substr($selectedFaculty->fac_last_name, 0, 1)) : '👤' }}
                                         @endif
@@ -342,9 +345,12 @@
                                                         data-name="{{ strtolower($pname) }}"
                                                         data-role="{{ $groupLabel }}"
                                                         onclick="selectTeacher('{{ $pid }}')">
-                                                        <span class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                                                            @if($person->fac_profile_image)
-                                                                <img src="{{ asset('images/faculty_profile/' . $person->fac_profile_image) }}" class="h-full w-full object-cover" alt="{{ $pname }} profile photo">
+                                                        <span
+                                                            class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                                                            @if ($person->fac_profile_image)
+                                                                <img src="{{ asset('images/faculty_profile/' . $person->fac_profile_image) }}"
+                                                                    class="h-full w-full object-cover"
+                                                                    alt="{{ $pname }} profile photo">
                                                             @else
                                                                 {{ strtoupper(substr($pname, 0, 1)) }}
                                                             @endif
@@ -371,7 +377,7 @@
                             </div>
 
 
-<span
+                            <span
                                 class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
                                 {{ optional($activeSemester)->label ?? 'No active semester' }}
                             </span>
@@ -601,7 +607,7 @@
                     <label class="field-label">Department</label>
                     <select id="add-department" class="field-input w-full">
                         <option value="">-- Select Department --</option>
-                        @foreach($allDepartments as $dept)
+                        @foreach ($allDepartments as $dept)
                             <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
                                 {{ $dept->dept_name }}
                             </option>
@@ -612,7 +618,8 @@
                 {{-- ── SECTION (triggers subject filter) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input" onchange="filterSubjectsBySection('add-section', 'add-subject')">
+                    <select id="add-section" class="field-input"
+                        onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
                             <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
@@ -642,9 +649,10 @@
                     </div>
                     <div class="flex-1">
                         <label class="field-label">Category</label>
-                        <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
+                        <select id="add-category" class="field-input !py-[9px]"
+                            onchange="filterSubjectsByCategory()">
                             <option value="">-- All --</option>
-                            @foreach($categories as $cat)
+                            @foreach ($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
@@ -763,7 +771,8 @@
                     <select id="edit-section" class="field-input">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
-                            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
+                            <option value="{{ $sec->sec_id }}"
+                                data-year-level="{{ $sec->sec_year_level ?? '' }}">
                                 {{ $sec->sec_name }}</option>
                         @endforeach
                     </select>
@@ -790,9 +799,10 @@
                     </div>
                     <div class="flex-1">
                         <label class="field-label">Cate</label>
-                        <select id="edit-category" class="field-input !py-[9px]" onchange="filterEditSubjectsByCategory()">
+                        <select id="edit-category" class="field-input !py-[9px]"
+                            onchange="filterEditSubjectsByCategory()">
                             <option value="">-- All --</option>
-                            @foreach($categories as $cat)
+                            @foreach ($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
@@ -800,11 +810,11 @@
                 </div>
                 <div class="mb-3">
                     <label class="field-label">Room</label>
-                        <select id="edit-room" class="field-input">
-                            <option value="">-- Select Room --</option>
-                            @foreach ($rooms ?? collect() as $r)
-                                <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
-                            @endforeach
+                    <select id="edit-room" class="field-input">
+                        <option value="">-- Select Room --</option>
+                        @foreach ($rooms ?? collect() as $r)
+                            <option value="{{ $r->room_id }}">{{ $r->room_name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -847,7 +857,7 @@
 
 
 
-{{-- ══════════════ MODAL: DELETE ══════════════ --}}
+    {{-- ══════════════ MODAL: DELETE ══════════════ --}}
     <div class="modal-overlay" id="modal-delete-schedule">
         <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
             <div class="modal-header">
@@ -899,7 +909,7 @@
         <label class="field-label">Department</label>
         <select id="edit-department" class="field-input">
             <option value="">-- Select Department --</option>
-            @foreach($allDepartments as $dept)
+            @foreach ($allDepartments as $dept)
                 <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
                     {{ $dept->dept_code ?? $dept->dept_name }}
                 </option>
@@ -1043,7 +1053,11 @@
                 "{{ $dept->dept_id }}": [
                     @php $deptSections = $sections->where('sec_dept_id', $dept->dept_id); @endphp
                     @foreach ($deptSections as $sec)
-                        { id: "{{ $sec->sec_id }}", name: "{{ $sec->sec_name }}", year: "{{ $sec->sec_year_level }}" },
+                        {
+                            id: "{{ $sec->sec_id }}",
+                            name: "{{ $sec->sec_name }}",
+                            year: "{{ $sec->sec_year_level }}"
+                        },
                     @endforeach
                 ],
             @endforeach
@@ -1052,14 +1066,33 @@
             @foreach ($allDepartments as $dept)
                 "{{ $dept->dept_id }}": [
                     @foreach ($subjects->where('course_dept_id', $dept->dept_id) as $sub)
-                        { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+                        {
+                            id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                            code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                            name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                            year: "{{ $sub->course_year_level ?? '' }}",
+                            sem: "{{ $sub->course_semester ?? '' }}",
+                            cat: "{{ $sub->course_category ?? '' }}",
+                            lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                            labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                        },
                     @endforeach
                 ],
             @endforeach
         };
         window.ALL_SUBJECTS_LIST = [
             @foreach ($allSubjects as $sub)
-                { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", dept: "{{ $sub->course_dept_id ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+                {
+                    id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                    code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                    name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                    year: "{{ $sub->course_year_level ?? '' }}",
+                    sem: "{{ $sub->course_semester ?? '' }}",
+                    cat: "{{ $sub->course_category ?? '' }}",
+                    dept: "{{ $sub->course_dept_id ?? '' }}",
+                    lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                    labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                },
             @endforeach
         ];
         window.ALL_CATEGORIES = @json($categories ?? []);
