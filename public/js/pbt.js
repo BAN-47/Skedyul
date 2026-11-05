@@ -271,10 +271,10 @@ function getShiftValue() {
 }
 
 // Shift grid ranges in minutes since midnight.
-// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:00 PM.
+// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:30 PM.
 function getShiftGridRange() {
   return getShiftValue() === 'evening'
-    ? { start: 16 * 60, end: 21 * 60, label: 'Evening (4:00 PM–9:00 PM)' }
+    ? { start: 16 * 60, end: (21 * 60) + 30, label: 'Evening (4:00 PM–9:30 PM)' }
     : { start: 7 * 60,  end: 16 * 60, label: 'Day (7:00 AM–4:00 PM)' };
 }
 
