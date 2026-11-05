@@ -77,7 +77,7 @@ function filterEditSubjectsByCategory() {
     const catSel = document.getElementById("edit-category");
     const subSel = document.getElementById("edit-subject");
     const secSel = document.getElementById("edit-section");
-    const deptSel = document.getElementById("edit-department");
+    const deptSel = document.getElementById("edit-department") || document.getElementById("edit-department-id");
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
@@ -138,7 +138,7 @@ function filterEditSubjectsByCategory() {
             if (show) subSel.appendChild(opt);
         });
     if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = "";
-}
+  }
 
 /* ── modal helpers (same pattern as PBS / other chair pages) ── */
 function openModal(id) {
@@ -713,9 +713,7 @@ function submitEdit() {
         fac_id: SELECTED_TEACHER,
         sem_id: document.getElementById("edit-semester").value,
         prog_id:
-            document.getElementById("edit-program")?.value ||
-            document.getElementById("edit-department")?.value ||
-            "",
+            document.getElementById("edit-department-id")?.value || "",
         sec_id: document.getElementById("edit-section").value,
         room_id: document.getElementById("edit-room").value,
         day: document.getElementById("edit-day").value,
