@@ -39,9 +39,9 @@ class ScheduleAssignmentService
         'Dean of Instruction' => 9,
         'College Dean' => 9,
         'Associate College Dean' => 12,
-        'Department SUC Function Chairperson' => 15,
-        'Campus Secretary' => 15,
-        'College Secretary' => 15,
+        'Department SUC Function Chairperson' => 16,
+        'Campus Secretary' => 16,
+        'College Secretary' => 16,
     ];
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
@@ -50,8 +50,10 @@ class ScheduleAssignmentService
             return (float) self::FULL_TIME_MAX_HOURS;
         }
 
-        if ($faculty->fac_special_position
-            && isset(self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position])) {
+        if (
+            $faculty->fac_special_position
+            && isset(self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position])
+        ) {
             return (float) self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position];
         }
 
@@ -117,9 +119,9 @@ class ScheduleAssignmentService
                 $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
                 $course = Course::findOrFail($data['subj_id']);
                 $isRec = $course->course_code === 'REC';
-                
+
                 $loadQuery = Study_Load::where([
-                    'sl_fac_id' => $data['fac_id'], 
+                    'sl_fac_id' => $data['fac_id'],
                     'sl_course_id' => $data['subj_id'],
                     'sl_sem_id' => $data['sem_id'],
                 ]);
@@ -244,13 +246,17 @@ class ScheduleAssignmentService
                 $this->assertCourseHoursAvailable($data, $course, $scheduleId);
                 $shift = $data['shift'] ?? $schedule->sch_shift ?? 'day';
                 $targetLoad = Study_Load::where([
-                    'sl_fac_id' => $data['fac_id'], 'sl_course_id' => $data['subj_id'],
-                    'sl_sec_id' => $data['sec_id'], 'sl_sem_id' => $data['sem_id'],
+                    'sl_fac_id' => $data['fac_id'],
+                    'sl_course_id' => $data['subj_id'],
+                    'sl_sec_id' => $data['sec_id'],
+                    'sl_sem_id' => $data['sem_id'],
                 ])->withExists('schedules')->first();
                 $isSameLoad = $targetLoad && $targetLoad->sl_id === $schedule->sch_load_id;
                 $movingOnlySchedule = $isSameLoad && $schedule->sch_shift !== $shift;
-                if ($movingOnlySchedule && Schedule::where('sch_load_id', $schedule->sch_load_id)
-                    ->where('sch_id', '!=', $schedule->sch_id)->where('sch_is_active', true)->exists()) {
+                if (
+                    $movingOnlySchedule && Schedule::where('sch_load_id', $schedule->sch_load_id)
+                    ->where('sch_id', '!=', $schedule->sch_id)->where('sch_is_active', true)->exists()
+                ) {
                     throw new RuntimeException('LOAD_LIMIT:All meetings for one course/section must stay in the same shift.');
                 }
                 if ($targetLoad && !$isSameLoad && $targetLoad->schedules_exists && $targetLoad->sl_shift && $targetLoad->sl_shift !== $shift) {
@@ -263,8 +269,10 @@ class ScheduleAssignmentService
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
-                    if ($replacingSameFacultyLoad && $willRemoveOldLoad
-                        && ($faculty->fac_employment_type === 'part_time' || $schedule->sch_shift === $shift)) {
+                    if (
+                        $replacingSameFacultyLoad && $willRemoveOldLoad
+                        && ($faculty->fac_employment_type === 'part_time' || $schedule->sch_shift === $shift)
+                    ) {
                         $oldCourse = Course::find($schedule->sch_course_id);
                         $currentHours -= $oldCourse ? self::courseHours($oldCourse) : 0;
                     }
@@ -277,10 +285,14 @@ class ScheduleAssignmentService
                     }
                     if (!$targetLoad) {
                         $targetLoad = Study_Load::create([
-                            'sl_fac_id' => $data['fac_id'], 'sl_course_id' => $data['subj_id'],
+                            'sl_fac_id' => $data['fac_id'],
+                            'sl_course_id' => $data['subj_id'],
                             'sl_shift' => $shift,
-                            'sl_sec_id' => $data['sec_id'], 'sl_sem_id' => $data['sem_id'],
-                            'sl_assigned_by' => Auth::id(), 'sl_assigned_at' => now(), 'sl_status' => 'approved',
+                            'sl_sec_id' => $data['sec_id'],
+                            'sl_sem_id' => $data['sem_id'],
+                            'sl_assigned_by' => Auth::id(),
+                            'sl_assigned_at' => now(),
+                            'sl_status' => 'approved',
                         ]);
                     } elseif ($targetLoadNeedsShiftMove) {
                         $targetLoad->sl_shift = $shift;
@@ -296,11 +308,15 @@ class ScheduleAssignmentService
                     }
                 }
                 $scheduleData = [
-                    'sch_fac_id' => $data['fac_id'], 'sch_course_id' => $data['subj_id'],
-                    'sch_sec_id' => $data['sec_id'], 'sch_room_id' => $data['room_id'],
-                    'sch_sem_id' => $data['sem_id'], 'sch_day' => $data['day'],
+                    'sch_fac_id' => $data['fac_id'],
+                    'sch_course_id' => $data['subj_id'],
+                    'sch_sec_id' => $data['sec_id'],
+                    'sch_room_id' => $data['room_id'],
+                    'sch_sem_id' => $data['sem_id'],
+                    'sch_day' => $data['day'],
                     'sch_shift' => $shift,
-                    'sch_start_time' => $data['start_time'], 'sch_end_time' => $data['end_time'],
+                    'sch_start_time' => $data['start_time'],
+                    'sch_end_time' => $data['end_time'],
                 ];
                 $schedule->update($scheduleData);
                 $this->syncWorkload($data['fac_id'], $data['sem_id']);
@@ -349,10 +365,10 @@ class ScheduleAssignmentService
         return (float) Study_Load::query()
             ->where('sl_fac_id', $facultyId)
             ->where('sl_sem_id', $semesterId)
-            ->when($faculty?->fac_employment_type !== 'part_time', fn ($query) => $query->where('sl_shift', $shift))
+            ->when($faculty?->fac_employment_type !== 'part_time', fn($query) => $query->where('sl_shift', $shift))
             ->with('subject')
             ->get()
-            ->sum(fn ($load) => self::courseHours($load->subject));
+            ->sum(fn($load) => self::courseHours($load->subject));
     }
 
     public static function courseHours(?Course $course): float
@@ -366,7 +382,7 @@ class ScheduleAssignmentService
     {
         return Faculty::query()
             ->whereKey($facultyId)
-            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->exists();
     }
 
@@ -404,7 +420,7 @@ class ScheduleAssignmentService
             $sectionName = $section?->sec_name ?? 'the selected section';
             throw new RuntimeException(
                 "COURSE_HOURS:Overextension: {$course->course_code} for {$sectionName} allows {$allowedHours} total hours per week. "
-                . "Already scheduled: {$scheduledHours} hours; this meeting adds {$newHours}, totaling {$projectedHours} hours."
+                    . "Already scheduled: {$scheduledHours} hours; this meeting adds {$newHours}, totaling {$projectedHours} hours."
             );
         }
     }
