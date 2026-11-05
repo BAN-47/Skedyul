@@ -323,40 +323,50 @@ function getShiftValue() {
         : "day";
 }
 
-// Shift grid ranges in minutes since midnight.
-// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:00 PM.
-function getShiftGridRange() {
-    return getShiftValue() === "evening"
-        ? {
-              start: 16 * 60,
-              end: 21 * 60 + 30,
-              label: "Evening (4:00 PM–9:30 PM)",
-          }
-        : {
-              start: 7 * 60,
-              end: 16 * 60,
-              label: "Day (7:00 AM–4:00 PM)",
-          };
+// Day = 7:00 AM–4:00 PM.
+// Evening = 4:00 PM–9:30 PM on weekdays; weekends may use 7:00 AM–9:30 PM.
+function getShiftGridRange(day = null) {
+    if (getShiftValue() !== "evening") {
+        return {
+            start: 7 * 60,
+            end: 16 * 60,
+            label: "Day (7:00 AM–4:00 PM)",
+        };
+    }
+
+    const isWeekend = day === "Saturday" || day === "Sunday";
+    return {
+        start: isWeekend ? 7 * 60 : 16 * 60,
+        end: 21 * 60 + 30,
+        label: isWeekend
+            ? "Weekend evening (7:00 AM–9:30 PM)"
+            : "Evening (4:00 PM–9:30 PM)",
+    };
 }
 
-// Returns an error message string if start/end fall outside the shift grid, otherwise null.
-function validateTimeInRange(startTime, endTime) {
-    const range = getShiftGridRange();
+// Returns an error message string if any selected day falls outside its shift window.
+function validateTimeInRange(startTime, endTime, days = []) {
     const toMinutes = (hhmm) => {
         const [h, m] = hhmm.split(":").map(Number);
         return h * 60 + m;
     };
+    const fmt = (mins) => {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+    };
+    const selectedDays = Array.isArray(days) ? days : [days];
+    const daysToCheck = selectedDays.length ? selectedDays : [null];
     const sMin = toMinutes(startTime);
     const eMin = toMinutes(endTime);
-    if (sMin < range.start || eMin > range.end) {
-        const fmt = (mins) => {
-            const h = Math.floor(mins / 60);
-            const m = mins % 60;
-            const ampm = h >= 12 ? "PM" : "AM";
-            const h12 = h % 12 === 0 ? 12 : h % 12;
-            return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
-        };
-        return `This time is outside the ${range.label} window (${fmt(range.start)}–${fmt(range.end)}). Switch to the other shift or pick a time within range.`;
+
+    for (const day of daysToCheck) {
+        const range = getShiftGridRange(day);
+        if (sMin < range.start || eMin > range.end) {
+            return `This time is outside the ${range.label} window (${fmt(range.start)}–${fmt(range.end)}). Pick a time within range.`;
+        }
     }
     return null;
 }
@@ -636,6 +646,7 @@ function submitAdd(keepOpen = false) {
     const rangeError = validateTimeInRange(
         payload.start_time,
         payload.end_time,
+        payload.days,
     );
     if (rangeError) {
         showToast(rangeError);
@@ -655,11 +666,9 @@ function submitAdd(keepOpen = false) {
         body: JSON.stringify(payload),
     })
         .then(async (res) => {
-            const data = await res
-                .json()
-                .catch(() => ({
-                    message: `The server returned an unreadable response (${res.status}).`,
-                }));
+            const data = await res.json().catch(() => ({
+                message: `The server returned an unreadable response (${res.status}).`,
+            }));
             if (!res.ok && !data.message && !data.errors)
                 data.message = `Schedule could not be saved (HTTP ${res.status}).`;
             if (data.success) {
@@ -736,6 +745,7 @@ function submitEdit() {
     const editRangeError = validateTimeInRange(
         payload.start_time,
         payload.end_time,
+        [payload.day],
     );
     if (editRangeError) {
         showToast(editRangeError);
