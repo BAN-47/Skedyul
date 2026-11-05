@@ -641,7 +641,7 @@
                         </select>
                     </div>
                     <div class="flex-1">
-                        <label class="field-label">Cate</label>
+                        <label class="field-label">Category</label>
                         <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
                             <option value="">-- All --</option>
                             @foreach($categories as $cat)
