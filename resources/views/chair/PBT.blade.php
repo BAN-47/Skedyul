@@ -47,7 +47,7 @@
 
         if ($shift === 'night') {
             $gridStart = 16 * 60; // 4:00 PM
-            $gridEnd = 21 * 60; // 9:30 PM
+            $gridEnd = 21 * 60 + 30 // 9:30 PM
         } else {
             $gridStart = 7 * 60; // 7:00 AM
             $gridEnd = 16 * 60; // 4:00 PM
