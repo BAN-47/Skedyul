@@ -39,9 +39,9 @@ class ScheduleAssignmentService
         'Dean of Instruction' => 9,
         'College Dean' => 9,
         'Associate College Dean' => 12,
-        'Department SUC Function Chairperson' => 15,
-        'Campus Secretary' => 15,
-        'College Secretary' => 15,
+        'Department SUC Function Chairperson' => 16,
+        'Campus Secretary' => 16,
+        'College Secretary' => 16,
     ];
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
@@ -253,7 +253,8 @@ class ScheduleAssignmentService
                 ])->withExists('schedules')->first();
                 $isSameLoad = $targetLoad && $targetLoad->sl_id === $schedule->sch_load_id;
                 $movingOnlySchedule = $isSameLoad && $schedule->sch_shift !== $shift;
-                if ($movingOnlySchedule && Schedule::where('sch_load_id', $schedule->sch_load_id)
+                if (
+                    $movingOnlySchedule && Schedule::where('sch_load_id', $schedule->sch_load_id)
                     ->where('sch_id', '!=', $schedule->sch_id)->where('sch_is_active', true)->exists()
                 ) {
                     throw new RuntimeException('LOAD_LIMIT:All meetings for one course/section must stay in the same shift.');
