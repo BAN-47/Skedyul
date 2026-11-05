@@ -270,18 +270,18 @@
                     {{-- RIGHT --}}
                     <div>
                         <h4 class="text-l font-bold">Location of Development</h4>
-                        <p class="mt-2 text-sm leading-6 text-slate-700">
+                        <address class="mt-2 text-sm leading-6 text-slate-700">
                             College of Computer, Information, and Communications Technology,<br>
                             Cebu Technological University - Main Campus,<br>
                             Corner M.J. Cuenco Ave, R. Palma Street,<br>
                             Cebu City, 6000
-                        </p>
+                        </address>
 
                         <h4 class="mt-5 text-l font-bold">Contact Us:</h4>
 
                         <div class="mt-2 flex items-center gap-2 text-sm text-slate-700">
                             <span class="text-xl font-bold text-slate-900">☏:</span>
-                            <span></span>
+                            <span>+63 969 236 9744</span>
                         </div>
 
                         <div class="mt-2 flex items-center gap-2 text-sm text-slate-700">
