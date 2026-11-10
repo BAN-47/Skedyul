@@ -47,7 +47,7 @@ class ScheduleAssignmentService
         'PERG Chair' => 16,
         'Campus Secretary' => 16,
         'College Secretary' => 16,
-    ];
+        ];
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {

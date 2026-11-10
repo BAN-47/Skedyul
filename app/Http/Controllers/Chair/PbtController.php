@@ -177,10 +177,31 @@ class PbtController extends Controller
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
                 ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
-                ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum))
+                ->where(function ($query) use ($semNum) {
+                    $query->where(function ($rec) {
+                        $rec->where('course_name', 'Research, Extension and Consultation Time');
+                    })->orWhere(function ($regular) use ($semNum) {
+                        $regular->where('course_name', '!=', 'Research, Extension and Consultation Time')
+                            ->where(function ($query) {
+                                $query->where('course_code', '!=', 'REC')
+                                    ->orWhereNull('course_code');
+                            })
+                            ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum));
+                    });
+                })
                 ->orderBy('course_code')
                 ->get(),
-            'allSubjects'      => Course::where('course_is_active', true)->orderBy('course_code')->get(),
+            'allSubjects'      => Course::where('course_is_active', true)
+                ->where(function ($query) {
+                    $query->where('course_name', '!=', 'Research, Extension and Consultation Time')
+                        ->where(function ($regular) {
+                            $regular->where('course_code', '!=', 'REC')
+                                ->orWhereNull('course_code');
+                        })
+                        ->orWhere('course_name', 'Research, Extension and Consultation Time');
+                })
+                ->orderBy('course_code')
+                ->get(),
             'facultyFullTime'  => $facultyFullTime,
             'facultyPartTime'  => $facultyPartTime,
             'facultyChairs'    => $facultyChairs,

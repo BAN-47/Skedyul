@@ -144,7 +144,14 @@
                             @php
                                 // One row per course+section assignment for the selected teacher
                                 $pbtCourseRows = $summarySchedules
-                                    ->filter(fn($s) => $s->course ?? $s->subject)
+                                    ->filter(function ($s) {
+                                        $course = $s->course ?? $s->subject;
+
+                                        return $course
+                                            && ($course->course_code ?? $course->subj_code ?? null) !== 'REC'
+                                            && ($course->course_name ?? $course->subj_name ?? null)
+                                                !== 'Research, Extension and Consultation Time';
+                                    })
                                     ->unique(
                                         fn($s) => ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) .
                                             '|' .
@@ -516,6 +523,11 @@
 
                                             $row = intdiv($startMins - $gridStart, $slotMinutes) + 1;
                                             $span = max(1, (int) ceil(($endMins - $startMins) / $slotMinutes));
+                                            $course = $s->course ?? $s->subject;
+                                            $courseCode = $course?->course_code ?? $course?->subj_code;
+                                            $courseName = $course?->course_name ?? $course?->subj_name;
+                                            $isRec = $courseCode === 'REC'
+                                                || $courseName === 'Research, Extension and Consultation Time';
                                         @endphp
 
                                         <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
@@ -539,8 +551,10 @@
 
                                             <div
                                                 class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
-                                                <div class="text-[13px] font-extrabold tracking-wide">
-                                                    {{ $s->subject->subj_code ?? '—' }}</div>
+                                                <div
+                                                    class="{{ $isRec ? 'text-[10px] leading-tight break-words' : 'text-[13px] tracking-wide' }} font-extrabold">
+                                                    {{ $isRec ? ($courseName ?? 'Research, Extension and Consultation Time') : ($courseCode ?? '—') }}
+                                                </div>
                                                 <div class="text-[11.5px] font-semibold mt-1">
                                                     {{ $s->section->sec_name ?? '' }}</div>
                                                 @if ($s->room)
