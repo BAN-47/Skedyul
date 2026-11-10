@@ -31,7 +31,7 @@
                                 Export Reports
                             </h1>
                             <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                                Generate an individual Program by Teacher workbook from your department’s active
+                                Generate an individual Program by Teacher workbook from your department’s selected
                                 schedule.
                             </p>
                         </div>
@@ -39,7 +39,7 @@
                         @if ($semester)
                             <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
                                 <div class="text-xs font-semibold uppercase tracking-wide text-blue-600">
-                                    Active semester
+                                    Selected semester
                                 </div>
                                 <div class="mt-1 text-sm font-bold text-slate-800">
                                     {{ $semester->sem_name }}
@@ -111,6 +111,20 @@
                             @else
                                 <form method="GET" action="{{ route('chair.export_reports.pbt') }}" class="space-y-5">
                                     <div>
+                                        <label for="semester" class="mb-2 block text-sm font-semibold text-slate-700">
+                                            Academic year and semester
+                                        </label>
+                                        <select id="semester" name="semester" required
+                                            class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                                            @foreach ($semesters as $option)
+                                                <option value="{{ $option->sem_id }}"
+                                                    @selected($semester?->sem_id === $option->sem_id)>
+                                                    {{ $option->label }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
                                         <label for="faculty_id" class="mb-2 block text-sm font-semibold text-slate-700">
                                             Faculty member
                                         </label>
@@ -149,7 +163,7 @@
                                         <div>
                                             <div class="text-sm font-semibold text-slate-700">Ready to export?</div>
                                             <div class="mt-1 text-xs text-slate-500">
-                                                The workbook uses the current active semester.
+                                                The workbook uses the selected semester.
                                             </div>
                                         </div>
 

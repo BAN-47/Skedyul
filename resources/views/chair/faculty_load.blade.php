@@ -47,7 +47,7 @@
 
             <div class="page-content">
 
-                <div class="flex items-start justify-between mb-6">
+                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <div class="text-[22px] font-extrabold">Faculty Load Management</div>
                         <div class="text-[13px] text-slate-400 mt-0.5">
@@ -55,17 +55,38 @@
                             @if ($program)
                                 &middot; {{ $program->dept_code ?? $program->prog_code }}
                             @endif
+                            &middot; Total load limit 30 teaching hours
                             &middot; Day limits follow faculty designation
-                            &middot; Evening limit {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::FULL_TIME_MAX_HOURS }} teaching hours
-                            &middot; Part-time limit {{ \App\Http\Controllers\Chair\ChairFacultyLoadController::PART_TIME_MAX_HOURS }} hours per shift
+                            &middot; Evening limit {{ \App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS }} teaching hours
+                            &middot; Part-time limit {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }} hours per shift
                         </div>
                     </div>
+                    <form method="GET" action="{{ route('chair.faculty_load') }}" class="flex flex-col gap-1">
+                        <label for="faculty-load-semester" class="text-xs font-semibold text-slate-600">
+                            Academic year and semester
+                        </label>
+                        <select id="faculty-load-semester" name="semester" onchange="this.form.submit()"
+                            class="min-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800">
+                            @foreach ($semesters as $option)
+                                <option value="{{ $option->sem_id }}"
+                                    @selected(($semester?->sem_id ?? '') === $option->sem_id)>
+                                    {{ $option->label }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
                 </div>
 
                 <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <input id="faculty-load-search" type="search" placeholder="Search faculty, course, or status..." aria-label="Search faculty loads"
                         class="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                     <div class="flex items-center gap-3 text-xs text-slate-500">
+                        <label for="faculty-load-page-size">Rows</label>
+                        <select id="faculty-load-page-size" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </select>
                         <span id="faculty-load-page-info" aria-live="polite"></span>
                         <button type="button" id="faculty-load-prev" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
                         <button type="button" id="faculty-load-next" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
@@ -83,7 +104,7 @@
                         <table class="data-table" id="faculty-load-table">
                             <thead>
                                 <tr>
-                                    @foreach (['Faculty', 'Employment', 'Special Position / Limit', 'Course Code', 'Academic Units', 'Day Teaching Hours', 'Evening Teaching Hours', 'Status'] as $h)
+                                    @foreach (['Faculty', 'Employment', 'Special Position / Limit', 'Course Code', 'Academic Units / Combined Hours', 'Day Teaching Hours', 'Evening Teaching Hours', 'Status'] as $h)
                                         <th>{{ $h }}</th>
                                     @endforeach
                                 </tr>
@@ -103,35 +124,26 @@
                                                         <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
                                                     @endforeach
                                                 </select>
-                                                <span data-position-cap class="text-xs text-slate-500">{{ $fl['employment'] === 'part_time' ? 'Day + evening cap: 30h' : ($fl['special_position_max_hours'] ? 'Day cap: '.$fl['special_position_max_hours'].'h' : 'Day cap: 30h').' · Evening cap: 30h' }}</span>
+                                                <span data-position-cap class="text-xs text-slate-500">{{ 'Day cap: '.($fl['special_position_max_hours'] ?? \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS).'h · Evening cap: '.\App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS.'h' }}</span>
                                                 <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
                                             </form>
                                         </td>
                                         <td class="text-slate-500">{{ $fl['subjects'] }}</td>
-                                        <td><span class="font-mono font-bold">{{ $fl['total_units'] }}u</span></td>
-                                        @if ($fl['employment'] === 'part_time')
-                                            @php
-                                                $partTimeHours = $fl['day']['total_hours'] + $fl['evening']['total_hours'];
-                                                $partTimeRemaining = max(0, 30 - $partTimeHours);
-                                                $partTimeStatus = $partTimeHours >= 30 ? ['Full', 'badge-red'] : ($partTimeHours >= 27 ? ['Near Max', 'badge-amber'] : ['Part-time', 'badge-teal']);
-                                            @endphp
-                                            <td colspan="2">
-                                                <div class="font-mono font-bold">{{ $partTimeHours }}h <span class="text-xs font-normal text-slate-400">/ 30h</span></div>
-                                                <div class="text-xs text-slate-500">{{ $partTimeRemaining }}h left</div>
-                                            </td>
-                                            <td><span class="badge {{ $partTimeStatus[1] }}">{{ $partTimeStatus[0] }}</span></td>
-                                        @else
-                                            @foreach (['day', 'evening'] as $shift)
-                                                <td>
-                                                    <div class="font-mono font-bold">{{ $fl[$shift]['total_hours'] }}h <span class="text-xs font-normal text-slate-400">/ {{ $fl[$shift]['max_hours'] }}h</span></div>
-                                                    <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div>
-                                                </td>
-                                            @endforeach
+                                        <td>
+                                            <span class="font-mono font-bold">{{ $fl['total_units'] }}u</span>
+                                            <div class="text-xs text-slate-500">{{ $fl['total_hours'] }}h combined across shifts</div>
+                                            <span class="badge {{ $fl['total_status_badge'] }}">{{ $fl['total_status_label'] }}</span>
+                                        </td>
+                                        @foreach (['day', 'evening'] as $shift)
                                             <td>
-                                                <div><span class="badge {{ $fl['day']['status_badge'] }}">Day: {{ $fl['day']['status_label'] }}</span></div>
-                                                <div class="mt-1"><span class="badge {{ $fl['evening']['status_badge'] }}">Evening: {{ $fl['evening']['status_label'] }}</span></div>
+                                                <div class="font-mono font-bold">{{ $fl[$shift]['total_hours'] }}h <span class="text-xs font-normal text-slate-400">/ {{ $fl[$shift]['max_hours'] }}h</span></div>
+                                                <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div>
                                             </td>
-                                        @endif
+                                        @endforeach
+                                        <td>
+                                            <div><span class="badge {{ $fl['day']['status_badge'] }}">Day: {{ $fl['day']['status_label'] }}</span></div>
+                                            <div class="mt-1"><span class="badge {{ $fl['evening']['status_badge'] }}">Evening: {{ $fl['evening']['status_label'] }}</span></div>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -174,8 +186,8 @@
                     const option = select.selectedOptions[0];
                     const maxHours = option.dataset.maxHours;
                     cap.textContent = select.form.closest('tr').querySelector('td:nth-child(2)')?.textContent.trim() === 'Part-time'
-                        ? 'Day + evening cap: 30h'
-                        : `Day cap: ${maxHours || 30}h · Evening cap: 30h`;
+                        ? `Day cap: {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}h · Evening cap: {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}h`
+                        : `Day cap: ${maxHours || {{ \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS }}}h · Evening cap: {{ \App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS }}h`;
                 };
                 select.addEventListener('change', syncCap);
                 syncCap();
@@ -187,7 +199,8 @@
             const info = document.getElementById('faculty-load-page-info');
             const previous = document.getElementById('faculty-load-prev');
             const next = document.getElementById('faculty-load-next');
-            const pageSize = 10;
+            const pageSizeSelect = document.getElementById('faculty-load-page-size');
+            let pageSize = Number(pageSizeSelect.value);
             let page = 0;
 
             function render() {
@@ -205,6 +218,11 @@
             }
 
             search.addEventListener('input', () => { page = 0; render(); });
+            pageSizeSelect.addEventListener('change', () => {
+                pageSize = Number(pageSizeSelect.value);
+                page = 0;
+                render();
+            });
             previous.addEventListener('click', () => { page--; render(); });
             next.addEventListener('click', () => { page++; render(); });
             render();

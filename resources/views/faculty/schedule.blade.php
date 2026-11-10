@@ -76,7 +76,7 @@
         $days = $days ?? ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $shift = $shift ?? 'day';
         $gridStart = $shift === 'night' ? 16 * 60 : 7 * 60;
-        $gridEnd = $shift === 'night' ? 21 * 60 : 16 * 60;
+        $gridEnd = $shift === 'night' ? 21 * 60 + 30 : 16 * 60;
         $slotMinutes = 30;
         $slotCount = intdiv($gridEnd - $gridStart, $slotMinutes);
         $showNoonBreak = $shift === 'day';
@@ -121,7 +121,7 @@
                             class="btn btn-secondary inline-flex items-center gap-2">
                             <span>Summary</span><span aria-hidden="true">▦</span>
                         </button>
-                        <a href="{{ route('faculty.pbt_export') }}"
+                        <a href="{{ route('faculty.pbt_export', ['semester' => $activeSemester?->sem_id]) }}"
                             class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
                             Download XLSX
                         </a>
@@ -253,16 +253,25 @@
                             </span>
                         </div>
 
-                        <span
-                            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">
-                            {{ $activeSemester->label ?? 'No active semester' }}
-                        </span>
+                        <form method="GET" action="{{ route('faculty.schedule') }}">
+                            <input type="hidden" name="shift" value="{{ $shift }}">
+                            <label for="faculty-semester" class="sr-only">Academic year and semester</label>
+                            <select id="faculty-semester" name="semester" onchange="this.form.submit()"
+                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">
+                                @foreach ($semesters as $semester)
+                                    <option value="{{ $semester->sem_id }}"
+                                        @selected(($activeSemester?->sem_id ?? '') === $semester->sem_id)>
+                                        {{ $semester->label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </form>
 
                         <div class="flex overflow-hidden rounded-lg border border-slate-300"
                             aria-label="Schedule shift">
-                            <a href="{{ route('faculty.schedule', ['shift' => 'day']) }}"
+                            <a href="{{ route('faculty.schedule', ['shift' => 'day', 'semester' => $activeSemester?->sem_id]) }}"
                                 class="px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Day</a>
-                            <a href="{{ route('faculty.schedule', ['shift' => 'night']) }}"
+                            <a href="{{ route('faculty.schedule', ['shift' => 'night', 'semester' => $activeSemester?->sem_id]) }}"
                                 class="border-l border-slate-300 px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Night</a>
                         </div>
 

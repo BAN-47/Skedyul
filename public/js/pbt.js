@@ -12,32 +12,27 @@ function filterSubjectsByCategory() {
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
-    const deptId = deptSel ? deptSel.value : "";
-    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-    const yearLevel = selectedOpt
-        ? selectedOpt.getAttribute("data-year-level") || ""
-        : "";
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || "");
-
     let subjectsToLoad = [];
     if (selectedCat) {
         const globalList = window.ALL_SUBJECTS_LIST || [];
-        subjectsToLoad = globalList.filter(
-            (s) => String(s.cat) === String(selectedCat),
+        subjectsToLoad = globalList.filter((subject) =>
+            String(subject.cat) === String(selectedCat),
         );
     } else {
+        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+        const deptId = selectedOpt?.getAttribute("data-dept-id") || (deptSel ? deptSel.value : "");
+        const yearLevel = selectedOpt ? selectedOpt.getAttribute("data-year-level") || "" : "";
+        const activeSemester = String(getSelectedCourseSemester() || "");
         Array.from(subSel.options).forEach((opt) => {
             if (!opt.value) return;
             const subYear = opt.getAttribute("data-year-level") || "";
             const subSem = opt.getAttribute("data-semester") || "";
             const isRec = opt.getAttribute("data-course-code") === "REC";
+            const subDept = opt.getAttribute("data-dept-id") || "";
             const show =
-                isRec ||
-                !yearLevel ||
-                !subYear ||
-                String(subYear) === String(yearLevel) ||
-                !subSem ||
-                String(subSem) === String(activeSemester);
+                (!deptId || !subDept || String(subDept) === String(deptId)) &&
+                (isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel)) &&
+                (isRec || !activeSemester || !subSem || String(subSem) === activeSemester);
             opt.hidden = !show;
             opt.style.display = show ? "" : "none";
         });
@@ -50,6 +45,7 @@ function filterSubjectsByCategory() {
         const opt = document.createElement("option");
         opt.value = sub.id;
         opt.textContent = sub.code + " — " + sub.name;
+        opt.dataset.departmentId = sub.dept || "";
         opt.dataset.yearLevel = sub.year || "";
         opt.dataset.semester = sub.sem || "";
         opt.dataset.category = sub.cat || "";
@@ -57,18 +53,6 @@ function filterSubjectsByCategory() {
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
 
-        if (!selectedCat) {
-            if (!yearLevel) {
-                // REC is always visible globally, other courses need section/year
-                if (sub.code !== "REC") {
-                    opt.hidden = true;
-                    opt.style.display = "none";
-                }
-            } else if (sub.year && String(sub.year) !== String(yearLevel)) {
-                opt.hidden = true;
-                opt.style.display = "none";
-            }
-        }
         subSel.appendChild(opt);
     });
 }
@@ -81,19 +65,20 @@ function filterEditSubjectsByCategory() {
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
-    const deptId = deptSel ? deptSel.value : "";
-    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-    const yearLevel = selectedOpt
-        ? selectedOpt.getAttribute("data-year-level") || ""
-        : "";
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || "");
-
     if (!selectedCat) {
+        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+        const deptId = selectedOpt?.getAttribute("data-dept-id") || (deptSel ? deptSel.value : "");
+        const yearLevel = selectedOpt
+            ? selectedOpt.getAttribute("data-year-level") || ""
+            : "";
+        const activeSemester = String(getSelectedCourseSemester() || "");
         Array.from(subSel.options).forEach((opt) => {
             if (!opt.value) return;
             const subYear = opt.getAttribute("data-year-level") || "";
             const subSem = opt.getAttribute("data-semester") || "";
             const isRec = opt.getAttribute("data-course-code") === "REC";
+            const subDept = opt.getAttribute("data-dept-id") || opt.dataset.departmentId || "";
+            const deptMatch = !deptId || !subDept || subDept === deptId;
             const yearMatch =
                 isRec ||
                 !yearLevel ||
@@ -104,7 +89,7 @@ function filterEditSubjectsByCategory() {
                 !activeSemester ||
                 !subSem ||
                 String(subSem) === String(activeSemester);
-            const show = yearMatch && semMatch;
+            const show = deptMatch && yearMatch && semMatch;
             opt.hidden = !show;
             opt.style.display = show ? "" : "none";
         });
@@ -112,7 +97,7 @@ function filterEditSubjectsByCategory() {
         return;
     }
 
-    // Filter by category across all departments
+    // Category mode intentionally ignores department, year level, and semester.
     const filtered = window.ALL_SUBJECTS_LIST || [];
     subSel.innerHTML = '<option value="">-- Select Subject --</option>';
     filtered
@@ -121,21 +106,15 @@ function filterEditSubjectsByCategory() {
             const opt = document.createElement("option");
             opt.value = sub.id;
             opt.textContent = sub.code + " — " + sub.name;
+            opt.dataset.departmentId = sub.dept || "";
             opt.dataset.yearLevel = sub.year || "";
             opt.dataset.semester = sub.sem || "";
             opt.dataset.category = sub.cat || "";
+            opt.dataset.courseCode = sub.code || "";
             opt.dataset.lectureHours = sub.lecHours || 0;
             opt.dataset.labHours = sub.labHours || 0;
 
-            const yearMatch =
-                !yearLevel ||
-                (sub.year && String(sub.year) === String(yearLevel));
-            const semMatch =
-                !activeSemester ||
-                !sub.sem ||
-                String(sub.sem) === activeSemester;
-            const show = yearMatch && semMatch;
-            if (show) subSel.appendChild(opt);
+            subSel.appendChild(opt);
         });
     if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = "";
   }
@@ -163,10 +142,13 @@ function showToast(msg) {
     const t = document.getElementById("toast");
     const m = document.getElementById("toast-msg");
     if (!t || !m) return;
+    if (t.parentElement !== document.body) {
+        document.body.appendChild(t);
+    }
     m.textContent = msg;
-    t.classList.add("show");
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => t.classList.remove("show"), 9200);
+    t.classList.add("show");
+    toastTimeout = setTimeout(() => t.classList.remove("show"), 3200);
 }
 
 function showInlineError(boxId, msg) {
@@ -220,7 +202,7 @@ function handleScheduleError(data, inlineBoxId) {
         ? Object.values(data.errors).flat()[0]
         : null;
     const message =
-        data.message || firstValidationError || "Something went wrong.";
+        firstValidationError || data.message || "Something went wrong.";
     showToast(message);
     showInlineError(inlineBoxId, message);
 }
@@ -302,13 +284,38 @@ function selectTeacher(facultyId) {
 
 /* ── filters / date nav ── */
 function applyFilters() {
+    syncSelectedSemesterFields();
     const params = new URLSearchParams(window.location.search);
-    const map = { program: "filter-program", semester: "filter-semester" };
-    Object.entries(map).forEach(([key, id]) => {
-        const val = document.getElementById(id).value;
-        val ? params.set(key, val) : params.delete(key);
-    });
+    const departmentFilter = document.getElementById("filter-program") ||
+        document.getElementById("filter-department");
+    const departmentParam = departmentFilter?.id === "filter-department" ? "department" : "program";
+    if (departmentFilter) {
+        departmentFilter.value
+            ? params.set(departmentParam, departmentFilter.value)
+            : params.delete(departmentParam);
+    }
+
+    const semester = document.getElementById("filter-semester")?.value || "";
+    semester ? params.set("semester", semester) : params.delete("semester");
     window.location.search = params.toString();
+}
+
+function getSelectedCourseSemester() {
+    const selected = document.getElementById("filter-semester")?.selectedOptions[0];
+    return selected?.dataset.courseSemester || window.ACTIVE_COURSE_SEMESTER || "";
+}
+
+function syncSelectedSemesterFields() {
+    const semesterSelect = document.getElementById("filter-semester");
+    if (!semesterSelect?.value) return;
+
+    const selectedOption = semesterSelect.selectedOptions[0];
+    ["add", "edit"].forEach((prefix) => {
+        const semesterInput = document.getElementById(`${prefix}-semester`);
+        const semesterLabel = document.getElementById(`${prefix}-semester-label`);
+        if (semesterInput) semesterInput.value = semesterSelect.value;
+        if (semesterLabel) semesterLabel.textContent = selectedOption.textContent.trim();
+    });
 }
 
 function setShift(shift) {
@@ -324,13 +331,13 @@ function getShiftValue() {
 }
 
 // Shift grid ranges in minutes since midnight.
-// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:30 PM.
+// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–10:00 PM.
 function getShiftGridRange() {
     return getShiftValue() === "evening"
         ? {
               start: 16 * 60,
-              end: 21 * 60 + 30,
-              label: "Evening (4:00 PM–9:30 PM)",
+              end: 22 * 60,
+              label: "Evening (4:00 PM–10:00 PM)",
           }
         : {
               start: 7 * 60,
@@ -341,13 +348,22 @@ function getShiftGridRange() {
 
 // Returns an error message string if start/end fall outside the shift grid, otherwise null.
 function validateTimeInRange(startTime, endTime) {
-    const range = getShiftGridRange();
+    const range = {
+        start: 7 * 60,
+        end: 22 * 60,
+    };
     const toMinutes = (hhmm) => {
         const [h, m] = hhmm.split(":").map(Number);
         return h * 60 + m;
     };
     const sMin = toMinutes(startTime);
     const eMin = toMinutes(endTime);
+    if (!Number.isFinite(sMin) || !Number.isFinite(eMin)) {
+        return "Enter both a valid start and end time.";
+    }
+    if (sMin % 30 !== 0 || eMin % 30 !== 0) {
+        return "Start and end times must be on 30-minute increments.";
+    }
     if (sMin < range.start || eMin > range.end) {
         const fmt = (mins) => {
             const h = Math.floor(mins / 60);
@@ -356,7 +372,7 @@ function validateTimeInRange(startTime, endTime) {
             const h12 = h % 12 === 0 ? 12 : h % 12;
             return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
         };
-        return `This time is outside the ${range.label} window (${fmt(range.start)}–${fmt(range.end)}). Switch to the other shift or pick a time within range.`;
+        return `Schedules must be between ${fmt(range.start)} and ${fmt(range.end)}. A class may cross between the day and evening grids.`;
     }
     return null;
 }
@@ -401,11 +417,28 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     const subSel = document.getElementById(subjectSelectId);
     if (!secSel || !subSel) return;
 
+    const categoryId = sectionSelectId.startsWith("edit") ? "edit-category" : "add-category";
+    if (document.getElementById(categoryId)?.value) {
+        if (sectionSelectId.startsWith("edit")) {
+            filterEditSubjectsByCategory();
+        } else {
+            filterSubjectsByCategory();
+        }
+        return;
+    }
+
     const selectedOpt = secSel.options[secSel.selectedIndex];
     const yearLevel = selectedOpt
         ? selectedOpt.getAttribute("data-year-level") || ""
         : "";
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || "");
+    const deptId = selectedOpt?.getAttribute("data-dept-id") ||
+        document.getElementById(sectionSelectId.replace("section", "department"))?.value ||
+        document.getElementById("edit-department-id")?.value ||
+        "";
+    const selectedCategory = document.getElementById(
+        sectionSelectId.startsWith("edit") ? "edit-category" : "add-category",
+    )?.value || "";
+    const activeSemester = String(getSelectedCourseSemester() || "");
 
     Array.from(subSel.options).forEach((opt) => {
         if (!opt.value) {
@@ -415,22 +448,18 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
         }
         const subYear = opt.getAttribute("data-year-level") || "";
         const subSem = opt.getAttribute("data-semester") || "";
+        const subDept = opt.getAttribute("data-dept-id") || opt.dataset.departmentId || "";
+        const subCategory = opt.getAttribute("data-category") || "";
         const courseCode = opt.getAttribute("data-course-code") || "";
         const isRec = courseCode === "REC";
 
-        if (!yearLevel) {
-            // Always show REC globally, hide other courses until section selected
-            opt.hidden = !isRec;
-            opt.style.display = isRec ? "" : "none";
-        } else {
-            const yearMatch = !subYear || String(subYear) === String(yearLevel);
-            const semMatch =
-                !opt.getAttribute("data-semester") ||
-                opt.getAttribute("data-semester") === activeSemester;
-            const match = yearMatch && semMatch;
-            opt.hidden = !match;
-            opt.style.display = match ? "" : "none";
-        }
+        const deptMatch = !deptId || !subDept || String(subDept) === String(deptId);
+        const categoryMatch = !selectedCategory || subCategory === selectedCategory;
+        const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
+        const semMatch = isRec || !activeSemester || !subSem || String(subSem) === activeSemester;
+        const match = deptMatch && categoryMatch && yearMatch && semMatch;
+        opt.hidden = !match;
+        opt.style.display = match ? "" : "none";
     });
 
     // Reset subject if current selection is no longer visible
@@ -463,7 +492,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const opt = document.createElement("option");
                 opt.value = sec.id;
                 opt.textContent = sec.name;
+                opt.dataset.deptId = sec.dept || deptId;
                 opt.dataset.yearLevel = sec.year;
+                opt.dataset.isEvening = String(sec.isEvening || "0");
                 sectionSelect.appendChild(opt);
             });
 
@@ -473,6 +504,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const opt = document.createElement("option");
                 opt.value = sub.id;
                 opt.textContent = sub.code + " — " + sub.name;
+                opt.dataset.departmentId = sub.dept || deptId;
                 opt.dataset.yearLevel = sub.year;
                 opt.dataset.semester = sub.sem;
                 opt.dataset.category = sub.cat;
@@ -523,7 +555,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const opt = document.createElement("option");
                 opt.value = sec.id;
                 opt.textContent = sec.name;
+                opt.dataset.deptId = sec.dept || deptId;
                 opt.dataset.yearLevel = sec.year;
+                opt.dataset.isEvening = String(sec.isEvening || "0");
                 sectionSelect.appendChild(opt);
             });
             filterSubjectsBySection("edit-section", "edit-subject");
@@ -548,7 +582,49 @@ document.addEventListener("DOMContentLoaded", () => {
     if (addDept) {
         addDept.dispatchEvent(new Event("change"));
     }
+    restoreAddAnotherState();
 });
+
+function restoreAddAnotherState() {
+    let rawState;
+    try {
+        rawState = sessionStorage.getItem("pbt-add-another");
+    } catch {
+        showToast("The schedule was saved, but the add-another form could not be restored.");
+        return;
+    }
+    if (!rawState) return;
+
+    let state;
+    try {
+        state = JSON.parse(rawState);
+    } catch {
+        sessionStorage.removeItem("pbt-add-another");
+        showToast("Could not restore the add-schedule form. Please select the course details again.");
+        return;
+    }
+    sessionStorage.removeItem("pbt-add-another");
+
+    const department = document.getElementById("add-department");
+    if (department && state.department && department.value !== state.department) {
+        department.value = state.department;
+        department.dispatchEvent(new Event("change"));
+    }
+
+    const section = document.getElementById("add-section");
+    const category = document.getElementById("add-category");
+    if (section) section.value = state.section || "";
+    if (category) category.value = state.category || "";
+    if (category?.value) {
+        filterSubjectsByCategory();
+    } else {
+        filterSubjectsBySection("add-section", "add-subject");
+    }
+
+    document.getElementById("add-subject").value = state.subject || "";
+    document.getElementById("add-room").value = state.room || "";
+    openModal("modal-add-schedule");
+}
 
 function openAddModal(day, startTime) {
     if (!SELECTED_TEACHER) {
@@ -556,6 +632,7 @@ function openAddModal(day, startTime) {
         return;
     }
     clearInlineError("add-error");
+    syncSelectedSemesterFields();
     ["add-subject", "add-section", "add-room", "add-description"].forEach(
         (id) => {
             const el = document.getElementById(id);
@@ -580,10 +657,10 @@ function openAddModal(day, startTime) {
 
 function submitAdd(keepOpen = false) {
     clearInlineError("add-error");
+    syncSelectedSemesterFields();
     const subjId = document.getElementById("add-subject").value;
     const secId = document.getElementById("add-section").value;
     const roomId = document.getElementById("add-room").value;
-
     const subjSel = document.getElementById("add-subject");
     const selectedOpt = subjSel.options[subjSel.selectedIndex];
     const isRec = selectedOpt
@@ -593,7 +670,7 @@ function submitAdd(keepOpen = false) {
     const payload = {
         subj_id: subjId,
         fac_id: SELECTED_TEACHER,
-        sem_id: document.getElementById("add-semester").value,
+        sem_id: document.getElementById("filter-semester")?.value || "",
         prog_id:
             document.getElementById("add-department")?.value ||
             document.getElementById("add-program")?.value ||
@@ -665,6 +742,20 @@ function submitAdd(keepOpen = false) {
             if (data.success) {
                 showToast(data.message || "Schedule added.");
                 if (keepOpen) {
+                    try {
+                        sessionStorage.setItem(
+                            "pbt-add-another",
+                            JSON.stringify({
+                            department: document.getElementById("add-department").value,
+                            section: document.getElementById("add-section").value,
+                            subject: document.getElementById("add-subject").value,
+                            room: document.getElementById("add-room").value,
+                            category: document.getElementById("add-category").value,
+                            }),
+                        );
+                    } catch {
+                        showToast("Schedule saved, but the add-another form could not be preserved.");
+                    }
                     document
                         .querySelectorAll(".add-day-checkbox")
                         .forEach((input) => {
@@ -676,8 +767,8 @@ function submitAdd(keepOpen = false) {
                     setAddButtonsLoading(false);
                 } else {
                     closeModal("modal-add-schedule");
-                    setTimeout(() => location.reload(), 800);
                 }
+                setTimeout(() => location.reload(), 800);
             } else {
                 handleScheduleError(data, "add-error");
                 setAddButtonsLoading(false);
@@ -692,8 +783,11 @@ function submitAdd(keepOpen = false) {
 /* ── EDIT ── */
 function openEditModal(block) {
     clearInlineError("edit-error");
+    syncSelectedSemesterFields();
     document.getElementById("edit-id").value = block.dataset.scheduleId;
     document.getElementById("edit-section").value = block.dataset.section || "";
+    const categorySelect = document.getElementById("edit-category");
+    if (categorySelect) categorySelect.value = "";
     // Filter subjects by the section's year level first, then set subject
     filterSubjectsBySection("edit-section", "edit-subject");
     document.getElementById("edit-subject").value = block.dataset.subject || "";
@@ -707,11 +801,12 @@ function openEditModal(block) {
 
 function submitEdit() {
     clearInlineError("edit-error");
+    syncSelectedSemesterFields();
     const id = document.getElementById("edit-id").value;
     const payload = {
         subj_id: document.getElementById("edit-subject").value,
         fac_id: SELECTED_TEACHER,
-        sem_id: document.getElementById("edit-semester").value,
+        sem_id: document.getElementById("filter-semester")?.value || "",
         prog_id:
             document.getElementById("edit-department-id")?.value || "",
         sec_id: document.getElementById("edit-section").value,
@@ -725,10 +820,9 @@ function submitEdit() {
     };
 
     if (payload.end_time <= payload.start_time) {
-        showInlineError(
-            "edit-error",
-            "End time must be later than start time.",
-        );
+        const message = "End time must be later than start time.";
+        showToast(message);
+        showInlineError("edit-error", message);
         return;
     }
     const editRangeError = validateTimeInRange(
@@ -764,10 +858,9 @@ function submitEdit() {
             }
         })
         .catch(() => {
-            showInlineError(
-                "edit-error",
-                "Something went wrong. Please try again.",
-            );
+            const message = "Something went wrong. Please try again.";
+            showToast(message);
+            showInlineError("edit-error", message);
             setButtonLoading(btn, false);
         });
 }
@@ -814,7 +907,10 @@ function submitDelete() {
             "X-CSRF-TOKEN": csrfToken(),
             Accept: "application/json",
         },
-        body: JSON.stringify({ _method: "DELETE" }),
+        body: JSON.stringify({
+            _method: "DELETE",
+            sem_id: document.getElementById("filter-semester")?.value || "",
+        }),
     })
         .then(async (res) => {
             const data = await res.json().catch(() => ({}));
@@ -823,35 +919,21 @@ function submitDelete() {
                 showToast(data.message || "Schedule deleted.");
                 setTimeout(() => location.reload(), 800);
             } else {
-                showInlineError(
-                    "delete-error",
-                    data.message || "Could not delete this schedule.",
-                );
+                const message = data.message || "Could not delete this schedule.";
+                showToast(message);
+                showInlineError("delete-error", message);
                 validateDeleteCode();
             }
         })
         .catch(() => {
-            showInlineError(
-                "delete-error",
-                "Something went wrong. Please try again.",
-            );
+            const message = "Something went wrong. Please try again.";
+            showToast(message);
+            showInlineError("delete-error", message);
             validateDeleteCode();
         });
 }
 
 /* ── toolbar ── */
-function saveDraft() {
-    fetch("/chair/pbt/save-draft", {
-        method: "POST",
-        headers: { "X-CSRF-TOKEN": csrfToken(), Accept: "application/json" },
-    })
-        .then(async (res) => {
-            const data = await res.json().catch(() => ({}));
-            showToast(data.message || "Draft saved.");
-        })
-        .catch(() => showToast("Could not save the draft."));
-}
-
 function clearAll() {
     if (
         !confirm(

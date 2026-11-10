@@ -9,17 +9,13 @@ function filterSubjectsByCategory() {
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
-    const deptId = deptSel ? deptSel.value : '';
-    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-    const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
-
     let subjectsToLoad = [];
     if (selectedCat) {
-        // Global mode: fetch all courses everywhere matching this category
         const globalList = window.ALL_SUBJECTS_LIST || [];
-        subjectsToLoad = globalList.filter(s => String(s.cat) === String(selectedCat));
+        subjectsToLoad = globalList.filter(sub => String(sub.cat) === String(selectedCat));
     } else {
+        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+        const deptId = selectedOpt?.getAttribute('data-dept-id') || (deptSel ? deptSel.value : '');
         // Standard mode: fetch department subjects matching department & year
         const deptList = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
         subjectsToLoad = deptList;
@@ -30,25 +26,14 @@ function filterSubjectsByCategory() {
         const opt = document.createElement('option');
         opt.value = sub.id;
         opt.textContent = sub.code + ' — ' + sub.name;
+        opt.dataset.departmentId = sub.dept || '';
         opt.dataset.yearLevel = sub.year || '';
         opt.dataset.semester = sub.sem || '';
         opt.dataset.category = sub.cat || '';
+        opt.dataset.courseCode = sub.code || '';
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
         
-        // REC is always visible globally, other courses follow year/semester filters
-        const isRec = sub.code === 'REC';
-        const yearMatch = selectedCat || !yearLevel || !sub.year || String(sub.year) === String(yearLevel);
-        const semesterMatch = selectedCat || !activeSemester || !sub.sem || String(sub.sem) === activeSemester;
-        if (!yearMatch || !semesterMatch) {
-            opt.hidden = true;
-            opt.style.display = 'none';
-        }
-        // Always show REC regardless of filters
-        if (isRec) {
-            opt.hidden = false;
-            opt.style.display = '';
-        }
         subSel.appendChild(opt);
     });
 }
@@ -62,21 +47,22 @@ function filterEditSubjectsByCategory() {
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
-    const deptId = deptSel ? deptSel.value : '';
-    const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-    const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
-
     if (!selectedCat) {
+        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
+        const deptId = selectedOpt?.getAttribute('data-dept-id') || (deptSel ? deptSel.value : '');
+        const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+        const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
         // reset to department mode: filter by section year level and semester
         Array.from(subSel.options).forEach(opt => {
             if (!opt.value) return;
             const subYear = opt.getAttribute('data-year-level') || '';
             const subSem = opt.getAttribute('data-semester') || '';
             const isRec = opt.getAttribute('data-course-code') === 'REC';
+            const subDept = opt.getAttribute('data-dept-id') || opt.dataset.departmentId || '';
+            const deptMatch = !deptId || !subDept || String(subDept) === String(deptId);
             const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
             const semMatch = isRec || !activeSemester || !subSem || String(subSem) === String(activeSemester);
-            const show = yearMatch && semMatch;
+            const show = deptMatch && yearMatch && semMatch;
             opt.hidden = !show;
             opt.style.display = show ? '' : 'none';
         });
@@ -84,23 +70,21 @@ function filterEditSubjectsByCategory() {
         return;
     }
 
-    // Filter by category across all departments
+    // Category mode intentionally searches all departments, year levels, and semesters.
     const filtered = window.ALL_SUBJECTS_LIST || [];
     subSel.innerHTML = '<option value="">-- Select Subject --</option>';
-    filtered.filter(s => String(s.cat) === String(selectedCat)).forEach(sub => {
+    filtered.filter(sub => String(sub.cat) === String(selectedCat)).forEach(sub => {
         const opt = document.createElement('option');
         opt.value = sub.id;
         opt.textContent = sub.code + ' — ' + sub.name;
+        opt.dataset.departmentId = sub.dept || '';
         opt.dataset.yearLevel = sub.year || '';
         opt.dataset.semester = sub.sem || '';
         opt.dataset.category = sub.cat || '';
+        opt.dataset.courseCode = sub.code || '';
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
-        
-        const yearMatch = !yearLevel || (sub.year && String(sub.year) === String(yearLevel));
-        const semMatch = !activeSemester || !sub.sem || String(sub.sem) === activeSemester;
-        const show = yearMatch && semMatch;
-        if (show) subSel.appendChild(opt);
+        subSel.appendChild(opt);
     });
     if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
 }
@@ -124,10 +108,13 @@ function showToast(msg) {
     const t = document.getElementById('toast');
     const m = document.getElementById('toast-msg');
     if (!t || !m) return;
+    if (t.parentElement !== document.body) {
+        document.body.appendChild(t);
+    }
     m.textContent = msg;
-    t.classList.add('show');
     clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => t.classList.remove('show'), 9200);
+    t.classList.add('show');
+    toastTimeout = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 function showInlineError(boxId, msg) {
@@ -223,10 +210,10 @@ function handleScheduleError(data, inlineBoxId) {
     let message;
     if (data.conflict) {
         message = data.message || 'Conflict: that slot is already taken.';
+    } else if (data.errors) {
+        message = Object.values(data.errors).flat()[0] || data.message || 'Validation failed.';
     } else if (data.message) {
         message = data.message;
-    } else if (data.errors) {
-        message = Object.values(data.errors).flat()[0] || 'Validation failed.';
     } else {
         message = 'Something went wrong.';
     }
@@ -256,22 +243,31 @@ function getShiftValue() {
 }
 
 // Shift grid ranges in minutes since midnight.
-// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–9:00 PM.
+// Day = 7:00 AM–4:00 PM, Evening = 4:00 PM–10:00 PM.
 function getShiftGridRange() {
     return getShiftValue() === 'evening'
-        ? { start: 16 * 60, end: 21 * 60, label: 'Evening (4:00 PM–9:00 PM)' }
-        : { start: 7 * 60,  end: 16 * 60, label: 'Day (7:00 AM–4:00 PM)' };
+        ? { start: 16 * 60, end: 22 * 60, label: 'Evening (4:00 PM–10:00 PM)' }
+        : { start: 7 * 60, end: 16 * 60, label: 'Day (7:00 AM–4:00 PM)' };
 }
 
 // Returns an error message string if start/end fall outside the shift grid, otherwise null.
 function validateTimeInRange(startTime, endTime) {
-    const range = getShiftGridRange();
+    const range = {
+        start: 7 * 60,
+        end: 22 * 60,
+    };
     const toMinutes = hhmm => {
         const [h, m] = hhmm.split(':').map(Number);
         return h * 60 + m;
     };
     const sMin = toMinutes(startTime);
     const eMin = toMinutes(endTime);
+    if (!Number.isFinite(sMin) || !Number.isFinite(eMin)) {
+        return 'Enter both a valid start and end time.';
+    }
+    if (sMin % 30 !== 0 || eMin % 30 !== 0) {
+        return 'Start and end times must be on 30-minute increments.';
+    }
     if (sMin < range.start || eMin > range.end) {
         const fmt = mins => {
             const h = Math.floor(mins / 60);
@@ -280,7 +276,7 @@ function validateTimeInRange(startTime, endTime) {
             const h12 = h % 12 === 0 ? 12 : h % 12;
             return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
         };
-        return `This time is outside the ${range.label} window (${fmt(range.start)}–${fmt(range.end)}). Switch to the other shift or pick a time within range.`;
+        return `Schedules must be between ${fmt(range.start)} and ${fmt(range.end)}. A class may cross between the day and evening grids.`;
     }
     return null;
 }
@@ -316,6 +312,8 @@ function applyFilters() {
 
     department ? params.set('department', department) : params.delete('department');
     section ? params.set('section', section) : params.delete('section');
+    const semester = document.getElementById('filter-semester')?.value || '';
+    semester ? params.set('semester', semester) : params.delete('semester');
     params.set('shift', getCurrentShift());
 
     window.location.search = params.toString();
@@ -351,8 +349,24 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     const subSel = document.getElementById(subjectSelectId);
     if (!secSel || !subSel) return;
 
+    const categoryId = sectionSelectId.startsWith('edit') ? 'edit-category' : 'add-category';
+    if (document.getElementById(categoryId)?.value) {
+        if (sectionSelectId.startsWith('edit')) {
+            filterEditSubjectsByCategory();
+        } else {
+            filterSubjectsByCategory();
+        }
+        return;
+    }
+
     const selectedOpt = secSel.options[secSel.selectedIndex];
     const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
+    const deptId = selectedOpt?.getAttribute('data-dept-id') ||
+        document.getElementById(sectionSelectId.replace('section', 'department'))?.value ||
+        '';
+    const selectedCategory = document.getElementById(
+        sectionSelectId.startsWith('edit') ? 'edit-category' : 'add-category'
+    )?.value || '';
     const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
 
     Array.from(subSel.options).forEach(opt => {
@@ -363,9 +377,15 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
         }
         const subYear = opt.getAttribute('data-year-level') || '';
         const subSem = opt.getAttribute('data-semester') || '';
-        const yearMatch = !yearLevel || !subYear || String(subYear) === String(yearLevel);
-        const semMatch = !activeSemester || !opt.getAttribute('data-semester') || opt.getAttribute('data-semester') === activeSemester;
-        const match = yearMatch && semMatch;
+        const subDept = opt.getAttribute('data-dept-id') || opt.dataset.departmentId || '';
+        const subCategory = opt.getAttribute('data-category') || '';
+        const courseCode = opt.getAttribute('data-course-code') || '';
+        const isRec = courseCode === 'REC';
+        const deptMatch = !deptId || !subDept || String(subDept) === String(deptId);
+        const categoryMatch = !selectedCategory || subCategory === selectedCategory;
+        const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
+        const semMatch = isRec || !activeSemester || !subSem || String(subSem) === activeSemester;
+        const match = deptMatch && categoryMatch && yearMatch && semMatch;
         opt.hidden = !match;
         opt.style.display = match ? '' : 'none';
     });
@@ -411,7 +431,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opt = document.createElement('option');
                 opt.value = sec.id;
                 opt.textContent = sec.name;
+                opt.dataset.deptId = sec.dept || deptId;
                 opt.dataset.yearLevel = sec.year;
+                opt.dataset.isEvening = String(sec.isEvening || '0');
                 sectionSelect.appendChild(opt);
             });
             
@@ -420,9 +442,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const opt = document.createElement('option');
                 opt.value = sub.id;
                 opt.textContent = sub.code + ' — ' + sub.name;
+                opt.dataset.departmentId = sub.dept || deptId;
                 opt.dataset.yearLevel = sub.year;
                 opt.dataset.semester = sub.sem;
                 opt.dataset.category = sub.cat;
+                opt.dataset.courseCode = sub.code;
                 opt.dataset.lectureHours = sub.lecHours;
                 opt.dataset.labHours = sub.labHours;
                 subjectSelect.appendChild(opt);
@@ -464,7 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editCat = document.getElementById('edit-category');
     if (editCat) {
         editCat.addEventListener('change', () => {
-            filterSubjectsByCategory();
+            filterEditSubjectsByCategory();
         });
     }
     
@@ -472,7 +496,58 @@ document.addEventListener('DOMContentLoaded', () => {
     if (addDept) {
         addDept.dispatchEvent(new Event('change'));
     }
+    restoreAddAnotherState();
 });
+
+function restoreAddAnotherState() {
+    let rawState;
+    try {
+        rawState = sessionStorage.getItem('pbs-add-another');
+    } catch {
+        showToast('The schedule was saved, but the add-another form could not be restored.');
+        return;
+    }
+    if (!rawState) return;
+
+    let state;
+    try {
+        state = JSON.parse(rawState);
+    } catch {
+        sessionStorage.removeItem('pbs-add-another');
+        showToast('Could not restore the add-schedule form. Please select the course details again.');
+        return;
+    }
+    sessionStorage.removeItem('pbs-add-another');
+
+    const department = document.getElementById('add-department');
+    if (department && state.department && department.value !== state.department) {
+        department.value = state.department;
+        department.dispatchEvent(new Event('change'));
+    }
+
+    const section = document.getElementById('add-section');
+    const category = document.getElementById('add-category');
+    if (section) section.value = state.section || '';
+    if (category) category.value = state.category || '';
+    if (category?.value) {
+        filterSubjectsByCategory();
+    } else {
+        filterSubjectsBySection('add-section', 'add-subject');
+    }
+    document.getElementById('add-subject').value = state.subject || '';
+    document.getElementById('add-room').value = state.room || '';
+
+    if (state.faculty) {
+        const facultyOption = [...document.querySelectorAll('.pbs-teacher-option')]
+            .find(option => option.dataset.id === state.faculty);
+        if (facultyOption) {
+            selectPbsTeacher(facultyOption);
+        } else {
+            showToast('The schedule was saved, but its professor is no longer available.');
+        }
+    }
+    openModal('modal-add-schedule');
+}
 
 function openAddModal(day, startTime) {
     clearInlineError('add-error');
@@ -587,6 +662,18 @@ function submitAdd(keepOpen = false) {
         if (data.success) {
             showToast(data.message || 'Schedule added.');
             if (keepOpen) {
+                try {
+                    sessionStorage.setItem('pbs-add-another', JSON.stringify({
+                        department: document.getElementById('add-department').value,
+                        section: document.getElementById('add-section').value,
+                        subject: document.getElementById('add-subject').value,
+                        room: document.getElementById('add-room').value,
+                        faculty: document.getElementById('add-faculty').value,
+                        category: document.getElementById('add-category').value,
+                    }));
+                } catch {
+                    showToast('Schedule saved, but the add-another form could not be preserved.');
+                }
                 document.querySelectorAll('.add-day-checkbox').forEach(input => { input.checked = false; });
                 document.getElementById('add-start').value = '';
                 document.getElementById('add-end').value = '';
@@ -594,8 +681,8 @@ function submitAdd(keepOpen = false) {
                 setAddButtonsLoading(false);
             } else {
                 closeModal('modal-add-schedule');
-                setTimeout(() => location.reload(), 800);
             }
+            setTimeout(() => location.reload(), 800);
         } else {
             // 422 conflict → toast (bottom-right), modal stays open
             // other errors → inline in modal
@@ -615,6 +702,8 @@ function openEditModal(block) {
 
     document.getElementById('edit-id').value       = block.dataset.scheduleId || '';
     document.getElementById('edit-section').value  = block.dataset.section  || '';
+    const categorySelect = document.getElementById('edit-category');
+    if (categorySelect) categorySelect.value = '';
     // Filter subjects by section year level first, then set the subject
     filterSubjectsBySection('edit-section', 'edit-subject');
     document.getElementById('edit-subject').value  = block.dataset.subject  || '';
@@ -650,11 +739,15 @@ function submitEdit() {
 
     if (!payload.subj_id || !payload.fac_id || !payload.sec_id || !payload.room_id ||
         !payload.sem_id || !payload.day || !payload.start_time || !payload.end_time) {
-        showInlineError('edit-error', 'Please fill in professor, room, semester, section, course, day, and both times.');
+        const message = 'Please fill in professor, room, semester, section, course, day, and both times.';
+        showToast(message);
+        showInlineError('edit-error', message);
         return;
     }
     if (payload.end_time <= payload.start_time) {
-        showInlineError('edit-error', 'End time must be later than start time.');
+        const message = 'End time must be later than start time.';
+        showToast(message);
+        showInlineError('edit-error', message);
         return;
     }
     const editRangeError = validateTimeInRange(payload.start_time, payload.end_time);
@@ -688,7 +781,9 @@ function submitEdit() {
         }
     })
     .catch(() => {
-        showInlineError('edit-error', 'Something went wrong. Please try again.');
+        const message = 'Something went wrong. Please try again.';
+        showToast(message);
+        showInlineError('edit-error', message);
         setButtonLoading(btn, false);
     });
 }
@@ -732,7 +827,10 @@ function submitDelete() {
             'X-CSRF-TOKEN': csrfToken(),
             'Accept': 'application/json',
         },
-        body: JSON.stringify({ _method: 'DELETE' }),
+        body: JSON.stringify({
+            _method: 'DELETE',
+            sem_id: document.getElementById('filter-semester')?.value || '',
+        }),
     })
     .then(async res => {
         const data = await res.json().catch(() => ({}));
@@ -741,73 +839,62 @@ function submitDelete() {
             showToast(data.message || 'Schedule deleted.');
             setTimeout(() => location.reload(), 800);
         } else {
-            showInlineError('delete-error', data.message || 'Could not delete this schedule.');
+            const message = data.message || 'Could not delete this schedule.';
+            showToast(message);
+            showInlineError('delete-error', message);
             validateDeleteCode();
         }
     })
     .catch(() => {
-        showInlineError('delete-error', 'Something went wrong. Please try again.');
+        const message = 'Something went wrong. Please try again.';
+        showToast(message);
+        showInlineError('delete-error', message);
         validateDeleteCode();
     });
 }
 
 /* ── toolbar ── */
-async function saveDraft() {
+async function saveSectionCount() {
     const sectionId = document.getElementById('filter-section')?.value || '';
     const input = document.getElementById('section-student-count');
     const countRaw = input ? String(input.value).trim() : '';
-    const count = countRaw === '' ? null : parseInt(countRaw, 10);
+    const count = countRaw === '' ? null : Number(countRaw);
 
-    // Save section student count (summary) when a section is selected
-    if (sectionId && count !== null && !Number.isNaN(count) && count >= 0) {
-        try {
-            const res = await fetch('/chair/pbs/section/students', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken(),
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify({
-                    sec_id: sectionId,
-                    sec_no_of_student: count,
-                }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
-                showToast(data.message || 'Could not save student count.');
-                return;
-            }
-            if (input && data.sec_no_of_student != null) {
-                input.value = data.sec_no_of_student;
-            }
-        } catch (e) {
-            showToast('Network error saving student count.');
-            return;
-        }
+    if (!sectionId) {
+        showToast('Select a section to save its student count.');
+        return;
+    }
+    if (count === null || !Number.isInteger(count) || count < 0) {
+        showToast('Enter a valid non-negative student count.');
+        return;
     }
 
-    // Save draft marker for schedules already on the grid (they save on Confirm)
     try {
-        const res = await fetch('/chair/pbs/save-draft', {
-            method: 'POST',
+        const res = await fetch('/chair/pbs/section/students', {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
             },
             credentials: 'same-origin',
             body: JSON.stringify({
-                section: sectionId,
-                semester: document.getElementById('filter-semester')?.value || '',
+                sec_id: sectionId,
+                sec_no_of_student: count,
             }),
         });
         const data = await res.json().catch(() => ({}));
-        showToast(data.message || 'Draft saved (summary + schedules).');
+        if (!res.ok || !data.success) {
+            showToast(data.message || 'Could not save student count.');
+            return;
+        }
+        if (input && data.sec_no_of_student != null) {
+            input.value = data.sec_no_of_student;
+        }
+        showToast('Student count saved.');
     } catch (e) {
-        showToast('Could not save the draft.');
+        showToast('Network error saving student count.');
     }
 }
 

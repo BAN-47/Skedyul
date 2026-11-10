@@ -28,6 +28,7 @@ class Section extends Model
         'sec_sem_id',
         'sec_name',
         'sec_year_level',
+        'sec_is_evening',
         'sec_no_of_student',
         'sec_max_capacity',
         'sec_status',

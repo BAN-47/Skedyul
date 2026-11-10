@@ -31,6 +31,10 @@
             class="nav-item {{ request()->routeIs('dean.departments') ? 'active' : '' }}">
             <span class="nav-icon"></span> Departments
         </a>
+        <a href="{{ route('dean.sections') }}"
+            class="nav-item {{ request()->routeIs('dean.sections*') ? 'active' : '' }}">
+            <span class="nav-icon"></span> Sections
+        </a>
 
         <div class="nav-section-label">Approvals</div>
         <a href="{{ route('dean.pending_approvals') }}"

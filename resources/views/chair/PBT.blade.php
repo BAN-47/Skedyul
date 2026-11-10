@@ -15,6 +15,7 @@
     @php
         // ── Defaults so this page renders before PbtController exists ──
         $schedules = $schedules ?? collect(); // schedules already filtered to $selectedFaculty, if one is chosen
+        $summarySchedules = $summarySchedules ?? $schedules;
         $subjects = $subjects ?? collect();
         $facultyFullTime = $facultyFullTime ?? collect();
         $facultyPartTime = $facultyPartTime ?? collect();
@@ -47,7 +48,7 @@
 
         if ($shift === 'night') {
             $gridStart = 16 * 60; // 4:00 PM
-            $gridEnd = (21 * 60) + 30; // 9:30 PM
+            $gridEnd = 22 * 60; // 10:00 PM
         } else {
             $gridStart = 7 * 60; // 7:00 AM
             $gridEnd = 16 * 60; // 4:00 PM
@@ -105,10 +106,10 @@
                                     Submit to Dean
                                 </button>
                             @endif
-                            <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id]) }}"
+                            <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
                                 class="btn btn-secondary">Download XLSX</a>
                         @endif
-                        <button type="button" onclick="saveDraft()" class="btn btn-secondary">Save Draft</button>
+                        <span class="text-xs text-slate-500">Schedules save as drafts when confirmed</span>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
                     </div>
                 </div>
@@ -133,7 +134,7 @@
                             <div
                                 class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">
                                 <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">
-                                    Summary of Courses
+                                    Summary of Courses — {{ strtoupper($selectedShift ?? 'day') }} Workload
                                 </span>
                                 <button type="button" onclick="closeScheduleSummary()"
                                     class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20"
@@ -142,7 +143,7 @@
 
                             @php
                                 // One row per course+section assignment for the selected teacher
-                                $pbtCourseRows = $schedules
+                                $pbtCourseRows = $summarySchedules
                                     ->filter(fn($s) => $s->course ?? $s->subject)
                                     ->unique(
                                         fn($s) => ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) .
@@ -180,7 +181,7 @@
                                                 $courseHours = \App\Services\ScheduleAssignmentService::courseHours(
                                                     $course,
                                                 );
-                                                $courseMeetings = $schedules
+                                                $courseMeetings = $summarySchedules
                                                     ->where('sch_course_id', $s->sch_course_id)
                                                     ->where('sch_sec_id', $s->sch_sec_id);
                                                 $meetingHours = fn($meeting) => \Illuminate\Support\Carbon::parse(
@@ -235,9 +236,23 @@
                                     <span>{{ $loadStats['units'] ?? '—' }}</span>
                                 </div>
                                 <div class="flex justify-between gap-2">
-                                    <span class="font-bold">No. of Hours/Week:</span>
+                                    <span class="font-bold">Scheduled Hours/Week ({{ ucfirst($selectedShift ?? 'day') }}):</span>
                                     <span>{{ $loadStats['hours_week'] ?? '—' }}</span>
                                 </div>
+                                <div class="flex justify-between gap-2">
+                                    <span class="font-bold">Assigned Workload Hours/Week ({{ ucfirst($selectedShift ?? 'day') }}):</span>
+                                    <span>{{ $loadStats['workload_hours'] ?? '—' }}</span>
+                                </div>
+                                @if (!empty($loadStats['is_part_time']))
+                                    <div class="flex justify-between gap-2">
+                                        <span class="font-bold">Scheduled Hours/Week (All Shifts):</span>
+                                        <span>{{ $loadStats['total_hours_week'] ?? '—' }}</span>
+                                    </div>
+                                    <div class="flex justify-between gap-2">
+                                        <span class="font-bold">Assigned Workload Hours/Week (All Shifts):</span>
+                                        <span>{{ $loadStats['total_workload_hours'] ?? '—' }}</span>
+                                    </div>
+                                @endif
                                 <div class="flex justify-between gap-2">
                                     <span class="font-bold">Teaching Load Limit:</span>
                                     <span>{{ isset($loadStats['load_limit']) ? rtrim(rtrim(number_format((float) $loadStats['load_limit'], 2), '0'), '.') . 'h' : '—' }}</span>
@@ -377,12 +392,18 @@
                             </div>
 
 
-                            <span
-                                class="inline-flex items-center px-3 py-1.5 rounded-md bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
-                                {{ optional($activeSemester)->label ?? 'No active semester' }}
-                            </span>
-                            <input type="hidden" id="filter-semester"
-                                value="{{ optional($activeSemester)->sem_id ?? '' }}">
+                            <label for="filter-semester" class="sr-only">Academic year and semester</label>
+                            <select id="filter-semester" onchange="applyFilters()"
+                                class="min-w-[190px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+                                <option value="">Select semester</option>
+                                @foreach ($semesters as $semester)
+                                    <option value="{{ $semester->sem_id }}"
+                                        data-course-semester="{{ str_contains(strtolower($semester->sem_name ?? ''), '2nd') || str_contains(strtolower($semester->sem_name ?? ''), 'second') ? 2 : 1 }}"
+                                        @selected(($filters['semester'] ?? '') === $semester->sem_id)>
+                                        {{ $semester->label }}
+                                    </option>
+                                @endforeach
+                            </select>
 
                             <input type="hidden" id="filter-department" value="{{ $selectedDeptId }}">
 
@@ -591,8 +612,8 @@
                 {{-- ── FIXED FIELDS (top) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Semester</label>
-                    <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                        {{ optional($activeSemester)->label ?? 'No active semester' }}
+                    <div id="add-semester-label" class="field-input bg-slate-100 font-semibold text-slate-700">
+                        {{ optional($activeSemester)->label ?? 'No semester selected' }}
                     </div>
                     <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
                 </div>
@@ -608,7 +629,7 @@
                     <select id="add-department" class="field-input w-full">
                         <option value="">-- Select Department --</option>
                         @foreach ($allDepartments as $dept)
-                            <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
+                            <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
                                 {{ $dept->dept_name }}
                             </option>
                         @endforeach
@@ -622,20 +643,31 @@
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
-                            <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
-                                {{ $sec->sec_name }}</option>
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 {{-- ── SUBJECT + CATEGORY (side by side) ── --}}
                 <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-1">
+                        <label class="field-label">Category</label>
+                        <select id="add-category" class="field-input !py-[9px]"
+                            onchange="filterSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat }}">{{ $cat }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="flex-[3]">
                         <label class="field-label">Subject</label>
                         <select id="add-subject" class="field-input">
                             <option value="">-- Select Subject --</option>
                             @foreach ($subjects as $sub)
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                                    data-dept-id="{{ $sub->course_dept_id ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
                                     data-category="{{ $sub->course_category ?? '' }}"
@@ -644,16 +676,6 @@
                                     {{ $sub->course_code ?? $sub->subj_code }} —
                                     {{ $sub->course_name ?? $sub->subj_name }}
                                 </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label class="field-label">Category</label>
-                        <select id="add-category" class="field-input !py-[9px]"
-                            onchange="filterSubjectsByCategory()">
-                            <option value="">-- All --</option>
-                            @foreach ($categories as $cat)
-                                <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -733,10 +755,13 @@
                 <div id="edit-error"
                     class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3">
                 </div>
+                <div class="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[12px] text-blue-800">
+                    Changes apply to this schedule only. All other schedule rows stay unchanged.
+                </div>
                 {{-- FIXED FIELDS --}}
                 <div class="mb-3">
                     <label class="field-label">Semester</label>
-                    <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                    <div id="edit-semester-label" class="field-input bg-slate-100 font-semibold text-slate-700">
                         {{ optional($activeSemester)->label ?? 'No active semester' }}
                     </div>
                     <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
@@ -771,21 +796,31 @@
                     <select id="edit-section" class="field-input">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
-                            <option value="{{ $sec->sec_id }}"
-                                data-year-level="{{ $sec->sec_year_level ?? '' }}">
-                                {{ $sec->sec_name }}</option>
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 {{-- SUBJECT + CATEGORY --}}
                 <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-1">
+                        <label class="field-label">Category</label>
+                        <select id="edit-category" class="field-input !py-[9px]"
+                            onchange="filterEditSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat }}">{{ $cat }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="flex-[3]">
                         <label class="field-label">Subject</label>
                         <select id="edit-subject" class="field-input">
                             <option value="">-- Select Subject --</option>
                             @foreach ($subjects as $sub)
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                                    data-dept-id="{{ $sub->course_dept_id ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-category="{{ $sub->course_category ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
@@ -794,16 +829,6 @@
                                     {{ $sub->course_code ?? $sub->subj_code }} —
                                     {{ $sub->course_name ?? $sub->subj_name }}
                                 </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label class="field-label">Cate</label>
-                        <select id="edit-category" class="field-input !py-[9px]"
-                            onchange="filterEditSubjectsByCategory()">
-                            <option value="">-- All --</option>
-                            @foreach ($categories as $cat)
-                                <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -897,98 +922,6 @@
                     class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
             </div>
         </div>
-        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-    </div>
-
-    <div class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
-        Teacher: <span
-            class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Department</label>
-        <select id="edit-department" class="field-input">
-            <option value="">-- Select Department --</option>
-            @foreach ($allDepartments as $dept)
-                <option value="{{ $dept->dept_id }}" @selected($chairDepartment && $chairDepartment->dept_id === $dept->dept_id)>
-                    {{ $dept->dept_code ?? $dept->dept_name }}
-                </option>
-            @endforeach
-        </select>
-    </div>
-
-    <input type="hidden" id="edit-id">
-
-    {{-- SECTION (triggers subject filter) --}}
-    <div class="mb-3">
-        <label class="field-label">Section</label>
-        <select id="edit-section" class="field-input">
-            <option value="">-- Select Section --</option>
-            @foreach ($sections as $sec)
-                <option value="{{ $sec->sec_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}">
-                    {{ $sec->sec_name }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    {{-- SUBJECT (auto-filtered by section year level) --}}
-    <div class="flex flex-col gap-3 mb-3">
-        <div>
-            <label class="field-label">Subject</label>
-            <select id="edit-subject" class="field-input">
-                <option value="">-- Select Subject --</option>
-                @foreach ($subjects as $sub)
-                    <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                        data-year-level="{{ $sub->course_year_level ?? '' }}"
-                        data-semester="{{ $sub->course_semester ?? '' }}"
-                        data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                        data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-                        {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-        <div>
-            <label class="field-label">Room</label>
-            <select id="edit-room" class="field-input">
-                <option value="">-- Select Room --</option>
-                @foreach ($rooms ?? collect() as $r)
-                    <option value="{{ $r->room_id }}">
-                        {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-                @endforeach
-            </select>
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Day</label>
-        <select id="edit-day" class="field-input">
-            <option value="">-- Select Day --</option>
-            @foreach ($days as $d)
-                <option value="{{ $d }}">{{ $d }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-            <label class="field-label">Start Time</label>
-            <input type="time" id="edit-start" step="1800" class="field-input">
-        </div>
-        <div>
-            <label class="field-label">End Time</label>
-            <input type="time" id="edit-end" step="1800" class="field-input">
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Description (optional)</label>
-        <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
-    </div>
-
-    </div>
-
-
     {{-- ══════════════ MODAL: SUBMIT PBT TO DEAN ══════════════ --}}
     @if ($selectedFaculty && $activeSemester)
         <div class="modal-overlay" id="modal-submit-dean">
@@ -1004,7 +937,7 @@
                     <div class="mb-3">
                         <label class="field-label">Semester</label>
                         <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                            {{ $activeSemester->label ?? ($activeSemester->sem_name ?? 'Active semester') }}
+                            {{ $activeSemester->label ?? ($activeSemester->sem_name ?? 'Selected semester') }}
                         </div>
                     </div>
 
@@ -1043,7 +976,7 @@
     @endif
 
     {{-- TOAST --}}
-    <div class="toast" id="toast"><span id="toast-msg"></span></div>
+    <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
     <script>
         window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
@@ -1056,6 +989,8 @@
                         {
                             id: "{{ $sec->sec_id }}",
                             name: "{{ $sec->sec_name }}",
+                            dept: "{{ $sec->sec_dept_id }}",
+                            isEvening: "{{ $sec->sec_is_evening ? '1' : '0' }}",
                             year: "{{ $sec->sec_year_level }}"
                         },
                     @endforeach
@@ -1070,6 +1005,7 @@
                             id: "{{ $sub->course_id ?? $sub->subj_id }}",
                             code: "{{ $sub->course_code ?? $sub->subj_code }}",
                             name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                            dept: "{{ $sub->course_dept_id ?? '' }}",
                             year: "{{ $sub->course_year_level ?? '' }}",
                             sem: "{{ $sub->course_semester ?? '' }}",
                             cat: "{{ $sub->course_category ?? '' }}",
@@ -1095,6 +1031,7 @@
                 },
             @endforeach
         ];
+        window.ACTIVE_COURSE_SEMESTER = @json(str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') || str_contains(strtolower($activeSemester->sem_name ?? ''), 'second') ? 2 : 1);
         window.ALL_CATEGORIES = @json($categories ?? []);
     </script>
     <script src="{{ asset('js/pbt.js') }}" defer></script>

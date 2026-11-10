@@ -13,6 +13,7 @@ use App\Models\Course;
 use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -38,25 +39,17 @@ class PbsController extends Controller
         return $chair?->dc_dept_id;
     }
 
-    /**
-     * Current (active) semester id, if any.
-     */
-    private function currentSemesterId(): ?string
+    /** Selected semester row, defaulting to the official active semester. */
+    private function activeSemester(?string $selectedId = null): ?object
     {
-        return Semester::where('sem_is_active', true)
-            ->orderByDesc('sem_start_date')
-            ->value('sem_id');
-    }
-
-    /** Active semester row + display label from Admin Settings (sem_is_active). */
-    private function activeSemester(): ?object
-    {
-        // Resolve the active term and academic year in one database request.
-        $sem = DB::table('semester as s')
+        $semesterQuery = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-            ->where('s.sem_is_active', true)
-            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label')
-            ->first();
+            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label');
+        $sem = $selectedId
+            ? (clone $semesterQuery)->where('s.sem_id', $selectedId)->first()
+            : null;
+        $sem ??= (clone $semesterQuery)->where('s.sem_is_active', true)->first();
+        $sem ??= (clone $semesterQuery)->orderByDesc('s.sem_start_date')->first();
         if (!$sem) {
             return null;
         }
@@ -76,7 +69,7 @@ class PbsController extends Controller
     /**
      * PBS page — scoped to the chair's program only.
      * BSIS chair sees only BSIS programs/sections (BSIS 1-A, BSIS 2-B, …).
-     * Semester defaults to the currently active semester.
+     * Semester defaults to the official active semester, or the latest term if none is active.
      */
     public function index(Request $request)
     {
@@ -113,8 +106,7 @@ class PbsController extends Controller
         $filters = $request->only(['section']);
         $filters['department'] = $selectedDeptId;
 
-        // Semester is FIXED from Admin → Academic Year settings (not user-selectable)
-        $activeSem = $this->activeSemester();
+        $activeSem = $this->activeSemester($request->query('semester'));
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
 
@@ -132,10 +124,15 @@ class PbsController extends Controller
                     ->where('sch_sec_id', $filters['section'])
                     ->when(
                         !empty($filters['semester']),
-                        fn ($q) => $q->where('sch_sem_id', $filters['semester'])
+                        fn ($q) => $q->where('sch_sem_id', $filters['semester']),
+                        fn ($q) => $q->whereRaw('1 = 0')
                     )
                     ->where('sch_is_active', true)
-                    ->where('sch_shift', $shiftKey)
+                    ->when(
+                        $shiftKey === 'evening',
+                        fn ($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                        fn ($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+                    )
                     ->with(['subject', 'faculty', 'section', 'room', 'semester'])
                     ->orderBy('sch_day')
                     ->orderBy('sch_start_time')
@@ -150,6 +147,23 @@ class PbsController extends Controller
             $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
         }
 
+        $summaryShift = $selectedSection?->sec_is_evening ? 'evening' : $shiftKey;
+        $summarySchedules = $schedules;
+        if ($selectedSection?->sec_is_evening) {
+            $summarySchedules = Schedule::query()
+                ->where('sch_sec_id', $selectedSection->sec_id)
+                ->when(
+                    !empty($filters['semester']),
+                    fn ($query) => $query->where('sch_sem_id', $filters['semester']),
+                    fn ($query) => $query->whereRaw('1 = 0')
+                )
+                ->where('sch_is_active', true)
+                ->with(['subject', 'faculty', 'section', 'room', 'semester'])
+                ->orderBy('sch_day')
+                ->orderBy('sch_start_time')
+                ->get();
+        }
+
         // Courses for this department, filtered by section year + active semester + category
         // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
         $selectedCategory = $request->query('category');
@@ -160,8 +174,8 @@ class PbsController extends Controller
             ->orderBy('course_code');
 
         if (!empty($selectedCategory)) {
-            // Category selected: show ALL courses in this category (global, no dept/year/semester filter)
-            $subjectsQuery->where('course_category', $selectedCategory);
+            $subjectsQuery->where('course_dept_id', $progId)
+                ->where('course_category', $selectedCategory);
         } else {
             // No category: filter by selected department + year level + semester
             $subjectsQuery->where('course_dept_id', $subjectDeptId);
@@ -246,6 +260,8 @@ class PbsController extends Controller
             'activeSemester'   => $activeSem,
             'selectedSection'  => $selectedSection,
             'selectedShift'    => $shiftKey,
+            'summaryShift'     => $summaryShift,
+            'summarySchedules' => $summarySchedules,
             'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
         ]);
     }
@@ -262,8 +278,8 @@ class PbsController extends Controller
             'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
             'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
-            'start_time' => 'required|date_format:H:i',
-            'end_time'   => 'required|date_format:H:i|after:start_time',
+            'start_time' => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after_or_equal:07:00', 'before:22:00'],
+            'end_time'   => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after:start_time', 'before_or_equal:22:00'],
         ]);
 
         $progId = $this->chairProgramId();
@@ -277,19 +293,39 @@ class PbsController extends Controller
             }
         }
 
+        $this->assertCourseFitsSection($data);
+
         return $data;
+    }
+
+    private function assertCourseFitsSection(array $data): void
+    {
+        if (empty($data['sec_id'])) {
+            return;
+        }
+
+        $course = Course::findOrFail($data['subj_id']);
+        $section = Section::findOrFail($data['sec_id']);
+        if ((string) $course->course_dept_id !== (string) $section->sec_dept_id) {
+            throw ValidationException::withMessages([
+                'subj_id' => 'The selected course must belong to the selected section department.',
+            ]);
+        }
+
+        if (
+            $course->course_code !== 'REC'
+            && !empty($course->course_year_level)
+            && (string) $course->course_year_level !== (string) $section->sec_year_level
+        ) {
+            throw ValidationException::withMessages([
+                'subj_id' => 'The selected course year level must match the selected section.',
+            ]);
+        }
     }
 
     public function store(Request $request)
     {
         $data = $this->validated($request, true);
-        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
-        if (empty($data['sem_id'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
-            ], 422);
-        }
         $result = $this->scheduler->assignMultiple($data);
 
         return response()->json($result, $result['success'] ? 201 : 422);
@@ -297,21 +333,42 @@ class PbsController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $data = $this->validated($request);
-        $data['sem_id'] = $this->currentSemesterId() ?? ($data['sem_id'] ?? null);
-        if (empty($data['sem_id'])) {
+        $progId = $this->chairProgramId();
+        if ($progId && !Schedule::whereKey($id)
+            ->whereHas('section', fn ($query) => $query->where('sec_dept_id', $progId))
+            ->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'No active semester is set. Ask the admin to set Academic Year in Settings.',
-            ], 422);
+                'message' => 'You can only update schedules under your assigned program.',
+            ], 403);
+        }
+
+        $data = $this->validated($request);
+        $schedule = Schedule::find($id);
+        if (!$schedule || (string) $schedule->sch_sem_id !== (string) $data['sem_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The schedule is not part of the selected semester.',
+            ], 404);
         }
         $result = $this->scheduler->update($id, $data);
 
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
+        $data = $request->validate([
+            'sem_id' => 'required|uuid|exists:semester,sem_id',
+        ]);
+        $schedule = Schedule::find($id);
+        if (!$schedule || (string) $schedule->sch_sem_id !== (string) $data['sem_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The schedule is not part of the selected semester.',
+            ], 404);
+        }
+
         $progId = $this->chairProgramId();
         if ($progId) {
             $schedule = Schedule::with('section')->find($id);
@@ -326,17 +383,13 @@ class PbsController extends Controller
         return response()->json($this->scheduler->delete($id));
     }
 
-    public function saveDraft(Request $request)
-    {
-        return response()->json(['success' => true, 'message' => 'Draft saved.']);
-    }
-
     public function clear(Request $request)
     {
-        $sectionId = $request->input('section');
-        if (!$sectionId) {
-            return response()->json(['success' => false, 'message' => 'No section selected.']);
-        }
+        $data = $request->validate([
+            'section' => 'required|uuid|exists:section,sec_id',
+            'semester' => 'required|uuid|exists:semester,sem_id',
+        ]);
+        $sectionId = $data['section'];
 
         $progId = $this->chairProgramId();
         if ($progId) {
@@ -352,10 +405,7 @@ class PbsController extends Controller
         }
 
         $query = Schedule::where('sch_sec_id', $sectionId)
-            ->when(
-                $request->filled('semester'),
-                fn ($q) => $q->where('sch_sem_id', $request->input('semester'))
-            );
+            ->where('sch_sem_id', $data['semester']);
 
         $schedules = $query->get(['sch_id', 'sch_load_id', 'sch_fac_id', 'sch_sem_id']);
         $ids = $schedules->pluck('sch_load_id');
@@ -416,6 +466,7 @@ class PbsController extends Controller
         $data = $request->validate([
             'department' => 'required|uuid|exists:department,dept_id',
             'section'    => 'required|uuid|exists:section,sec_id',
+            'semester'   => 'required|uuid|exists:semester,sem_id',
             'shift'      => 'required|in:day,evening',
         ]);
 
@@ -436,7 +487,7 @@ class PbsController extends Controller
             return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
         }
 
-        $activeSem = $this->activeSemester();
+        $activeSem = $this->activeSemester($data['semester']);
         if (!$activeSem) {
             return response()->json(['success' => false, 'message' => 'No active semester set.'], 422);
         }
@@ -451,7 +502,11 @@ class PbsController extends Controller
                 fn ($q) => $q->whereRaw('1 = 0')
             )
             ->where('sch_is_active', true)
-            ->where('sch_shift', $shiftKey)
+            ->when(
+                $shiftKey === 'evening',
+                fn ($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                fn ($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+            )
             ->with(['subject', 'faculty', 'section', 'room', 'semester'])
             ->orderBy('sch_day')
             ->orderBy('sch_start_time')
@@ -481,4 +536,3 @@ class PbsController extends Controller
         ]);
     }
 }
-

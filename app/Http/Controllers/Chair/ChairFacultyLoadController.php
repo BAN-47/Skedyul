@@ -11,7 +11,6 @@ use App\Models\Course;
 use App\Models\Section;
 use App\Models\Study_Load;
 use App\Models\Semester;
-use App\Models\AcademicYear;
 use App\Models\Workload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,20 +28,41 @@ use App\Services\ScheduleAssignmentService;
  */
 class ChairFacultyLoadController extends Controller
 {
-    const FULL_TIME_MAX_HOURS = 30;
-    const PART_TIME_MAX_HOURS = 30;
     const NEAR_MAX_BUFFER     = 3;
 
     public const SPECIAL_POSITION_MAX_HOURS = ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS;
 
-    public function index()
+    public function index(Request $request)
     {
         $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
 
         $department   = College::find($deptChair->dc_college_id);
         $program      = Departments::find($deptChair->dc_dept_id);
-        $academicYear = AcademicYear::where('ay_is_active', true)->first();
-        $semester     = Semester::where('sem_is_active', true)->first();
+        $validated = $request->validate([
+            'semester' => ['nullable', 'uuid', 'exists:semester,sem_id'],
+        ]);
+        $semester = !empty($validated['semester'])
+            ? Semester::with('academicYear')->findOrFail($validated['semester'])
+            : null;
+        $semester ??= Semester::with('academicYear')->where('sem_is_active', true)->first();
+        $semester ??= Semester::with('academicYear')->orderByDesc('sem_start_date')->first();
+        $academicYear = $semester?->academicYear;
+        $semesters = Semester::with('academicYear')
+            ->orderByDesc('sem_start_date')
+            ->get()
+            ->map(function (Semester $option) {
+                $year = $option->academicYear?->ay_academic_year
+                    ?? $option->academicYear?->ay_year_label
+                    ?? '';
+                $yearLabel = $year !== '' ? str_replace('-', ' - ', $year) : '';
+                $option->label = trim(
+                    ($option->sem_name ?? '')
+                    . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
+                    . ($option->sem_is_active ? ' (Current)' : '')
+                );
+
+                return $option;
+            });
 
         $programSectionIds = Section::where('sec_dept_id', $deptChair->dc_dept_id)->pluck('sec_id');
         $assignedFacultyIds = $semester
@@ -78,7 +98,11 @@ class ChairFacultyLoadController extends Controller
             ->get();
 
         $studyLoads = Study_Load::whereIn('sl_fac_id', $facultyIds)
-            ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
+            ->when(
+                $semester,
+                fn ($q) => $q->where('sl_sem_id', $semester->sem_id),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
             ->with('subject')
             ->get()
             ->groupBy('sl_fac_id');
@@ -135,6 +159,9 @@ class ChairFacultyLoadController extends Controller
                     ? self::SPECIAL_POSITION_MAX_HOURS[$f->fac_special_position] ?? null : null,
                 'subjects' => collect([$day['subjects'], $evening['subjects']])->reject(fn ($codes) => $codes === '—')->unique()->implode(', ') ?: '—',
                 'total_units' => $day['total_units'] + $evening['total_units'],
+                'total_hours' => $day['total_hours'] + $evening['total_hours'],
+                'total_status_label' => 'Separate shift limits',
+                'total_status_badge' => 'badge-blue',
                 'day' => $day,
                 'evening' => $evening,
             ];
@@ -151,6 +178,7 @@ class ChairFacultyLoadController extends Controller
             'program',
             'academicYear',
             'semester',
+            'semesters',
             'facultyLoad',
             'faculty',
             'subjects',
@@ -198,9 +226,8 @@ class ChairFacultyLoadController extends Controller
             ], 422);
         }
 
-        // Current load from study_load (source of truth)
-        $currentHours = app(ScheduleAssignmentService::class)
-            ->facultyHoursForShift($data['fac_id'], $data['sem_id'], $data['shift']);
+        $scheduler = app(ScheduleAssignmentService::class);
+        $currentHours = $scheduler->facultyHoursForShift($data['fac_id'], $data['sem_id'], $data['shift']);
 
         if (($currentHours + $subjectHours) > $maxHours) {
             $label = $isPartTime ? 'part-time' : 'full-time';
@@ -226,11 +253,8 @@ class ChairFacultyLoadController extends Controller
                 ]);
 
                 // Keep workload table in sync with weekly teaching hours.
-                $newTotal = Study_Load::where('sl_fac_id', $data['fac_id'])
-                    ->where('sl_sem_id', $data['sem_id'])
-                    ->with('subject')
-                    ->get()
-                    ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
+                $newTotal = app(ScheduleAssignmentService::class)
+                    ->facultyHours($data['fac_id'], $data['sem_id']);
 
                 $semester = Semester::find($data['sem_id']);
 
@@ -299,11 +323,7 @@ class ChairFacultyLoadController extends Controller
 
             $load->delete();
 
-            $newTotal = Study_Load::where('sl_fac_id', $facId)
-                ->where('sl_sem_id', $semId)
-                ->with('subject')
-                ->get()
-                ->sum(fn ($sl) => \App\Services\ScheduleAssignmentService::courseHours($sl->subject));
+            $newTotal = app(ScheduleAssignmentService::class)->facultyHours($facId, $semId);
 
             Workload::where('wl_fac_id', $facId)
                 ->where('wl_sem_id', $semId)

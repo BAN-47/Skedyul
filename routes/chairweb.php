@@ -31,7 +31,6 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::post('/pbs', [PbsController::class, 'store'])->name('chair.pbs.store');
     Route::put('/pbs/{id}', [PbsController::class, 'update'])->name('chair.pbs.update');
     Route::delete('/pbs/{id}', [PbsController::class, 'destroy'])->name('chair.pbs.destroy');
-    Route::post('/pbs/save-draft', [PbsController::class, 'saveDraft'])->name('chair.pbs.save-draft');
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
     Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
@@ -41,7 +40,6 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::post('/pbt', [PbtController::class, 'store'])->name('chair.pbt.store');
     Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
     Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
-    Route::post('/pbt/save-draft', [PbtController::class, 'saveDraft'])->name('chair.pbt.save-draft');
     Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
 
     // MIS — Class Program for MIS
