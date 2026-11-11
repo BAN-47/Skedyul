@@ -573,8 +573,13 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
 
-        return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
+        if ($isEveningSection) {
+            return false;
+        }
+
+        return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], true)
             && $start >= 7 * 60
             && $end <= 17 * 60
             && !($start < 13 * 60 && $end > 12 * 60);
@@ -585,16 +590,21 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
+
+        if (!$isEveningSection) {
+            return false;
+        }
 
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
             return $start >= 16 * 60 && $end <= 22 * 60;
         }
 
-        if ($day === 'saturday') {
-            return $start >= 17 * 60 && $end <= 22 * 60;
+        if (in_array($day, ['saturday', 'sunday'], true)) {
+            return $start >= 7 * 60 && $end <= 22 * 60;
         }
 
-        return $day === 'sunday' && $start >= 7 * 60 && $end <= 22 * 60;
+        return false;
     }
 
     private function minutes($time): int

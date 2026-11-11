@@ -503,6 +503,12 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
+
+        // Evening sections NEVER belong on the Day sheet
+        if ($isEveningSection) {
+            return false;
+        }
 
         return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
             && $start >= 7 * 60
@@ -515,22 +521,24 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
 
+        // Day sections NEVER belong on the Evening sheet
+        if (!$isEveningSection) {
+            return false;
+        }
+
+        // Evening sections: Weekdays 4:00 PM - 10 PM
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
-            return $start >= (16 * 60) + 30 && $end <= 22 * 60;
+            return $start >= (16 * 60) && $end <= 22 * 60;
         }
 
-        if ($day === 'saturday') {
-            // Put Saturday classes that do not fit the Day worksheet
-            // into the Evening worksheet's full-day weekend timetable.
-            return $start >= 7 * 60
-                && $end <= 22 * 60
-                && !$this->isDaySchedule($schedule);
+        // Evening sections: Weekends (Sat/Sun) go to Evening sheet (full day grid)
+        if (in_array($day, ['saturday', 'sunday'], true)) {
+            return $start >= 7 * 60 && $end <= 22 * 60;
         }
 
-        return $day === 'sunday'
-            && $start >= 7 * 60
-            && $end <= 22 * 60;
+        return false;
     }
 
     private function minutes($time): int
@@ -624,16 +632,26 @@ class PbtExportController extends Controller
         $sectionName = $schedule->section->sec_name ?? 'Section';
         $roomName = $schedule->room->room_name ?? 'Room not assigned';
 
-        $sheet->setCellValue(
-            $coordinate,
-            $courseCode . "\n" . $sectionName . "\n" . $roomName
-        );
+        if ($courseCode === 'REC') {
+            $displayText = "Research,\nExtension\nand\nConsultation\ntime";
+        } else {
+            $displayText = $courseCode . "\n" . $sectionName . "\n" . $roomName;
+        }
+
+        $sheet->setCellValue($coordinate, $displayText);
 
         $paletteIndex = crc32((string) $schedule->sch_course_id) % count(self::CLASS_COLORS);
         $style = $sheet->getStyle($coordinate . ':' . $lastCoordinate);
-        $style->getFill()
-            ->setFillType(Fill::FILL_SOLID)
-            ->getStartColor()->setRGB(self::CLASS_COLORS[$paletteIndex]);
+        
+        if ($courseCode === 'REC') {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('FFFFFF');
+        } else {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB(self::CLASS_COLORS[$paletteIndex]);
+        }
 
         $style->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
