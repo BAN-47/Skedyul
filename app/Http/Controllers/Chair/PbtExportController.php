@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -561,7 +562,7 @@ class PbtExportController extends Controller
             $sheet,
             $schedule,
             $dayColumns[$day],
-            $baseRow + (int) floor(($start - $baseMinutes) / 20),
+            $baseRow + (int) ceil(($start - $baseMinutes) / 20),
             $baseRow + (int) ceil(($end - $baseMinutes) / 20) - 1
         );
     }
@@ -599,7 +600,7 @@ class PbtExportController extends Controller
             $sheet,
             $schedule,
             $column,
-            $baseRow + (int) floor((($start - $baseMinutes) * $rowsPerHour) / 60),
+            $baseRow + (int) ceil((($start - $baseMinutes) * $rowsPerHour) / 60),
             $baseRow + (int) ceil((($end - $baseMinutes) * $rowsPerHour) / 60) - 1
         );
     }
@@ -640,9 +641,13 @@ class PbtExportController extends Controller
                 ->getStartColor()->setRGB(self::CLASS_COLORS[$paletteIndex]);
         }
 
+        $style->getFont()->getColor()->setRGB('000000'); // Ensure text color is black
         $style->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setWrapText(true);
+        $style->getBorders()->getOutline()
+            ->setBorderStyle(Border::BORDER_THIN)
+            ->getColor()->setRGB('000000');
     }
 }
