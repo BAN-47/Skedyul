@@ -226,12 +226,14 @@ class PbtController extends Controller
                     's.sem_id',
                     's.sem_name',
                     's.sem_is_active',
+                    's.sem_is_plotting_enabled',
                     's.sem_start_date',
                     's.sem_ay_id',
                     'ay.ay_academic_year',
                     'ay.ay_year_label',
                 ])
                 ->get()
+                ->filter(fn($sem) => !empty($sem->sem_is_active) || !empty($sem->sem_is_plotting_enabled))
                 ->map(function ($sem) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';

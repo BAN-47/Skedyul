@@ -264,7 +264,12 @@ Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function (
         }
 
         $academicYears = \App\Models\AcademicYear::query()->orderByDesc('ay_academic_year')->get();
-        $semesters = \App\Models\Semester::query()->orderBy('sem_name')->get();
+        $semesters = \App\Models\Semester::query()
+            ->when($activeYear, fn($q) => $q->where('sem_ay_id', $activeYear->ay_id))
+            ->orderBy('sem_name')
+            ->get();
+        
+        $activeSemester = \App\Models\Semester::query()->where('sem_is_active', true)->first();
 
         $ayStart = $activeSemester && $activeSemester->sem_start_date
             ? \Illuminate\Support\Carbon::parse($activeSemester->sem_start_date)->format('Y-m-d')
@@ -292,6 +297,9 @@ Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function (
 
     Route::put('/academic-year', [AcademicYearController::class, 'update'])
         ->name('admin.academic-year.update');
+
+    Route::post('/semester/{id}/toggle-plotting', [AcademicYearController::class, 'togglePlotting'])
+        ->name('admin.semester.toggle-plotting');
 
     Route::put('/profile/personal-info', [AdminProfileController::class, 'updatePersonalInfo'])
         ->name('admin.profile.personal-info.update');

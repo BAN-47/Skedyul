@@ -21,10 +21,12 @@ class Semester extends Model
         'sem_start_date',
         'sem_end_date',
         'sem_is_active',
+        'sem_is_plotting_enabled',
     ];
 
     protected $casts = [
         'sem_is_active' => 'boolean',
+        'sem_is_plotting_enabled' => 'boolean',
         'sem_start_date' => 'date',
         'sem_end_date' => 'date',
     ];
