@@ -56,8 +56,7 @@ class FacultyScheduleController extends Controller
                 return $semester;
             });
 
-        $shift = $request->query('shift') === 'night' ? 'night' : 'day';
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
 
         $allSchedules = Schedule::with(['subject', 'section', 'room'])
             ->where('sch_fac_id', $faculty->fac_id)
@@ -67,47 +66,95 @@ class FacultyScheduleController extends Controller
                 fn ($query) => $query->where('sch_sem_id', $activeSemester->sem_id),
                 fn ($query) => $query->whereRaw('1 = 0')
             )
+            ->when(
+                $shiftKey === 'evening',
+                fn ($q) => $q->whereRaw("CAST(sch_start_time AS TIME) < '22:00:00' AND CAST(sch_end_time AS TIME) > '16:00:00'"),
+                fn ($q) => $q->whereRaw("CAST(sch_start_time AS TIME) < '16:00:00' AND CAST(sch_end_time AS TIME) > '07:00:00'")
+            )
             ->orderBy('sch_start_time')
             ->get();
 
-        $schedules = $allSchedules->filter(function ($schedule) use ($shift) {
-            $hour = (int) substr((string) $schedule->sch_start_time, 0, 2);
-            return $shift === 'night' ? $hour >= 16 : $hour < 16;
-        })->values();
+        $schedules = $allSchedules;
 
-        $courseRows = $allSchedules
-            ->filter(fn ($schedule) => $schedule->subject)
-            ->unique(fn ($schedule) => $schedule->sch_course_id . '|' . $schedule->sch_sec_id)
-            ->values();
+        $summarySchedules = Schedule::query()
+            ->where('sch_fac_id', $faculty->fac_id)
+            ->when(
+                $activeSemester,
+                fn ($q) => $q->where('sch_sem_id', $activeSemester->sem_id),
+                fn ($q) => $q->whereRaw('1 = 0')
+            )
+            ->where('sch_is_active', true)
+            ->whereHas('studyLoad', fn ($q) => $q->where('sl_fac_id', $faculty->fac_id))
+            ->where(function ($query) use ($shiftKey) {
+                if ($shiftKey === 'evening') {
+                    $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'evening'))
+                        ->orWhereHas('section', fn ($section) => $section->where('sec_is_evening', true));
+                } else {
+                    $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'day'))
+                        ->whereDoesntHave('section', fn ($section) => $section->where('sec_is_evening', true));
+                }
+            })
+            ->with(['subject', 'section', 'room', 'studyLoad'])
+            ->orderBy('sch_day')
+            ->orderBy('sch_start_time')
+            ->get();
 
-        // Match PBT: units/preparations come from assigned Study Loads,
-        // while weekly hours come from the meetings attached to those loads.
         $studyLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when(
                 $activeSemester,
-                fn ($query) => $query->where('sl_sem_id', $activeSemester->sem_id),
-                fn ($query) => $query->whereRaw('1 = 0')
+                fn ($q) => $q->where('sl_sem_id', $activeSemester->sem_id),
+                fn ($q) => $q->whereRaw('1 = 0')
             )
-            ->with(['subject', 'schedules'])
+            ->with('subject', 'section', 'schedules')
             ->get();
 
-        $units = $studyLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
-        $hoursPerWeek = $studyLoads->sum(fn ($load) => $load->schedules->sum(function ($schedule) {
-            $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
-            $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
-            return $start->diffInMinutes($end) / 60;
-        }));
+        $shiftForLoad = fn ($load) => $load->section?->sec_is_evening
+            ? 'evening'
+            : ($load->sl_shift ?? 'day');
+        $loads = $studyLoads->filter(fn ($load) => $shiftForLoad($load) === $shiftKey)->values();
+
+        $units = $loads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
+        $hoursForLoads = function ($loads) {
+            return $loads->sum(function ($load) {
+                return $load->schedules->where('sch_is_active', true)->sum(function ($schedule) {
+                    $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                    $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                    return $start->diffInMinutes($end) / 60;
+                });
+            });
+        };
+        $hoursPerWeek = $hoursForLoads($loads);
+        $totalHoursPerWeek = $faculty->fac_employment_type === 'part_time'
+            ? $hoursForLoads($studyLoads)
+            : null;
+        $workloadHours = $loads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+        $totalWorkloadHours = $faculty->fac_employment_type === 'part_time'
+            ? $studyLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
+            : null;
+
+        $courseRows = $summarySchedules
+            ->filter(fn ($schedule) => $schedule->subject && ($schedule->subject->course_code ?? '') !== 'REC')
+            ->unique(fn ($schedule) => $schedule->sch_course_id . '|' . $schedule->sch_sec_id)
+            ->values();
 
         $loadStats = [
-            'preparations' => $studyLoads->pluck('sl_course_id')->unique()->count(),
+            'preparations' => $loads->filter(fn($l) => ($l->subject->course_code ?? '') !== 'REC')->pluck('sl_course_id')->unique()->count(),
             'units' => $units ?: null,
             'hours_week' => $hoursPerWeek ?: null,
+            'total_hours_week' => $totalHoursPerWeek ?: null,
+            'workload_hours' => $workloadHours ?: null,
+            'total_workload_hours' => $totalWorkloadHours ?: null,
+            'is_part_time' => $faculty->fac_employment_type === 'part_time',
             'designation' => $faculty->fac_special_position ?: $faculty->fac_rank,
-            'load_limit' => \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty),
+            'load_limit' => \App\Services\ScheduleAssignmentService::facultyMaxHours($faculty, $shiftKey),
             'production' => null,
             'extension' => null,
             'research' => null,
         ];
+
+        $shift = $shiftKey === 'evening' ? 'night' : 'day';
+
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
         $department = $faculty->program;
         $chair = $department
@@ -146,6 +193,7 @@ class FacultyScheduleController extends Controller
             'faculty',
             'allSchedules',
             'schedules',
+            'summarySchedules',
             'courseRows',
             'loadStats',
             'activeSemester',

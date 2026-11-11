@@ -272,7 +272,7 @@
                             <a href="{{ route('faculty.schedule', ['shift' => 'day', 'semester' => $activeSemester?->sem_id]) }}"
                                 class="px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Day</a>
                             <a href="{{ route('faculty.schedule', ['shift' => 'night', 'semester' => $activeSemester?->sem_id]) }}"
-                                class="border-l border-slate-300 px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Night</a>
+                                class="border-l border-slate-300 px-3 py-2 text-[11px] font-bold uppercase {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">Evening</a>
                         </div>
 
                         <span class="ml-auto text-[11px] italic text-slate-400">View only</span>

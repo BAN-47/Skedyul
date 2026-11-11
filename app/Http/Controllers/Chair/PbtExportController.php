@@ -85,7 +85,7 @@ class PbtExportController extends Controller
         $chair = $this->chair();
 
         $validated = $request->validate([
-            'faculty_id' => ['required', 'uuid'],
+            'faculty_id' => ['required', 'uuid', 'exists:faculty,fac_id'],
             'semester' => ['nullable', 'uuid', 'exists:semester,sem_id'],
         ]);
 
@@ -101,7 +101,7 @@ class PbtExportController extends Controller
 
         $faculty = Faculty::with(['user', 'program'])
             ->where('fac_id', $validated['faculty_id'])
-            ->where('fac_dept_id', $chair->dc_dept_id)
+            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->firstOrFail();
 
         $schedules = Schedule::with([
@@ -368,37 +368,27 @@ class PbtExportController extends Controller
         int $hoursRow,
         int $designationRow
     ): void {
-        $studyLoads = Study_Load::with('subject')
-            ->where('sl_fac_id', $faculty->fac_id)
-            ->whereHas('schedules', function ($query) use ($schedules) {
-                $scheduleIds = $schedules->pluck('sch_id')->all();
+        $scheduleIds = $schedules->pluck('sch_id')->filter()->all();
+        $studyLoads = $scheduleIds
+            ? Study_Load::with('subject')
+                ->where('sl_fac_id', $faculty->fac_id)
+                ->whereHas('schedules', fn ($query) => $query->whereIn('sch_id', $scheduleIds))
+                ->get()
+                ->unique('sl_id')
+            : collect();
 
-                if ($scheduleIds) {
-                    $query->whereIn('sch_id', $scheduleIds);
-                } else {
-                    $query->whereRaw('1 = 0');
-                }
-            })
-            ->get();
-
-        $preparations = $schedules
-            ->pluck('sch_course_id')
+        $preparations = $studyLoads
+            ->filter(fn ($load) => ($load->subject?->course_code ?? '') !== 'REC')
+            ->pluck('sl_course_id')
             ->filter()
             ->unique()
             ->count();
 
-        $units = $studyLoads
-            ->map(fn($load) => (float) ($load->subject?->course_units ?? 0))
-            ->sum();
+        $units = $studyLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
 
-        $hours = $schedules->sum(function ($schedule) {
-            $start = strtotime((string) $schedule->sch_start_time);
-            $end = strtotime((string) $schedule->sch_end_time);
-
-            return $start && $end && $end > $start
-                ? ($end - $start) / 3600
-                : 0;
-        });
+        $hours = $studyLoads->sum(
+            fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
+        );
 
         $sheet->setCellValue('C' . $preparationsRow, $preparations);
         $sheet->setCellValue('C' . $unitsRow, $units);
@@ -523,17 +513,14 @@ class PbtExportController extends Controller
         $end = $this->minutes($schedule->sch_end_time);
         $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
 
-        // Day sections NEVER belong on the Evening sheet
         if (!$isEveningSection) {
             return false;
         }
 
-        // Evening sections: Weekdays 4:00 PM - 10 PM
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
             return $start >= (16 * 60) && $end <= 22 * 60;
         }
 
-        // Evening sections: Weekends (Sat/Sun) go to Evening sheet (full day grid)
         if (in_array($day, ['saturday', 'sunday'], true)) {
             return $start >= 7 * 60 && $end <= 22 * 60;
         }

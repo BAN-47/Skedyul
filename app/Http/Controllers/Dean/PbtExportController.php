@@ -362,7 +362,11 @@ class PbtExportController extends Controller
                 : 0;
         });
 
-        $sheet->setCellValue($this->valueColumn($evening, $preparationsRow), $courseSchedules->count());
+        $preparationsCount = $courseSchedules
+            ->filter(fn($s) => ($s->subject->course_code ?? '') !== 'REC')
+            ->count();
+
+        $sheet->setCellValue($this->valueColumn($evening, $preparationsRow), $preparationsCount);
         $sheet->setCellValue($this->valueColumn($evening, $unitsRow), $units);
         $sheet->setCellValue($this->valueColumn($evening, $hoursRow), $hours);
 
@@ -550,17 +554,30 @@ class PbtExportController extends Controller
             $sheet->mergeCells($cell . ':' . $lastCell);
         }
 
-        $text = ($schedule->subject->course_code ?? 'Course')
-            . "\n" . ($schedule->section->sec_name ?? 'Section')
-            . "\n" . ($schedule->room->room_name ?? 'Room not assigned');
+        $courseCode = $schedule->subject->course_code ?? 'Course';
+        $sectionName = $schedule->section->sec_name ?? 'Section';
+        $roomName = $schedule->room->room_name ?? 'Room not assigned';
+
+        if ($courseCode === 'REC') {
+            $text = "Research,\nExtension\nand\nConsultation\ntime";
+        } else {
+            $text = $courseCode . "\n" . $sectionName . "\n" . $roomName;
+        }
 
         $sheet->setCellValue($cell, $text);
 
         $colorIndex = crc32((string) $schedule->sch_course_id) % count(self::COLORS);
         $style = $sheet->getStyle($cell . ':' . $lastCell);
-        $style->getFill()
-            ->setFillType(Fill::FILL_SOLID)
-            ->getStartColor()->setRGB(self::COLORS[$colorIndex]);
+        
+        if ($courseCode === 'REC') {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('FFFFFF');
+        } else {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB(self::COLORS[$colorIndex]);
+        }
 
         $style->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)

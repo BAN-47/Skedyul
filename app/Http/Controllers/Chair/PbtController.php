@@ -314,7 +314,7 @@ class PbtController extends Controller
             : null;
 
         return [
-            'preparations' => $loads->pluck('sl_course_id')->unique()->count(),
+            'preparations' => $loads->filter(fn($l) => ($l->subject->course_code ?? '') !== 'REC')->pluck('sl_course_id')->unique()->count(),
             'units'        => $units ?: null,
             'hours_week'   => $hoursPerWeek ?: null,
             'total_hours_week' => $totalHoursPerWeek ?: null,

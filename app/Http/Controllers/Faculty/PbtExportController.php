@@ -7,6 +7,7 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Semester;
+use App\Models\Study_Load;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -117,6 +118,7 @@ class PbtExportController extends Controller
         $this->fillSheet(
             $daySheet,
             $schedules->filter(fn($schedule) => $this->isDay($schedule))->values(),
+            $faculty,
             $facultyName,
             $chairSignature,
             $semesterLabel,
@@ -126,6 +128,7 @@ class PbtExportController extends Controller
         $this->fillSheet(
             $eveningSheet,
             $schedules->filter(fn($schedule) => $this->isEvening($schedule))->values(),
+            $faculty,
             $facultyName,
             $chairSignature,
             $semesterLabel,
@@ -147,6 +150,7 @@ class PbtExportController extends Controller
     private function fillSheet(
         $sheet,
         $schedules,
+        Faculty $faculty,
         string $facultyName,
         string $chairSignature,
         string $semesterLabel,
@@ -190,7 +194,7 @@ class PbtExportController extends Controller
 
         $courseSchedules = $schedules
             ->filter(fn($schedule) => $schedule->subject && $schedule->section)
-            ->unique(fn($schedule) => $schedule->sch_course_id . ':' . $schedule->sch_sec_id)
+            ->unique(fn($s) => ($s->subject->course_code ?? ''))
             ->values();
 
         if ($courseSchedules->count() > ($lastCourseRow - $firstCourseRow + 1)) {
@@ -208,26 +212,35 @@ class PbtExportController extends Controller
             $sheet->setCellValue('E' . $row, (int) ($schedule->section->sec_no_of_student ?? 0));
         }
 
-        $units = $courseSchedules->sum(
-            fn($schedule) => (float) ($schedule->subject->course_units ?? 0)
+        $scheduleIds = $schedules->pluck('sch_id')->filter()->all();
+        $studyLoads = $scheduleIds
+            ? Study_Load::with('subject')
+                ->where('sl_fac_id', $faculty->fac_id)
+                ->whereHas('schedules', fn ($query) => $query->whereIn('sch_id', $scheduleIds))
+                ->get()
+                ->unique('sl_id')
+            : collect();
+
+        $preparationsCount = $studyLoads
+            ->filter(fn ($load) => ($load->subject?->course_code ?? '') !== 'REC')
+            ->pluck('sl_course_id')
+            ->filter()
+            ->unique()
+            ->count();
+
+        $units = $studyLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
+        $hours = $studyLoads->sum(
+            fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
         );
 
-        $hours = $schedules->sum(function ($schedule) {
-            $start = strtotime((string) $schedule->sch_start_time);
-            $end = strtotime((string) $schedule->sch_end_time);
-
-            return $start && $end && $end > $start
-                ? ($end - $start) / 3600
-                : 0;
-        });
-
-        $sheet->setCellValue('C' . $preparationsRow, $courseSchedules->count());
+        $sheet->setCellValue('C' . $preparationsRow, $preparationsCount);
         $sheet->setCellValue('C' . $unitsRow, $units);
         $sheet->setCellValue('C' . $hoursRow, $hours);
-        $sheet->setCellValue(
-            'C' . $designationRow,
-            $this->facultyDesignation()
-        );
+
+        $designation = $this->facultyDesignation();
+        if (!empty($designation)) {
+            $sheet->setCellValue('C' . $designationRow, $designation);
+        }
 
         foreach ($schedules as $schedule) {
             $this->writeSchedule($sheet, $schedule, $evening);
@@ -332,6 +345,45 @@ class PbtExportController extends Controller
             }
         }
     }
+    private function isDay(Schedule $schedule): bool
+    {
+        $day = strtolower((string) $schedule->sch_day);
+        $start = $this->minutes($schedule->sch_start_time);
+        $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
+
+        if ($isEveningSection) {
+            return false;
+        }
+
+        return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], true)
+            && $start >= 7 * 60
+            && $end <= 17 * 60
+            && !($start < 13 * 60 && $end > 12 * 60);
+    }
+
+    private function isEvening(Schedule $schedule): bool
+    {
+        $day = strtolower((string) $schedule->sch_day);
+        $start = $this->minutes($schedule->sch_start_time);
+        $end = $this->minutes($schedule->sch_end_time);
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
+
+        if (!$isEveningSection) {
+            return false;
+        }
+
+        if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
+            return $start >= 16 * 60 && $end <= 22 * 60;
+        }
+
+        if (in_array($day, ['saturday', 'sunday'], true)) {
+            return $start >= 7 * 60 && $end <= 22 * 60;
+        }
+
+        return false;
+    }
+
     private function writeSchedule($sheet, Schedule $schedule, bool $evening): void
     {
         $day = strtolower((string) $schedule->sch_day);
@@ -395,54 +447,35 @@ class PbtExportController extends Controller
             $sheet->mergeCells($cell . ':' . $lastCell);
         }
 
-        $text = ($schedule->subject->course_code ?? 'Course')
-            . "\n" . ($schedule->section->sec_name ?? 'Section')
-            . "\n" . ($schedule->room->room_name ?? 'Room not assigned');
+        $courseCode = $schedule->subject->course_code ?? 'Course';
+        $sectionName = $schedule->section->sec_name ?? 'Section';
+        $roomName = $schedule->room->room_name ?? 'Room not assigned';
+
+        if ($courseCode === 'REC') {
+            $text = "Research,\nExtension\nand\nConsultation\ntime";
+        } else {
+            $text = $courseCode . "\n" . $sectionName . "\n" . $roomName;
+        }
 
         $sheet->setCellValue($cell, $text);
 
         $colorIndex = crc32((string) $schedule->sch_course_id) % count(self::COLORS);
-
         $style = $sheet->getStyle($cell . ':' . $lastCell);
-        $style->getFill()
-            ->setFillType(Fill::FILL_SOLID)
-            ->getStartColor()->setRGB(self::COLORS[$colorIndex]);
+        
+        if ($courseCode === 'REC') {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB('FFFFFF');
+        } else {
+            $style->getFill()
+                ->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB(self::COLORS[$colorIndex]);
+        }
 
         $style->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER)
             ->setWrapText(true);
-    }
-
-    private function isDay(Schedule $schedule): bool
-    {
-        $day = strtolower((string) $schedule->sch_day);
-        $start = $this->minutes($schedule->sch_start_time);
-        $end = $this->minutes($schedule->sch_end_time);
-
-        return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
-            && $start >= 7 * 60
-            && $end <= 17 * 60
-            && !($start < 13 * 60 && $end > 12 * 60);
-    }
-
-    private function isEvening(Schedule $schedule): bool
-    {
-        $day = strtolower((string) $schedule->sch_day);
-        $start = $this->minutes($schedule->sch_start_time);
-        $end = $this->minutes($schedule->sch_end_time);
-
-        if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
-            return $start >= 16 * 60 && $end <= 22 * 60;
-        }
-
-        if ($day === 'saturday') {
-            return $start >= 17 * 60 && $end <= 22 * 60;
-        }
-
-        return $day === 'sunday'
-            && $start >= 7 * 60
-            && $end <= 22 * 60;
     }
 
     private function minutes($time): int
