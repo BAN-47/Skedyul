@@ -43,8 +43,10 @@
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-        // Same Day/Evening shift mechanics as PBS.
+        // Day view uses a shared 7:00 AM–4:00 PM grid.
+        // Evening view has separate weekday and weekend time axes like the workbook.
         $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
+        $slotMinutes = 30;
 
         if ($shift === 'night') {
             $gridStart = 16 * 60; // 4:00 PM
@@ -54,8 +56,14 @@
             $gridEnd = 16 * 60; // 4:00 PM
         }
 
-        $slotMinutes = 30;
+        $gridStart = $shift === 'night' ? $weekendEveningStart : $dayGridStart;
+        $gridEnd = $shift === 'night' ? $eveningGridEnd : $dayGridEnd;
         $slotCount = intdiv($gridEnd - $gridStart, $slotMinutes);
+        $weekdayEveningSlotCount = intdiv($eveningGridEnd - $weekdayEveningStart, $slotMinutes);
+        $weekendEveningSlotCount = intdiv($eveningGridEnd - $weekendEveningStart, $slotMinutes);
+        // Scale weekday rows to the same total height as the longer weekend schedule.
+        $weekendEveningRowHeight = 26;
+        $weekdayEveningRowHeight = ($weekendEveningRowHeight * $weekendEveningSlotCount) / $weekdayEveningSlotCount;
 
         $noonStart = 12 * 60;
         $noonEnd = 13 * 60;
@@ -66,21 +74,42 @@
             $selectedDate = \Illuminate\Support\Carbon::parse($selectedDate);
         }
 
-        // Occupied-cell lookup — same purpose as PBS: don't render a click
-        // target under an existing schedule block.
+        // Occupied-cell lookup for the day grid and split Evening grids.
         $occupied = [];
+        $weekdayOccupied = [];
+        $weekendOccupied = [];
         foreach ($schedules as $s) {
             $dIdx = array_search($s->sch_day, $days, true);
             if ($dIdx === false) {
                 continue;
             }
+
             $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
             $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
-            $sMin = max($start->hour * 60 + $start->minute, $gridStart);
-            $eMin = min($end->hour * 60 + $end->minute, $gridEnd);
-            for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
-                $rowIdx = intdiv($m - $gridStart, $slotMinutes);
-                $occupied[$dIdx . '-' . $rowIdx] = true;
+            $startMinutes = $start->hour * 60 + $start->minute;
+            $endMinutes = $end->hour * 60 + $end->minute;
+
+            if ($shift === 'night' && $dIdx < 5) {
+                $sMin = max($startMinutes, $weekdayEveningStart);
+                $eMin = min($endMinutes, $eveningGridEnd);
+                for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
+                    $rowIdx = intdiv($m - $weekdayEveningStart, $slotMinutes);
+                    $weekdayOccupied[$dIdx . '-' . $rowIdx] = true;
+                }
+            } elseif ($shift === 'night') {
+                $sMin = max($startMinutes, $weekendEveningStart);
+                $eMin = min($endMinutes, $eveningGridEnd);
+                for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
+                    $rowIdx = intdiv($m - $weekendEveningStart, $slotMinutes);
+                    $weekendOccupied[$dIdx - 5 . '-' . $rowIdx] = true;
+                }
+            } else {
+                $sMin = max($startMinutes, $dayGridStart);
+                $eMin = min($endMinutes, $dayGridEnd);
+                for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
+                    $rowIdx = intdiv($m - $dayGridStart, $slotMinutes);
+                    $occupied[$dIdx . '-' . $rowIdx] = true;
+                }
             }
         }
     @endphp
@@ -426,70 +455,322 @@
                             </div>
                         </div>
 
-                        {{-- ══ WEEK GRID (identical mechanics to PBS) ══ --}}
-                        <div class="overflow-x-auto">
-                            <div class="min-w-[840px]">
+                        {{-- EVENING VIEW: separate weekday and weekend time axes --}}
+                        @if ($shift === 'night')
+                            <div class="overflow-x-auto">
+                                <div
+                                    class="min-w-[1100px] overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                    <div class="grid gap-0 min-h-full"
+                                        style="grid-template-columns: minmax(0, 5fr) 10px minmax(0, 2fr);">
+                                        {{-- Monday–Friday: evening hours only --}}
+                                        <div class="min-w-0 bg-white">
+                                            <div class="grid bg-slate-100 border-b border-slate-200"
+                                                style="grid-template-columns: 70px repeat(5, minmax(0, 1fr));">
+                                                <div
+                                                    class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
+                                                    Time</div>
+                                                @for ($weekdayIndex = 0; $weekdayIndex < 5; $weekdayIndex++)
+                                                    <div
+                                                        class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-l border-slate-200">
+                                                        {{ $days[$weekdayIndex] }}</div>
+                                                @endfor
+                                            </div>
 
-                                <div class="grid bg-slate-100 border-b border-slate-200"
-                                    style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));">
-                                    <div
-                                        class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
-                                        Time</div>
-                                    @foreach ($days as $d)
-                                        <div
-                                            class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-l border-slate-200">
-                                            {{ $d }}</div>
-                                    @endforeach
-                                </div>
+                                            <div class="grid relative"
+                                                style="grid-template-columns: 70px repeat(5, minmax(0, 1fr)); grid-template-rows: repeat({{ $weekdayEveningSlotCount }}, {{ $weekdayEveningRowHeight }}px);">
+                                                @for ($i = 0; $i < $weekdayEveningSlotCount; $i += 2)
+                                                    @php
+                                                        $mins = $weekdayEveningStart + $i * $slotMinutes;
+                                                        $bandStart = \Illuminate\Support\Carbon::createFromTime(
+                                                            intdiv($mins, 60),
+                                                            0,
+                                                        );
+                                                        $bandEndMinutes = min(
+                                                            $mins + 2 * $slotMinutes,
+                                                            $eveningGridEnd,
+                                                        );
+                                                        $bandEnd = \Illuminate\Support\Carbon::createFromTime(
+                                                            intdiv($bandEndMinutes, 60),
+                                                            $bandEndMinutes % 60,
+                                                        );
+                                                        $bandSpan = min(2, $weekdayEveningSlotCount - $i);
+                                                        $bandEndFormat = $bandEndMinutes % 60 === 0 ? 'g' : 'g:i';
+                                                        $timeLabel =
+                                                            $bandStart->format('g') .
+                                                            '-' .
+                                                            $bandEnd->format($bandEndFormat) .
+                                                            ' ' .
+                                                            $bandEnd->format('A');
+                                                    @endphp
+                                                    <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-end text-[10.5px] font-semibold text-slate-500"
+                                                        style="grid-column: 1; grid-row: {{ $i + 1 }} / span {{ $bandSpan }};">
+                                                        {{ $timeLabel }}</div>
+                                                @endfor
 
-                                <div class="grid relative"
-                                    style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));
-                          grid-template-rows: repeat({{ $slotCount }}, 26px);">
+                                                @for ($i = 0; $i < $weekdayEveningSlotCount; $i++)
+                                                    @php $mins = $weekdayEveningStart + ($i * $slotMinutes); @endphp
+                                                    @for ($c = 0; $c < 5; $c++)
+                                                        @php
+                                                            $cellDay = $days[$c];
+                                                            $cellTime = \Illuminate\Support\Carbon::createFromTime(
+                                                                intdiv($mins, 60),
+                                                                $mins % 60,
+                                                            )->format('H:i');
+                                                            $isTaken = isset($weekdayOccupied[$c . '-' . $i]);
+                                                        @endphp
+                                                        @if ($isTaken || !$selectedFaculty)
+                                                            <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
+                                                                style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
+                                                            </div>
+                                                        @else
+                                                            <button type="button"
+                                                                onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
+                                                                class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
+                                                                style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
+                                                                title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}"></button>
+                                                        @endif
+                                                    @endfor
+                                                @endfor
 
-                                    @for ($i = 0; $i < $slotCount; $i += 2)
-                                        @php
-                                            $mins = $gridStart + $i * $slotMinutes;
-                                            $bandStart = \Illuminate\Support\Carbon::createFromTime(
-                                                intdiv($mins, 60),
-                                                0,
-                                            );
-                                            $bandEnd = (clone $bandStart)->addHour();
-                                            $label =
-                                                $bandStart->format('g') .
-                                                '-' .
-                                                $bandEnd->format('g') .
-                                                ' ' .
-                                                $bandEnd->format('A');
-                                        @endphp
-                                        <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-end text-[10.5px] font-semibold text-slate-500"
-                                            style="grid-column: 1; grid-row: {{ $i + 1 }} / span 2;">
-                                            {{ $label }}
+                                                {{-- Existing weekday evening schedules --}}
+                                                @foreach ($schedules as $s)
+                                                    @php
+                                                        $dayIndex = array_search($s->sch_day, $days, true);
+                                                        if ($dayIndex === false || $dayIndex >= 5) {
+                                                            continue;
+                                                        }
+                                                        $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                                                        $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                                                        $startMins = max(
+                                                            $start->hour * 60 + $start->minute,
+                                                            $weekdayEveningStart,
+                                                        );
+                                                        $endMins = min($end->hour * 60 + $end->minute, $eveningGridEnd);
+                                                        if ($endMins <= $startMins) {
+                                                            continue;
+                                                        }
+                                                        $row =
+                                                            intdiv($startMins - $weekdayEveningStart, $slotMinutes) + 1;
+                                                        $span = max(
+                                                            1,
+                                                            (int) ceil(($endMins - $startMins) / $slotMinutes),
+                                                        );
+                                                    @endphp
+                                                    <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
+                                                        style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
+                                                        data-schedule-id="{{ $s->sch_id }}"
+                                                        data-subject="{{ $s->sch_subj_id }}"
+                                                        data-section="{{ $s->sch_sec_id }}"
+                                                        data-room="{{ $s->sch_room_id }}"
+                                                        data-semester="{{ $s->sch_sem_id }}"
+                                                        data-day="{{ $s->sch_day }}"
+                                                        data-start="{{ substr($s->sch_start_time, 0, 5) }}"
+                                                        data-end="{{ substr($s->sch_end_time, 0, 5) }}">
+                                                        <div
+                                                            class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
+                                                            <button type="button"
+                                                                onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
+                                                                class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
+                                                            <button type="button"
+                                                                onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
+                                                                class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
+                                                        </div>
+                                                        <div
+                                                            class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
+                                                            <div class="text-[13px] font-extrabold tracking-wide">
+                                                                {{ $s->subject->subj_code ?? '—' }}</div>
+                                                            <div class="text-[11.5px] font-semibold mt-1">
+                                                                {{ $s->section->sec_name ?? '' }}</div>
+                                                            @if ($s->room)
+                                                                <div
+                                                                    class="text-[11.5px] font-medium mt-0.5 opacity-95">
+                                                                    {{ $s->room->room_name }}</div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
                                         </div>
-                                    @endfor
 
-                                    @for ($i = 0; $i < $slotCount; $i++)
-                                        @php $mins = $gridStart + ($i * $slotMinutes); @endphp
-                                        @for ($c = 0; $c < count($days); $c++)
+                                        <div class="bg-slate-50 border-x border-slate-200 self-stretch"
+                                            aria-hidden="true"></div>
+
+                                        {{-- Saturday–Sunday: morning and evening hours --}}
+                                        <div class="min-w-0 bg-white">
+                                            <div class="grid bg-slate-100 border-b border-slate-200"
+                                                style="grid-template-columns: repeat(2, minmax(0, 1fr)) 70px;">
+                                                <div
+                                                    class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-r border-slate-200">
+                                                    Saturday</div>
+                                                <div
+                                                    class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-r border-slate-200">
+                                                    Sunday</div>
+                                                <div
+                                                    class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
+                                                    Time</div>
+                                            </div>
+
+                                            <div class="grid relative"
+                                                style="grid-template-columns: repeat(2, minmax(0, 1fr)) 70px; grid-template-rows: repeat({{ $weekendEveningSlotCount }}, {{ $weekendEveningRowHeight }}px);">
+                                                @for ($i = 0; $i < $weekendEveningSlotCount; $i += 2)
+                                                    @php
+                                                        $mins = $weekendEveningStart + $i * $slotMinutes;
+                                                        $bandStart = \Illuminate\Support\Carbon::createFromTime(
+                                                            intdiv($mins, 60),
+                                                            0,
+                                                        );
+                                                        $bandEndMinutes = min(
+                                                            $mins + 2 * $slotMinutes,
+                                                            $eveningGridEnd,
+                                                        );
+                                                        $bandEnd = \Illuminate\Support\Carbon::createFromTime(
+                                                            intdiv($bandEndMinutes, 60),
+                                                            $bandEndMinutes % 60,
+                                                        );
+                                                        $bandSpan = min(2, $weekendEveningSlotCount - $i);
+                                                        $bandEndFormat = $bandEndMinutes % 60 === 0 ? 'g' : 'g:i';
+                                                        $timeLabel =
+                                                            $bandStart->format('g') .
+                                                            '-' .
+                                                            $bandEnd->format($bandEndFormat) .
+                                                            ' ' .
+                                                            $bandEnd->format('A');
+                                                    @endphp
+                                                    <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-start text-[10.5px] font-semibold text-slate-500"
+                                                        style="grid-column: 3; grid-row: {{ $i + 1 }} / span {{ $bandSpan }};">
+                                                        {{ $timeLabel }}</div>
+                                                @endfor
+
+                                                @for ($i = 0; $i < $weekendEveningSlotCount; $i++)
+                                                    @php $mins = $weekendEveningStart + ($i * $slotMinutes); @endphp
+                                                    @for ($c = 0; $c < 2; $c++)
+                                                        @php
+                                                            $cellDay = $days[$c + 5];
+                                                            $cellTime = \Illuminate\Support\Carbon::createFromTime(
+                                                                intdiv($mins, 60),
+                                                                $mins % 60,
+                                                            )->format('H:i');
+                                                            $isTaken = isset($weekendOccupied[$c . '-' . $i]);
+                                                        @endphp
+                                                        @if ($isTaken || !$selectedFaculty)
+                                                            <div class="border-r border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
+                                                                style="grid-column: {{ $c + 1 }}; grid-row: {{ $i + 1 }};">
+                                                            </div>
+                                                        @else
+                                                            <button type="button"
+                                                                onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
+                                                                class="pbs-cell border-r border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
+                                                                style="grid-column: {{ $c + 1 }}; grid-row: {{ $i + 1 }};"
+                                                                title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}"></button>
+                                                        @endif
+                                                    @endfor
+                                                @endfor
+
+                                                {{-- Existing Saturday and Sunday evening schedules --}}
+                                                @foreach ($schedules as $s)
+                                                    @php
+                                                        $dayIndex = array_search($s->sch_day, $days, true);
+                                                        if ($dayIndex === false || $dayIndex < 5) {
+                                                            continue;
+                                                        }
+                                                        $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                                                        $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                                                        $startMins = max(
+                                                            $start->hour * 60 + $start->minute,
+                                                            $weekendEveningStart,
+                                                        );
+                                                        $endMins = min($end->hour * 60 + $end->minute, $eveningGridEnd);
+                                                        if ($endMins <= $startMins) {
+                                                            continue;
+                                                        }
+                                                        $row =
+                                                            intdiv($startMins - $weekendEveningStart, $slotMinutes) + 1;
+                                                        $span = max(
+                                                            1,
+                                                            (int) ceil(($endMins - $startMins) / $slotMinutes),
+                                                        );
+                                                        $weekendColumn = $dayIndex - 4;
+                                                    @endphp
+                                                    <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
+                                                        style="grid-column: {{ $weekendColumn }}; grid-row: {{ $row }} / span {{ $span }};"
+                                                        data-schedule-id="{{ $s->sch_id }}"
+                                                        data-subject="{{ $s->sch_subj_id }}"
+                                                        data-section="{{ $s->sch_sec_id }}"
+                                                        data-room="{{ $s->sch_room_id }}"
+                                                        data-semester="{{ $s->sch_sem_id }}"
+                                                        data-day="{{ $s->sch_day }}"
+                                                        data-start="{{ substr($s->sch_start_time, 0, 5) }}"
+                                                        data-end="{{ substr($s->sch_end_time, 0, 5) }}">
+                                                        <div
+                                                            class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
+                                                            <button type="button"
+                                                                onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
+                                                                class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
+                                                            <button type="button"
+                                                                onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
+                                                                class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
+                                                        </div>
+                                                        <div
+                                                            class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
+                                                            <div class="text-[13px] font-extrabold tracking-wide">
+                                                                {{ $s->subject->subj_code ?? '—' }}</div>
+                                                            <div class="text-[11.5px] font-semibold mt-1">
+                                                                {{ $s->section->sec_name ?? '' }}</div>
+                                                            @if ($s->room)
+                                                                <div
+                                                                    class="text-[11.5px] font-medium mt-0.5 opacity-95">
+                                                                    {{ $s->room->room_name }}</div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @else
+                            {{-- Day view keeps the original full-week shared time axis --}}
+                            <div class="overflow-x-auto">
+                                <div class="min-w-[840px]">
+                                    <div class="grid bg-slate-100 border-b border-slate-200"
+                                        style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));">
+                                        <div
+                                            class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
+                                            Time</div>
+                                        @foreach ($days as $d)
+                                            <div
+                                                class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-l border-slate-200">
+                                                {{ $d }}</div>
+                                        @endforeach
+                                    </div>
+
+                                    <div class="grid relative"
+                                        style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr)); grid-template-rows: repeat({{ $slotCount }}, 26px);">
+                                        @for ($i = 0; $i < $slotCount; $i += 2)
                                             @php
-                                                $cellDay = $days[$c];
-                                                $cellTime = \Illuminate\Support\Carbon::createFromTime(
+                                                $mins = $gridStart + $i * $slotMinutes;
+                                                $bandStart = \Illuminate\Support\Carbon::createFromTime(
                                                     intdiv($mins, 60),
-                                                    $mins % 60,
-                                                )->format('H:i');
-                                                $isTaken = isset($occupied[$c . '-' . $i]);
+                                                    0,
+                                                );
+                                                $bandEndMinutes = min($mins + 2 * $slotMinutes, $gridEnd);
+                                                $bandEnd = \Illuminate\Support\Carbon::createFromTime(
+                                                    intdiv($bandEndMinutes, 60),
+                                                    $bandEndMinutes % 60,
+                                                );
+                                                $bandSpan = min(2, $slotCount - $i);
+                                                $bandEndFormat = $bandEndMinutes % 60 === 0 ? 'g' : 'g:i';
+                                                $timeLabel =
+                                                    $bandStart->format('g') .
+                                                    '-' .
+                                                    $bandEnd->format($bandEndFormat) .
+                                                    ' ' .
+                                                    $bandEnd->format('A');
                                             @endphp
-                                            @if ($isTaken || !$selectedFaculty)
-                                                <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
-                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
-                                                </div>
-                                            @else
-                                                <button type="button"
-                                                    onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
-                                                    class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
-                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
-                                                    title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}">
-                                                </button>
-                                            @endif
+                                            <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-end text-[10.5px] font-semibold text-slate-500"
+                                                style="grid-column: 1; grid-row: {{ $i + 1 }} / span {{ $bandSpan }};">
+                                                {{ $timeLabel }}</div>
                                         @endfor
                                     @endfor
 
@@ -561,13 +842,73 @@
                                                     <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
                                                         {{ $s->room->room_name }}</div>
                                                 @endif
-                                            </div>
-                                        </div>
-                                    @endforeach
+                                            @endfor
+                                        @endfor
 
+                                        @if ($showNoonBreak)
+                                            @php
+                                                $noonRow = intdiv($noonStart - $gridStart, $slotMinutes) + 1;
+                                                $noonSpan = intdiv($noonEnd - $noonStart, $slotMinutes);
+                                            @endphp
+                                            <div class="z-10 flex items-center justify-center bg-slate-900 text-white text-[12px] font-bold tracking-[3px] pointer-events-none"
+                                                style="grid-column: 2 / span {{ count($days) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
+                                                NOON BREAK</div>
+                                        @endif
+
+                                        {{-- Existing day schedules --}}
+                                        @foreach ($schedules as $s)
+                                            @php
+                                                $dayIndex = array_search($s->sch_day, $days, true);
+                                                if ($dayIndex === false) {
+                                                    continue;
+                                                }
+                                                $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                                                $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                                                $startMins = max($start->hour * 60 + $start->minute, $gridStart);
+                                                $endMins = min($end->hour * 60 + $end->minute, $gridEnd);
+                                                if ($endMins <= $startMins) {
+                                                    continue;
+                                                }
+                                                $row = intdiv($startMins - $gridStart, $slotMinutes) + 1;
+                                                $span = max(1, (int) ceil(($endMins - $startMins) / $slotMinutes));
+                                            @endphp
+                                            <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
+                                                style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
+                                                data-schedule-id="{{ $s->sch_id }}"
+                                                data-subject="{{ $s->sch_subj_id }}"
+                                                data-section="{{ $s->sch_sec_id }}"
+                                                data-room="{{ $s->sch_room_id }}"
+                                                data-semester="{{ $s->sch_sem_id }}"
+                                                data-day="{{ $s->sch_day }}"
+                                                data-start="{{ substr($s->sch_start_time, 0, 5) }}"
+                                                data-end="{{ substr($s->sch_end_time, 0, 5) }}">
+                                                <div
+                                                    class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
+                                                    <button type="button"
+                                                        onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
+                                                        class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
+                                                    <button type="button"
+                                                        onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
+                                                        class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
+                                                </div>
+                                                <div
+                                                    class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
+                                                    <div class="text-[13px] font-extrabold tracking-wide">
+                                                        {{ $s->subject->subj_code ?? '—' }}</div>
+                                                    <div class="text-[11.5px] font-semibold mt-1">
+                                                        {{ $s->section->sec_name ?? '' }}</div>
+                                                    @if ($s->room)
+                                                        <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
+                                                            {{ $s->room->room_name }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        @endif
+
 
                         {{-- DATE NAV --}}
                         <div class="flex flex-col items-center gap-1 py-3 border-t border-slate-200 bg-slate-50">

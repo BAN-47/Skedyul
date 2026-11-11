@@ -61,7 +61,9 @@ function filterEditSubjectsByCategory() {
     const catSel = document.getElementById("edit-category");
     const subSel = document.getElementById("edit-subject");
     const secSel = document.getElementById("edit-section");
-    const deptSel = document.getElementById("edit-department") || document.getElementById("edit-department-id");
+    const deptSel =
+        document.getElementById("edit-department") ||
+        document.getElementById("edit-department-id");
     if (!catSel || !subSel) return;
 
     const selectedCat = catSel.value;
@@ -117,7 +119,7 @@ function filterEditSubjectsByCategory() {
             subSel.appendChild(opt);
         });
     if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = "";
-  }
+}
 
 /* ── modal helpers (same pattern as PBS / other chair pages) ── */
 function openModal(id) {
@@ -356,6 +358,15 @@ function validateTimeInRange(startTime, endTime) {
         const [h, m] = hhmm.split(":").map(Number);
         return h * 60 + m;
     };
+    const fmt = (mins) => {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        const ampm = h >= 12 ? "PM" : "AM";
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+    };
+    const selectedDays = Array.isArray(days) ? days : [days];
+    const daysToCheck = selectedDays.length ? selectedDays : [null];
     const sMin = toMinutes(startTime);
     const eMin = toMinutes(endTime);
     if (!Number.isFinite(sMin) || !Number.isFinite(eMin)) {
@@ -713,6 +724,7 @@ function submitAdd(keepOpen = false) {
     const rangeError = validateTimeInRange(
         payload.start_time,
         payload.end_time,
+        payload.days,
     );
     if (rangeError) {
         showToast(rangeError);
@@ -732,11 +744,9 @@ function submitAdd(keepOpen = false) {
         body: JSON.stringify(payload),
     })
         .then(async (res) => {
-            const data = await res
-                .json()
-                .catch(() => ({
-                    message: `The server returned an unreadable response (${res.status}).`,
-                }));
+            const data = await res.json().catch(() => ({
+                message: `The server returned an unreadable response (${res.status}).`,
+            }));
             if (!res.ok && !data.message && !data.errors)
                 data.message = `Schedule could not be saved (HTTP ${res.status}).`;
             if (data.success) {
@@ -828,6 +838,7 @@ function submitEdit() {
     const editRangeError = validateTimeInRange(
         payload.start_time,
         payload.end_time,
+        [payload.day],
     );
     if (editRangeError) {
         showToast(editRangeError);

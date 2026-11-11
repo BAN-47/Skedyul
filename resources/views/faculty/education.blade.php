@@ -12,15 +12,17 @@
 <body class="min-h-screen bg-[radial-gradient(circle_at_top_right,#2563eb_0,#0f172a_48%,#020617_100%)] p-4 font-sans text-slate-900 sm:p-8">
     <div class="flex min-h-[calc(100vh-2rem)] items-center justify-center sm:min-h-[calc(100vh-4rem)]">
         <main class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div class="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-7 text-white sm:px-9">
-                <div class="flex items-start text-center justify-between gap-4">
-                    <div class="mb-1 text-3xl font-extrabold tracking-tight text-white leading-none">
+            <div class="bg-gradient-to-r from-blue-700 to-indigo-700 px-6 py-7 text-white sm:px-9 border-4 border-white/20">
+                <div class="relative flex items-start justify-end gap-4">
+                    <div class="absolute inset-x-0 text-start text-5xl font-extrabold tracking-tight text-white leading-none">
                         SKED<span class="text-blue-400">YUL</span>
                     </div>
-                    <div class="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">{{ $faculty->fac_employment_type === 'full_time' ? 'Full-Time' : 'Part-Time' }}</div>
+                    <div class="relative rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">
+                        {{ $faculty->fac_employment_type === 'full_time' ? 'Full-Time' : 'Part-Time' }}
+                    </div>
                 </div>
-                <h1 class="mt-2 text-l font-extrabold sm:text-3xl text-center">Complete your profile</h1>
-                <p class="mt-2 text-sm leading-relaxed text-blue-100">Your account is approved. Save your education information before entering your dashboard.</p>
+                <h1 class="mt-12 text-l font-extrabold sm:text-2xl text-start">Complete your profile</h1>
+                <p class="mt-2 text-sm leading-relaxed text-blue-100 text-start">Your account is approved. Save your education information before entering your dashboard.</p>
             </div>
             <form class="space-y-5 p-6 sm:p-9" method="POST" action="{{ request()->fullUrl() }}">
                 @csrf
