@@ -22,6 +22,8 @@ use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\InstitutionController;
 use App\Http\Controllers\Admin\AcademicYearController;
+use App\Http\Controllers\Admin\ScheduleArchiveController;
+use App\Http\Controllers\Admin\SectionController;
 
 // Models
 use App\Models\AcademicYear;
@@ -185,6 +187,18 @@ Route::middleware(['auth', 'audit.activity'])->group(function () {
 */
 
 Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function () {
+
+    Route::get('/schedule-archives', [ScheduleArchiveController::class, 'index'])
+        ->name('admin.schedule-archives');
+
+    Route::get('/sections', [SectionController::class, 'adminIndex'])
+        ->name('admin.sections');
+    Route::post('/sections', [SectionController::class, 'adminStore'])
+        ->name('admin.sections.store');
+    Route::put('/sections/{section}', [SectionController::class, 'adminUpdate'])
+        ->name('admin.sections.update');
+    Route::delete('/sections/{section}', [SectionController::class, 'adminDestroy'])
+        ->name('admin.sections.destroy');
 
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])
         ->name('admin.activity-logs');

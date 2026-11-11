@@ -81,7 +81,7 @@
                             </thead>
                             <tbody>
                                 @forelse($submissions as $sub)
-                                    <tr>
+                                    <tr data-approval-row>
                                         <td><b>{{ $sub->department->dept_code ?? '—' }}</b></td>
                                         <td>
                                             <b>{{ $sub->faculty->user->usr_name ?? 'Unknown Faculty' }}</b>
@@ -141,6 +141,13 @@
                                 @endforelse
                             </tbody>
                         </table>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+                        <p id="approval-page-info" class="text-sm text-slate-500" role="status" aria-live="polite"></p>
+                        <div id="approval-pagination" class="flex items-center gap-2">
+                            <button type="button" id="approval-previous" class="topbar-btn btn-secondary" aria-label="Previous approvals page">Previous</button>
+                            <button type="button" id="approval-next" class="topbar-btn btn-secondary" aria-label="Next approvals page">Next</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -265,6 +272,50 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
+
+        function setupApprovalListPagination() {
+            const rows = Array.from(document.querySelectorAll('[data-approval-row]'));
+            const pageSize = 10;
+            const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+            const pageInfo = document.getElementById('approval-page-info');
+            const pagination = document.getElementById('approval-pagination');
+            const previousButton = document.getElementById('approval-previous');
+            const nextButton = document.getElementById('approval-next');
+            let currentPage = 0;
+
+            function renderPage() {
+                const start = currentPage * pageSize;
+                const end = Math.min(start + pageSize, rows.length);
+
+                rows.forEach((row, index) => {
+                    row.style.display = index >= start && index < end ? '' : 'none';
+                });
+
+                pageInfo.textContent = rows.length === 0
+                    ? 'Showing 0 of 0 submissions'
+                    : `Showing ${start + 1}–${end} of ${rows.length} submissions`;
+                previousButton.disabled = currentPage === 0;
+                nextButton.disabled = currentPage >= pageCount - 1;
+                pagination.style.display = rows.length > pageSize ? 'flex' : 'none';
+            }
+
+            previousButton.addEventListener('click', () => {
+                if (currentPage > 0) {
+                    currentPage -= 1;
+                    renderPage();
+                }
+            });
+            nextButton.addEventListener('click', () => {
+                if (currentPage < pageCount - 1) {
+                    currentPage += 1;
+                    renderPage();
+                }
+            });
+
+            renderPage();
+        }
+
+        setupApprovalListPagination();
 
         function setupSchedulePagination() {
             const rows = Array.from(document.querySelectorAll('[data-schedule-row]'));

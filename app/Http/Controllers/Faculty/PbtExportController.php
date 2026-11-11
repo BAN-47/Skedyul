@@ -7,6 +7,7 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Semester;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -28,15 +29,18 @@ class PbtExportController extends Controller
         'F4CCCC',
     ];
 
-    public function download()
+    public function download(Request $request)
     {
         $faculty = Faculty::with(['user', 'program'])
             ->where('fac_usr_id', Auth::id())
             ->firstOrFail();
 
-        $semester = Semester::with('academicYear')
-            ->where('sem_is_active', true)
-            ->first();
+        $validated = $request->validate([
+            'semester' => ['nullable', 'uuid', 'exists:semester,sem_id'],
+        ]);
+        $semester = !empty($validated['semester'])
+            ? Semester::with('academicYear')->findOrFail($validated['semester'])
+            : Semester::with('academicYear')->where('sem_is_active', true)->first();
 
         if (!$semester) {
             throw ValidationException::withMessages([
@@ -54,7 +58,7 @@ class PbtExportController extends Controller
 
         if ($schedules->isEmpty()) {
             throw ValidationException::withMessages([
-                'faculty_id' => 'You have no active scheduled classes for the current semester.',
+                'faculty_id' => 'You have no active scheduled classes for the selected semester.',
             ]);
         }
 

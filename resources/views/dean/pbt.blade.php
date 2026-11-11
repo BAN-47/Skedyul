@@ -13,7 +13,7 @@
     $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
     $gridStart = $shift === 'night' ? 16 * 60 : 7 * 60;
-    $gridEnd = $shift === 'night' ? 21 * 60 : 16 * 60;
+    $gridEnd = $shift === 'night' ? 21 * 60 + 30 : 16 * 60;
     $slotMinutes = 30;
     $slotCount = intdiv($gridEnd - $gridStart, $slotMinutes);
     $noonStart = 12 * 60;

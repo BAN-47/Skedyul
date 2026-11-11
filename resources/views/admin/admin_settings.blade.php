@@ -172,7 +172,7 @@
                     <option value="1st Semester" @selected((optional($activeSemester)->sem_name ?? '') === '1st Semester')>1st Semester</option>
                     <option value="2nd Semester" @selected((optional($activeSemester)->sem_name ?? '') === '2nd Semester')>2nd Semester</option>
                   </select>
-                  <p class="text-[11px] text-slate-400 mt-1">Only two semesters exist system-wide.</p>
+                  <p class="text-[11px] text-slate-400 mt-1">Each semester is saved separately for its academic year.</p>
                 </div>
               </div>
 
@@ -412,7 +412,7 @@ function saveInstitution() {
     .catch(function () { showToast('Network error saving institution'); });
 }
 
-function saveAcademicYear() {
+async function saveAcademicYear() {
   var payload = {
     ay_academic_year: (document.getElementById('ay-year').value || '').trim(),
     sem_name: (document.getElementById('ay-semester').value || '').trim(),
@@ -423,7 +423,7 @@ function saveAcademicYear() {
     showToast('Please fill academic year, semester, start date, and end date.');
     return;
   }
-  fetch('{{ route("admin.academic-year.update") }}', {
+  var requestOptions = {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -433,21 +433,33 @@ function saveAcademicYear() {
     },
     credentials: 'same-origin',
     body: JSON.stringify(payload),
-  })
-    .then(function (res) { return res.json().then(function (data) { return { res: res, data: data }; }); })
-    .then(function (r) {
-      if (r.res.status === 401 || r.res.status === 419) {
-        showToast('Session expired. Please log in again.');
-        return;
-      }
-      if (!r.res.ok || !r.data.success) {
-        showToast(r.data.message || 'Failed to save academic year');
-        return;
-      }
-      showToast(r.data.message || 'Academic year saved!');
-      setTimeout(function () { window.location.reload(); }, 700);
-    })
-    .catch(function () { showToast('Network error saving academic year'); });
+  };
+
+  try {
+    var response = await fetch('{{ route("admin.academic-year.update") }}', requestOptions);
+    var result = await response.json();
+
+    if (response.status === 409 && result.confirmation_required) {
+      if (!window.confirm(result.message)) return;
+      payload.confirm_new_academic_year = true;
+      requestOptions.body = JSON.stringify(payload);
+      response = await fetch('{{ route("admin.academic-year.update") }}', requestOptions);
+      result = await response.json();
+    }
+
+    if (response.status === 401 || response.status === 419) {
+      showToast('Session expired. Please log in again.');
+      return;
+    }
+    if (!response.ok || !result.success) {
+      showToast(result.message || 'Failed to save academic year');
+      return;
+    }
+    showToast(result.message || 'Academic year saved!');
+    setTimeout(function () { window.location.reload(); }, 700);
+  } catch (error) {
+    showToast('Network error saving academic year');
+  }
 }
 
 function savePassword() {

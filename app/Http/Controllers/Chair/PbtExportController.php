@@ -35,13 +35,35 @@ class PbtExportController extends Controller
         'F4CCCC',
     ];
 
-    public function index()
+    public function index(Request $request)
     {
         $chair = $this->chair();
 
-        $semester = Semester::with('academicYear')
+        $semester = $request->filled('semester')
+            ? Semester::with('academicYear')->find($request->query('semester'))
+            : null;
+        $semester ??= Semester::with('academicYear')
             ->where('sem_is_active', true)
             ->first();
+        $semester ??= Semester::with('academicYear')
+            ->orderByDesc('sem_start_date')
+            ->first();
+        $semesters = Semester::with('academicYear')
+            ->orderByDesc('sem_start_date')
+            ->get()
+            ->map(function (Semester $option) {
+                $year = $option->academicYear?->ay_academic_year
+                    ?? $option->academicYear?->ay_year_label
+                    ?? '';
+                $yearLabel = $year !== '' ? str_replace('-', ' - ', $year) : '';
+                $option->label = trim(
+                    ($option->sem_name ?? '')
+                    . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
+                    . ($option->sem_is_active ? ' (Current)' : '')
+                );
+
+                return $option;
+            });
 
         $facultyMembers = Faculty::with('user')
             ->where('fac_dept_id', $chair->dc_dept_id)
@@ -51,6 +73,7 @@ class PbtExportController extends Controller
 
         return view('chair.export_reports', compact(
             'semester',
+            'semesters',
             'facultyMembers'
         ));
     }
@@ -61,11 +84,12 @@ class PbtExportController extends Controller
 
         $validated = $request->validate([
             'faculty_id' => ['required', 'uuid'],
+            'semester' => ['nullable', 'uuid', 'exists:semester,sem_id'],
         ]);
 
-        $semester = Semester::with('academicYear')
-            ->where('sem_is_active', true)
-            ->first();
+        $semester = !empty($validated['semester'])
+            ? Semester::with('academicYear')->findOrFail($validated['semester'])
+            : Semester::with('academicYear')->where('sem_is_active', true)->first();
 
         if (!$semester) {
             throw ValidationException::withMessages([
@@ -491,11 +515,11 @@ class PbtExportController extends Controller
         $end = $this->minutes($schedule->sch_end_time);
 
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
-            return $start >= 16 * 60 && $end <= 22 * 60;
+            return $start >= (16 * 60) + 30 && $end <= 22 * 60;
         }
 
         if ($day === 'saturday') {
-            return $start >= 17 * 60 && $end <= 22 * 60;
+            return $start >= (16 * 60) + 30 && $end <= 22 * 60;
         }
 
         return $day === 'sunday'

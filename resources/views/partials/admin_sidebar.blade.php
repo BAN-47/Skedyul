@@ -45,6 +45,10 @@
 
                 ['admin.pending-accounts', route('admin.pending-accounts'), '', 'Pending Account Approval'],
 
+                ['admin.sections', route('admin.sections'), '', 'Sections'],
+
+                ['admin.schedule-archives', route('admin.schedule-archives'), '', 'Schedule Archives'],
+
                 ['subject.index', route('subject.index'), '', 'Courses'],
 
                 ['admin.rooms', route('admin.rooms'), '', 'Rooms'],

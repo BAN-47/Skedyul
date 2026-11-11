@@ -48,15 +48,33 @@
           <div class="card-title">Room Management</div>
           <button onclick="openModal('modal-add-room')" class="btn btn-primary">+ Add Room</button>
         </div>
+        <div class="flex flex-col gap-2 px-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <input id="room-search" type="search" placeholder="Search rooms, colleges, or room type..." aria-label="Search rooms"
+            class="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+          <div class="flex items-center gap-2 text-xs text-slate-500">
+            <label for="room-page-size">Rows</label>
+            <select id="room-page-size" class="rounded-lg border border-slate-200 bg-white px-2 py-1.5">
+              <option value="10" selected>10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+            </select>
+            <span id="room-page-info" aria-live="polite"></span>
+            <button type="button" id="room-page-prev" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+            <button type="button" id="room-page-next" class="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+          </div>
+        </div>
         <div class="overflow-x-auto">
           <table class="data-table" id="rooms-table">
-            <tr>
-              @foreach(['Room','College','Type','Capacity','Status','Actions'] as $h)
-              <th>{{ $h }}</th>
-              @endforeach
-            </tr>
+            <thead>
+              <tr>
+                @foreach(['Room','College','Type','Capacity','Status','Actions'] as $h)
+                <th>{{ $h }}</th>
+                @endforeach
+              </tr>
+            </thead>
+            <tbody id="rooms-table-body">
             @foreach ($rooms as $room)
-            <tr data-room-id="{{ $room->room_id }}">
+            <tr data-room-id="{{ $room->room_id }}" class="room-row">
               <td class="cell-name font-semibold">{{ $room->room_name }}</td>
               <td class="cell-college">{{ $collegeNames[$room->room_college_id] ?? 'Unassigned' }}</td>
               <td class="cell-type">{{ $room->room_type }}</td>
@@ -72,11 +90,13 @@
                 <div class="flex gap-1.5">
                   <button onclick="openViewRoom('{{ $room->room_id }}')" class="btn btn-secondary text-[11px] px-3 py-1.5">View</button>
                   <button onclick="openEditRoom('{{ $room->room_id }}')" class="btn btn-secondary text-[11px] px-3 py-1.5">Edit</button>
-                  <button onclick="deleteRoom('{{ $room->room_id }}', '{{ $room->room_name }}')" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>
+                  <button onclick="deleteRoom('{{ $room->room_id }}')" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>
                 </div>
               </td>
             </tr>
             @endforeach
+            <tr id="rooms-no-results" hidden><td colspan="6" class="text-center py-6 text-slate-400">No rooms match your search.</td></tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -248,6 +268,14 @@
 <script>
 const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
 let currentRoomId = null;
+const roomSearch = document.getElementById('room-search');
+const roomPageSizeSelect = document.getElementById('room-page-size');
+const roomPageInfo = document.getElementById('room-page-info');
+const roomPrevious = document.getElementById('room-page-prev');
+const roomNext = document.getElementById('room-page-next');
+const roomNoResults = document.getElementById('rooms-no-results');
+let roomPage = 0;
+let roomPageSize = Number(roomPageSizeSelect.value);
 
 const ROOMS_DATA = {
   @foreach ($rooms as $room)
@@ -301,6 +329,79 @@ function refreshStats() {
   document.getElementById('stat-inuse').textContent = rooms.filter(r => !r.available).length;
 }
 
+function renderRooms() {
+  const rows = [...document.querySelectorAll('#rooms-table-body [data-room-id]')];
+  const query = roomSearch.value.trim().toLowerCase();
+  const matches = rows.filter(row => row.textContent.toLowerCase().includes(query));
+  const pageCount = Math.max(1, Math.ceil(matches.length / roomPageSize));
+  roomPage = Math.max(0, Math.min(roomPage, pageCount - 1));
+  const start = roomPage * roomPageSize;
+
+  rows.forEach(row => { row.hidden = true; });
+  matches.slice(start, start + roomPageSize).forEach(row => { row.hidden = false; });
+  roomNoResults.hidden = matches.length > 0;
+  roomPageInfo.textContent = matches.length
+    ? `Showing ${start + 1}–${Math.min(start + roomPageSize, matches.length)} of ${matches.length}`
+    : 'Showing 0 of 0';
+  roomPrevious.disabled = roomPage === 0;
+  roomNext.disabled = roomPage >= pageCount - 1;
+}
+
+function createRoomRow(room, collegeName) {
+  const row = document.createElement('tr');
+  row.dataset.roomId = room.room_id;
+  row.className = 'room-row';
+
+  const addCell = (value, className = '') => {
+    const cell = document.createElement('td');
+    cell.className = className;
+    cell.textContent = value;
+    row.appendChild(cell);
+    return cell;
+  };
+
+  addCell(room.room_name, 'cell-name font-semibold');
+  addCell(collegeName, 'cell-college');
+  addCell(room.room_type, 'cell-type');
+  addCell(room.room_capacity, 'cell-capacity');
+
+  const statusCell = addCell('', 'cell-status');
+  const statusBadge = document.createElement('span');
+  statusBadge.className = room.room_is_available ? 'badge badge-green' : 'badge badge-amber';
+  statusBadge.textContent = room.room_is_available ? 'Available' : 'In Use';
+  statusCell.appendChild(statusBadge);
+
+  const actionsCell = document.createElement('td');
+  const actions = document.createElement('div');
+  actions.className = 'flex gap-1.5';
+  [
+    ['View', 'btn btn-secondary text-[11px] px-3 py-1.5', () => openViewRoom(room.room_id)],
+    ['Edit', 'btn btn-secondary text-[11px] px-3 py-1.5', () => openEditRoom(room.room_id)],
+    ['Delete', 'btn btn-danger text-[11px] px-3 py-1.5', () => deleteRoom(room.room_id, ROOMS_DATA[room.room_id]?.name || room.room_name)],
+  ].forEach(([label, className, action]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    button.textContent = label;
+    button.addEventListener('click', action);
+    actions.appendChild(button);
+  });
+  actionsCell.appendChild(actions);
+  row.appendChild(actionsCell);
+
+  return row;
+}
+
+roomSearch.addEventListener('input', () => { roomPage = 0; renderRooms(); });
+roomPageSizeSelect.addEventListener('change', () => {
+  roomPageSize = Number(roomPageSizeSelect.value);
+  roomPage = 0;
+  renderRooms();
+});
+roomPrevious.addEventListener('click', () => { roomPage--; renderRooms(); });
+roomNext.addEventListener('click', () => { roomPage++; renderRooms(); });
+renderRooms();
+
 // ── ROOMS: ADD ─────────────────────────────────────────────────────────────────
 async function saveAddRoom() {
   const name = document.getElementById('add-room-name').value.trim();
@@ -350,26 +451,15 @@ async function saveAddRoom() {
       building: room.room_building,
     };
 
-    const tbody = document.getElementById('rooms-table');
-    const tr = document.createElement('tr');
-    tr.setAttribute('data-room-id', room.room_id);
+    const tbody = document.getElementById('rooms-table-body');
+    const tr = createRoomRow(room, ROOMS_DATA[room.room_id].collegeName);
     tr.style.opacity = '0';
-    tr.innerHTML = `
-      <td class="cell-name font-semibold">${room.room_name}</td>
-      <td class="cell-college">${ROOMS_DATA[room.room_id].collegeName}</td>
-      <td class="cell-type">${room.room_type}</td>
-      <td class="cell-capacity">${room.room_capacity}</td>
-      <td class="cell-status"><span class="badge badge-green">Available</span></td>
-      <td>
-        <div class="flex gap-1.5">
-          <button onclick="openViewRoom('${room.room_id}')" class="btn btn-secondary text-[11px] px-3 py-1.5">View</button>
-          <button onclick="openEditRoom('${room.room_id}')" class="btn btn-secondary text-[11px] px-3 py-1.5">Edit</button>
-          <button onclick="deleteRoom('${room.room_id}', '${room.room_name}')" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>
-        </div>
-      </td>`;
     tbody.appendChild(tr);
     requestAnimationFrame(() => { tr.style.transition = 'opacity 0.3s'; tr.style.opacity = '1'; });
 
+    roomSearch.value = '';
+    roomPage = Math.ceil(Object.keys(ROOMS_DATA).length / roomPageSize) - 1;
+    renderRooms();
     refreshStats();
     closeModal('modal-add-room');
     ['add-room-name','add-room-capacity','add-room-building','add-room-college'].forEach(id => {
@@ -473,10 +563,9 @@ async function saveEditRoom() {
       row.querySelector('.cell-status').innerHTML = room.room_is_available
         ? `<span class="badge badge-green">Available</span>`
         : `<span class="badge badge-amber">In Use</span>`;
-      const deleteBtn = row.querySelector('button[onclick^="deleteRoom("]');
-      if (deleteBtn) deleteBtn.setAttribute('onclick', `deleteRoom('${room.room_id}', '${room.room_name}')`);
     }
 
+    renderRooms();
     refreshStats();
     closeModal('modal-edit-room');
     showToast(data.message || ('Room "' + name + '" updated successfully!'));
@@ -487,7 +576,7 @@ async function saveEditRoom() {
 }
 
 // ── ROOMS: DELETE ──────────────────────────────────────────────────────────────
-async function deleteRoom(roomId, name) {
+async function deleteRoom(roomId, name = ROOMS_DATA[roomId]?.name || 'Room') {
   if (!confirm('Delete room: ' + name + '?\nThis action cannot be undone.')) return;
 
   try {
@@ -512,9 +601,10 @@ async function deleteRoom(roomId, name) {
     if (row) {
       row.style.transition = 'opacity 0.3s';
       row.style.opacity = '0';
-      setTimeout(() => { row.remove(); refreshStats(); }, 300);
+      setTimeout(() => { row.remove(); refreshStats(); renderRooms(); }, 300);
     } else {
       refreshStats();
+      renderRooms();
     }
   } catch (err) {
     showErrorModal('Failed to delete room. Please try again.');

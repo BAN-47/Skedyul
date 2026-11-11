@@ -18,17 +18,43 @@ class FacultyScheduleController extends Controller
     public function index(Request $request)
     {
         $faculty = Faculty::where('fac_usr_id', auth()->id())->firstOrFail();
-        $activeSemester = Semester::where('sem_is_active', true)->first();
-        $activeYear = DB::table('academic_year')->where('ay_is_active', true)->first();
+        $activeSemester = $request->filled('semester')
+            ? Semester::with('academicYear')->find($request->query('semester'))
+            : null;
+        $activeSemester ??= Semester::with('academicYear')
+            ->where('sem_is_active', true)
+            ->first();
+        $activeSemester ??= Semester::with('academicYear')
+            ->orderByDesc('sem_start_date')
+            ->first();
 
         if ($activeSemester) {
-            $year = $activeYear->ay_academic_year ?? $activeYear->ay_year_label ?? '';
+            $year = $activeSemester->academicYear?->ay_academic_year
+                ?? $activeSemester->academicYear?->ay_year_label
+                ?? '';
             $yearLabel = $year !== '' ? str_replace('-', ' - ', $year) : '';
             $activeSemester->label = trim(
                 ($activeSemester->sem_name ?? '')
                 . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
             );
         }
+
+        $semesters = Semester::with('academicYear')
+            ->orderByDesc('sem_start_date')
+            ->get()
+            ->map(function (Semester $semester) {
+                $year = $semester->academicYear?->ay_academic_year
+                    ?? $semester->academicYear?->ay_year_label
+                    ?? '';
+                $yearLabel = $year !== '' ? str_replace('-', ' - ', $year) : '';
+                $semester->label = trim(
+                    ($semester->sem_name ?? '')
+                    . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
+                    . ($semester->sem_is_active ? ' (Current)' : '')
+                );
+
+                return $semester;
+            });
 
         $shift = $request->query('shift') === 'night' ? 'night' : 'day';
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -57,7 +83,11 @@ class FacultyScheduleController extends Controller
         // Match PBT: units/preparations come from assigned Study Loads,
         // while weekly hours come from the meetings attached to those loads.
         $studyLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
-            ->when($activeSemester, fn ($query) => $query->where('sl_sem_id', $activeSemester->sem_id))
+            ->when(
+                $activeSemester,
+                fn ($query) => $query->where('sl_sem_id', $activeSemester->sem_id),
+                fn ($query) => $query->whereRaw('1 = 0')
+            )
             ->with(['subject', 'schedules'])
             ->get();
 
@@ -119,6 +149,7 @@ class FacultyScheduleController extends Controller
             'courseRows',
             'loadStats',
             'activeSemester',
+            'semesters',
             'days',
             'shift',
             'signatories'

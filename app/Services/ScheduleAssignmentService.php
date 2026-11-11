@@ -9,6 +9,8 @@ use App\Models\Semester;
 use App\Models\AcademicYear;
 use App\Models\Workload;
 use App\Models\Course;
+use App\Models\Room;
+use App\Models\Section;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -27,8 +29,10 @@ use RuntimeException;
  */
 class ScheduleAssignmentService
 {
+    public const TOTAL_MAX_HOURS = 30;
+    public const EVENING_MAX_HOURS = 30;
+    public const PART_TIME_MAX_HOURS = 30;
     private const FULL_TIME_MAX_HOURS = 30;
-    private const PART_TIME_MAX_HOURS = 30;
 
     /** Fixed caps use the upper end of each policy range. */
     public const SPECIAL_POSITION_MAX_HOURS = [
@@ -40,14 +44,19 @@ class ScheduleAssignmentService
         'College Dean' => 9,
         'Associate College Dean' => 12,
         'Department SUC Function Chairperson' => 16,
+        'PERG Chair' => 16,
         'Campus Secretary' => 16,
         'College Secretary' => 16,
-    ];
+        ];
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
-        if ($shift === 'evening' || $faculty->fac_employment_type === 'part_time') {
-            return (float) self::FULL_TIME_MAX_HOURS;
+        if ($shift === 'evening') {
+            return (float) self::EVENING_MAX_HOURS;
+        }
+
+        if ($faculty->fac_employment_type === 'part_time') {
+            return (float) self::PART_TIME_MAX_HOURS;
         }
 
         if (
@@ -58,6 +67,23 @@ class ScheduleAssignmentService
         }
 
         return (float) self::FULL_TIME_MAX_HOURS;
+    }
+
+    public static function workloadShiftForAssignment(
+        bool $sectionIsEvening,
+        string $scheduleShift,
+        ?string $existingShift = null,
+        bool $hasScheduledMeetings = false
+    ): string {
+        if ($sectionIsEvening) {
+            return 'evening';
+        }
+
+        if ($hasScheduledMeetings && in_array($existingShift, ['day', 'evening'], true)) {
+            return $existingShift;
+        }
+
+        return $scheduleShift;
     }
 
     /** Assign one course/session to several weekdays as one all-or-nothing action. */
@@ -116,9 +142,13 @@ class ScheduleAssignmentService
 
         try {
             $result = DB::transaction(function () use ($data, $syncWorkload) {
-                $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
                 $course = Course::findOrFail($data['subj_id']);
                 $isRec = $course->course_code === 'REC';
+                $faculty = $this->lockConflictResources($data, $isRec);
+
+                if ($conflict = $this->findConflict($data, $isRec)) {
+                    throw new RuntimeException('SCHEDULE_CONFLICT:' . $conflict);
+                }
 
                 $loadQuery = Study_Load::where([
                     'sl_fac_id' => $data['fac_id'],
@@ -134,33 +164,36 @@ class ScheduleAssignmentService
                     $this->assertCourseHoursAvailable($data, $course);
                 }
 
-                $shift = $data['shift'] ?? 'day';
-                if ($studyLoad && $studyLoad->schedules_exists && $studyLoad->sl_shift && $studyLoad->sl_shift !== $shift) {
-                    throw new RuntimeException("LOAD_LIMIT:This course/section is already assigned to the {$studyLoad->sl_shift} shift. Keep all meetings for this load in one shift.");
-                }
-                $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $shift);
-                $additionalHours = (!$studyLoad || $studyLoad->sl_shift !== $shift) ? $courseHours : 0;
+                $scheduleShift = $data['shift'] ?? 'day';
+                $sectionIsEvening = !empty($data['sec_id'])
+                    && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
+                $workloadShift = self::workloadShiftForAssignment(
+                    $sectionIsEvening,
+                    $scheduleShift,
+                    $studyLoad?->sl_shift,
+                    (bool) ($studyLoad?->schedules_exists ?? false)
+                );
+                $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
+                $additionalHours = (!$studyLoad || $studyLoad->sl_shift !== $workloadShift) ? $courseHours : 0;
                 $hoursAfterAssignment = $currentHours + $additionalHours;
-                $maxHours = self::facultyMaxHours($faculty, $shift);
+                $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                 if ($hoursAfterAssignment > $maxHours) {
-                    throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$shift} shift; this course adds {$additionalHours} hours, totaling {$hoursAfterAssignment} against the {$maxHours}-hour limit.");
+                    throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$additionalHours} hours, totaling {$hoursAfterAssignment} against the {$maxHours}-hour limit.");
                 }
 
                 if (!$studyLoad) {
                     $studyLoad = Study_Load::create([
                         'sl_fac_id' => $data['fac_id'],
                         'sl_course_id' => $data['subj_id'],
-                        'sl_shift' => $shift,
+                        'sl_shift' => $workloadShift,
                         'sl_sec_id' => $data['sec_id'] ?? null,
                         'sl_sem_id' => $data['sem_id'],
                         'sl_assigned_by' => Auth::id(),
                         'sl_status'      => 'approved',
                         'sl_assigned_at' => now(),
                     ]);
-                } elseif ($studyLoad->sl_shift !== $shift) {
-                    // Faculty Load assignments without any meetings may be
-                    // moved to the shift chosen in the first plotted session.
-                    $studyLoad->sl_shift = $shift;
+                } elseif ($studyLoad->sl_shift !== $workloadShift) {
+                    $studyLoad->sl_shift = $workloadShift;
                     $studyLoad->save();
                 }
 
@@ -172,7 +205,7 @@ class ScheduleAssignmentService
                     'sch_room_id'    => $data['room_id'],
                     'sch_sem_id'     => $data['sem_id'],
                     'sch_day'        => $data['day'],
-                    'sch_shift'      => $shift,
+                    'sch_shift'      => $scheduleShift,
                     'sch_start_time' => $data['start_time'],
                     'sch_end_time'   => $data['end_time'],
                     'sch_status'     => 'draft',
@@ -190,14 +223,18 @@ class ScheduleAssignmentService
                     'hours' => $updatedHours,
                     'max_hours' => $maxHours,
                     'hours_after' => $hoursAfterAssignment,
+                    'workload_shift' => $workloadShift,
                 ];
             });
             $schedule = $result['schedule'];
             $notice = '';
-            if ($syncWorkload && $result['hours'] !== null) {
-                $hours = $result['hours'];
+            if ($syncWorkload && $result['hours_after'] !== null) {
+                $hours = $result['hours_after'];
                 $max = $result['max_hours'];
-                $notice = $hours >= $max ? " Faculty load is now {$hours} of {$max} teaching hours; further course assignments are blocked." : '';
+                $shift = $result['workload_shift'];
+                $notice = $hours >= $max
+                    ? " Faculty load is now {$hours} of {$max} teaching hours in the {$shift} workload; further course assignments in this shift are blocked."
+                    : '';
             }
             if ($refreshResponse) {
                 $schedule->load(['subject', 'faculty', 'section', 'room']);
@@ -209,6 +246,9 @@ class ScheduleAssignmentService
                 'hours_after' => $result['hours_after'],
             ];
         } catch (RuntimeException $e) {
+            if (str_starts_with($e->getMessage(), 'SCHEDULE_CONFLICT:')) {
+                return ['success' => false, 'conflict' => true, 'message' => substr($e->getMessage(), strlen('SCHEDULE_CONFLICT:'))];
+            }
             if (str_starts_with($e->getMessage(), 'LOAD_LIMIT:')) {
                 return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 11)];
             }
@@ -230,64 +270,120 @@ class ScheduleAssignmentService
             return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
         }
 
-        $schedule = Schedule::findOrFail($scheduleId);
-
-        if ($conflict = $this->findConflict($data, excludeScheduleId: $scheduleId)) {
+        $course = Course::findOrFail($data['subj_id']);
+        $isRec = $course->course_code === 'REC';
+        if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
 
-        $oldFacultyId = $schedule->sch_fac_id;
-        $oldSemesterId = $schedule->sch_sem_id;
+        $oldFacultyId = null;
+        $oldSemesterId = null;
         try {
-            $schedule = DB::transaction(function () use ($schedule, $scheduleId, $data) {
-                $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
+            $schedule = DB::transaction(function () use ($scheduleId, $data, $isRec, &$oldFacultyId, &$oldSemesterId) {
+                $faculty = $this->lockConflictResources($data, $isRec);
+                $schedule = Schedule::whereKey($scheduleId)->lockForUpdate()->firstOrFail();
+                $oldFacultyId = $schedule->sch_fac_id;
+                $oldSemesterId = $schedule->sch_sem_id;
+
+                if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {
+                    throw new RuntimeException('SCHEDULE_CONFLICT:' . $conflict);
+                }
+
                 $course = Course::findOrFail($data['subj_id']);
                 $courseHours = self::courseHours($course);
                 $this->assertCourseHoursAvailable($data, $course, $scheduleId);
-                $shift = $data['shift'] ?? $schedule->sch_shift ?? 'day';
+                $scheduleShift = $data['shift'] ?? $schedule->sch_shift ?? 'day';
+                $sectionIsEvening = !empty($data['sec_id'])
+                    && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
+
+                $sourceLoad = Study_Load::whereKey($schedule->sch_load_id)
+                    ->lockForUpdate()
+                    ->first();
+                $isSameFacultySectionChange = $sourceLoad
+                    && $schedule->sch_fac_id === $data['fac_id']
+                    && $schedule->sch_course_id === $data['subj_id']
+                    && $schedule->sch_sem_id === $data['sem_id']
+                    && $schedule->sch_sec_id !== $data['sec_id'];
+                $sourceLoadHasOtherSchedules = $isSameFacultySectionChange
+                    && Schedule::where('sch_load_id', $sourceLoad->sl_id)
+                        ->where('sch_id', '!=', $schedule->sch_id)
+                        ->exists();
+
                 $targetLoad = Study_Load::where([
                     'sl_fac_id' => $data['fac_id'],
                     'sl_course_id' => $data['subj_id'],
                     'sl_sec_id' => $data['sec_id'],
                     'sl_sem_id' => $data['sem_id'],
                 ])->withExists('schedules')->first();
+                $workloadShift = self::workloadShiftForAssignment(
+                    $sectionIsEvening,
+                    $scheduleShift,
+                    $targetLoad?->sl_shift,
+                    (bool) ($targetLoad?->schedules_exists ?? false)
+                );
+                if ($isSameFacultySectionChange) {
+                    $workloadShift = $sectionIsEvening ? 'evening' : 'day';
+                }
                 $isSameLoad = $targetLoad && $targetLoad->sl_id === $schedule->sch_load_id;
-                $movingOnlySchedule = $isSameLoad && $schedule->sch_shift !== $shift;
-                if (
-                    $movingOnlySchedule && Schedule::where('sch_load_id', $schedule->sch_load_id)
-                    ->where('sch_id', '!=', $schedule->sch_id)->where('sch_is_active', true)->exists()
-                ) {
-                    throw new RuntimeException('LOAD_LIMIT:All meetings for one course/section must stay in the same shift.');
-                }
-                if ($targetLoad && !$isSameLoad && $targetLoad->schedules_exists && $targetLoad->sl_shift && $targetLoad->sl_shift !== $shift) {
-                    throw new RuntimeException("LOAD_LIMIT:This course/section is already assigned to the {$targetLoad->sl_shift} shift. Keep all meetings for this load in one shift.");
-                }
-                if (!$isSameLoad || $movingOnlySchedule) {
-                    $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $shift);
+                $targetLoadNeedsShiftMove = $targetLoad && $targetLoad->sl_shift !== $workloadShift;
+                $sourceLoadToDelete = null;
+                if ($isSameFacultySectionChange && $sourceLoadHasOtherSchedules) {
+                    $sourceWorkloadShift = (bool) Section::whereKey($sourceLoad->sl_sec_id)->value('sec_is_evening')
+                        ? 'evening'
+                        : ($sourceLoad->sl_shift ?? 'day');
+                    if ($sourceLoad->sl_shift !== $sourceWorkloadShift) {
+                        $sourceLoad->sl_shift = $sourceWorkloadShift;
+                        $sourceLoad->save();
+                    }
+                    $schedule->sch_load_id = $sourceLoad->sl_id;
+                } elseif ($isSameFacultySectionChange) {
+                    $sourceWorkloadShift = (bool) Section::whereKey($sourceLoad->sl_sec_id)->value('sec_is_evening')
+                        ? 'evening'
+                        : ($sourceLoad->sl_shift ?? 'day');
+                    if ($sourceWorkloadShift !== $workloadShift && !$targetLoad) {
+                        $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
+                        $projectedHours = $currentHours + $courseHours;
+                        $maxHours = self::facultyMaxHours($faculty, $workloadShift);
+                        if ($projectedHours > $maxHours) {
+                            throw new RuntimeException("LOAD_LIMIT:Cannot move {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$courseHours} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
+                        }
+                    }
+
+                    if ($targetLoad && $targetLoad->sl_id !== $sourceLoad->sl_id) {
+                        $schedule->sch_load_id = $targetLoad->sl_id;
+                        $sourceLoadToDelete = $sourceLoad->sl_id;
+                    } else {
+                        $sourceLoad->sl_sec_id = $data['sec_id'];
+                        $sourceLoad->sl_shift = $workloadShift;
+                        $sourceLoad->save();
+                        $schedule->sch_load_id = $sourceLoad->sl_id;
+                    }
+                } elseif (!$isSameLoad || $targetLoadNeedsShiftMove) {
+                    $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
                     $replacingSameFacultyLoad = $schedule->sch_fac_id === $data['fac_id'] && $schedule->sch_sem_id === $data['sem_id'];
+                    $sourceLoad = Study_Load::with('section')->find($schedule->sch_load_id);
+                    $sourceWorkloadShift = $sourceLoad?->section?->sec_is_evening
+                        ? 'evening'
+                        : ($sourceLoad?->sl_shift ?? 'day');
                     $oldLoadHasOtherSchedules = Schedule::where('sch_load_id', $schedule->sch_load_id)
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
-                    if (
-                        $replacingSameFacultyLoad && $willRemoveOldLoad
-                        && ($faculty->fac_employment_type === 'part_time' || $schedule->sch_shift === $shift)
-                    ) {
+                    if ($replacingSameFacultyLoad && $willRemoveOldLoad && $sourceWorkloadShift === $workloadShift) {
                         $oldCourse = Course::find($schedule->sch_course_id);
                         $currentHours -= $oldCourse ? self::courseHours($oldCourse) : 0;
                     }
-                    $targetLoadNeedsShiftMove = $targetLoad && $targetLoad->sl_shift !== $shift;
-                    $hoursToAdd = (!$targetLoad || $targetLoadNeedsShiftMove || $movingOnlySchedule) ? $courseHours : 0;
+                    $hoursToAdd = (!$targetLoad || $targetLoadNeedsShiftMove) ? $courseHours : 0;
                     $projectedHours = $currentHours + $hoursToAdd;
-                    $maxHours = self::facultyMaxHours($faculty, $shift);
+                    $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                     if ($projectedHours > $maxHours) {
-                        throw new RuntimeException("LOAD_LIMIT:Cannot assign {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
+                        throw new RuntimeException("LOAD_LIMIT:Cannot assign {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
                     }
                     if (!$targetLoad) {
                         $targetLoad = Study_Load::create([
                             'sl_fac_id' => $data['fac_id'],
                             'sl_course_id' => $data['subj_id'],
-                            'sl_shift' => $shift,
+                            'sl_shift' => $workloadShift,
                             'sl_sec_id' => $data['sec_id'],
                             'sl_sem_id' => $data['sem_id'],
                             'sl_assigned_by' => Auth::id(),
@@ -295,7 +391,7 @@ class ScheduleAssignmentService
                             'sl_status' => 'approved',
                         ]);
                     } elseif ($targetLoadNeedsShiftMove) {
-                        $targetLoad->sl_shift = $shift;
+                        $targetLoad->sl_shift = $workloadShift;
                         $targetLoad->save();
                     }
                     if (!$isSameLoad) {
@@ -314,15 +410,23 @@ class ScheduleAssignmentService
                     'sch_room_id' => $data['room_id'],
                     'sch_sem_id' => $data['sem_id'],
                     'sch_day' => $data['day'],
-                    'sch_shift' => $shift,
+                    'sch_shift' => $scheduleShift,
                     'sch_start_time' => $data['start_time'],
                     'sch_end_time' => $data['end_time'],
                 ];
                 $schedule->update($scheduleData);
+                if ($sourceLoadToDelete) {
+                    Study_Load::whereKey($sourceLoadToDelete)
+                        ->whereDoesntHave('schedules')
+                        ->delete();
+                }
                 $this->syncWorkload($data['fac_id'], $data['sem_id']);
                 return $schedule;
             });
         } catch (RuntimeException $e) {
+            if (str_starts_with($e->getMessage(), 'SCHEDULE_CONFLICT:')) {
+                return ['success' => false, 'conflict' => true, 'message' => substr($e->getMessage(), strlen('SCHEDULE_CONFLICT:'))];
+            }
             if (str_starts_with($e->getMessage(), 'LOAD_LIMIT:')) return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 11)];
             if (str_starts_with($e->getMessage(), 'COURSE_HOURS:')) return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 13)];
             throw $e;
@@ -360,12 +464,10 @@ class ScheduleAssignmentService
 
     public function facultyHoursForShift(string $facultyId, string $semesterId, string $shift): float
     {
-        $faculty = Faculty::find($facultyId);
-
         return (float) Study_Load::query()
             ->where('sl_fac_id', $facultyId)
             ->where('sl_sem_id', $semesterId)
-            ->when($faculty?->fac_employment_type !== 'part_time', fn($query) => $query->where('sl_shift', $shift))
+            ->where('sl_shift', $shift)
             ->with('subject')
             ->get()
             ->sum(fn($load) => self::courseHours($load->subject));
@@ -443,6 +545,21 @@ class ScheduleAssignmentService
      * semester, overlapping time range. Returns a human-readable conflict
      * message, or null when the slot is free.
      */
+    private function lockConflictResources(array $data, bool $isRec): Faculty
+    {
+        $faculty = Faculty::whereKey($data['fac_id'])->lockForUpdate()->firstOrFail();
+
+        if (!$isRec && !empty($data['room_id'])) {
+            Room::whereKey($data['room_id'])->lockForUpdate()->firstOrFail();
+        }
+
+        if (!$isRec && !empty($data['sec_id'])) {
+            Section::whereKey($data['sec_id'])->lockForUpdate()->firstOrFail();
+        }
+
+        return $faculty;
+    }
+
     private function findConflict(array $data, bool $isRec = false, ?string $excludeScheduleId = null): ?string
     {
         $base = Schedule::query()

@@ -20,7 +20,7 @@ class DeanDepartmentController extends Controller
 {
     // Keep these in sync with DeanFacultyWorkloadController / DeanDashboardController
     const FULL_TIME_MAX_HOURS = 30;
-    const PART_TIME_MAX_HOURS = 22;
+    const PART_TIME_MAX_HOURS = 30;
     const NEAR_MAX_BUFFER     = 3;
     const OK_THRESHOLD       = 20;
 

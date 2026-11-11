@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 class AutoSwitchSemester extends Command
 {
     protected $signature = 'schedule:auto-switch-semester';
-    protected $description = 'Auto-switch semester (1st→2nd, 2nd→archive) based on end dates';
+    protected $description = 'Auto-switch semester (1st→2nd, then prompt for the next academic year)';
 
     public function handle(): int
     {

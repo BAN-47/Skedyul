@@ -50,7 +50,7 @@
             ]))) ?: ($user?->usr_name ?? 'Unknown applicant');
           @endphp
 
-          <section class="card mb-4" aria-labelledby="applicant-{{ $review->fvr_id }}">
+          <section class="card mb-4" data-pending-account-row aria-labelledby="applicant-{{ $review->fvr_id }}">
             @if($review->possible_name_match)
               <div class="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <strong>Possible name match:</strong> another faculty profile has the same first and last name. Compare the employee ID and uploaded photo; a matching name alone does not mean it is the same person.
@@ -107,6 +107,16 @@
           </div>
         @endforelse
 
+        @if($pendingAccounts->isNotEmpty())
+          <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <p id="pending-account-page-info" class="text-sm text-slate-500" role="status" aria-live="polite"></p>
+            <div id="pending-account-pagination" class="flex items-center gap-2">
+              <button type="button" id="pending-account-previous" class="btn btn-secondary" aria-label="Previous pending accounts page">Previous</button>
+              <button type="button" id="pending-account-next" class="btn btn-secondary" aria-label="Next pending accounts page">Next</button>
+            </div>
+          </div>
+        @endif
+
         @if($rejectedAccounts->isNotEmpty())
           <section class="card mt-6 overflow-hidden">
             <div class="card-header">
@@ -127,7 +137,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                   @foreach($rejectedAccounts as $decision)
-                    <tr>
+                    <tr data-rejected-account-row>
                       <td class="px-4 py-3 align-top">
                         <div class="font-semibold text-slate-800">{{ $decision->fvr_applicant_name ?: 'Applicant record' }}</div>
                         <div class="text-xs text-slate-500">{{ $decision->fvr_applicant_email ?: '—' }}</div>
@@ -139,6 +149,13 @@
                   @endforeach
                 </tbody>
               </table>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+              <p id="rejected-account-page-info" class="text-sm text-slate-500" role="status" aria-live="polite"></p>
+              <div id="rejected-account-pagination" class="flex items-center gap-2">
+                <button type="button" id="rejected-account-previous" class="btn btn-secondary" aria-label="Previous rejected accounts page">Previous</button>
+                <button type="button" id="rejected-account-next" class="btn btn-secondary" aria-label="Next rejected accounts page">Next</button>
+              </div>
             </div>
           </section>
         @endif
@@ -171,6 +188,64 @@
   </div>
 
   <script>
+    function setupClientPagination({ rowSelector, pageSize, infoId, paginationId, previousId, nextId, itemLabel }) {
+      const rows = Array.from(document.querySelectorAll(rowSelector));
+      const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+      const info = document.getElementById(infoId);
+      const pagination = document.getElementById(paginationId);
+      const previousButton = document.getElementById(previousId);
+      const nextButton = document.getElementById(nextId);
+      if (!info || !pagination || !previousButton || !nextButton) return;
+
+      let currentPage = 0;
+      function renderPage() {
+        const start = currentPage * pageSize;
+        const end = Math.min(start + pageSize, rows.length);
+        rows.forEach((row, index) => {
+          row.style.display = index >= start && index < end ? '' : 'none';
+        });
+        info.textContent = rows.length === 0
+          ? `Showing 0 of 0 ${itemLabel}`
+          : `Showing ${start + 1}–${end} of ${rows.length} ${itemLabel}`;
+        previousButton.disabled = currentPage === 0;
+        nextButton.disabled = currentPage >= pageCount - 1;
+        pagination.style.display = rows.length > pageSize ? 'flex' : 'none';
+      }
+
+      previousButton.addEventListener('click', () => {
+        if (currentPage > 0) {
+          currentPage -= 1;
+          renderPage();
+        }
+      });
+      nextButton.addEventListener('click', () => {
+        if (currentPage < pageCount - 1) {
+          currentPage += 1;
+          renderPage();
+        }
+      });
+      renderPage();
+    }
+
+    setupClientPagination({
+      rowSelector: '[data-pending-account-row]',
+      pageSize: 10,
+      infoId: 'pending-account-page-info',
+      paginationId: 'pending-account-pagination',
+      previousId: 'pending-account-previous',
+      nextId: 'pending-account-next',
+      itemLabel: 'pending accounts'
+    });
+    setupClientPagination({
+      rowSelector: '[data-rejected-account-row]',
+      pageSize: 3,
+      infoId: 'rejected-account-page-info',
+      paginationId: 'rejected-account-pagination',
+      previousId: 'rejected-account-previous',
+      nextId: 'rejected-account-next',
+      itemLabel: 'rejected accounts'
+    });
+
     let rejectPreviousFocus = null;
 
     function openRejectDialog(action, applicantName) {

@@ -12,6 +12,7 @@ use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Dean\PbtExportController;
 use App\Http\Controllers\Dean\DeanScheduleViewerController;
 use App\Http\Controllers\Admin\AdminProfileController;
+use App\Http\Controllers\Admin\SectionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,6 +29,18 @@ Route::middleware(['auth', 'audit.activity'])
 
         Route::get('/departments', [DeanDepartmentController::class, 'index'])
             ->name('departments');
+
+        Route::get('/sections', [SectionController::class, 'deanIndex'])
+            ->name('sections');
+
+        Route::post('/sections', [SectionController::class, 'deanStore'])
+            ->name('sections.store');
+
+        Route::put('/sections/{section}', [SectionController::class, 'deanUpdate'])
+            ->name('sections.update');
+
+        Route::delete('/sections/{section}', [SectionController::class, 'deanDestroy'])
+            ->name('sections.destroy');
 
         Route::get('/faculty-workload', [FacultyWorkloadController::class, 'facultyWorkload'])
             ->name('faculty_workload');

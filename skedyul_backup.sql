@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qxiToOh3TzjTtV9tx8aexssct5CdjhsF3q2azMj73xidAtZVwkRhq07053U39wJ
+\restrict UseyCe6xbVQn9mXIwjtWaiMlgUTxZIg1vkhBOfNgbjZELjbaHIQD7f6L4tbTCT0
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.4
@@ -1009,6 +1009,14 @@ declare
     -- previous identity values for update/delete
     old_columns realtime.wal_column[];
 
+    -- the same values as wal2json sent them, which is what filters compare against
+    raw_columns realtime.wal_column[] =
+        array_agg((x->>'name', x->>'type', x->>'typeoid', x->'value', null, null)::realtime.wal_column)
+        from jsonb_array_elements(wal -> 'columns') x;
+    raw_old_columns realtime.wal_column[] =
+        array_agg((x->>'name', x->>'type', x->>'typeoid', x->'value', null, null)::realtime.wal_column)
+        from jsonb_array_elements(wal -> 'identity') x;
+
     error_record_exceeds_max_size boolean = octet_length(wal::text) > max_record_bytes;
 
     -- Primary jsonb output for record
@@ -1167,10 +1175,10 @@ begin
                         subs.entity = entity_
                         and subs.claims_role = working_role
                         and (
-                            realtime.is_visible_through_filters(columns, subs.filters)
+                            realtime.is_visible_through_filters(raw_columns, subs.filters)
                             or (
                               action = 'DELETE'
-                              and realtime.is_visible_through_filters(old_columns, subs.filters)
+                              and realtime.is_visible_through_filters(raw_old_columns, subs.filters)
                             )
                         )
             ) loop
@@ -1337,6 +1345,77 @@ $$;
 
 
 ALTER FUNCTION realtime.apply_rls(wal jsonb, max_record_bytes integer) OWNER TO supabase_realtime_admin;
+
+--
+-- Name: authorize(text, text, text, text, text, text[], text[]); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+CREATE FUNCTION realtime.authorize(role_name text, topic_name text, claims text, sub text, headers text, read_extensions text[], write_extensions text[], OUT read_allowed boolean[], OUT write_allowed boolean[]) RETURNS record
+    LANGUAGE plpgsql
+    AS $$
+declare
+  probe_ids uuid[];
+  probe_inserted_at timestamp := now() at time zone 'utc';
+  visible_ids uuid[];
+  ext text;
+  allowed boolean;
+begin
+  -- The probe inserts are rolled back, but they still give the transaction an xid, so it ends
+  -- in a commit. Nothing durable was written, so skip waiting on the WAL flush and sync standbys.
+  -- Set outside the block below, whose rollback would undo it.
+  perform set_config('synchronous_commit', 'off', true);
+
+  -- The RAISE at the end of this block rolls back everything in it.
+  begin
+    probe_ids := array(select gen_random_uuid() from unnest(read_extensions));
+
+    insert into realtime.messages (id, topic, extension, inserted_at, updated_at)
+    select p.id, topic_name, p.extension, probe_inserted_at, probe_inserted_at
+    from unnest(probe_ids, read_extensions) as p(id, extension);
+
+    perform set_config('role', role_name, true),
+            set_config('realtime.topic', topic_name, true),
+            set_config('request.jwt.claims', claims, true),
+            set_config('request.jwt.claim.sub', sub, true),
+            set_config('request.jwt.claim.role', role_name, true),
+            set_config('request.headers', headers, true);
+
+    -- One lookup for every probe, by the full primary key.
+    visible_ids := array(
+      select m.id
+      from realtime.messages m
+      where m.inserted_at = probe_inserted_at
+        and m.id = any(probe_ids));
+
+    read_allowed := array(
+      select p.id = any(visible_ids)
+      from unnest(probe_ids) with ordinality as p(id, n)
+      order by p.n);
+
+    write_allowed := '{}';
+
+    foreach ext in array write_extensions loop
+      begin
+        insert into realtime.messages (topic, extension, inserted_at, updated_at)
+        values (topic_name, ext, now() at time zone 'utc', now() at time zone 'utc');
+
+        allowed := true;
+      exception when insufficient_privilege then
+        allowed := false;
+      end;
+
+      write_allowed := write_allowed || allowed;
+    end loop;
+
+    raise sqlstate 'RTA01';
+  exception when sqlstate 'RTA01' then
+    null;
+  end;
+end;
+$$;
+
+
+ALTER FUNCTION realtime.authorize(role_name text, topic_name text, claims text, sub text, headers text, read_extensions text[], write_extensions text[], OUT read_allowed boolean[], OUT write_allowed boolean[]) OWNER TO supabase_realtime_admin;
 
 --
 -- Name: broadcast_changes(text, text, text, text, text, record, record, text); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
@@ -1541,6 +1620,20 @@ $$;
 ALTER FUNCTION realtime.check_equality_op(op realtime.equality_op, type_ regtype, val_1 text, val_2 text, negate boolean) OWNER TO supabase_realtime_admin;
 
 --
+-- Name: filters_hash(realtime.user_defined_filter[]); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+CREATE FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) RETURNS bytea
+    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+    AS $$
+  select pg_catalog.int8send(pg_catalog.hash_array_extended(filters, 0))
+      || pg_catalog.int8send(pg_catalog.hash_array_extended(filters, 1))
+$$;
+
+
+ALTER FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) OWNER TO supabase_realtime_admin;
+
+--
 -- Name: is_visible_through_filters(realtime.wal_column[], realtime.user_defined_filter[]); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -1645,6 +1738,78 @@ $$;
 ALTER FUNCTION realtime.list_changes(publication name, slot_name name, max_changes integer, max_record_bytes integer) OWNER TO supabase_realtime_admin;
 
 --
+-- Name: list_changes_sync(name, name, integer, integer); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+CREATE FUNCTION realtime.list_changes_sync(publication name, slot_name name, max_changes integer, max_record_bytes integer) RETURNS TABLE(wal jsonb, is_rls_enabled boolean, subscription_ids uuid[], errors text[], slot_changes_count bigint)
+    LANGUAGE sql
+    SET log_min_messages TO 'fatal'
+    AS $$
+  WITH pub AS (
+    SELECT
+      concat_ws(
+        ',',
+        CASE WHEN bool_or(pubinsert) THEN 'insert' ELSE NULL END,
+        CASE WHEN bool_or(pubupdate) THEN 'update' ELSE NULL END,
+        CASE WHEN bool_or(pubdelete) THEN 'delete' ELSE NULL END
+      ) AS w2j_actions,
+      coalesce(
+        string_agg(
+          realtime.quote_wal2json(format('%I.%I', schemaname, tablename)::regclass),
+          ','
+        ) filter (WHERE ppt.tablename IS NOT NULL),
+        ''
+      ) AS w2j_add_tables
+    FROM pg_publication pp
+    LEFT JOIN pg_publication_tables ppt ON pp.pubname = ppt.pubname
+    WHERE pp.pubname = publication
+    GROUP BY pp.pubname
+    LIMIT 1
+  ),
+  -- MATERIALIZED ensures the slot is read exactly once.
+  consumed AS MATERIALIZED (
+    SELECT x.*, pub.w2j_add_tables
+    FROM pub,
+         realtime.settled_changes(
+           slot_name, max_changes,
+           'include-pk', 'true',
+           'include-transaction', 'false',
+           'include-timestamp', 'true',
+           'include-type-oids', 'true',
+           'format-version', '2',
+           'actions', pub.w2j_actions,
+           'add-tables', pub.w2j_add_tables
+         ) x
+  ),
+  slot_count AS (
+    SELECT count(*)::bigint AS cnt
+    FROM consumed
+    WHERE consumed.w2j_add_tables <> ''
+  ),
+  rls_filtered AS (
+    SELECT xyz.wal, xyz.is_rls_enabled, xyz.subscription_ids, xyz.errors
+    FROM consumed,
+         realtime.apply_rls(
+           wal := consumed.data::jsonb,
+           max_record_bytes := max_record_bytes
+         ) xyz(wal, is_rls_enabled, subscription_ids, errors)
+    WHERE consumed.w2j_add_tables <> ''
+      AND xyz.subscription_ids[1] IS NOT NULL
+  )
+  SELECT rf.wal, rf.is_rls_enabled, rf.subscription_ids, rf.errors, sc.cnt
+  FROM rls_filtered rf, slot_count sc
+
+  UNION ALL
+
+  SELECT null, null, null, null, sc.cnt
+  FROM slot_count sc
+  WHERE NOT EXISTS (SELECT 1 FROM rls_filtered)
+$$;
+
+
+ALTER FUNCTION realtime.list_changes_sync(publication name, slot_name name, max_changes integer, max_record_bytes integer) OWNER TO supabase_realtime_admin;
+
+--
 -- Name: quote_wal2json(regclass); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -1725,6 +1890,99 @@ $$;
 
 
 ALTER FUNCTION realtime.send_binary(payload bytea, event text, topic text, private boolean) OWNER TO supabase_realtime_admin;
+
+--
+-- Name: settled_changes(name, integer, text[]); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+CREATE FUNCTION realtime.settled_changes(slot_name name, max_changes integer, VARIADIC opts text[]) RETURNS TABLE(lsn pg_lsn, xid xid, data text)
+    LANGUAGE plpgsql
+    AS $$
+declare
+  upto pg_lsn;
+  total bigint;
+  xids xid[];
+  starts bigint[];
+  snapshot pg_snapshot;
+  running_xids xid[];
+  xmax_age int;
+  cut bigint;
+begin
+  -- Each statement in a volatile function takes its own snapshot, which is what lets the
+  -- check below see a writer that was still in flight when the peek ran. Under REPEATABLE
+  -- READ the snapshot never advances, so a deferred change would never be released.
+  if current_setting('transaction_isolation') <> 'read committed' then
+    raise exception 'realtime.settled_changes requires READ COMMITTED';
+  end if;
+
+  -- The peek and the read below cover the same WAL, so the read cannot reach a commit the
+  -- check never saw.
+  upto := pg_current_wal_flush_lsn();
+
+  -- One entry per transaction, in commit order: its xid and the position of its first
+  -- change. The peek uses the caller's own options, so max_changes counts exactly what the
+  -- read counts. A non-transactional logical message is emitted as soon as it is decoded,
+  -- tagged with the xid of whatever transaction wrote it, so it does not mark where that
+  -- transaction starts.
+  select coalesce(sum(g.n), 0),
+         array_agg(g.x order by g.first) filter (where g.first is not null),
+         array_agg(g.first order by g.first) filter (where g.first is not null)
+    into total, xids, starts
+    from (
+      select p.xid as x, count(*) as n,
+             min(p.ord) filter (where not case
+               when starts_with(p.data, '{"action":"M"') then (p.data::jsonb->>'transactional')::boolean is false
+               else false
+             end) as first
+      from pg_logical_slot_peek_changes(slot_name, upto, max_changes, variadic opts)
+           with ordinality as p(lsn, xid, data, ord)
+      group by p.xid
+    ) g;
+
+  -- Nothing for the caller, but the slot still has to move past what the peek covered.
+  if total = 0 then
+    perform pg_replication_slot_advance(slot_name, upto);
+    return;
+  end if;
+
+  if xids is not null then
+    -- Taken after the peek is materialized, so a writer that was still in flight during
+    -- decoding is guaranteed to show up here.
+    snapshot := pg_current_snapshot();
+
+    -- A commit record reaches the WAL before the writer leaves the proc array, so a change
+    -- can be decoded while its row is invisible. apply_rls would resolve a policy against a
+    -- row it cannot see and authorize it for nobody, while the read consumed it regardless.
+    --
+    -- xip lists transactions running when the snapshot was taken. It does not cover a writer
+    -- whose xid sits at or beyond xmax, which never appears there, so the horizon is checked
+    -- too. age() counts backwards from the current xid and so compares correctly across
+    -- wraparound.
+    select coalesce(array_agg(running.x::xid), array[]::xid[])
+      into running_xids
+      from pg_snapshot_xip(snapshot) running(x);
+    xmax_age := age(pg_snapshot_xmax(snapshot)::xid);
+
+    select min(u.s) into cut
+      from unnest(xids, starts) as u(x, s)
+      where u.x = any(running_xids) or age(u.x) <= xmax_age;
+  end if;
+
+  -- The read stops right after the commit that brings its count to upto_nchanges, so the
+  -- count of changes in front of the first unsettled transaction stops it just before that
+  -- transaction.
+  if cut is null then
+    return query
+      select p.* from pg_logical_slot_get_changes(slot_name, upto, max_changes, variadic opts) p;
+  elsif cut > 1 then
+    return query
+      select p.* from pg_logical_slot_get_changes(slot_name, upto, (cut - 1)::int, variadic opts) p;
+  end if;
+end;
+$$;
+
+
+ALTER FUNCTION realtime.settled_changes(slot_name name, max_changes integer, VARIADIC opts text[]) OWNER TO supabase_realtime_admin;
 
 --
 -- Name: subscription_check_filters(); Type: FUNCTION; Schema: realtime; Owner: supabase_realtime_admin
@@ -1980,6 +2238,72 @@ $$;
 ALTER FUNCTION storage.can_insert_object(bucketid text, name text, owner uuid, metadata jsonb) OWNER TO supabase_storage_admin;
 
 --
+-- Name: delete_lifecycle_objects(uuid[]); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.delete_lifecycle_objects(object_ids uuid[]) RETURNS TABLE(id uuid, is_delete_marker boolean, metadata jsonb)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    object_id uuid;
+    deleted_row storage.objects%ROWTYPE;
+    deleted_ids uuid[];
+    deleted_markers boolean[];
+    deleted_metadata jsonb[];
+    bulk_deleted boolean := false;
+BEGIN
+    -- Surface pre-existing deferred violations instead of treating them as blocked rows.
+    SET CONSTRAINTS ALL IMMEDIATE;
+    PERFORM set_config('storage.allow_delete_query', 'true', true);
+
+    -- One subxact keeps the subxid cache from overflowing; rows return only once it commits.
+    BEGIN
+        WITH deleted AS (
+            DELETE FROM storage.objects AS object_row
+              WHERE object_row.id = ANY(object_ids) AND object_row.archived_at IS NOT NULL
+              RETURNING object_row.id, object_row.is_delete_marker, object_row.metadata
+        )
+        SELECT array_agg(deleted.id), array_agg(deleted.is_delete_marker), array_agg(deleted.metadata)
+          INTO deleted_ids, deleted_markers, deleted_metadata
+          FROM deleted;
+        bulk_deleted := true;
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- User triggers may use insufficient_privilege to block a row.
+            IF SQLSTATE <> '42501' AND left(SQLSTATE, 2) IN ('08', '40', '42', '53', '55', '57', '58', 'XX') THEN
+                RAISE;
+            END IF;
+    END;
+    IF bulk_deleted THEN
+        RETURN QUERY SELECT * FROM unnest(deleted_ids, deleted_markers, deleted_metadata);
+        RETURN;
+    END IF;
+
+    FOREACH object_id IN ARRAY object_ids LOOP
+        BEGIN
+            DELETE FROM storage.objects AS object_row
+              WHERE object_row.id = object_id AND object_row.archived_at IS NOT NULL
+              RETURNING object_row.* INTO deleted_row;
+            IF FOUND THEN
+                id := deleted_row.id;
+                is_delete_marker := deleted_row.is_delete_marker;
+                metadata := deleted_row.metadata;
+                RETURN NEXT;
+            END IF;
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF SQLSTATE <> '42501' AND left(SQLSTATE, 2) IN ('08', '40', '42', '53', '55', '57', '58', 'XX') THEN
+                    RAISE;
+                END IF;
+        END;
+    END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION storage.delete_lifecycle_objects(object_ids uuid[]) OWNER TO supabase_storage_admin;
+
+--
 -- Name: enforce_bucket_lifecycle_service_role(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -1988,14 +2312,9 @@ CREATE FUNCTION storage.enforce_bucket_lifecycle_service_role() RETURNS trigger
     SET search_path TO 'pg_catalog'
     AS $$
 BEGIN
-  IF current_user::text IS DISTINCT FROM TG_ARGV[0]
-     AND (
-       OLD.lifecycle_configuration IS DISTINCT FROM NEW.lifecycle_configuration
-       OR OLD.lifecycle_configuration_generation IS DISTINCT FROM NEW.lifecycle_configuration_generation
-     ) THEN
-    -- AFTER runs only after caller RLS has accepted the proposed row. The API
-    -- recognizes this specific error after rolling back its permission probe;
-    -- direct non-service writes still fail and cannot persist the change.
+  IF current_user::text IS DISTINCT FROM TG_ARGV[0] THEN
+    -- Keep this check AFTER caller RLS accepts the proposed row. The API
+    -- recognizes this exact signal after rolling back its permission probe.
     RAISE EXCEPTION 'bucket control columns may only be changed by the configured storage service role'
       USING ERRCODE = 'PST01',
             SCHEMA = TG_TABLE_SCHEMA,
@@ -2027,6 +2346,31 @@ $$;
 
 
 ALTER FUNCTION storage.enforce_bucket_name_length() OWNER TO supabase_storage_admin;
+
+--
+-- Name: enforce_versioning_status_transition(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.enforce_versioning_status_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF NEW.versioning_status = OLD.versioning_status THEN
+        RETURN NEW;
+    END IF;
+
+    IF NEW.versioning_status = 'DISABLED' OR
+       (OLD.versioning_status = 'DISABLED' AND NEW.versioning_status = 'SUSPENDED') THEN
+        RAISE EXCEPTION 'Cannot transition bucket versioning status from % to %',
+            OLD.versioning_status, NEW.versioning_status;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION storage.enforce_versioning_status_transition() OWNER TO supabase_storage_admin;
 
 --
 -- Name: extension(text); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
@@ -2859,6 +3203,37 @@ $$;
 ALTER FUNCTION storage.operation() OWNER TO supabase_storage_admin;
 
 --
+-- Name: protect_active_lifecycle_states(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.protect_active_lifecycle_states() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM storage.bucket_lifecycle_states
+        WHERE bucket_id = OLD.id
+          AND NOT (
+              continuation IS NULL
+              OR (continuation @> '{"continuationVersion": 1}' AND continuation #> '{batch,inFlight}' IS NULL)
+          )
+    ) THEN
+        RAISE EXCEPTION 'update or delete on table "buckets" violates foreign key constraint "bucket_lifecycle_states_bucket_id_fkey" on table "bucket_lifecycle_states"'
+            USING ERRCODE = 'foreign_key_violation',
+                  DETAIL = format('Key (id)=(%s) is still referenced from table "bucket_lifecycle_states".', OLD.id),
+                  SCHEMA = 'storage',
+                  TABLE = 'bucket_lifecycle_states',
+                  CONSTRAINT = 'bucket_lifecycle_states_bucket_id_fkey';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION storage.protect_active_lifecycle_states() OWNER TO supabase_storage_admin;
+
+--
 -- Name: protect_bucket_control_columns(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -2938,6 +3313,82 @@ $$;
 
 
 ALTER FUNCTION storage.protect_delete() OWNER TO supabase_storage_admin;
+
+--
+-- Name: reconcile_lifecycle_state(text, boolean); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+DECLARE
+    bucket storage.buckets%ROWTYPE;
+    active boolean;
+    idle boolean;
+    state_generation uuid;
+BEGIN
+    SELECT * INTO bucket FROM storage.buckets WHERE id = target_bucket_id FOR NO KEY UPDATE;
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
+
+    SELECT continuation IS NULL OR (
+               continuation @> '{"continuationVersion": 1}'
+               AND continuation #> '{batch,inFlight}' IS NULL
+           ), generation
+    INTO idle, state_generation
+    FROM storage.bucket_lifecycle_states
+    WHERE bucket_id = target_bucket_id
+    FOR UPDATE;
+
+    IF bucket.lifecycle_configuration IS NULL THEN
+        DELETE FROM storage.bucket_lifecycle_states
+        WHERE bucket_id = target_bucket_id
+          AND idle IS TRUE;
+
+        UPDATE storage.bucket_lifecycle_states
+        SET next_run_at = clock_timestamp(), updated_at = clock_timestamp()
+        WHERE bucket_id = target_bucket_id
+          AND idle IS NOT TRUE;
+        RETURN;
+    END IF;
+
+    active := bucket.versioning_status <> 'DISABLED'
+        AND bucket.lifecycle_configuration @> '{"rules":[{"status":"Enabled"}]}'::jsonb;
+
+    -- The state row records the generation it was reconciled with so callers need not detect
+    -- policy changes. Rows without a recorded generation keep their work.
+    policy_changed := policy_changed OR (
+        state_generation IS NOT NULL AND state_generation <> bucket.lifecycle_configuration_generation
+    );
+
+    INSERT INTO storage.bucket_lifecycle_states AS state (bucket_id, generation, next_run_at)
+    VALUES (bucket.id, bucket.lifecycle_configuration_generation, CASE WHEN active THEN clock_timestamp() END)
+    ON CONFLICT (bucket_id) DO UPDATE
+    SET next_run_at = CASE
+            WHEN policy_changed THEN
+                CASE WHEN active OR idle IS NOT TRUE THEN clock_timestamp() END
+            ELSE EXCLUDED.next_run_at
+        END,
+        generation = EXCLUDED.generation,
+        claim_id = CASE WHEN policy_changed AND idle IS TRUE
+                        THEN NULL ELSE state.claim_id END,
+        claim_until = CASE WHEN policy_changed AND idle IS TRUE
+                           THEN NULL ELSE state.claim_until END,
+        continuation = CASE WHEN policy_changed AND idle IS TRUE
+                            THEN NULL ELSE state.continuation END,
+        failure_count = CASE WHEN policy_changed AND idle IS TRUE
+                             THEN 0 ELSE state.failure_count END,
+        last_error = CASE WHEN policy_changed AND idle IS TRUE
+                          THEN NULL ELSE state.last_error END,
+        updated_at = clock_timestamp()
+    WHERE policy_changed OR (state.next_run_at IS NULL AND EXCLUDED.next_run_at IS NOT NULL);
+END;
+$$;
+
+
+ALTER FUNCTION storage.reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean) OWNER TO supabase_storage_admin;
 
 --
 -- Name: search(text, text, integer, integer, integer, text, text, text, text, text); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
@@ -3758,6 +4209,27 @@ $$;
 
 ALTER FUNCTION storage.update_updated_at_column() OWNER TO supabase_storage_admin;
 
+--
+-- Name: wake_lifecycle_state(); Type: FUNCTION; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE FUNCTION storage.wake_lifecycle_state() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'pg_catalog'
+    AS $$
+BEGIN
+    IF TG_OP = 'INSERT' AND NEW.lifecycle_configuration IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    PERFORM storage.reconcile_lifecycle_state(NEW.id, false);
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION storage.wake_lifecycle_state() OWNER TO supabase_storage_admin;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -4545,11 +5017,12 @@ CREATE TABLE public."USER" (
     usr_is_active boolean DEFAULT true NOT NULL,
     usr_created_at timestamp with time zone DEFAULT now() NOT NULL,
     usr_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    usr_bio text,
     usr_first_name character varying(255),
     usr_last_name character varying(255),
     usr_middle_name character varying(255),
     usr_suffix character varying(255),
+    usr_failed_login_attempts integer DEFAULT 0 NOT NULL,
+    usr_locked_until timestamp(0) without time zone,
     CONSTRAINT "USER_usr_role_check" CHECK (((usr_role)::text = ANY (ARRAY[('system_admin'::character varying)::text, ('dean'::character varying)::text, ('department_chair'::character varying)::text, ('faculty'::character varying)::text])))
 );
 
@@ -4631,6 +5104,59 @@ CREATE TABLE public.cache_locks (
 ALTER TABLE public.cache_locks OWNER TO postgres;
 
 --
+-- Name: college; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.college (
+    college_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    college_name character varying(100) NOT NULL,
+    college_code character varying(20) NOT NULL,
+    college_created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.college OWNER TO postgres;
+
+--
+-- Name: course; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.course (
+    course_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    course_college_id uuid NOT NULL,
+    course_dept_id uuid NOT NULL,
+    course_code character varying(20) NOT NULL,
+    course_name character varying(150) NOT NULL,
+    course_lecture_hours numeric(4,1) DEFAULT 0 NOT NULL,
+    course_lab_hours numeric(4,1) DEFAULT 0 NOT NULL,
+    course_is_active boolean DEFAULT true NOT NULL,
+    course_created_at timestamp with time zone DEFAULT now() NOT NULL,
+    course_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    course_year_level smallint,
+    course_semester smallint,
+    course_units numeric(5,2),
+    course_total_hours numeric(6,2) GENERATED ALWAYS AS ((COALESCE(course_lecture_hours, (0)::numeric) + COALESCE(course_lab_hours, (0)::numeric))) STORED,
+    course_category text
+);
+
+
+ALTER TABLE public.course OWNER TO postgres;
+
+--
+-- Name: COLUMN course.course_year_level; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.course.course_year_level IS '1–4 year level in the program curriculum';
+
+
+--
+-- Name: COLUMN course.course_semester; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.course.course_semester IS '1 = 1st Semester, 2 = 2nd Semester';
+
+
+--
 -- Name: dean; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -4646,19 +5172,27 @@ CREATE TABLE public.dean (
     dean_office_address character varying(255),
     dean_profile_image text,
     dean_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
+    dean_college_id uuid,
     dean_dept_id uuid,
-    dean_prog_id uuid,
     dean_employee_id character varying(50),
     dean_gender character varying(50),
     dean_civil_status character varying(50),
     dean_dob date,
     dean_nationality character varying(100),
     dean_profile_image_public_id character varying(255),
-    dean_bio text
+    dean_bio text,
+    dean_address text
 );
 
 
 ALTER TABLE public.dean OWNER TO postgres;
+
+--
+-- Name: COLUMN dean.dean_address; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.dean.dean_address IS 'Home / office address (same idea as fac_address / dc_address)';
+
 
 --
 -- Name: department; Type: TABLE; Schema: public; Owner: postgres
@@ -4666,6 +5200,7 @@ ALTER TABLE public.dean OWNER TO postgres;
 
 CREATE TABLE public.department (
     dept_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
+    dept_college_id uuid NOT NULL,
     dept_name character varying(100) NOT NULL,
     dept_code character varying(20) NOT NULL,
     dept_created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -4681,7 +5216,7 @@ ALTER TABLE public.department OWNER TO postgres;
 CREATE TABLE public.department_chair (
     dc_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     dc_usr_id uuid NOT NULL,
-    dc_dept_id uuid NOT NULL,
+    dc_college_id uuid NOT NULL,
     dc_first_name character varying(100) NOT NULL,
     dc_middle_name character varying(100),
     dc_last_name character varying(100) NOT NULL,
@@ -4691,35 +5226,17 @@ CREATE TABLE public.department_chair (
     dc_address character varying(255),
     dc_profile_image text,
     dc_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
-    dc_prog_id uuid,
+    dc_dept_id uuid,
     dc_employee_id character varying(50),
     dc_gender character varying(50),
     dc_civil_status character varying(50),
     dc_dob date,
-    dc_nationality character varying(100)
+    dc_nationality character varying(100),
+    dc_bio text
 );
 
 
 ALTER TABLE public.department_chair OWNER TO postgres;
-
---
--- Name: fac_preference; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.fac_preference (
-    fpref_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    fpref_fac_id uuid NOT NULL,
-    fpref_subj_id uuid,
-    fpref_preferred_day character varying(15),
-    fpref_preferred_start time without time zone,
-    fpref_preference_score integer DEFAULT 1,
-    fpref_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT fac_preference_fpref_preference_score_check CHECK (((fpref_preference_score >= 1) AND (fpref_preference_score <= 5))),
-    CONSTRAINT fac_preference_fpref_preferred_day_check CHECK (((fpref_preferred_day)::text = ANY (ARRAY[('Monday'::character varying)::text, ('Tuesday'::character varying)::text, ('Wednesday'::character varying)::text, ('Thursday'::character varying)::text, ('Friday'::character varying)::text, ('Saturday'::character varying)::text, ('Sunday'::character varying)::text])))
-);
-
-
-ALTER TABLE public.fac_preference OWNER TO postgres;
 
 --
 -- Name: fac_specialization; Type: TABLE; Schema: public; Owner: postgres
@@ -4741,7 +5258,7 @@ ALTER TABLE public.fac_specialization OWNER TO postgres;
 CREATE TABLE public.faculty (
     fac_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     fac_usr_id uuid NOT NULL,
-    fac_dept_id uuid NOT NULL,
+    fac_college_id uuid NOT NULL,
     fac_first_name character varying(100) NOT NULL,
     fac_middle_name character varying(100),
     fac_last_name character varying(100) NOT NULL,
@@ -4754,17 +5271,44 @@ CREATE TABLE public.faculty (
     fac_profile_image text,
     fac_created_at timestamp with time zone DEFAULT now() NOT NULL,
     fac_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    fac_prog_id uuid,
+    fac_dept_id uuid,
     fac_employee_id character varying(50),
     fac_gender character varying(50),
     fac_civil_status character varying(50),
     fac_dob date,
     fac_nationality character varying(100),
+    fac_bio text,
+    fac_special_position text,
+    fac_special_position_max_hours numeric(5,2),
+    fac_bachelors_degree character varying(255),
+    fac_masters_degree character varying(255),
+    fac_doctorate_degree character varying(255),
     CONSTRAINT faculty_fac_employment_type_check CHECK (((fac_employment_type)::text = ANY (ARRAY[('full_time'::character varying)::text, ('part_time'::character varying)::text])))
 );
 
 
 ALTER TABLE public.faculty OWNER TO postgres;
+
+--
+-- Name: faculty_account_reviews; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.faculty_account_reviews (
+    fvr_id uuid NOT NULL,
+    fvr_usr_id uuid NOT NULL,
+    fvr_id_photo_path character varying(500) NOT NULL,
+    fvr_status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    fvr_reviewed_by uuid,
+    fvr_reviewed_at timestamp(0) without time zone,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone,
+    fvr_applicant_name character varying(255),
+    fvr_applicant_email character varying(255),
+    fvr_decision_note text
+);
+
+
+ALTER TABLE public.faculty_account_reviews OWNER TO postgres;
 
 --
 -- Name: failed_jobs; Type: TABLE; Schema: public; Owner: postgres
@@ -4968,19 +5512,45 @@ CREATE TABLE public.password_reset_tokens (
 ALTER TABLE public.password_reset_tokens OWNER TO postgres;
 
 --
--- Name: program; Type: TABLE; Schema: public; Owner: postgres
+-- Name: personal_access_tokens; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.program (
-    prog_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    prog_dept_id uuid NOT NULL,
-    prog_name character varying(100) NOT NULL,
-    prog_code character varying(20) NOT NULL,
-    prog_created_at timestamp with time zone DEFAULT now() NOT NULL
+CREATE TABLE public.personal_access_tokens (
+    id bigint NOT NULL,
+    tokenable_type character varying(255) NOT NULL,
+    tokenable_id uuid NOT NULL,
+    name text NOT NULL,
+    token character varying(64) NOT NULL,
+    abilities text,
+    last_used_at timestamp(0) without time zone,
+    expires_at timestamp(0) without time zone,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
 );
 
 
-ALTER TABLE public.program OWNER TO postgres;
+ALTER TABLE public.personal_access_tokens OWNER TO postgres;
+
+--
+-- Name: personal_access_tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.personal_access_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.personal_access_tokens_id_seq OWNER TO postgres;
+
+--
+-- Name: personal_access_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.personal_access_tokens_id_seq OWNED BY public.personal_access_tokens.id;
+
 
 --
 -- Name: room; Type: TABLE; Schema: public; Owner: postgres
@@ -4990,12 +5560,12 @@ CREATE TABLE public.room (
     room_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     room_name character varying(100) NOT NULL,
     room_building character varying(100) NOT NULL,
-    room_location character varying(150),
     room_type character varying(50) NOT NULL,
     room_capacity integer NOT NULL,
     room_is_available boolean DEFAULT true NOT NULL,
     room_created_at timestamp with time zone DEFAULT now() NOT NULL,
     room_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    room_college_id uuid,
     CONSTRAINT room_room_capacity_check CHECK ((room_capacity > 0))
 );
 
@@ -5010,9 +5580,9 @@ CREATE TABLE public.schedule (
     sch_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     sch_load_id uuid NOT NULL,
     sch_fac_id uuid NOT NULL,
-    sch_subj_id uuid NOT NULL,
-    sch_sec_id uuid NOT NULL,
-    sch_room_id uuid NOT NULL,
+    sch_course_id uuid NOT NULL,
+    sch_sec_id uuid,
+    sch_room_id uuid,
     sch_sem_id uuid NOT NULL,
     sch_day character varying(15) NOT NULL,
     sch_start_time time without time zone NOT NULL,
@@ -5023,6 +5593,8 @@ CREATE TABLE public.schedule (
     sch_created_by uuid NOT NULL,
     sch_created_at timestamp with time zone DEFAULT now() NOT NULL,
     sch_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    sch_mis_code character varying(50),
+    sch_shift character varying(10) DEFAULT 'day'::character varying NOT NULL,
     CONSTRAINT schedule_check CHECK ((sch_end_time > sch_start_time)),
     CONSTRAINT schedule_sch_day_check CHECK (((sch_day)::text = ANY (ARRAY[('Monday'::character varying)::text, ('Tuesday'::character varying)::text, ('Wednesday'::character varying)::text, ('Thursday'::character varying)::text, ('Friday'::character varying)::text, ('Saturday'::character varying)::text, ('Sunday'::character varying)::text]))),
     CONSTRAINT schedule_sch_status_check CHECK (((sch_status)::text = ANY (ARRAY[('draft'::character varying)::text, ('published'::character varying)::text, ('archived'::character varying)::text])))
@@ -5030,6 +5602,43 @@ CREATE TABLE public.schedule (
 
 
 ALTER TABLE public.schedule OWNER TO postgres;
+
+--
+-- Name: COLUMN schedule.sch_mis_code; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.schedule.sch_mis_code IS 'MIS reference code — manual entry on MIS page';
+
+
+--
+-- Name: schedule_archives; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.schedule_archives (
+    sar_id uuid NOT NULL,
+    sar_sch_id uuid,
+    sar_sem_id uuid,
+    sar_ay_id uuid,
+    sar_fac_id uuid,
+    sar_course_id uuid,
+    sar_sec_id uuid,
+    sar_room_id uuid,
+    sar_day character varying(255),
+    sar_start_time time(0) without time zone,
+    sar_end_time time(0) without time zone,
+    sar_shift character varying(255),
+    sar_status character varying(255),
+    sar_is_active boolean DEFAULT false NOT NULL,
+    sar_description text,
+    sar_created_by uuid,
+    sar_updated_by uuid,
+    sar_archived_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp(0) without time zone,
+    updated_at timestamp(0) without time zone
+);
+
+
+ALTER TABLE public.schedule_archives OWNER TO postgres;
 
 --
 -- Name: schedule_submission; Type: TABLE; Schema: public; Owner: postgres
@@ -5045,6 +5654,8 @@ CREATE TABLE public.schedule_submission (
     schsub_reviewed_at timestamp with time zone,
     schsub_status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     schsub_remarks text,
+    schsub_schedule_snapshot json,
+    schsub_fac_id uuid,
     CONSTRAINT schedule_submission_schsub_status_check CHECK (((schsub_status)::text = ANY (ARRAY[('pending'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text])))
 );
 
@@ -5057,7 +5668,7 @@ ALTER TABLE public.schedule_submission OWNER TO postgres;
 
 CREATE TABLE public.section (
     sec_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    sec_prog_id uuid NOT NULL,
+    sec_dept_id uuid NOT NULL,
     sec_ay_id uuid NOT NULL,
     sec_sem_id uuid NOT NULL,
     sec_name character varying(50) NOT NULL,
@@ -5067,25 +5678,13 @@ CREATE TABLE public.section (
     sec_status character varying(20) DEFAULT 'active'::character varying NOT NULL,
     sec_created_at timestamp with time zone DEFAULT now() NOT NULL,
     sec_updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    sec_is_evening boolean DEFAULT false NOT NULL,
     CONSTRAINT section_sec_max_capacity_check CHECK ((sec_max_capacity > 0)),
     CONSTRAINT section_sec_year_level_check CHECK (((sec_year_level >= 1) AND (sec_year_level <= 5)))
 );
 
 
 ALTER TABLE public.section OWNER TO postgres;
-
---
--- Name: section_subject; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.section_subject (
-    ssub_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    ssub_sec_id uuid NOT NULL,
-    ssub_subj_id uuid NOT NULL
-);
-
-
-ALTER TABLE public.section_subject OWNER TO postgres;
 
 --
 -- Name: semester; Type: TABLE; Schema: public; Owner: postgres
@@ -5128,37 +5727,18 @@ ALTER TABLE public.sessions OWNER TO postgres;
 CREATE TABLE public.study_load (
     sl_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
     sl_fac_id uuid NOT NULL,
-    sl_subj_id uuid NOT NULL,
-    sl_sec_id uuid NOT NULL,
+    sl_course_id uuid NOT NULL,
+    sl_sec_id uuid,
     sl_sem_id uuid NOT NULL,
     sl_assigned_by uuid NOT NULL,
     sl_assigned_at timestamp with time zone DEFAULT now() NOT NULL,
     sl_status character varying(20) DEFAULT 'draft'::character varying NOT NULL,
+    sl_shift character varying(10) DEFAULT 'day'::character varying NOT NULL,
     CONSTRAINT study_load_sl_status_check CHECK (((sl_status)::text = ANY (ARRAY[('draft'::character varying)::text, ('submitted'::character varying)::text, ('approved'::character varying)::text, ('returned'::character varying)::text, ('published'::character varying)::text])))
 );
 
 
 ALTER TABLE public.study_load OWNER TO postgres;
-
---
--- Name: subject; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.subject (
-    subj_id uuid DEFAULT extensions.uuid_generate_v4() NOT NULL,
-    subj_dept_id uuid NOT NULL,
-    subj_prog_id uuid NOT NULL,
-    subj_code character varying(20) NOT NULL,
-    subj_name character varying(150) NOT NULL,
-    subj_lecture_hours numeric(4,1) DEFAULT 0 NOT NULL,
-    subj_lab_hours numeric(4,1) DEFAULT 0 NOT NULL,
-    subj_is_active boolean DEFAULT true NOT NULL,
-    subj_created_at timestamp with time zone DEFAULT now() NOT NULL,
-    subj_updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-ALTER TABLE public.subject OWNER TO postgres;
 
 --
 -- Name: system_backup; Type: TABLE; Schema: public; Owner: postgres
@@ -5205,6 +5785,27 @@ CREATE TABLE public.token_blacklist (
 ALTER TABLE public.token_blacklist OWNER TO postgres;
 
 --
+-- Name: webauthn_credentials; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.webauthn_credentials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    usr_id uuid NOT NULL,
+    credential_id text NOT NULL,
+    public_key text NOT NULL,
+    sign_count bigint DEFAULT 0 NOT NULL,
+    transports jsonb DEFAULT '[]'::jsonb NOT NULL,
+    device_name text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp with time zone,
+    credential_record jsonb,
+    CONSTRAINT webauthn_credentials_sign_count_check CHECK ((sign_count >= 0))
+);
+
+
+ALTER TABLE public.webauthn_credentials OWNER TO postgres;
+
+--
 -- Name: workload; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -5217,7 +5818,7 @@ CREATE TABLE public.workload (
     wl_total_hours numeric(5,1) DEFAULT 0 NOT NULL,
     wl_created_at timestamp with time zone DEFAULT now() NOT NULL,
     wl_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT workload_wl_total_hours_check CHECK (((wl_total_hours >= (0)::numeric) AND (wl_total_hours <= (30)::numeric)))
+    CONSTRAINT workload_wl_total_hours_check CHECK (((wl_total_hours >= (0)::numeric) AND (wl_total_hours <= (60)::numeric)))
 );
 
 
@@ -5233,11 +5834,12 @@ CREATE TABLE realtime.messages (
     payload jsonb,
     event text,
     private boolean DEFAULT false,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    inserted_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT timezone('utc'::text, clock_timestamp()) NOT NULL,
+    inserted_at timestamp without time zone DEFAULT timezone('utc'::text, clock_timestamp()) NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     binary_payload bytea,
-    skip_broadcast boolean DEFAULT false NOT NULL
+    skip_broadcast boolean DEFAULT false NOT NULL,
+    expires_at timestamp without time zone
 )
 PARTITION BY RANGE (inserted_at);
 
@@ -5291,6 +5893,33 @@ ALTER TABLE realtime.subscription ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTI
 
 
 --
+-- Name: bucket_lifecycle_states; Type: TABLE; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TABLE storage.bucket_lifecycle_states (
+    bucket_id text NOT NULL,
+    generation uuid,
+    next_run_at timestamp with time zone,
+    claim_id uuid,
+    claim_until timestamp with time zone,
+    continuation jsonb,
+    last_started_at timestamp with time zone,
+    last_completed_at timestamp with time zone,
+    last_success_at timestamp with time zone,
+    last_result jsonb,
+    failure_count integer DEFAULT 0 NOT NULL,
+    last_error jsonb,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT bucket_lifecycle_continuation_object_check CHECK (((continuation IS NULL) OR (jsonb_typeof(continuation) = 'object'::text))),
+    CONSTRAINT bucket_lifecycle_failure_count_check CHECK ((failure_count >= 0)),
+    CONSTRAINT bucket_lifecycle_last_result_object_check CHECK (((last_result IS NULL) OR (jsonb_typeof(last_result) = 'object'::text))),
+    CONSTRAINT bucket_lifecycle_recovery_due_check CHECK (((next_run_at IS NOT NULL) OR (NOT jsonb_path_exists(COALESCE(continuation, '{}'::jsonb), '$."batch"."inFlight"'::jsonpath))))
+);
+
+
+ALTER TABLE storage.bucket_lifecycle_states OWNER TO supabase_storage_admin;
+
+--
 -- Name: buckets; Type: TABLE; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -5316,7 +5945,6 @@ CASE
     ELSE false
 END))),
     CONSTRAINT buckets_lifecycle_configuration_standard_only_check CHECK (((type = 'STANDARD'::storage.buckettype) OR ((lifecycle_configuration IS NULL) AND (lifecycle_configuration_generation IS NULL)))),
-    CONSTRAINT buckets_versioning_dark_check CHECK ((versioning_status = 'DISABLED'::text)),
     CONSTRAINT buckets_versioning_standard_only_check CHECK (((type = 'STANDARD'::storage.buckettype) OR (versioning_status = 'DISABLED'::text))),
     CONSTRAINT buckets_versioning_status_check CHECK ((versioning_status = ANY (ARRAY['DISABLED'::text, 'ENABLED'::text, 'SUSPENDED'::text])))
 );
@@ -5361,6 +5989,21 @@ CREATE TABLE storage.buckets_vectors (
 
 
 ALTER TABLE storage.buckets_vectors OWNER TO supabase_storage_admin;
+
+--
+-- Name: lifecycle_abandoned_artifacts; Type: TABLE; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TABLE storage.lifecycle_abandoned_artifacts (
+    bucket_id text NOT NULL,
+    key text NOT NULL,
+    name text NOT NULL,
+    version text,
+    attempted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE storage.lifecycle_abandoned_artifacts OWNER TO supabase_storage_admin;
 
 --
 -- Name: migrations; Type: TABLE; Schema: storage; Owner: supabase_storage_admin
@@ -5493,6 +6136,13 @@ ALTER TABLE ONLY public.jobs ALTER COLUMN id SET DEFAULT nextval('public.jobs_id
 --
 
 ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.migrations_id_seq'::regclass);
+
+
+--
+-- Name: personal_access_tokens id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.personal_access_tokens ALTER COLUMN id SET DEFAULT nextval('public.personal_access_tokens_id_seq'::regclass);
 
 
 --
@@ -5797,18 +6447,20 @@ COPY auth.webauthn_credentials (id, user_id, credential_id, public_key, attestat
 -- Data for Name: USER; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public."USER" (usr_id, usr_name, usr_email, usr_password_hash, usr_role, usr_is_active, usr_created_at, usr_updated_at, usr_bio, usr_first_name, usr_last_name, usr_middle_name, usr_suffix) FROM stdin;
-bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Dr. Carlos Mendoza	carlos.mendoza@ctu.edu.ph	$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi	dean	t	2026-07-17 14:23:53.460898+00	2026-07-17 14:23:53.460898+00	\N	\N	\N	\N	\N
-ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel Reyes	emmanuel@ctu.edu.ph	$2y$12$rxmpl0IC9sk.TayU6.xT9uln7PIilX4/V/Q1RAG7vOzOxqx85ST4K	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
-b0e4adf0-59b3-4a5f-a9ab-9094f130ae9b	Tristan Obeso	Obeso@ctu.edu.ph	$2y$12$Ca.uTtlwxv29PnMuyuIoNeQc.oOFgutfUSs.3jl38DR5UnXAyidA6	dean	t	2026-09-08 06:08:30.229609+00	2026-09-08 06:08:30.229609+00	\N	\N	\N	\N	\N
-30552f5d-6983-426f-8e9f-2854ab12fc24	Odyssy Subingsubing	odc@ctu.edu.ph	$2y$12$DF5Jmi5BMyeDKWH3KOPkf.c45WYWu3Y0G70vntP2CJtDa9fI0dJ4C	faculty	t	2026-09-08 06:13:37.615704+00	2026-09-08 06:13:37.615704+00	\N	\N	\N	\N	\N
-41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria Santos	chair.ccict@ctu.edu.ph	$2y$12$btn7JzikHUxIc/TPmy16wO/pSUH4Do5v9TtKinwfHVXiAQtZViGdO	department_chair	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
-270ad7b7-7c4d-4823-b314-816b91773cb9	System Administrator	admin@skedyul.ctu.edu.ph	$2y$12$5UjYtBYFQ/VoBJn20OHFi.99w85lPfLCPSVilGSt3kFTj04mZU4Si	system_admin	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	Inde	Navarette	Golan	\N
-56b56f76-e432-490c-a35b-b4f588ddf716	Christopher Dignos	christopher@ctu.edu.ph	$2y$12$YYunHuHXAcvAy4E1Zb1Ga.NbrSisSTrKRVjLtCWSAi3mYEfxnw7Nu	faculty	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	I am Christopher Dignos A Web Developer	\N	\N	\N	\N
-335c70b6-c19a-4214-8b7b-fb771a2c9e02	Noreen B. Fuentes	noreen.fuentes@ctu.edu.ph	$2y$12$dd0z0SiJN5J96e/JDLRyxuU2KZtRVZMwR3xIFg5NwAJudPZS5h3Wq	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	\N	\N	\N	\N
-0180a717-2d4b-4d0d-a418-153b7b24911e	Pet Andrew P. Nacua	pet.nacua@ctu.edu.ph	$2y$12$RYI3Bz9DBTQyErHy.P0zt.33ZcC5ye/XyWV.iry9aSZSPe1RIrmCi	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	Pet Andrew	Nacua\r\n	P.\r\n	\N
-d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juan Dela Cruz	dean@ctu.edu.ph	$2y$12$kzLQbjP0ge0BeNboWgniW.QXZHlSbUziKWYFZHI5Bch7HL/T0XyNW	dean	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N	\N	\N	\N	\N
-3abae64c-f024-4897-940b-fb4531d720ee	Marie Joy B. Alit	mariejoy.alit@ctu.edu.ph	$2y$12$vNLEGDWqyifQeyPV6LeE2OwtBpkxEJIoyqCyliDimViwiHPFDbbka	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	\N	\N	\N	\N	\N
+COPY public."USER" (usr_id, usr_name, usr_email, usr_password_hash, usr_role, usr_is_active, usr_created_at, usr_updated_at, usr_first_name, usr_last_name, usr_middle_name, usr_suffix, usr_failed_login_attempts, usr_locked_until) FROM stdin;
+d126364e-680c-4fe5-879b-52a849cf8e19	Emelie C. Villaceran	emelievillaceran@gmail.com	$2y$12$y8L6FjE2IKKELvZWVfPjuOPR0hRb1OI.2u61x77b3NmIDh25Kl5Ni	faculty	t	2026-11-03 08:33:06.441612+00	2026-11-03 08:33:06.441612+00	Emelie	Villaceran	C.	\N	0	\N
+cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Raamah C. Rosales	hamaar.selasor@gmail.com	$2y$12$pJuHVUfofeizWzqAF4sokefl6TSV42KWmoWcQkzL0BO2gxXQud2WG	department_chair	t	2026-11-03 08:30:28.347565+00	2026-11-03 08:30:28.347565+00	Raamah	Rosales	C.	\N	0	\N
+2005b54a-b45b-437a-bb5a-e167c8137a02	Black N/A Pink	blackpink@gmail.com	$2y$12$QPPqZXUtLqDY8lCgzLg02uS3MtA1eg3d3K4i2kqcKZsxVPMnm.TO.	faculty	t	2026-11-08 11:30:21.480931+00	2026-11-08 11:30:21.480931+00	Black	Pink	N/A	\N	0	\N
+e891982b-d1b2-45c8-a64f-e2c5615e433a	John Rey E. Furtos	johnfurtos@gmail.com	$2y$12$HfFK6cFQIaFx6tngjFqWO.HtspkIQsflxbggAT85CTMF6RKtY4gxK	faculty	t	2026-11-03 08:05:10.661713+00	2026-11-03 08:05:10.661713+00	John Rey	Furtos	E.	\N	0	\N
+335c70b6-c19a-4214-8b7b-fb771a2c9e02	Noreen B. Fuentes	noreen.fuentes@ctu.edu.ph	$2y$12$cEw4K73H9eIH1BQj/K6rC.gWgsPbxsyf7mACw3PmiqVqFobxohvSC	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	Noreen	Fuentes	B.	\N	0	\N
+270ad7b7-7c4d-4823-b314-816b91773cb9	System Administrator	admin@skedyul.ctu.edu.ph	$2y$12$5UjYtBYFQ/VoBJn20OHFi.99w85lPfLCPSVilGSt3kFTj04mZU4Si	system_admin	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	Inde	Navarette	Golan	\N	0	\N
+0180a717-2d4b-4d0d-a418-153b7b24911e	Pet Andrew P. Nacua	pet.nacua@ctu.edu.ph	$2y$12$RYI3Bz9DBTQyErHy.P0zt.33ZcC5ye/XyWV.iry9aSZSPe1RIrmCi	department_chair	t	2026-07-18 06:03:37.813106+00	2026-07-18 06:03:37.813106+00	Pet Andrew	Nacua\r\n	P.\r\n	\N	0	\N
+d2468e93-6a49-4532-8eae-b5ab3f0dd090	Gerry Ritz R. Densing	gerryritzdensing@ctu.edu.ph	$2y$12$D0JOu.DDCVdfQZmv0GaAFu3PGiF0c4B8egvCVqMBfslPglfkXGUXe	faculty	t	2026-10-06 07:01:06.548816+00	2026-10-06 07:01:06.548816+00	Gerry Ritz	Densing	R.	\N	0	\N
+80e78fb0-6908-422c-ae9e-cc31a7a29f04	Albert D. Maghanoy	albertmaghanoy123@gmail.com	$2y$12$7jHp6/fy1TvaVtxGY3vIIOEQmmkzMuuUQAHL7KrBIoMbcG2DOkblG	faculty	t	2026-11-03 08:23:15.104358+00	2026-11-03 08:23:15.104358+00	Albert	Maghanoy	D.	\N	0	\N
+03ffd937-4f2b-4984-bce1-22b9bf2a29a9	Suzette B. Bacus	suzette.bacus@gmail.com	$2y$12$3zEfbEjynFSmDtu71jo4ZOnqHsniiNPsSLBiihyq3E23b7VI6MvPm	faculty	t	2026-11-03 08:23:27.490049+00	2026-11-03 08:23:27.490049+00	Suzette	Bacus	B.	\N	0	\N
+0a6013f9-0b25-4383-a1f9-f81cac3ea32d	Janet S. Ugang	janetugang@gmail.com	$2y$12$HQOa7rYOB61oSwLe3LumfuslGaLuHA7sIbu9RdRSnE3qDf6WnOHou	faculty	t	2026-11-03 08:29:43.126142+00	2026-11-03 08:29:43.126142+00	Janet	Ugang	S.	\N	0	\N
+32ab44ac-a571-4128-8306-8d6f38c050f6	Oddyssy Aying Subingsubing	oddyssysubingsubing@gmail.com	$2y$12$cZKOo3ow4DGJb9Y3i9OcCuynFBFAzpbJOyaB6z2J.AIyS5odOqJ4e	faculty	t	2026-11-03 07:10:04.017756+00	2026-11-03 07:10:04.017756+00	Oddyssy	Subingsubing	Aying	\N	0	\N
+bc02c426-ac11-4fb4-93d5-eb6804b7974e	Jose  Maria S Garcia II	josemariagarcia123@gmail.com	$2y$12$RlBo0db0kasVfEnaTbAbtO1qeT6NGhbMa2NUSySNtcLbaQCtIDmEe	dean	t	2026-11-03 07:20:41.672579+00	2026-11-03 07:20:41.672579+00	Jose  Maria	Garcia	S	II	0	\N
 \.
 
 
@@ -5817,12 +6469,7 @@ d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juan Dela Cruz	dean@ctu.edu.ph	$2y$12$kzLQb
 --
 
 COPY public.academic_year (ay_id, ay_academic_year, ay_year_label, ay_is_active, ay_created_at) FROM stdin;
-a880a964-ef79-4b67-948b-acf76c0c0c09	2023-2024	Academic Year 2023-2024	f	2026-07-15 15:02:46.174993+00
-fbd45845-3a8b-4484-8cc5-0312408111e2	2024-2025	Academic Year 2024-2025	f	2026-07-15 15:02:46.174993+00
-929e267e-ac05-41eb-bbeb-dd7f5cd273e3	2026-2027	Academic Year 2026-2027	f	2026-07-15 15:02:46.174993+00
-5f924702-240c-4eec-9e44-968756421168	2027-2028	Academic Year 2027-2028	f	2026-07-15 15:02:46.174993+00
-ceaa38d7-0d5c-48ae-a811-68b24925a534	2025-2026	Academic Year 2025-2026	f	2026-07-15 15:02:46.174993+00
-7f59daaa-01ff-44c3-babe-0efeb21e1cb0	2020-2021	2020-2021	t	2026-09-26 05:23:35+00
+0e90a55c-51ba-4d90-868d-3b91051ce5a0	2026-2027	2026-2027	t	2026-09-30 08:18:55.204565+00
 \.
 
 
@@ -5832,10 +6479,1098 @@ ceaa38d7-0d5c-48ae-a811-68b24925a534	2025-2026	Academic Year 2025-2026	f	2026-07
 
 COPY public.audit_log (al_id, al_usr_id, al_action, al_target_table, al_target_id, al_description, al_ip_address, al_created_at) FROM stdin;
 dc5c7aa3-79f7-40c6-a218-869dd37e746c	270ad7b7-7c4d-4823-b314-816b91773cb9	CREATE	FACULTY	\N	Created faculty profile.	192.168.1.10	2026-07-15 15:05:14.128162+00
-b592a3ca-d9f7-48e5-b878-64fbabd49571	41a4e102-068a-4a65-8e1d-70e5289f99ef	UPDATE	STUDY_LOAD	\N	Updated faculty teaching load.	192.168.1.15	2026-07-15 15:05:14.128162+00
-983af05e-b8c8-4def-8fc4-2cf47735cbcb	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	APPROVE	SCHEDULE_SUBMISSION	\N	Approved department schedule.	192.168.1.20	2026-07-15 15:05:14.128162+00
-4f72499f-955a-48c2-bd64-a1ed2550d828	56b56f76-e432-490c-a35b-b4f588ddf716	LOGIN	USER	\N	Faculty logged in.	192.168.1.30	2026-07-15 15:05:14.128162+00
-82807210-1905-4f02-a435-58708e72725f	ea9ad791-09c3-4f91-a464-c3bb72922747	LOGOUT	USER	\N	Faculty logged out.	192.168.1.31	2026-07-15 15:05:14.128162+00
+87160eff-bf34-4bc4-a9e0-66afe47bf4a2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 06:41:41+00
+015fa18d-affe-456f-b15b-5bec5985db6b	e891982b-d1b2-45c8-a64f-e2c5615e433a	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 08:14:42+00
+83a61caa-924a-45ba-926b-2ea083fcd617	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:38:09+00
+f3531a97-7bed-495f-98d5-0884fa2e62e6	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 08:40:40+00
+909ec735-cf0e-47f7-91bc-d213068c1987	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 12:39:40+00
+baf9b2d2-e2a4-40a8-80fd-dda286cea0d7	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 12:39:48+00
+56257af6-4c8b-4aec-aaf9-ac05cf70edac	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 13:26:37+00
+efb5f2e8-8a59-4331-adeb-d0e34106f41f	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 02:57:28+00
+dc3534e1-6d47-487c-95b9-a6ea0b9cc4b2	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 06:03:05+00
+2d0fb453-f494-4fca-be7d-9a09d45a8491	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:29:35+00
+238bc55b-de0c-4847-8bc4-10c2672c6f7b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:30:18+00
+f5411534-b394-4820-a3cb-5e9ffa3535ff	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:30:30+00
+efc4e9aa-fdfe-4a4e-b545-4fac489c7ee2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 13:31:17+00
+96cc191a-2ad1-4d9b-b17a-eaad32fc50d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbs.update	c1ac7966-cb6f-4faa-972d-77d5e0d0d96f	Role: Department Chair; Route: chair.pbs.update; HTTP 200	127.0.0.1	2026-11-04 10:18:40+00
+daaf73d8-6a51-43d8-94f7-c5f30a1f50aa	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 13:02:04+00
+005b4f38-351c-4592-95c3-d62bb01338cf	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 13:32:26+00
+8feb81e9-f467-4ca8-a395-dc5f0f6f6d88	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 13:33:14+00
+938a7ccd-58d6-4d42-bbb0-b36248cdc543	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 13:17:39+00
+b3f2ad0f-6ba2-465b-9f7e-8355f6df9ab2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:17:49+00
+6a009b65-e8bc-49e2-ab7a-b028d9a988b3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:33:49+00
+907cfb60-4ce9-4a33-b3fe-e0f88f85dd14	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 13:36:52+00
+550c7ae3-5645-4b3d-b2c9-f3b6792fdff1	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:37:17+00
+a85925bd-4cfd-4cc8-a8a7-8b74869f5d32	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:37:54+00
+c2aa063f-a306-46b4-95b0-ce99cb558d13	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 13:41:40+00
+5230b2f1-5e12-4e40-a778-ec13eaec3054	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:43:28+00
+56458bec-018b-4a55-8a67-6d1e6235d015	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:48:17+00
+bf5f4d2c-2d6c-40f4-8921-4fe9a0114009	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 13:49:04+00
+e4701ecc-f65e-4a1b-80a3-4526cdc9fc00	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 13:54:20+00
+fa0f99c6-a00e-4aba-9fdd-3c911adc6b76	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 13:55:04+00
+515d0542-a939-426f-b81e-e571e4ebe189	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 13:56:19+00
+9ba859e9-d857-4684-9917-018feec27fcb	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 13:57:24+00
+2919adb0-45b0-4306-a0a4-182f5b0a3e78	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 13:57:40+00
+3fd76210-aab2-4d87-9ad0-8a5c46015cf4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 13:58:19+00
+2fa4d681-2a91-4e14-a497-f1f4cb263cd3	e891982b-d1b2-45c8-a64f-e2c5615e433a	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-04 13:18:02+00
+ffcdf5eb-79b2-44da-aa83-f41a534b0b28	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 15:14:22+00
+e153fe55-fbb3-4ed7-ae06-0516281a504f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-05 02:08:49+00
+23e72af9-1728-4eb3-a877-f4a4c7bc42a1	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-05 02:09:07+00
+f33ba1b4-3cb0-4a2a-866f-803971971bbc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 15:18:08+00
+e3f53987-4ea7-4bef-a855-a4491966a970	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 15:26:12+00
+dddcc985-c894-4124-86b9-8277cd6fe655	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 15:27:36+00
+3ca74751-41c7-4c26-b0ab-51e1d7169a9d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 15:27:47+00
+9222c1c0-cb47-4084-813b-e5543110fb85	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 15:29:48+00
+88499df5-536b-4f62-805f-a2a64d8b373a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 15:45:21+00
+36bc53f3-4eab-42e4-8fb5-7c247c69a90f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 15:47:49+00
+def941ca-c04a-4ce6-9e3a-7016b807f0cf	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 16:11:30+00
+4f54fd3f-b5a2-4872-9663-ae87bc5a4330	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 16:16:33+00
+2a538677-ce3b-4fae-a293-62e47d4bac30	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 16:29:46+00
+21a17716-3f61-46ee-a9d3-b4752540d5c6	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 16:30:23+00
+49451055-0a0c-4477-bfcf-e7496684ce91	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 16:46:57+00
+e8f9fd44-8eb2-495a-82f4-ec8fc5a9564b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 16:47:09+00
+ac62470f-de1f-4a65-9195-290d03c1765c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 16:47:43+00
+2510fa18-5040-4c59-974c-2b32ee6451e7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 16:48:11+00
+d5d0766e-441c-49cb-907a-44fa943884e5	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 16:51:43+00
+a896c85c-b065-42d7-9e0e-a343846c5d45	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	c436529d-538a-41f8-b83e-6b31147c298d	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-10-05 16:52:27+00
+76410d06-3e72-416d-86c9-9da103a48a86	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	99319d27-b14d-4325-baab-ea2be7fd93b1	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-05 16:53:04+00
+74a0219c-a898-4a30-860d-ed4b40409f3d	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 16:53:30+00
+dd1c801a-6e27-4020-a463-82b05f76e260	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 07:10:43+00
+4506def4-bf2d-4af7-baaf-3db0f293322f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:16:06+00
+8a87265e-9fea-474c-bec6-686ad7cf24db	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 08:39:16+00
+7f4b1014-eeda-4be3-91c0-a2b13ef6c2a6	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:05:44+00
+68c47143-63c3-495c-9599-7d6ae7aafe52	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:06:49+00
+dc4af930-749a-4963-af4b-096a0366877a	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:07:03+00
+2e816d79-965a-4648-9977-92e8d87f4065	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:07:25+00
+39210ac2-077f-419b-82ee-eb748054a8ab	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:14:57+00
+77b91feb-4c7c-48cf-9db0-fd487354088b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:15:49+00
+7b288a3b-e68e-4dcc-8f75-4f6122d3f02a	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:18:37+00
+fbef9827-d11b-4c66-bb65-122485dcffd8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:19:01+00
+c82c740b-c095-4290-8c45-24c5f8d6340d	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:23:38+00
+3d6cf910-857f-4d75-85e1-da8127933707	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:24:19+00
+854a5a58-1d32-47e0-8473-a91d314cf996	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 17:27:18+00
+36451b52-75d2-4445-a96a-c14cc0789db6	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 17:28:16+00
+80ff3b10-9753-459a-937d-409ae5e6819a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 17:28:33+00
+7cb49631-fe2c-4293-bb0b-682a5983c82b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 17:29:16+00
+39e5404f-b152-46f6-a179-2bc4e3c09c7f	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 02:59:36+00
+f1e49e01-41f0-4fc6-8372-2e8b21788ea6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 02:59:47+00
+c4614437-bf00-4c10-873e-b8cc38160afa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 03:00:42+00
+f69e1b98-ed06-43cc-8d37-9ebefc5edc9c	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 03:00:56+00
+6e4cb190-3d07-47fd-ba4b-c6c4b3acc1d4	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 23:48:43+00
+85cd1a65-bbd5-4eba-9fbe-b056723bbe59	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 23:51:47+00
+d7017ebc-9d2c-4848-a853-c44b94886f80	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-05 23:51:58+00
+6c087660-4928-4dd4-88da-1372a8c722ef	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-05 23:55:37+00
+2b074c5d-c11b-4fa6-a76c-f560c2cfb188	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 23:55:50+00
+f4339259-e62b-4f90-97a6-e6b944437151	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-05 23:57:00+00
+6aafc013-c1f2-4ef8-aa0b-a7eaf0666f46	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-05 23:58:27+00
+d84591a3-70a7-4db3-91bf-150a2506292f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 00:00:03+00
+a24ebf00-9bed-4df4-b470-e1df0f833d37	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 00:00:12+00
+61bb4bd9-f18a-44d6-8d81-4eb0d66ec0cf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 00:01:50+00
+ad74ce07-1592-4515-8805-b8179fd96498	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-06 00:03:52+00
+0a5113a3-d42b-4322-bb9f-a320e11249e4	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.reject	8ca485d0-0485-45d0-9a90-c6fc1794f224	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 302	127.0.0.1	2026-10-06 00:05:44+00
+641e637d-dd73-4662-9151-352702736161	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 00:06:56+00
+dba4c719-4e39-45e0-b25b-21f1442827ad	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 00:07:07+00
+1c1163a8-38f2-4143-8ddb-cccf891493e6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 00:10:33+00
+ee1ff9e7-4823-4bb7-89ed-c2a336a1559f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-06 00:18:58+00
+8bba28e1-6800-42a1-ba10-290c5bbe7309	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 00:21:49+00
+804c2e84-c382-495b-8bfd-0840c0710cd0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 00:22:02+00
+7f5fd8a5-b0c0-4b16-bfc4-0f3d3f94b4c4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 00:24:49+00
+5289e567-5afe-4bb7-9de9-4e8c5b2e4941	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 06:10:10+00
+4df6f18a-7af3-4059-b2c0-e108de97fe28	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 10:36:00+00
+c2eb7688-0616-41b8-b3a8-f394df1036fb	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-06 00:30:35+00
+48b6cc9c-b8c2-4a8b-820a-e8e36fd3c1a4	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 00:33:36+00
+8d3b04cd-a426-41a2-b169-aa72e12016a8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 13:02:34+00
+b40ec1b1-9987-4079-8b40-691ae47e1157	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:02:43+00
+9e7c0842-54c4-4667-9901-af2bb7668940	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-06 05:37:53+00
+414ce198-da63-4c4a-87a7-4515ea1a320e	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.reject	0ff7a695-dc13-4cb5-a999-23e6bde2cf0b	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 302	127.0.0.1	2026-10-06 05:38:28+00
+6bcd8699-d1ab-42ec-a39f-b37b7a24d299	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 05:41:20+00
+9222b6f3-141c-4aa0-9927-b83517fca260	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:31:38+00
+d14e5e27-5bd1-4842-bda9-6a2ca9c5f0eb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 15:54:15+00
+5cd763ee-7294-4aaf-9505-50a9f43522d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 05:48:51+00
+70980822-c5ba-4dfd-8ca5-64270115c7e8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 06:01:46+00
+3c225b3c-e1e1-4d58-b73d-839cf3aa8f46	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 15:54:20+00
+05f20aaa-debb-40cd-941f-694bda2641b4	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-06 07:02:43+00
+b27de7b8-0a52-4ab7-8f38-d9705086c63d	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	a6490d96-ebb4-4e57-b6c3-ef798c2927a7	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-10-06 07:03:55+00
+92c5a923-c0aa-4078-adca-953b68042f9b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-06 07:06:16+00
+78c60331-f927-486f-a054-065f92254efe	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 07:11:33+00
+1dd39c0a-1dae-429f-a59c-a5585187f418	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	166d28d0-360f-4d1a-89df-92713e4cbc4d	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 07:25:55+00
+08f6f284-be5c-42b9-b95a-c568f60b5bdc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 07:39:43+00
+dee37d09-b129-4637-b6c5-63e3d9bdb675	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:45:04+00
+f221a976-2766-4c6e-8441-0e0ad09a10b3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 07:46:31+00
+80663b88-0041-42fc-a24b-aab2d7007260	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:46:56+00
+fd8010ab-2b56-4504-a4db-b4f94d23e304	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:47:07+00
+14e2ee76-197a-44bc-b2bf-7879e69ee3a3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:47:21+00
+7f40d2ba-7111-4a83-8c4d-2c29cf125f05	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:47:33+00
+fde132e9-783b-4fb6-bd44-23bad231abb4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:47:56+00
+14b4c112-11a2-48e8-9cf7-2af857c98b9a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 07:48:12+00
+b132061b-a424-4a09-b3f7-c75e0a8925d2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:51:41+00
+22daaf99-e09d-4c48-8d80-918030d8c156	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 07:51:55+00
+18441964-969f-4550-9ff4-b28d4d83198a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 07:52:11+00
+da0c478d-cc86-4b1d-a525-1a7d72f414d0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	99abb9a0-fcb4-4540-9217-98dfa637b1ea	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 07:53:29+00
+6907a748-f376-4ed5-b74d-d47887df25b2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	aadbaa7b-7ce7-4dd5-8a87-8e0206162ddc	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 07:53:59+00
+18ca4291-913f-4113-936d-3b7fb6863673	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	83587a45-571d-4366-88ae-68c0837ab82f	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 07:54:24+00
+5e218c5e-42fa-42c1-8af3-4452a375506b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 08:01:52+00
+3ccc0e55-a7dd-4747-92d3-246537b9353b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:04:15+00
+596b192e-0590-419b-b8d3-7ce366db0cf8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:04:25+00
+8d88b113-fe1d-47e0-9900-883ef0e45230	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:04:39+00
+98ea968c-ac7f-40cb-b1e6-75abff673f75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:04:51+00
+5baf05e3-3c78-4188-b3a4-26c809ebbfec	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:05:29+00
+f60c2f72-3eef-4690-8ffe-0232efa4bdd4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:07:33+00
+0db981f3-6dc4-4a24-b8ad-e8f0bf0690ad	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:07:46+00
+2c0f6257-f218-4c07-9d12-899000caf776	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-06 08:07:56+00
+b70cc592-9732-4eff-ae19-137194ceed9e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 08:09:50+00
+98f9a434-0166-4fbd-831f-a5d48a3b824f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	99aa5b27-e35d-413e-abe5-cc2f01e160c1	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-06 08:11:18+00
+cd7a38b4-e768-4206-9b2a-4a9370141076	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 08:11:58+00
+570d489c-5178-483f-8261-07163b8a5106	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-10-06 08:12:35+00
+2411b336-f497-4a95-be0a-aba28aceb206	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-10-06 08:14:55+00
+1947587b-5e77-480d-bbd9-e02541bfe28e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 08:15:10+00
+58896673-599a-4c01-9f5c-51818b017c69	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-06 08:16:44+00
+e51b3d30-a0b5-4e06-85ff-af0f7083ff22	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	c95750a5-61ff-49c9-b9e5-8be1e42f8ebd	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 08:17:39+00
+ed8494bd-7256-4e1a-8d2e-a48d91b277ad	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	c95750a5-61ff-49c9-b9e5-8be1e42f8ebd	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-06 08:18:05+00
+6087f056-f74c-4a1b-81b3-ffd3286707a4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 08:18:40+00
+d1b6e8bf-5923-451d-b871-838517069f89	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-10-06 08:18:53+00
+52a9b7e4-5ff7-4a26-b835-6a8ed3c526c0	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-10-06 08:21:37+00
+d4463178-318b-44d2-9073-c228c4c5b5d9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-06 08:22:16+00
+d4d9b6bb-0f42-4575-ad82-c113e69b9bd9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-06 08:24:26+00
+eb14e867-b169-4370-a0e9-f1a3ae2caa54	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 02:41:41+00
+0103f3c8-b9a1-4f26-8b22-62ee9914c523	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 03:28:55+00
+ed89ed52-0306-4a04-bc4e-971c6f645821	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 03:34:18+00
+101a890d-5e5b-4293-ab36-4bc4810af354	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 03:35:19+00
+4af06529-8ae8-4d50-8eb5-c1ef35500aee	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 03:35:30+00
+0c30a448-9584-4c34-8e42-b1290aeb35e4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 03:44:31+00
+a6dbd2a8-01e7-40ec-8623-d48b7e58703c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 03:50:04+00
+6734d269-76dc-4c02-bfa2-17daaa6e6a75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 03:50:38+00
+0759f1d6-c122-4f24-9cf0-d5455b23b5b3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 03:51:46+00
+a930dbd4-d2e2-4402-8a1b-5a4dae33647b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 03:51:55+00
+8edf66f6-89a5-4a00-9fa8-819a8fc15b7a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 04:42:57+00
+2b173c95-7f6d-4cf6-b75d-6a9552cb9321	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	6e84d5bf-8df4-412d-b89e-f7f2eaab6f95	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 05:30:09+00
+21e3fb6b-d59b-4e96-94f6-fc679279815b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	0a755f77-6259-40b5-8dc2-304ea5b9ddc8	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 05:30:22+00
+058fde3f-f6ac-4203-941b-37b6d1dc48dc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	660d1cf3-7cdc-4276-bc0f-00241e945d8d	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 05:30:37+00
+38956b1d-7b9b-44c6-8292-52da2f7c5f4d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	3ad488f9-ed03-4d51-b67e-50fb50affef2	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 05:32:41+00
+c53270ce-5947-4242-96df-21abb215d773	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	6e52bef0-ce51-4fc0-addc-2da0e2c792de	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 05:33:03+00
+6d562e37-bad5-4ce7-a313-87329f8f816a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:34:16+00
+536a9ad2-02f5-4457-9466-8a8669558b6b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:34:40+00
+8504c4b8-f943-4ee9-ac03-d12765c13936	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:35:27+00
+24e79c2d-e6da-457b-b33c-4d7d1be1c974	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:38:48+00
+c7ec6f2c-1ded-4adb-934f-06e165dc681f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:39:24+00
+47584f47-5873-4fdc-a1c8-4f05e4004b11	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:43:19+00
+df08ebcb-60a5-4130-b84c-cbcbeca1275f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:43:52+00
+5a300a1d-d4e6-46f5-98f4-e7db01797e87	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:49:06+00
+6c44bb20-011c-40f9-ac98-a3a6ef69e8cf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 05:50:20+00
+89ef30ab-9b5e-4a7d-afde-26f7868cb9be	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	d01a5e78-47d5-48b9-aa5c-df571d00ee4c	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-07 05:51:09+00
+500aa852-af39-4c8e-9434-295d4bb7f762	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	1c6cece4-b4ac-46f1-b960-8b9e77658d17	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 05:51:28+00
+541051e1-325d-473a-8565-33d297a0fb15	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	28e14207-c379-4ef8-9461-657de7927bbd	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 05:52:12+00
+ae476895-f72e-4d15-87c0-f40886a4fa2f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	28e14207-c379-4ef8-9461-657de7927bbd	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 05:52:32+00
+6dc94c4c-900d-44a6-902e-eb27ba5b607b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:53:59+00
+f29e5984-0c5e-42c8-9983-c0c09f2eb470	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:55:46+00
+09cb62d9-cc58-42e1-b741-9ee326ee239c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:57:22+00
+0f80cf8a-f668-4370-817d-6c17b98ec6d1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:57:37+00
+031c2fd0-3591-4912-8705-4a5ec0439ec7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 05:57:55+00
+47b300d9-c9b9-4861-96f6-e1fceb5c7905	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 06:01:52+00
+1727efa3-13ea-4597-b564-1a898ec19d9d	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	e7c7dd9f-cc3e-42eb-9e40-89980764cc19	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 07:12:12+00
+95553d3f-8d59-4e07-913f-c8c5d8abe604	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	d57ab905-7f9a-4de4-847e-4ba3c7bcfac2	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:16:03+00
+a0a49ff9-0f8a-402c-9c41-18136656b9f7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 06:05:01+00
+00425ed0-cf51-4e73-a1f5-e3952b23a89c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-07 06:07:21+00
+b05fdcda-c0c7-4338-9862-743eb72b976d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 06:07:34+00
+aa53e5a3-6ca1-4eed-918f-0e002a177e10	32ab44ac-a571-4128-8306-8d6f38c050f6	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 12:54:08+00
+94e66bae-6ced-477f-87b8-1e2457d7e659	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 06:08:27+00
+fb8b9541-f58d-46cb-8758-3b2fcb4bded3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	b8474d63-164f-452f-ae6c-21371fc35819	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 06:09:03+00
+c140c716-a3d0-4ad7-8950-fdfaf15761fa	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 03:06:23+00
+2252a5fa-16fe-44f1-b7c9-e6c04c6585d9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 06:16:24+00
+f3e8b3d9-163a-4421-9a6a-509105c02224	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 06:24:29+00
+b36a7230-85fd-4f6e-8720-f7875e6c2d03	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 03:06:37+00
+ee745719-7846-48f6-9aad-d856234efe17	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbs.update	d01a5e78-47d5-48b9-aa5c-df571d00ee4c	Role: Department Chair; Route: chair.pbs.update; HTTP 200	127.0.0.1	2026-10-07 06:33:14+00
+20a0a8db-6ab5-45ba-a969-8837fe1ef361	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbs.update	41451ae6-c2e7-43f5-a9db-7956b4b2f1a1	Role: Department Chair; Route: chair.pbs.update; HTTP 200	127.0.0.1	2026-10-07 06:33:38+00
+5157f73a-1628-43e1-b3c2-813febe2b257	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbs.update	41451ae6-c2e7-43f5-a9db-7956b4b2f1a1	Role: Department Chair; Route: chair.pbs.update; HTTP 200	127.0.0.1	2026-10-07 06:33:59+00
+bac19a99-a4f3-4d47-a5e5-6d80c107b4a1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 06:46:51+00
+46d4a2e5-96e2-4129-864e-83463edaa5fb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 06:31:40+00
+40b442cf-0c5d-44c5-bdcf-68d68af8b589	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 06:51:02+00
+83c95f21-8382-4403-bb52-eec9f328d8f1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 06:53:52+00
+59b3a4f9-9094-4ef3-ba3e-95942d4d7d30	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbs.update	7fc84490-540a-4441-90ca-118c5d7a6158	Role: Department Chair; Route: chair.pbs.update; HTTP 200	127.0.0.1	2026-11-04 10:59:51+00
+e2ed1bf7-9254-42bf-bc5b-6c8fdac47cdc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 06:56:30+00
+04d04d45-e443-49f3-8b76-c4e5d185d52b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 07:00:37+00
+e427cc4e-cb17-45ff-8287-24cd2c1df4e7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 07:06:15+00
+a9109761-8cf2-4c37-b9ea-4adbb4fa4b3d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-10-07 07:09:49+00
+663d7e5f-f7b7-456f-bba6-1922e4a898dd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 07:11:45+00
+30b05470-8334-4669-b0d1-039d66b494a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 07:13:01+00
+dcf60b3d-f333-43e5-88a7-f5427d8a5da5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 07:23:58+00
+121d95f1-fcbb-4306-b13f-bf415bf8aba8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 07:45:59+00
+a16d32f0-eea7-4c53-bac0-21da5f9e8e51	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-10-07 07:48:00+00
+9d0d7779-11d9-4382-962a-71140bd73b2d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-10-07 07:57:45+00
+46fe59a7-20c9-41e4-b595-1524f2df4c43	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-10-07 07:58:22+00
+003d83a3-9649-45d5-a993-07ecb8167b95	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 07:59:28+00
+849e3954-df33-4e9b-9dd3-bf8c89001cb5	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 07:14:01+00
+bd99c386-3f8a-48af-b22a-b6b2a6103338	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-10-07 07:59:34+00
+1f06f259-4f69-44a5-985b-ba0422826740	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-10-07 07:59:51+00
+edd8e1b3-cc73-4b2f-b284-96d7fa763c51	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 08:06:14+00
+02408f19-7e13-42a9-a795-f0af0e816426	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 08:06:47+00
+cca3a208-c422-47ce-9c7e-8611031e90fe	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 08:10:28+00
+5e64bc15-46de-4391-a354-0b1fad911966	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 08:16:28+00
+4faa142d-cfa0-4387-a2cf-6140159af415	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 08:48:51+00
+623d09ec-b9a2-43f6-b73a-3dbc4c37efa0	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 08:58:43+00
+3f30cdbb-9fa9-438a-95a9-237d8837b1da	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 08:58:48+00
+8ebb5c14-5efc-48f0-bd67-73479027ef09	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 08:59:09+00
+64a9f044-4bba-4547-8dda-4180703c17a8	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:06:21+00
+4f150748-af86-4576-9fa0-e7d1e39cada1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:06:59+00
+3d75ecef-55fb-44d1-8fcf-a3f56659ea70	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 09:09:29+00
+133f017d-b94e-4ded-b1e6-51d9e328ccbe	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:16:49+00
+878a83cc-52f1-4f7b-ba3a-aaa4ce0bae51	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 09:12:59+00
+af25ccdc-f440-4488-893e-2fae142e509d	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:14:42+00
+975200cc-5b3d-4b67-8f23-30b15506054c	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:21:07+00
+06d94a93-fffe-437b-9769-5f3d7146729c	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:24:17+00
+b05ec444-b361-47e7-acd0-8b721444ad9e	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:25:14+00
+a5c9b4c4-db91-4940-ad9a-6d35ee021d9a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:25:20+00
+72d49916-f2ad-400c-af94-f3e4869feff7	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:25:24+00
+bc152a65-8b2e-40e6-8db3-988a03bbb2ae	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:25:31+00
+58dd4630-b497-4904-8ced-cf3f8e3417e2	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	99319d27-b14d-4325-baab-ea2be7fd93b1	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:26:09+00
+79c30933-c93c-4b9e-a199-1f161ed6fcd6	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 09:28:00+00
+e37b15fd-f35d-4c9e-acd6-f451c8aeff83	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 09:30:24+00
+de228bf3-2905-437b-a423-8274acf6b513	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	3abae64c-f024-4897-940b-fb4531d720ee	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:33:07+00
+393447fa-491e-4a16-9aa1-6f1671d08460	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:34:06+00
+1d6c9348-d451-4cf5-ace4-45ae2465bba7	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e926c91b-b05f-47fc-aa0d-0b42c2a77067	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:34:50+00
+85703bed-5cbb-4627-8f3c-72ded80a57bb	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 09:37:34+00
+acf44280-69e6-46a5-af0d-5de53328749f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 09:39:56+00
+d7369f77-0c41-4da7-9122-c8bfb1d36429	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 09:54:54+00
+ca01a1df-173d-4bf7-aff6-40fa986d9b75	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 09:55:27+00
+2de69b6e-2d57-4f2d-957f-80c06ab0aebc	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:56:31+00
+f64d6b1c-9db5-4506-9f18-b9dbdc940528	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 09:57:02+00
+a6e72ca5-df1c-4e87-b8fa-7991d568d9aa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 09:57:29+00
+a9b139fb-7533-4c81-bb29-db34c9e085f9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 09:57:50+00
+9c82b070-586a-4879-a527-c660248f4b0b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 09:57:59+00
+7d183ef8-769c-4b4c-9855-a15da4616513	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:58:49+00
+9cf5ab28-03d6-4548-8e71-a819a9b8907b	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:17+00
+bad0327f-bfa3-4910-a4f1-9d5863a2a842	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:20+00
+470dd586-ee23-4921-88ff-17087f861e03	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:23+00
+d190acb8-1c1b-4b34-b849-4b34c236fc78	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:26+00
+61a2421e-014c-438b-bbfd-584a918ebebf	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:29+00
+c167e610-3136-4c37-ac62-7f591f36459f	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:32+00
+32fce6cd-586e-4df2-8b2d-ad2fabcf1cd6	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:37+00
+6281cbed-1626-4549-a214-4eab9b468c42	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:40+00
+59daebcc-eb22-4c2c-8f0f-3914b31ff7d1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:43+00
+bf7fab42-d2f0-4903-9f18-f7aa51393ca6	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:46+00
+6fdd38be-2dbb-4294-adbf-0262c69afffd	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:49+00
+8b788e77-fed7-4eab-b9a3-3fb44fe3ffaa	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:52+00
+1297519b-95ff-4b8e-927b-5eb8e194d371	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:55+00
+f20631d3-00f9-43c1-81ed-d527755a8830	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 09:59:59+00
+bede03b4-f3c4-4270-a532-9c2bd4c3e400	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-10-07 10:07:03+00
+b939bc59-8203-4de6-829b-97e3fe7648a8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 10:07:25+00
+55cb1752-906c-45c4-866b-b43d7b633cc1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 10:07:37+00
+aeacec94-9323-4df3-911c-104f669c6870	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:10:40+00
+21a3a954-f092-4374-adf1-5768b67887bc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:11:57+00
+0b9f02c6-ca1a-4c36-8e6b-4fb8c12e75dc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 10:12:27+00
+743e4454-fb1a-4e83-8665-273acf57ea96	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	5732476c-7557-4185-a926-e2232be20e7b	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 10:13:30+00
+705c86a2-02b6-4625-a75d-5eae43e36fc9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	d5d4df1d-f034-4da5-b72c-83f93cc49215	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-07 10:14:09+00
+ab543912-7882-4e82-9dd7-2a886a2476b1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	9325480d-67fc-4b9d-b3e3-8ec424a30672	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 10:15:41+00
+a62d412b-03d7-4f8d-9f5a-a98641503377	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:19:45+00
+196959a3-3ead-4d3d-a70e-4483d5c6e388	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:20:04+00
+fcaf2f74-0241-4697-82fe-ebacaa1c7a55	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:20:25+00
+600d3d78-bb9c-4501-9cb5-0a8976dc0b68	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:25:53+00
+b6af7064-cea2-46d0-a7b3-7cffc7dfcf29	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:26:23+00
+b7cab61b-ca44-464f-a5a1-478e4de08ca6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-07 10:26:44+00
+a85e8b87-f448-4414-a6ab-b79c6812453d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 10:27:08+00
+7e298cb2-f63e-415c-871a-2bec6b35108d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	286e0afb-e074-40df-bf70-61b90dfa8b0f	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-10-07 10:28:20+00
+f20e77f9-7dd1-4b7f-a26e-aa12a4dc5b3a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	286e0afb-e074-40df-bf70-61b90dfa8b0f	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-07 10:28:43+00
+7d4952db-a8d5-4980-a362-ca07d6c1e92d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-07 10:30:57+00
+0281e22a-aff6-48cc-883b-6e5db143b14f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 10:33:42+00
+f7f6c804-bce7-4ab3-8cac-86a12b5bea93	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 10:40:41+00
+864147c9-cd9a-4704-b4b4-bdf4269f6012	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 10:41:01+00
+bb826341-39ca-4144-aba2-b786e1b3d1f9	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 10:41:13+00
+a263769a-f0d5-4b62-913e-c064559e9cb5	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 10:41:40+00
+dbbd98cd-0971-48fc-9e26-e20f6c67aee2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 10:41:54+00
+f7315f65-0c60-42ee-8fd7-a3031dca3716	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 10:47:26+00
+d67d1d12-2e1c-4d80-a55b-e3c9a7ae8d4a	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-07 10:47:50+00
+bf6f59a8-e9c4-4e3e-b606-924e53653fc8	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	b8c258c3-2b38-42f6-ba35-6ab99c484b20	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-10-07 10:48:29+00
+41d30cdd-7aeb-4bb6-870f-314262f2a888	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-07 10:48:49+00
+932c1a62-2998-424c-9700-2d9d60a320eb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 10:49:03+00
+0fba92c3-4dab-4fb1-b5af-70df3c227018	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 10:49:49+00
+1b226b14-a8e0-44d7-8275-9935936317aa	32ab44ac-a571-4128-8306-8d6f38c050f6	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 07:14:08+00
+3fee0800-c0c2-4a89-8d63-ed73911e1e8e	32ab44ac-a571-4128-8306-8d6f38c050f6	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 07:17:49+00
+2d417578-b1a8-48c7-910b-33b412a588b7	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:18:51+00
+ff22ce64-8fbb-40f0-a7fb-2ed08862448c	32ab44ac-a571-4128-8306-8d6f38c050f6	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 13:00:57+00
+85a77b5b-7931-41ab-8adc-d6508c9aad97	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 15:38:52+00
+45792044-991d-4b70-96f3-ad90a994ec14	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 15:53:11+00
+ec8e5314-493d-42a6-8406-1466f928e6ba	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 13:01:10+00
+e87c567e-34d1-45c7-a97f-6be4a7501b56	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 03:15:09+00
+a660b470-a5ca-4285-b1e3-3bf887950fe6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-07 15:59:55+00
+e5f7d218-276b-4d8e-8e23-1d09660720d0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-07 16:00:40+00
+19da16ed-6c69-406a-b665-39c53618565c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-07 16:00:46+00
+7ab35430-f1c0-4fa7-876b-b015be7cda31	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-07 16:01:07+00
+1380f540-a18a-460d-8dac-36bf958313f3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-07 16:01:19+00
+c0cae2b9-85db-46f5-ac9f-45b5a635eb85	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-07 16:06:52+00
+8c1d748f-95e0-4f68-ba26-128e19c024a6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-07 16:07:10+00
+32aa923a-1c22-44d1-b9ec-6626e2b5c585	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 03:15:21+00
+fcb2f039-7648-43e6-9ed4-de43873ec7aa	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 08:50:22+00
+890fe94a-fa2c-47a8-96ec-455f42f38f45	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-08 05:17:48+00
+0086eca7-654d-4218-8506-78b92d95e59f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-08 05:20:32+00
+e0a660ea-5a72-4635-81d2-06d3cae17d99	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 05:20:42+00
+8ad80a4e-365e-4986-aa9a-0eaeb1fc45c2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.profile.avatar.update	\N	Role: Department Chair; Route: chair.profile.avatar.update; HTTP 200	127.0.0.1	2026-10-08 05:21:39+00
+e31c5ef3-d797-49bb-b01e-ed19da6c30aa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.password.update	\N	Role: Department Chair; Route: chair.profile.password.update; HTTP 200	127.0.0.1	2026-10-08 05:22:26+00
+76772fce-b495-44a1-9073-36df9edf678f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.personal-info.update	\N	Role: Department Chair; Route: chair.profile.personal-info.update; HTTP 200	127.0.0.1	2026-10-08 05:22:31+00
+b98d5240-2ae1-49ba-918b-6fa56b78f524	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 05:22:42+00
+8e91356c-551a-420a-aff7-f2f539685f8a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 05:23:04+00
+ff8191c4-fb31-4b5c-b5c8-3de8010118ae	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 05:26:57+00
+9db77ff2-e250-44c8-bf27-df98f13e45ef	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 11:07:10+00
+efd5b93f-4a01-471c-8da8-f09ec4140091	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 11:07:59+00
+6e1a4617-a896-427c-8be8-1973c4efad49	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-08 05:31:21+00
+c9507b21-a9ce-46e2-9375-e6591a91e189	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-08 05:37:12+00
+054ba346-1421-4c8f-81ff-3cdee8ef396e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:03:34+00
+c3cc906d-7fe8-4dbd-b74a-77e6b1abbc9e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:33:00+00
+4bae8cc8-a61b-4ea5-b223-a9225f7e693e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:33:22+00
+28e45773-404d-4f83-aae4-f34ca3d2ea60	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-08 05:43:25+00
+bf4ad44e-4804-4d59-8aaf-605fff4acb22	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:33:33+00
+c9e6047e-51a4-42db-8f74-a5e598ef9ff0	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-08 05:45:40+00
+e8c07507-3598-4dfe-9d69-6b7aa7d69ff6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:33:55+00
+90de2589-fc4c-4bd3-9e1b-5994875a43b4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:34:34+00
+a3ed57b1-a394-49ec-80df-f6e3a89639af	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:34:36+00
+263f7534-fb1f-492d-982e-51a96fe08d37	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:34:39+00
+6c80d444-d62a-4a45-9020-b257ccb768ef	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.fetch-schedules	\N	Role: Department Chair; Route: chair.pbs.fetch-schedules; HTTP 200	127.0.0.1	2026-11-04 13:34:42+00
+7d36c3a8-f21a-4e6a-90f5-df24cd06b666	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:35:02+00
+559d7ce9-af9e-429e-a7b7-0ddc7adb0552	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:35:13+00
+70f9e12c-98e8-4f9a-ac71-40dea5f3e489	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 15:54:33+00
+fcf61076-c9f9-4e26-bef7-92ccac7fb3f2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 06:07:58+00
+7bb5999b-9f41-452e-86c3-c8855fb3aa8e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.notification-preferences.update	\N	Role: Department Chair; Route: chair.profile.notification-preferences.update; HTTP 200	127.0.0.1	2026-10-08 06:10:10+00
+dd76528b-096d-4217-97f8-acae5ce03f5f	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-04 15:54:49+00
+981c6311-9128-4410-aa8e-244373f3c60d	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-04 15:59:22+00
+e97310c2-4b8d-4760-862e-7df4a5ae8038	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 06:13:36+00
+3653400d-bc81-46d9-95bf-9d8a8aff1300	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 02:09:18+00
+49cb501c-3d2e-4c96-8f2c-9d65e9110821	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	8a72daaa-ba58-423b-984e-a34c65a2e619	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-05 02:33:53+00
+9a4ced6f-20b0-4e36-a3eb-24e7983009d1	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 07:21:03+00
+4c5a13ab-a40f-4bf3-8964-90a7dba96719	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	a1fa86d6-84d4-4a11-9bba-251e088f4634	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 07:21:54+00
+aa0a1e9e-4b27-4d0b-a4a0-d94ade9eb051	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 06:27:50+00
+fb952213-b88d-4287-9d85-d6392a465679	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 06:34:44+00
+0b0b2031-3f04-498e-af47-8a4670fba696	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-10-08 06:35:31+00
+c670ac8b-b96c-437f-9c19-ca5862090f22	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-10-08 06:36:02+00
+cf74f1d2-4a6d-4769-9dd5-76f222e941cf	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-10-08 06:37:09+00
+4f50f3b4-e3bd-45e1-852c-631a21909e8b	d2468e93-6a49-4532-8eae-b5ab3f0dd090	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-10-08 06:38:33+00
+fba18c40-5d68-4bd5-9232-640d2a30d386	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 06:39:07+00
+7a89b9b3-1a8a-4626-87a1-6a2058304076	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:50:02+00
+cbdc918e-a490-45b2-8995-0c32ba6a71a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:50:15+00
+c1087e2b-6240-45d2-8c4c-2e7678ee21f2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:51:30+00
+ebfff58a-972e-4050-a1cf-6cb0450f96a6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:51:46+00
+e0b4cec7-4507-4608-a563-e04541247137	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-08 06:53:46+00
+1b29d8a1-7c1d-402e-b763-5bf5fdd3eed5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-08 06:54:53+00
+23ee2e0d-c4a4-4667-a68f-2f71c941f1d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:56:28+00
+b2983e4d-ffaa-4213-9c68-2591fd56dafb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:56:43+00
+297ecca9-0ca2-4eb4-89c0-8e3c1bc1dc8e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-08 06:56:50+00
+3a1ae49c-47fc-48ca-ab98-89c8c2fd7082	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-08 06:57:02+00
+015f6304-8cf6-4b61-983c-938416c69f59	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 07:01:17+00
+01ce46e9-4eab-4ca4-9dcb-3d426f989a73	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 07:22:05+00
+35880267-40fb-4595-a977-b88f173a1782	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 07:10:53+00
+1092eaf8-1856-439b-acd4-810204194974	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 07:11:27+00
+986ad880-d5bf-4b0b-a43a-d9dac6b45739	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 07:11:56+00
+8e1bb790-fef2-41e2-9cce-eeb761481dd9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-08 07:25:21+00
+34029b61-fdca-4720-a87d-2629259d47cb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-08 07:25:33+00
+53eb8d71-353e-448a-a177-30dbbe5086b0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-08 07:25:40+00
+7d9017e4-b5e2-43ef-a8b2-a09ee3a148e2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 07:31:14+00
+237f7ce0-c88a-45a2-8db5-8606e86d4e86	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-08 07:36:16+00
+19d4122d-bbea-4f3c-9a89-60084b8e2220	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 08:01:05+00
+07589b56-300d-4df9-a897-f6d4c1f2a94c	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 07:22:15+00
+c99f19cb-b257-4ef6-897e-944bcb685578	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Created / Submitted	dean.profile.avatar.update	\N	Role: Dean; Route: dean.profile.avatar.update; HTTP 200	127.0.0.1	2026-11-03 07:27:38+00
+c2471309-c491-452d-8b27-08bdc36cb22b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 13:03:41+00
+cb055e47-db9c-4027-80f0-560f8462c438	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 08:11:10+00
+e81cecd6-8593-42de-927f-59db9676a2d2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 500	127.0.0.1	2026-10-08 08:12:15+00
+efff07e6-3610-4167-bc1b-e7bb693f3f54	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-08 08:19:35+00
+7f9ce966-5963-4ee3-9663-5e652b814f75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 08:19:52+00
+219565fa-2d9a-40a8-b0fe-9ce2aa8f18fb	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 03:36:50+00
+d55205a5-c383-447d-8804-37c05b26ff6d	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-08 08:21:01+00
+443ab7ac-6b08-40e6-b109-4a93fee93b7e	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 03:37:06+00
+c73ded74-def5-44d5-85a6-1c1ad7eabef7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 08:21:10+00
+74b995b5-5ec5-4f07-8c2d-e3b10f1f7e2f	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 03:37:26+00
+dbb8e4cc-d88d-4f0f-8d75-e9d20423129a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 08:21:26+00
+0aa916ba-bf74-4e64-8eaa-b1f6921f863e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 08:21:27+00
+50f55afc-1447-49da-80f0-d35e520a9efb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-08 08:24:36+00
+e1ae04e7-50b3-4993-a8e3-a2c278aee354	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-08 08:25:35+00
+7b4ec449-6429-489d-97c1-dad3e212465e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-09 02:39:46+00
+cd5c6cae-d619-4530-9411-444965d4ac25	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-09 02:41:31+00
+f62a8275-33bc-4742-8de0-152a98d58aad	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-09 02:41:55+00
+ecd54cca-2a20-412b-b5ea-018cda196e94	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.save-draft	\N	Role: Department Chair; Route: chair.pbt.save-draft; HTTP 200	127.0.0.1	2026-10-09 02:42:26+00
+591bfa39-d73c-4611-827e-e710563b8812	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.save-draft	\N	Role: Department Chair; Route: chair.pbt.save-draft; HTTP 200	127.0.0.1	2026-10-09 02:53:25+00
+6b12938a-10d1-4727-8a24-1459d6e0256e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-09 02:53:47+00
+f5a647ba-c9b5-4792-8ecf-9d488f6f3371	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 07:24:05+00
+dfec7e9b-f635-41b8-adcb-17bc5201ec1a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-09 10:29:58+00
+8d6a0ee0-1b07-4e79-9395-cacc5c643c4c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-09 10:36:40+00
+23a47e8c-b65e-4d7a-83d7-de1a144a2ef5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-09 10:42:52+00
+c365b391-ac77-4dfb-b488-68481194a434	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-09 11:03:23+00
+9a31a721-d6b8-446c-b18b-82f789c9ba78	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-09 11:03:45+00
+7859ef8d-0a6f-4309-9762-ddf7f68ae739	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-09 11:36:43+00
+83f68ff7-e516-4a8f-8098-9176866b0f95	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 07:24:20+00
+aa9d11fa-6966-40ce-bc99-7ec0687039df	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-03 07:26:21+00
+998467f5-ff24-44bb-844b-90bccc7eb5ff	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-09 11:43:26+00
+17fd7b9e-84dc-49b7-88de-953669a5d07a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-09 11:44:51+00
+8a8d81f7-b3d9-40a9-be25-1b228da39345	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-10 07:44:58+00
+a6915785-bdc4-41d5-8938-729bde2344ba	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-10 07:46:44+00
+62334e72-4046-46e6-9fcb-9c86585d3972	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-10 07:48:02+00
+45491d48-9fbf-4da6-8063-94b601268aec	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 07:26:29+00
+243351f3-e88c-4584-af1c-4474643300b0	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-03 07:26:59+00
+56382311-864e-4184-aab2-b01249c9908d	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-03 07:27:12+00
+42f13f79-0100-4cd8-a163-b6af1826a0e0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-10 07:51:31+00
+632a97f4-820e-429d-9db5-9c829f728548	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-14 05:22:02+00
+e1fd80e2-1cef-4b6c-af74-fd6c54962473	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-10-14 05:40:54+00
+de3c4074-7d28-41b2-bbff-ea9cd97db5f4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-10-14 05:41:12+00
+a00b0dbd-1605-4c73-aa30-2c4863e19afb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-14 05:43:20+00
+7e0d6e29-4372-4807-b14a-b17d40b1b2c6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-19 10:21:35+00
+78ed6a5f-14c4-43f3-b4fd-e82b53f4472a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-19 10:21:48+00
+7808361d-2cbc-48ae-9ee1-a76d7a259ee2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-19 15:38:34+00
+3d585a11-7a7b-4341-9fe3-6dedb8d97101	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:24:55+00
+d9adb529-5ff1-4bcc-b915-de2fb0530f0d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-22 10:37:49+00
+030b2727-ec2f-4bd4-ab26-f9693e7c5e81	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-22 10:38:08+00
+ee501a45-a0a5-4f11-b5bc-017ec38dd30e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-22 15:09:09+00
+8f6ef65a-6919-45e6-be72-eb30e9ea3b4b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-22 15:09:23+00
+c98a0cf0-9dfb-4da5-8afc-12ad0f9713ca	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-22 15:33:55+00
+b1400134-51a3-4d83-a964-c8cd0333807e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-22 15:34:54+00
+f7027272-c033-4b62-bda0-98463ad1ad8e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:27:31+00
+30e06daf-1837-4f1d-b204-36c3a47d55ea	80e78fb0-6908-422c-ae9e-cc31a7a29f04	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 08:27:58+00
+db1d054d-4dfd-45eb-b3ea-3dd85c7ad866	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-22 15:56:59+00
+afe20eb7-1d05-4f69-a533-38b80892927b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-23 06:31:32+00
+f059af55-c6bd-4883-97d9-b8528cfb8f08	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-23 11:25:10+00
+cf4b452d-0239-459a-8179-bb939761e55a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-23 11:25:30+00
+57f180fc-70b8-4cea-81ab-75ed73600a46	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	8f56fa7d-5767-4df7-a072-450ed0a6275c	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:28:43+00
+122fc8ec-b03a-49d8-9a7e-8dacc5d5bcea	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:28:53+00
+301e3bf1-4658-4c09-858a-713ed729b7fa	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 08:29:04+00
+06c9de55-1ca3-4df4-8873-51ea07ede271	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-03 13:06:43+00
+4cb1ec97-85ec-40fd-8d58-7552179a5f70	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 03:37:37+00
+cdd8050b-528c-4567-b2b8-ce8c82175d12	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 08:53:51+00
+cccca9c6-622f-46c5-935a-1ce46662fff8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-23 11:37:58+00
+242aa9d3-c7b3-4401-923e-d8f38e9e5f6b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-23 11:52:32+00
+d2dcbe75-3a18-4443-b123-54cc2311693e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 06:45:04+00
+fc031665-4719-47d0-af17-40f107660d67	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 07:31:44+00
+2390d437-30f3-41f5-991e-f2c7005cf6da	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 08:54:07+00
+ec290f29-575e-4be9-986b-52fceef54126	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 11:12:20+00
+8b77489b-b334-4c24-8e98-096af470a152	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:05:23+00
+eb1878d0-a623-4670-b321-c5896247f856	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-04 13:46:29+00
+41b4e921-6ad7-4595-a934-dc01f2ba836f	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 16:06:56+00
+4d8b134f-85f6-473c-9175-2f9afe626013	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-05 02:21:38+00
+38416a25-3151-422f-8bea-65d2db5f8d72	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 02:21:47+00
+0c1f0c96-f04d-4bd1-82aa-56f8c6f7dbed	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-05 02:35:32+00
+a96c49bd-cd33-4c49-b70b-4c445bbd3a2a	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-03 07:34:17+00
+106024c8-0ce6-4d4c-bd2f-b48b0bc6e039	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 07:34:52+00
+48879df8-5478-41ce-9773-5810a6657a57	0180a717-2d4b-4d0d-a418-153b7b24911e	Created / Submitted	chair.profile.avatar.update	\N	Role: Department Chair; Route: chair.profile.avatar.update; HTTP 200	127.0.0.1	2026-11-03 07:36:51+00
+0bab72fe-a138-4bd4-9e5c-90fd7a5d86df	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 08:44:13+00
+aae61dbf-5e4c-4ee7-a4f3-c03f52f70b0f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 08:55:31+00
+b93e1788-e07d-4478-a23c-ba010ea541c7	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-24 08:55:52+00
+cbcf7a75-a357-4b7f-b091-276a0b81b82f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-24 09:02:56+00
+9e421554-12ac-4157-91b6-ab801477b0e2	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-24 09:04:05+00
+fe60a750-5beb-4d62-8ecf-02a81f1e8b23	270ad7b7-7c4d-4823-b314-816b91773cb9	Deleted	admin.users.destroy	30552f5d-6983-426f-8e9f-2854ab12fc24	Role: System Admin; Route: admin.users.destroy; HTTP 302	127.0.0.1	2026-10-24 09:04:51+00
+945a49d0-7fe7-4729-a3cf-617aad146f43	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-24 09:05:02+00
+e944e0e6-40ba-43eb-aa50-77227770f81b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-24 09:25:20+00
+fa924821-db50-4951-ab03-60feb4eccb02	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	5a7014b0-d782-43d3-bd94-5d11cf36e5b5	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-10-24 09:25:59+00
+0ff97bdb-4700-4181-9f84-6263a96e75a8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-24 09:26:11+00
+b60a65d6-3ad2-4171-ae00-21b257a9f9cf	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	e8cd8376-6a99-4344-8446-9159c05a9fe5	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:25:30+00
+ef27a2ad-4e5a-4792-953b-c33663d04816	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:25:52+00
+ca2fda86-861f-4c2f-89bc-3101a4db9b67	80e78fb0-6908-422c-ae9e-cc31a7a29f04	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 08:26:31+00
+3c688afa-eb68-41e6-a963-1b38adedd205	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 13:37:11+00
+5c043309-1e46-46af-8827-d47992a9c6d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 04:02:28+00
+7fc7f05c-9d3e-4286-9046-e5c870167520	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	b8474d63-164f-452f-ae6c-21371fc35819	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 08:57:38+00
+775f388b-9211-4d88-911e-eb01e048dbb4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	41451ae6-c2e7-43f5-a9db-7956b4b2f1a1	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 08:58:04+00
+9f6b1c1f-67f1-4444-8807-1d4b820b2e64	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	d01a5e78-47d5-48b9-aa5c-df571d00ee4c	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 08:58:20+00
+83de1235-ea76-4fc2-88a3-efc4a9286a09	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	1c6cece4-b4ac-46f1-b960-8b9e77658d17	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 08:58:34+00
+b3af62c2-5ef7-40af-8555-fde8043967de	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	28e14207-c379-4ef8-9461-657de7927bbd	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 08:58:53+00
+89b6e4f7-c12d-4553-bc9f-d5f172e560d2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 11:14:11+00
+52e8535d-9399-4621-a86b-90a36f003972	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 09:47:58+00
+e43ca6db-4132-4651-8990-e5f0c05afc55	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 09:49:22+00
+b6699a62-4ed9-4464-a748-43294755ccb9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 11:14:35+00
+db47e0f3-57db-4274-b311-29c0e985f542	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 11:14:56+00
+1b029a65-69a8-4ccc-9439-1f1ecab6cf85	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	4bdfd2a0-265b-4ed3-89cd-696011f3a8d7	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-04 11:15:16+00
+26e0b962-8407-4ef3-8627-8bc961c8caaa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	4bdfd2a0-265b-4ed3-89cd-696011f3a8d7	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-04 11:15:30+00
+5edead96-1d6d-416b-8799-2cc11b7deeca	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-11-04 13:07:30+00
+1a7e58d1-d1d3-441d-b28e-1a769dbf9e1f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:07:43+00
+d07c70e3-e589-4214-8fbd-03da80147f63	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 09:55:17+00
+38fea78f-4adc-4833-b14f-9fad44816dce	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 10:14:58+00
+7dd2f63d-8419-433a-a801-89c4e300de25	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 13:07:57+00
+68fe2572-26ee-4c33-b638-ab5115bb94d8	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Created / Submitted	dean.pending_approvals.return	a36a47b5-6030-4fc0-b7eb-6dd251e84c6c	Role: Dean; Route: dean.pending_approvals.return; HTTP 302	127.0.0.1	2026-11-04 13:09:49+00
+198849a8-b85d-46df-a420-e8791578e639	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 13:07:38+00
+103286ce-a0f2-4010-a29f-3e47460089ce	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:09:51+00
+a486f0e7-e859-49fa-b4aa-64cd9a02beb6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in with passkey	webauthn_credentials	01a16e08-0d3e-7211-981f-fac062f7eb99	Successful passkey sign-in.	127.0.0.1	2026-10-24 13:10:26+00
+4335b6a5-6d14-4d23-86a3-0c98c1f7647b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:10:39+00
+5d799a9e-c5d8-4e8e-a697-99d0aca616bf	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 13:09:56+00
+58f7e75e-6120-47e9-b51b-adf8005aedde	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:10:07+00
+087e2c83-3009-49bf-8c5f-c166335f9c9c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-11-04 13:10:48+00
+d6693c6a-b917-497b-b746-cd7ebdad7dc6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 13:10:58+00
+1cc88619-ca88-4a96-8877-bcbb3282e850	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in with passkey	webauthn_credentials	01a16e08-0d3e-7211-981f-fac062f7eb99	Successful passkey sign-in.	127.0.0.1	2026-10-24 13:12:33+00
+1868fe8b-4dc7-431e-9c8f-70a91731c40c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:13:10+00
+02873975-5612-4019-85aa-a0549919a90f	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 13:11:07+00
+9fd57ebb-e16a-4776-98b4-e56e1572eac4	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 13:12:02+00
+148be519-8435-463e-820b-8e1ab8a59712	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 13:15:21+00
+755647b4-ac27-4b6b-8768-dd3bd868f8f9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:16:40+00
+f579461c-bdca-4bfd-9331-50ad7f29410e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in with passkey	webauthn_credentials	01a16e0e-4a73-70d8-8cff-228146efd7ac	Successful passkey sign-in.	127.0.0.1	2026-10-24 13:18:08+00
+fa67509d-5fba-4961-b43c-de3e55796067	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:18:20+00
+3cfab12f-9da7-4752-b4e4-4d212fb1ac71	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 13:38:31+00
+696d3620-392a-40b6-90f6-3286e6ac4d74	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 13:53:09+00
+e141756d-44ef-4c0c-8c11-5b225b56de1a	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 07:37:18+00
+d79f05ef-790b-4f66-a4a1-e04c852673b9	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-24 15:50:17+00
+d2e39d03-765a-418a-a46b-2221eb5fce21	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-24 15:50:38+00
+f2028a1b-2076-4006-9c54-1577da214399	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-24 15:52:53+00
+3cfac692-ab4f-40cd-bc37-c04217432a67	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-24 16:15:29+00
+23b77e7a-8c69-4210-8fd9-6c3ddd83995e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-24 16:25:12+00
+b1208fc0-73da-47ed-9dbb-1127cfeb64bf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-24 17:54:31+00
+2c1204c5-9eca-4649-9a86-1528ca78594e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-24 17:54:39+00
+06ef7bae-d268-4cf8-9976-6fa9f447a030	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-24 17:54:53+00
+e51df996-aca1-4032-80a9-804c38aeaf60	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-24 18:06:24+00
+d2f7b609-db64-4e03-94b1-09f7314c429e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:30:05+00
+0fd154b1-2217-443f-aa57-8ef230f652d9	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	1fb1299f-33d4-4e86-a994-b5ad75e7b435	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:30:30+00
+83f136bc-7d62-4d6c-9e43-1290d7461f33	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:30:41+00
+56da367f-30cf-4cda-bc8f-e02e91cf5b6f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 15:18:30+00
+156953c6-fb92-4433-9b53-85c2bc2fafbc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-25 07:54:44+00
+04e953cd-4053-4725-aaa5-da04aaba6c2a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-25 07:57:16+00
+ccdfe330-9ac4-4eb2-9de6-cea0036d234f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 05:37:28+00
+c58698c0-a5b1-4b1e-ae31-4419701847ad	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 05:37:38+00
+217ece45-c5ab-4470-aeb6-28af527c9113	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 05:19:14+00
+0cd6c268-bb3c-410b-bece-5b02e1631e3c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 09:06:48+00
+d896fa24-a870-4090-8225-6db2b8bc9257	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:30:00+00
+a29342e2-ff2f-4bae-9196-6a63060b3c29	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:31:02+00
+e65f3cc4-4e0c-4b9c-94d8-6b70c2673da7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:31:53+00
+0e100eaa-0222-4f16-9851-4425f5f0c524	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 05:34:31+00
+2031e6a2-5c28-45af-a23c-24f856c4152b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:50:22+00
+13e4b280-0ebb-4b32-88fe-447448c2f3d6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 05:55:11+00
+56b91a7c-a08a-4c2d-9c30-1f6947198fe3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:55:24+00
+fe824815-45f5-44fb-ab9e-467d6449bc82	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	72919f13-da69-4641-8d31-04d53d8654eb	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-26 05:56:16+00
+c91e48dd-c80b-4a2a-a696-7e2e60f962cd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:57:19+00
+ca5de4b0-9b18-4b69-9402-74f022f2deeb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-26 05:57:47+00
+39ad9db3-f6c9-4ffd-8bdb-772f3cb647c2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 05:59:12+00
+caa73b0a-0466-4634-a120-faa5bc0ef7dc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 05:59:36+00
+7f82b5dc-4336-46f9-abfc-f3d1de291e21	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 05:59:52+00
+b7f2c6f1-414b-41ee-85af-9761fdf07c53	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 06:00:04+00
+e505cf29-b21c-418d-85d1-96b33b7410ca	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	6f3509ac-606e-4d32-9bc6-3df0e6d41410	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-26 06:10:33+00
+79594cdf-3362-4bf6-a1d5-cc2d054d3bdd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	941738d5-2e64-4ec7-b098-c70eaa0b7aa0	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-26 06:10:44+00
+d85ce931-4097-4de7-a35d-09550fe3d75b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	17b4ff84-96cd-4819-80d9-e3a2c4acaacb	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-26 06:10:54+00
+ef043067-c694-4963-b736-a1d3f49a503e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	3225c1e2-d642-4acf-a902-32da7ed36f86	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-10-26 06:11:08+00
+f0198a54-e9be-4e7b-8ad2-1408535fc519	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 06:12:01+00
+87625798-9ce0-4e55-95c3-c1b254963949	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 06:12:55+00
+cb7249c0-b68a-4b5c-843d-ee8e789535b0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 06:13:11+00
+0e09397e-2447-4c02-a50e-40525da86a65	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-26 06:18:09+00
+0f4d6cc1-9598-42f4-b9cf-236cd45934bd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 06:20:18+00
+049b4d46-d4e1-4ae7-886b-b51a0973c711	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-26 06:20:26+00
+a0fd89af-717e-47ce-bc56-09806d98d505	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.rooms.store	\N	Role: Department Chair; Route: chair.rooms.store; HTTP 302	127.0.0.1	2026-10-26 06:21:23+00
+6ebb4b26-5e74-419f-bb6e-e6fdb1ae9ea0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.rooms.store	\N	Role: Department Chair; Route: chair.rooms.store; HTTP 302	127.0.0.1	2026-10-26 06:22:49+00
+12fbd9c6-cfa4-4fa5-93f6-f03e128c0536	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-26 06:32:58+00
+2fba7651-f5af-427c-ac17-b523956d593b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 06:33:22+00
+05d91c00-e1e4-4b58-bc4f-86aef0d716b1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 07:39:15+00
+d483bd64-4abf-422b-afda-415c2c9f3b0e	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 08:30:59+00
+d40cea0a-b007-498f-ae29-7c106dfd7202	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:31:11+00
+0009e178-62b4-45bb-832c-0e6bf280fbb3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 06:35:20+00
+ee1eb4ad-0086-459e-8bf9-3db7b7074fb8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 06:41:29+00
+f09e4d77-50d3-45da-9404-25826de9458b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 06:41:42+00
+ea8dad14-d5fa-4554-bd1d-49fabd0c309e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 06:42:37+00
+7eed97e2-ec0a-4f1a-b651-2f8fd5aa8bf6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 17:42:30+00
+01b34e0e-6c7f-4d40-8db4-b100f3ea00cc	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 05:50:36+00
+106a3954-f38e-4172-b00e-c095f2b7006b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in with passkey	webauthn_credentials	01a176f2-4224-7056-82c8-dfafe8d8ea36	Successful passkey sign-in.	127.0.0.1	2026-10-26 06:43:40+00
+72742f81-4127-4bd1-a08a-dcfa62dfcf32	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 07:02:55+00
+29095929-0704-4340-aa74-0950f6aec837	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 07:03:07+00
+2d30ec3c-810f-43a6-a499-02d71bce815f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 07:07:43+00
+5630da6e-c653-4cff-bddf-22c1e67f03ee	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 05:51:42+00
+da967846-055c-4fed-98c8-37bfb8ddc186	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 12:22:19+00
+bae0395b-d209-42d6-9c6a-bcb366a234b7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 13:34:33+00
+5087f131-1198-479a-b94e-804a904d210f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-26 13:34:45+00
+b0068dfc-a626-4f8f-a79f-30cf695117f1	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-26 13:36:56+00
+2191d131-527b-4b45-a1ca-26f3705b5952	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 09:21:40+00
+f2189d53-1fd4-46f5-a96f-e728837c6ee5	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-26 13:38:35+00
+d9228e1a-8142-45eb-8780-6c67c317d9c7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 11:25:49+00
+c7f8e39f-12d9-42b8-86ab-94f7c058099c	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 11:25:58+00
+aef434a9-767f-4cf3-9f3f-a85e0e6d9622	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 13:12:16+00
+0e6a2df0-0ab6-41c6-8add-bc3bf8baaee6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 13:43:15+00
+a32fec8b-2fbd-4459-88f5-7f992e59e511	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-26 13:52:04+00
+3770b241-effa-40da-955d-67bc26c8a94c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 13:13:23+00
+dd75c210-0c66-4aa6-98fa-bf3b68921acb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 13:49:10+00
+a2f7e008-6c86-4cc6-abc1-007347f8028b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 15:44:59+00
+f0622006-004a-4842-80f8-5e38b6ed8f58	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 16:00:42+00
+591f649c-32ac-4dcb-ae1d-17dab8c957c1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 16:18:52+00
+2a0c7509-08bf-4af5-ae0d-c6bf5e973be5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 16:18:59+00
+33e31782-2cfc-454d-adb2-855a62d09038	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 16:19:54+00
+a10ab303-2cdf-46e8-82a5-24deaa4bfe64	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 16:20:05+00
+3373f224-4805-4444-a94e-d3b11ac838d4	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-05 02:27:25+00
+2426c49b-dacf-40eb-8af1-ec4c29302b97	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-05 02:27:46+00
+5addde50-7b37-47f8-87db-ad979469312e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-05 02:35:46+00
+fdc33f31-dc8f-459b-9f2a-bf79b03a67d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 02:51:05+00
+b6d45bb9-2b58-415c-b1a2-9c01ba5864f3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 02:56:30+00
+e0063c1e-624e-475b-9ae3-92022b6c7199	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	57ee0c8d-7afe-41cd-b43e-7754006959f9	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-05 03:05:26+00
+5c8906c5-3c91-4b58-b8b1-b18bf0057168	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 16:28:05+00
+58d2df9a-4f84-42f6-a2ea-b097f8367463	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 16:36:07+00
+d0f2f9da-000c-4c9a-b4f8-cd3a501adef6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 03:15:40+00
+cfa680cd-6142-4a81-adc3-b2304fce95f8	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e891982b-d1b2-45c8-a64f-e2c5615e433a	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-05 03:16:29+00
+bdacf20b-562c-44c7-97af-5250a42bc1d0	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e891982b-d1b2-45c8-a64f-e2c5615e433a	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-05 03:16:50+00
+594b4359-0df6-45ca-8d9b-8674723565d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 03:22:52+00
+e2834cff-274d-423d-99ca-76ef449c2e97	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 03:54:52+00
+6d37ed71-e1a7-484a-9e2e-149c5efcb295	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-05 04:02:20+00
+bda059e4-f06a-4604-8337-45bbb965f01a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 17:08:43+00
+e6abf8ee-3368-4ea3-b15f-a6989804718e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 17:17:39+00
+24ecc85e-c00e-49b9-99fd-ac051e92dcd7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 09:14:33+00
+978c7152-58d9-40d3-8c1e-efcd7db7a69a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 10:45:14+00
+4d154639-f0b8-4905-9a97-7d3bedf9b689	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-05 14:46:45+00
+7ce37846-5059-461d-a421-3b08b7d664b2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-05 16:37:02+00
+f641c527-7df5-4a49-8bf0-73c96870de33	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-26 17:45:53+00
+a43a7832-5b9e-489b-9c62-48f3a5682f63	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-26 17:53:56+00
+dde6678c-34f8-4a1f-8aa5-92ac1acb04e8	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 07:45:18+00
+31ed430d-45dc-4fa2-895b-ffb11bf741aa	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	f4621259-120e-465b-9ec7-567c11393625	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:32:26+00
+c5b40394-05f7-41be-a551-2973ffb28b51	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 08:33:19+00
+4bb0b311-dd34-47d9-9ee4-cc7ea016bc14	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 03:43:10+00
+418262d3-85f4-439e-b7f5-071b75d61786	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 00:22:16+00
+a7c030c4-49a6-406a-bde4-f84080f52ea2	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 05:52:25+00
+0a3e60b5-e422-42a3-ba6e-1265620ede8b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 03:52:46+00
+978377f5-1c80-42b2-a0e8-e5774fba8f14	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 03:54:52+00
+8d023f8d-c876-4181-a7d5-98f5fc375391	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 05:52:29+00
+dfe125eb-222f-4414-a165-5f78843f2297	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 05:53:39+00
+0fc11dc7-7ad9-42d8-a79c-248e0b054e66	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-27 04:06:25+00
+c95b2744-bb5a-44ce-8e7d-ee32b9f2c082	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.reject	168f3fdd-6615-4e26-8c6e-1ef2ff17c493	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 302	127.0.0.1	2026-10-27 04:07:26+00
+a85132a0-b76e-4907-9b0c-023e44fb947e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-27 04:08:04+00
+cc5f5efe-03ee-4e13-82e6-ca8c86164053	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-27 04:11:13+00
+496fbcc3-61e2-46b1-a593-c15bb01879db	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 04:11:19+00
+a68be3b1-eaaf-4f0a-99f1-b2db8d929eca	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	85e50b88-29c1-430c-9f9c-00b8567b5e68	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-10-27 04:11:59+00
+eb36e8b6-c40c-4eaa-be80-5ca54886b687	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-27 04:12:11+00
+b6693448-4d43-401a-944f-189c5f4d8282	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 09:57:17+00
+8cf246fb-18bc-412f-a6ab-d4d40d72fde5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbs.destroy	232f6a43-87f3-433f-8048-bd2d51eb58ad	Role: Department Chair; Route: chair.pbs.destroy; HTTP 200	127.0.0.1	2026-11-04 09:59:34+00
+21d0db7a-5097-4bac-9070-63c719eaa8e5	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 11:35:01+00
+93ee39ea-0a41-46a2-88c9-4d2273c17613	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 11:35:16+00
+375e12bb-c65c-4cdb-9062-4f47a92bbe52	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 13:14:10+00
+ed5d4d17-4f87-4c6d-890a-6ae089956710	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	8a72daaa-ba58-423b-984e-a34c65a2e619	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-04 13:14:35+00
+00d587e4-54dd-43c0-b1e9-c6f243bd06a5	e891982b-d1b2-45c8-a64f-e2c5615e433a	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-04 14:24:35+00
+15a96019-b3c0-4490-97c4-07a25bd45c76	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 04:20:05+00
+f5af51a3-16db-4f72-be75-3fa244aef0cb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 16:21:41+00
+5a323c0d-3b5c-4861-919f-0988cfda0307	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	8b3c02b2-40c2-40f8-9ff6-90a8d4ebb4f7	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-05 02:31:07+00
+b2e19db4-192d-45e0-ae44-dd1d0786244b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 04:21:47+00
+e3152bdb-dbdc-4dfa-8305-df835a74da31	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 04:27:22+00
+3dd520ec-d794-415f-be6e-2f7d621a6f59	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.approve	8b3c02b2-40c2-40f8-9ff6-90a8d4ebb4f7	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 404	127.0.0.1	2026-11-05 02:31:17+00
+c993dec3-958a-4e0e-bfc9-9be08227edfb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 02:48:58+00
+ff541ae9-31b9-4194-921f-59c56dab10c7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 04:39:25+00
+c2e0e12e-084d-4492-84de-0f3852ca973b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-27 05:02:19+00
+973fff7d-d700-471a-b58e-2bd08cae53c8	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:06:40+00
+900c0bb5-e1ee-44b2-875c-e1a58d263239	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:07:56+00
+e40c65d6-d91c-43e3-b029-6b4f009d66b4	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:08:27+00
+3380edd3-3e05-4542-a9ed-910a4503033a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-10-27 05:08:44+00
+f11e060b-1ee0-4952-99ec-77f4e5f5a603	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:09:01+00
+982617c9-4f44-4ed8-96d4-2e4543b5e748	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:09:57+00
+d2b958b2-2c01-4fa1-ab3d-c71e76c4d160	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-0846-70f7-838f-78f46a9c229f	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:10:15+00
+323f1581-4c51-4ab3-bdac-2f78ece3d264	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-7ffa-70e7-ad0b-1425dec9e6cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:10:30+00
+71d2b91c-f828-477f-8074-20744eeacda7	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-0543-7291-8245-b4aa9535a39d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:10:42+00
+5777f37f-396f-4518-8297-f5e0a345573a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc0-df9f-71d9-9c74-d3c001aa7636	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:11:32+00
+20d8b710-9f85-430e-877b-3825e58755fb	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-0543-7291-8245-b4aa9535a39d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:11:42+00
+de228de2-1ab2-43f0-bb05-6ba7bc8d0c62	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-0543-7291-8245-b4aa9535a39d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:11:46+00
+47177709-824a-461a-88e4-2194c9d3d964	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-7ffa-70e7-ad0b-1425dec9e6cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:11:55+00
+22df1bc8-25c4-412c-98f2-655872478176	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-10-27 05:12:04+00
+6180869a-29aa-4843-a223-296f28a3c463	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-0846-70f7-838f-78f46a9c229f	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:12:22+00
+adda692c-eb37-48e9-b55e-d54dc4d75ee4	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-e393-732e-936f-8d7d53bd790e	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 05:12:42+00
+37500127-dfd8-4446-9fc8-af73c5e85dd4	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:19:15+00
+cbf098c3-e609-48ea-b2e5-753a5c20bb05	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:19:52+00
+457ef7ed-9c7c-4a4c-b44d-0d4bbfc5cea1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-27 05:20:25+00
+7967e9b8-9676-40e4-af12-097f4fa0b7e2	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 05:20:51+00
+27e7d159-389d-4678-ac0f-d5d79c6a4b59	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	2b58fd60-f2fb-4920-84eb-85cec962a211	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-10-27 05:20:56+00
+093c8b9c-b804-4bd5-bd0a-04939f4e6e08	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 409	127.0.0.1	2026-10-27 05:22:14+00
+ea2f67ff-856d-47f9-8140-55d57032f157	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 409	127.0.0.1	2026-10-27 05:25:15+00
+9d1e691e-b75f-4ebb-938b-57665a4c40d8	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 409	127.0.0.1	2026-10-27 05:27:56+00
+88cf8d3b-29fc-4add-9251-d6496824867a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 05:40:01+00
+646cc510-e8c2-48f6-87f6-6ed9f2e4114c	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-27 05:40:12+00
+d1b9299f-f4b1-4952-aa2e-102690bb104e	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-27 05:47:09+00
+39c7a43c-71ce-4fd7-a520-8f2067fb780c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 05:47:26+00
+f3f6da94-66cf-4d9f-978c-fade011347b1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	0ea3a218-045d-4506-a906-34ee83d7b2af	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-27 06:01:35+00
+c4df4c9d-ae46-4c0a-bc98-2d5d62af0379	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.mis.code	0ea3a218-045d-4506-a906-34ee83d7b2af	Role: Department Chair; Route: chair.mis.code; HTTP 200	127.0.0.1	2026-10-27 06:02:01+00
+801083d1-83c7-4622-a40f-6850c192330b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:07:32+00
+7ff4e883-07ca-49b4-9314-4b805aceab15	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:08:27+00
+e20875e9-9807-4d27-89f3-3b4e01841511	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:09:29+00
+9102e8c3-518f-496e-a468-e3b344455baf	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a176e0-3cda-73eb-abd5-d05a057346cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:09:42+00
+afa6d770-11b2-4f7d-af26-e30a6cdfeb91	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:09:59+00
+772184a6-4983-47ae-8205-e5ba3d098a01	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc0-df9f-71d9-9c74-d3c001aa7636	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:10:26+00
+4968f1c6-c641-4634-af20-937179676769	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-0543-7291-8245-b4aa9535a39d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:10:36+00
+b66fd881-8417-40eb-ab76-853844e7bcec	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-7ffa-70e7-ad0b-1425dec9e6cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:10:43+00
+65606b5f-1517-4f29-b0e3-96e03a83e75f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:10:53+00
+d0f85ced-52f4-48d1-ab9d-188fc5456923	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-0846-70f7-838f-78f46a9c229f	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:10:57+00
+e5742875-a765-49a0-be57-6cfda92ae391	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-e393-732e-936f-8d7d53bd790e	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:11:20+00
+466b3011-8ffe-4f95-88f2-bbec585e52d1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:11:32+00
+051af83a-aa78-4769-8525-75f01a6e8ce1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcc-65bb-7120-b431-3c89f25ccded	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:11:36+00
+c6e1cd4d-5340-428c-a17c-bd098ad0ff0f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:11:45+00
+1bb41f81-9196-4460-8148-4e5e4c1fbb5d	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcc-f742-7317-adf8-51246c2d8cdd	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:11:46+00
+f0a03e28-34f8-4978-9b13-546a4f740563	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 07:49:05+00
+8262a92b-f041-44cb-9d22-1fefa0bcd7d9	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bf9-6f71-7398-b483-83e9a64e5ffc	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:11:57+00
+92d16f5e-c34f-4fd6-97dd-fc784c68303c	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:12:36+00
+11abdfd9-ed7b-489d-93b4-64627dd4a85c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:12:54+00
+7e838127-634a-4592-bdba-8c4f32bb6bde	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:13:02+00
+0a25a5d0-2519-4a0b-ac24-cda8758e6f93	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:13:21+00
+265fed18-7b71-475e-a240-77566bd2e3c6	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:13:29+00
+2dcb5ffd-49f6-4bee-8ce7-d1b6295dab14	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:13:50+00
+3a134598-7531-42eb-91cb-b96fd5ba0cbb	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 409	127.0.0.1	2026-10-27 06:14:16+00
+d8f43b9b-4fcf-4072-b76f-11f6f6e07b61	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:14:35+00
+8195e5cd-3b34-4c6c-961f-8a320bd40de5	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:15:21+00
+7bc8205c-49d9-4962-a1cf-c4399ef5e708	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:16:51+00
+f838cca9-6977-4861-8903-eade80365ad0	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:17:21+00
+8145a433-1a9c-48b9-b4bb-4cb6bb7c3999	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:17:52+00
+78188b7c-515a-474d-911f-c1789401e97a	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:18:04+00
+a0255d8b-3fa2-4db5-8315-de50b8c5d655	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:18:37+00
+9d228566-5950-42a7-9fd1-b5c80c9f893c	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:18:55+00
+0d05743c-e4b5-468b-89d1-73b0fdfda07b	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 07:50:58+00
+2cdba7a4-01af-46d4-af7e-a02680a6911e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 08:33:06+00
+997266c2-2394-45b4-b449-3696352d9b13	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:19:37+00
+19dd097a-f59b-4ed9-8bb6-8695bd3030f1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:21:58+00
+38ff41ae-a51a-413b-bd44-b25b97967b69	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a176e0-3cda-73eb-abd5-d05a057346cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:22:08+00
+2336cc4a-68e5-481b-8fb3-e202d5bc197a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc0-df9f-71d9-9c74-d3c001aa7636	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:22:15+00
+16419009-1948-4902-915d-57fbf8244ef3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 07:51:07+00
+7e90e375-0751-404d-b3b8-77e0f60a4963	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:22:30+00
+b1ffeca9-15f6-43ba-8f14-88505b0875d1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-0543-7291-8245-b4aa9535a39d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:22:44+00
+0678ecf6-7347-43c2-9a51-df7b5f65bf7e	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc0-df9f-71d9-9c74-d3c001aa7636	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:22:53+00
+e41b87ff-f43d-48bd-9f98-ff42b749b6fd	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a176e0-3cda-73eb-abd5-d05a057346cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:23:01+00
+d924498b-b85f-49f1-9eb3-308115df4835	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:23:11+00
+106b2784-acfa-4140-ae2b-df585fb2328b	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc2-7ffa-70e7-ad0b-1425dec9e6cf	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:23:31+00
+cfd0453b-446a-48ff-8d13-60e9f847f8c8	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-0846-70f7-838f-78f46a9c229f	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:23:43+00
+109dc5a9-3798-47d4-9f19-6bfd351bdd86	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:23:56+00
+1425e38a-7b94-4cc7-9bb5-1e127a449145	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bc3-e393-732e-936f-8d7d53bd790e	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:23:58+00
+16a2882c-8b14-48a9-b828-ef4dde3a5621	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcc-65bb-7120-b431-3c89f25ccded	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:24:43+00
+7cee736a-1db3-4d51-aeb8-ea9f6529ef66	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bcc-f742-7317-adf8-51246c2d8cdd	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:24:56+00
+577e438d-ac75-4b84-9ff0-56d48afe899a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bf9-6f71-7398-b483-83e9a64e5ffc	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:25:24+00
+59bd86b7-3c44-439b-bd96-7b364496e2c1	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bfa-6247-73a9-b57a-90b0e8213149	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:25:34+00
+0f5c3b60-315d-44ca-bcae-19c612b5dac5	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bfd-3b82-7254-8b81-4481eef3759c	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:25:43+00
+58decdce-c964-470d-95c7-abe3c11c9135	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bfd-a2c0-717d-9ac9-7a2d9664898d	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:25:57+00
+56be96bc-7048-4956-97d0-38eaf6e431c4	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-03 08:33:39+00
+205ed580-af1d-4774-a71c-ac08293fd49e	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bfe-0c49-70c5-bf4a-04ed2299b141	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:26:08+00
+df62be88-c899-49fc-b5ef-63961f2b9e7b	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bfe-5c34-71d1-92de-103dcb66defe	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:26:21+00
+be1aa273-bd9e-4509-abb9-aab9e3fb4c50	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bff-0d7b-739d-b84a-467ca4fc5fa7	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:26:34+00
+c5e05d92-8710-453e-86e1-e26cdad2bd5a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17bff-bf7f-7254-b603-6c7f491731ee	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:26:44+00
+490add58-d5eb-43da-bc27-6d3c72b52c55	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c01-22df-7386-9f83-908d579df931	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:27:08+00
+85bb2789-5ed8-4fa9-a20b-78aec396ee92	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c01-9594-7329-9a15-d70c42621d70	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:27:18+00
+02a4c5c9-c77c-4e02-b731-75b8be981737	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c02-3fe8-708f-a00c-04376fddf85c	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:27:28+00
+43253411-d132-4e0c-a9e0-e8e57b93deba	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c02-bfb8-7070-bbde-b163456119e5	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:27:41+00
+c199b119-1740-4bd6-986b-a9ba72bad3ba	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c03-045a-71f0-8a7a-b235f135a727	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:27:51+00
+04ad03e5-6dd0-4c7c-a8d2-7ed8aa5eb55a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.rooms.update	01a17c03-a9f0-73a5-87be-99e46e353412	Role: System Admin; Route: admin.rooms.update; HTTP 200	127.0.0.1	2026-10-27 06:28:03+00
+51f7661b-fad1-4636-8038-12894cf4210a	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:28:27+00
+3b68129d-38e1-46a7-ab8d-74efd183807d	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:28:50+00
+846ed08a-ab7a-4e59-9165-872a06fec139	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:37:25+00
+649f648e-ed7e-4c5b-969c-e0429c83613a	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.rooms.store	\N	Role: System Admin; Route: admin.rooms.store; HTTP 200	127.0.0.1	2026-10-27 06:29:13+00
+e2c1c077-9172-4370-bac8-5bb47178c17f	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:29:22+00
+ccc07b8b-8409-4757-aa47-34a1bdf8c124	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:35:03+00
+467aa58c-d828-4ddf-b494-8e77fc533463	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:36:31+00
+68b04dd4-02b4-4084-a8c4-ad269d61776c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-27 06:40:33+00
+95e644a9-4ef6-42bf-ac80-8b880e5bb32f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-27 06:40:48+00
+68a787c1-dde8-406d-86ad-1f3583c5186e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 06:41:28+00
+1a9f456e-0109-4580-b47a-fd599191f31c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 01:11:16+00
+e52d4159-058e-444b-ab1b-ea10a37f442b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-27 06:41:51+00
+03d4ea77-a583-4437-b7d5-70cf81e14ffe	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-04 01:11:36+00
+c76641e3-5726-47b3-8995-0984c4cf36da	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 06:42:38+00
+06217729-1527-4102-9e34-884e739dc5cb	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 07:17:26+00
+cd269ac5-f891-40e2-a605-41dbc8a4b6b6	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 05:54:33+00
+c7344531-09e0-4270-ba3c-0d96c3f5be61	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 05:55:52+00
+b9aa8bb9-17f8-4b13-a613-271c77b36f30	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-04 05:56:08+00
+5456639f-674e-4aad-87cd-c8396639d47f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 01:52:17+00
+2e8ff170-96c8-4eb8-99d4-974bf22cdbe8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 07:34:30+00
+1839ed97-e331-4cd5-9355-097c9862a0a4	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 07:52:26+00
+b5dc0de6-3edf-483f-9ef9-def073038dc9	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 07:34:45+00
+0226691e-a919-4d48-999c-a9daa097158f	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 07:34:52+00
+705ccd9f-5612-4261-b9a3-ea4506ac5055	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 07:43:06+00
+945a1fca-dce2-475f-b98c-07ad0b6b5fd1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 07:44:03+00
+ba7460f0-ea78-4955-b220-a947c9d98793	0180a717-2d4b-4d0d-a418-153b7b24911e	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-27 08:01:20+00
+c652693c-43e9-416e-810a-962a8d92ec3a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-27 08:01:29+00
+d84f820c-3127-49e4-a6ab-16908618294a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-28 02:54:18+00
+2d51956a-797b-4485-8a7b-8e0ff6ebfbe2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-30 06:19:51+00
+ef780533-f12d-47b6-a024-d7938d1ebb42	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-10-30 07:03:19+00
+58c48d1f-3ca5-4755-ac7a-6aaf6cec0fb1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-30 07:04:13+00
+109e65d2-5d00-455a-b4a6-458274749946	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-30 07:04:37+00
+e31f29b6-5aac-4269-a6fc-12582cc62640	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-10-30 07:05:08+00
+8559ebe6-0602-4b82-9a42-5c87333f838f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-30 07:16:20+00
+8be2f61d-c73f-4947-b652-d46715d8e8e4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 07:52:40+00
+a5d9b17c-ae97-40ca-b998-96e19f2a2b5f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:33:45+00
+62098b5e-736c-40c1-bf76-f1c09bea1a1f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-30 07:22:27+00
+c380e770-e28d-47a1-acc2-cf488f3d042c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 03:51:45+00
+8e14b973-d7d5-43e8-9502-a6ac42946491	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 04:54:29+00
+8cfe3424-b58e-454c-983b-6eb25a44725f	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	fefa2366-a955-46f1-bb2b-5d243dfe86b7	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:34:10+00
+8c151c72-7f8b-4403-b9a6-db4cd4982b77	d126364e-680c-4fe5-879b-52a849cf8e19	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 08:34:39+00
+1a474da9-8305-484d-bc55-0a59f82ed155	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 05:49:28+00
+80358b08-bbd8-42fd-a73b-c12fda06f8dc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 06:03:00+00
+4b37d6f4-7c2c-4b88-b7a2-a736e73e27c0	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-10-31 11:32:15+00
+c58cbb14-5823-4a4b-ba72-9c1e1b8a7bd2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 13:08:40+00
+bddfd0bf-fe75-4801-9b85-7d2b0ef9278a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-31 13:31:48+00
+8090ccdf-a2b1-43ea-a78a-7666defb4ef8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 13:32:03+00
+2408d4b5-a254-4175-8d7d-f9f3ef9c7810	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 13:32:13+00
+6037b085-744d-4491-b462-523864376827	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-31 13:44:49+00
+533ee9f1-1b56-410f-8e4f-bc5b686f8c2b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 13:45:05+00
+8652f537-96c7-49c1-98ce-30fca7a9f31a	d126364e-680c-4fe5-879b-52a849cf8e19	Logged out	session	\N	User logged out; role: faculty	127.0.0.1	2026-11-03 08:36:16+00
+cfd87ebb-7e6d-4916-91d5-157c2b2a1f5c	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-04 02:14:29+00
+5022a8aa-4be1-4d7c-b099-1a98847c19d6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 13:46:15+00
+3b329e3e-ef87-4e2c-b25b-1ebaf768c4e3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.submit_dean.store	\N	Role: Department Chair; Route: chair.submit_dean.store; HTTP 302	127.0.0.1	2026-10-31 13:52:40+00
+0801a3dd-7ab7-409f-bb7a-4191237c3d86	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-10-31 17:46:06+00
+216bb058-c576-4c90-8193-1788ee3a1f75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 17:46:50+00
+82bb67f4-64de-4745-98d4-e2b12befb399	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 18:48:46+00
+22479ca7-89f1-430c-bba7-cba6c259b01f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:17:58+00
+cf17f6b0-4a79-43ca-8267-6bea755803f3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-04 02:14:42+00
+3b4bdfff-1476-4f60-8025-4bedaaaf3dcf	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 05:57:40+00
+327b6872-a499-4459-a0a8-1eafa3eb2478	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 05:59:56+00
+5d7021ee-cfa3-4c1e-9b63-63c64f9fbe3a	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 06:00:35+00
+faf13506-6217-4625-9016-ff09a5e8e3e1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 20:35:56+00
+e4d2717b-5537-4045-a10d-b06f825469ba	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:37:26+00
+05653ebf-2ed8-448f-83a6-03971c18732e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 20:37:38+00
+3ffc8a5d-69f5-467c-bba3-420787eb6e9c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:42:29+00
+7ab05507-1f1b-41ca-bebf-40d4626734e4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 20:42:46+00
+493edbbc-1f06-4d2d-ab4e-0aa0d2611aaf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:46:39+00
+779ceac2-cd33-4909-b441-a36f45fa0e67	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 20:47:07+00
+445b1c32-f792-49d2-93c6-dd2dd1096151	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:47:37+00
+d1ec16ab-eef6-43bf-9bcc-7810911988a6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 20:58:50+00
+8d2dd43c-1733-4dd6-8829-46328a49fc6d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 20:59:26+00
+e78e5005-80d4-4681-bc51-3971e13279d5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-10-31 21:04:25+00
+93f05dc7-5ba7-49a4-bfdc-073d8ace1eb1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-10-31 21:06:26+00
+7d70f461-f698-4a68-8b80-0dbe596a995f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-01 01:11:03+00
+2956ddd2-dbd5-408f-b4d0-2c0bb0fb0c7b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.personal-info.update	\N	Role: Department Chair; Route: chair.profile.personal-info.update; HTTP 200	127.0.0.1	2026-11-01 01:16:47+00
+c5a34cce-72b0-4600-9b3e-a11cb7cf7d02	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.profile.personal-info.update	\N	Role: Department Chair; Route: chair.profile.personal-info.update; HTTP 200	127.0.0.1	2026-11-01 01:16:50+00
+0119fb8b-7cf3-4f7e-823c-a14a48630ad9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-01 01:17:40+00
+4fbee5dc-83ca-47c7-a7f0-7f903d22c734	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-01 01:22:56+00
+1260ee12-cdbe-4522-898b-ad33ab01c998	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.reject	908da125-4569-4540-9f37-6cfad23dba3d	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 404	127.0.0.1	2026-11-01 01:24:39+00
+de98c06d-19cf-41a4-8804-1ef69777f132	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.reject	908da125-4569-4540-9f37-6cfad23dba3d	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 404	127.0.0.1	2026-11-01 01:24:43+00
+908ce53f-a8bc-432b-b594-23fbf0923113	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.reject	908da125-4569-4540-9f37-6cfad23dba3d	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 404	127.0.0.1	2026-11-01 01:26:56+00
+85fad473-0b9a-44ad-9b37-753cdde18da1	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.reject	908da125-4569-4540-9f37-6cfad23dba3d	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 404	127.0.0.1	2026-11-01 01:27:04+00
+909136dd-af90-44f7-b1e9-89bdd9f6bb07	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	5a02482f-b018-4aaf-825d-adb78c5737a8	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-01 01:29:00+00
+3b6f98e8-a0dc-4663-88b4-cd9872fd6a09	270ad7b7-7c4d-4823-b314-816b91773cb9	Failed Created / Submitted	admin.pending-accounts.reject	908da125-4569-4540-9f37-6cfad23dba3d	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 404	127.0.0.1	2026-11-01 01:32:21+00
+4f1903de-95ef-4cbb-92ac-54756f3817c2	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.reject	1d27e246-7ce6-437c-9f56-3d36a849f257	Role: System Admin; Route: admin.pending-accounts.reject; HTTP 302	127.0.0.1	2026-11-01 01:32:43+00
+85150ffc-d57f-4ca1-8b21-03715b6163e9	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-01 01:38:44+00
+e27b33f5-f472-424b-afb8-57e34e8f252c	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-01 01:40:50+00
+f0b6ab5f-2b02-4199-a206-40a250c9cf08	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	225825f2-93a1-4593-9ae5-1a4c85023c99	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-01 01:41:36+00
+871e6123-97d9-4b6d-968d-4a5bc94e494b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-01 01:53:18+00
+37a2e9ea-1858-43bd-bd5b-23304b5bcf75	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-01 01:58:39+00
+64cfdcd1-13aa-4a16-bc6d-57c7663adc92	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	3c10ea20-fcb6-4bc3-80ec-945f5a955302	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-01 01:59:01+00
+f1621973-9276-49dd-a764-d2dd927b89ce	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:06:31+00
+3362e0a2-dea2-471f-a2ca-ccfe276afcfc	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:19+00
+cd6601c1-cf1a-4714-a186-4746aa7762b8	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:24+00
+10db0533-9b97-4fc0-a9b2-6f8a17952747	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:26+00
+bb0426a2-cda9-466f-9110-8e16421dd5a6	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:28+00
+a11898e6-174c-4da2-9956-633b114852e2	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:31+00
+5181cb3c-914e-4c95-b15b-a3f8b84b8fb5	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:34+00
+11650333-07b8-4b35-9d30-24a5af8af0e0	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:03:36+00
+3c9b5f9c-e16c-42c3-a5e9-72a77d13f1a7	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-01 02:04:23+00
+87573dc7-2e9b-4aef-ab4f-323abbff47a2	e891982b-d1b2-45c8-a64f-e2c5615e433a	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-03 08:08:11+00
+f8e2750d-0990-4d7a-bd54-cf12b9107804	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-03 08:34:05+00
+5038b3e3-6fad-448c-a0e6-0c1a9079fab2	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:34:21+00
+15276697-26cf-48a1-b0a7-869a176c29cd	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Created / Submitted	dean.profile.avatar.update	\N	Role: Dean; Route: dean.profile.avatar.update; HTTP 200	127.0.0.1	2026-11-03 08:34:49+00
+c4993e10-14ce-457e-84fd-f24512c16854	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:36:28+00
+b8e5b3f3-c5f2-4e02-8592-9d68993060f0	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-01 02:08:12+00
+3f7f2917-329e-4403-8dd0-098d8249959b	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:09:20+00
+e21c3eff-429b-4473-bb4c-22ed9edb5c93	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:10:02+00
+d5c0ddb7-a192-4347-9e9e-77e02f1a6c48	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:10:23+00
+fa504945-0c34-4ec1-abf7-b540dc42d1de	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:10:37+00
+5ae17491-18f9-4774-ab41-b801ecf95554	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:12:30+00
+b9e3812d-a9c5-4bac-abe9-8951d7bb7795	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:12:51+00
+366bf5d1-ff7b-4e6d-95a3-5b5b15a7a0ed	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:16:17+00
+66e39993-769e-4953-8a52-eb119c7779cc	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:16:39+00
+94179cae-c5e1-4eb0-ad63-fc95f2bc532e	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:17:00+00
+aad66855-7fa7-4e16-87d3-7e5eb509e268	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:17:41+00
+8df31a76-6fb5-49c4-a5ce-da87e956fb35	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:18:12+00
+7117b1f7-bbc7-46b2-bc47-c240961b95ad	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	8e71ea7a-a33f-4eb3-89d0-61f9013a7031	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-01 02:19:29+00
+16d6b5b8-56a3-4539-99cf-4aae83b0dfb2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-01 03:35:34+00
+8534dc97-61cf-4087-b83d-d28f653950e7	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-01 03:47:39+00
+39564087-3080-4026-b688-9f4a9eea2aaa	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	6257f202-a6c3-45aa-b511-4296e1f50ac7	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-03 08:07:14+00
+3e210d03-1fd6-4d2d-b5bd-f2ae66faead3	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-03 08:07:39+00
+a2c1fcfa-ce5b-435a-8dd1-453e8806affe	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.notifications.read-all	\N	Role: Department Chair; Route: chair.notifications.read-all; HTTP 200	127.0.0.1	2026-11-01 05:12:00+00
+a19e5004-9ac7-4744-bee0-7e1907cc7a13	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.notifications.read-all	\N	Role: Department Chair; Route: chair.notifications.read-all; HTTP 200	127.0.0.1	2026-11-01 05:12:03+00
+d73c7d8b-8d11-4597-851d-e5ea815d0098	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-03 08:37:31+00
+59690dce-9ea8-4a08-8738-0b004c9d7fcb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-01 09:35:19+00
+f1a29668-c6f4-484e-9674-f37c282c13ba	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-02 02:59:36+00
+adac2943-a7ec-4436-9fbb-b4cf41e63709	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 01:13:43+00
+f75f8fdc-8655-4c22-8369-a5a78d082413	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 05:51:52+00
+44a8eb32-5d9d-4bc8-aa7e-0eef4c882837	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 05:53:31+00
+a73fe8ec-db5f-4712-ad2c-bf95af76bf80	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 05:54:17+00
+8dc7a79a-f0e7-49c3-8040-8c5a47487055	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-03 06:33:28+00
+68abb53f-f33e-4d33-9929-51be9a403a1d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-03 06:33:45+00
+ab92b1f7-b5f1-40a5-a18b-fd9578272367	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-04 02:31:14+00
+76a7eaa9-9156-49f0-9cd7-127b6ae19554	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-04 06:00:52+00
+99fe511a-e798-4bfc-ac64-b069094924fa	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-04 06:02:41+00
+1da8777f-1ece-41b4-8d96-82d3509c017f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-04 10:18:00+00
+30310073-573b-4f97-8f63-c7289f2f5906	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 12:53:36+00
+f27aa14b-d2c0-4229-8e10-d7d0aa6ff75e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 12:53:58+00
+adebfa73-03b4-49fd-9b26-1801dd745b3e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 12:55:11+00
+f0e912af-cb83-4ac3-8f7e-5202e783b4ff	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 13:15:38+00
+3a81f21d-2d89-4603-b1e5-3b88d5f91e1e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-04 13:17:06+00
+4ff7c4b1-9f14-479a-865a-87b3a0fd5077	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	322ca05e-404e-4638-9c3f-ece2f95d8996	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-04 14:28:35+00
+41f2a9d4-79e2-49dc-849d-d60051c15c52	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	ba231c3b-b91d-421c-806a-ed6f3da49bcd	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-04 14:29:10+00
+1575652f-8ab6-4e0b-ad6b-ecadd44ef7e2	e891982b-d1b2-45c8-a64f-e2c5615e433a	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-04 14:29:21+00
+820e98cb-4ead-42f1-b367-bd4fea3d8bcb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	ba231c3b-b91d-421c-806a-ed6f3da49bcd	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-04 14:30:44+00
+3f8489da-ee66-4dc4-a162-c54f86153e0d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 14:31:48+00
+c3e87611-edf6-480f-a114-875abf4e1803	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-04 14:32:05+00
+f732cb08-7f6b-4fd4-9391-53b493c85d5e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-05 02:03:29+00
+6df40da0-0086-4eec-bcc9-f54485941eaa	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-05 02:04:03+00
+cb640e2e-9472-42de-81d6-b599ec8d23a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	2308c1f5-88ca-4dfa-88e4-75f411ba24e3	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-05 02:33:12+00
+88349ff6-ed12-4de0-ac75-5de38173ee8b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	5f8d8d4a-41ed-409d-ab8c-f6f90f647d83	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-05 02:33:31+00
+7501f2d4-43dc-4712-ac35-cc7dfbe915f7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 02:50:29+00
+ee454f2d-5d48-4de5-ba87-b612e4096db3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 02:53:17+00
+28a54813-de7d-4e03-8e83-b59ba59256cc	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 02:53:51+00
+193f6074-b433-46af-ae8b-d83644b3203b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 02:57:23+00
+ca0bf892-a503-4c16-b9ef-4019e5adbaf9	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e891982b-d1b2-45c8-a64f-e2c5615e433a	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-05 03:14:01+00
+7fa795b0-c5b7-4e39-ab71-c0875e8717be	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	dcd87c9e-0236-4c08-839d-4894dace7cfe	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-05 03:16:13+00
+9d8de827-18fa-4ebb-b7a4-4054b3d7581e	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e891982b-d1b2-45c8-a64f-e2c5615e433a	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-05 03:20:43+00
+f90939e1-1906-4d1a-a339-b2306b922a42	270ad7b7-7c4d-4823-b314-816b91773cb9	Updated	admin.users.update	e891982b-d1b2-45c8-a64f-e2c5615e433a	Role: System Admin; Route: admin.users.update; HTTP 302	127.0.0.1	2026-11-05 03:21:06+00
+85161462-c479-4589-9481-e15953b57162	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 03:24:22+00
+a04d83e6-7ce9-4dba-b649-c26257e4b3ee	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 03:56:34+00
+6e888ca3-c4af-4ce0-b281-9185982144b2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 04:02:45+00
+90d9e05b-d172-4115-95f3-17a20db7f432	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 09:38:10+00
+a33e0ffc-2dc2-4d30-8c62-137bc7817ab5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 14:40:43+00
+437ccb7b-373a-47a9-bc76-05fe94c37804	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 14:41:41+00
+b9e3dcb2-8e52-4533-81c1-c9a192f9fdd5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 500	127.0.0.1	2026-11-05 14:59:07+00
+2b008f5f-b70f-4398-84cd-c8ac7d220630	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 500	127.0.0.1	2026-11-05 14:59:53+00
+5bc58ce2-8268-4738-99fb-552888b1e219	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 500	127.0.0.1	2026-11-05 15:00:29+00
+55c61111-81fb-4f59-bc03-807df3fafa02	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-05 16:39:01+00
+8c790f4f-786a-4c16-a5b9-1f7c3188199f	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-05 16:39:49+00
+46e7fd93-0ba7-47c2-ba86-0065822fcf94	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-05 16:40:09+00
+070d9a8b-06ca-444a-9ef7-6e4ea42e9448	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-05 16:40:43+00
+22198362-5943-4cb9-84bf-540c5ec0d521	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-05 16:40:54+00
+be15babd-dca9-4ad3-b0f5-ff635d123971	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-11-05 16:43:57+00
+8844f81d-23be-4868-be47-937c91c253c4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-11-05 16:44:48+00
+91a5ec56-9116-4da8-94bd-75fceb6ba59a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 23:18:13+00
+0a67ff9a-a614-4eb3-91e2-85fa2e9b9936	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-05 23:18:26+00
+76b428ee-81c0-40a7-92af-e1d31f0d3d1e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 23:19:57+00
+88af3f90-be1b-4d4a-b86f-116ac109c626	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-05 23:20:03+00
+d95ad414-f1b6-46a1-933e-a353cfb50bb5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-06 00:05:26+00
+1abdcc42-793b-42ca-a6b7-9a245762ea45	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-06 00:05:31+00
+33dac26a-4e48-43b8-b693-14713fe225c1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-06 00:06:26+00
+f3b0a7e9-129e-4361-9cb7-44249a1f724c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 00:09:23+00
+1eb49913-b4d7-43bc-b25c-1f5d05406f5d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-06 02:38:40+00
+752dfb73-19d9-4d34-9024-33c75749cb3f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-06 02:39:53+00
+52a8c797-11f7-410b-bd00-080f3fa569fa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	630e7908-2598-48ae-9a2a-a1988112f12d	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-06 02:40:31+00
+8b6c3e82-f57d-46a2-983c-43ba8be071df	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbs.destroy	630e7908-2598-48ae-9a2a-a1988112f12d	Role: Department Chair; Route: chair.pbs.destroy; HTTP 200	127.0.0.1	2026-11-06 02:41:24+00
+964a0d03-bb8a-4d63-90d0-966337d9305c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-11-06 02:42:08+00
+f3d4637f-33e2-4482-b412-3b9e1483be13	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 02:43:27+00
+fb8421aa-86f7-4ef5-91e2-7ea111efe1a8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-06 02:50:35+00
+2d121b5c-f461-4662-8d80-ab1c5898262e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:02:32+00
+f3b15553-7add-462d-a341-d2ee60f195bf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:05:19+00
+100231fe-800e-476a-b2de-0d8b9e6b7adb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:06:18+00
+c5ecf0c2-d245-48f3-81d1-9eca47183f12	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:07:39+00
+e2b47ba9-ee23-4562-b6d1-8d7958aa1dda	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:09:42+00
+5430aea7-10f3-468f-af07-5825026df266	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:14:02+00
+24ff3a5d-8436-4498-9b0c-ee8169b9a50a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:16:54+00
+474763f4-d90f-4ed3-8c96-d92beb42c05a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-11-06 03:18:04+00
+6b5af11f-d51e-4b3a-b57d-c2d305cd1504	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 03:18:17+00
+926ebe20-426f-46be-9fb8-c8ae62592739	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-06 03:22:06+00
+a8ce40a8-bd27-4353-a3fc-f2d992c210e2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 201	127.0.0.1	2026-11-06 04:04:51+00
+00b1d050-dbfc-4a3e-a27d-529027ad59b2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-06 04:48:08+00
+430230a5-075c-412a-b287-33dc5a33fe77	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-07 04:53:07+00
+7521adc0-fe8d-4a31-976b-d4c9b57b719f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-07 08:05:58+00
+ca938aea-7fbd-4cd3-9d39-6d16388db9b0	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-08 11:17:29+00
+a9272344-5ea9-4d73-9180-6ff83d81725a	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-08 11:22:37+00
+27af6d32-2270-4e77-ac72-fe452e5a6620	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 11:23:10+00
+1f4ef345-645b-40f1-9cef-b65159f61262	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 11:31:03+00
+5e5a6b93-2159-474e-b827-bb305877fbcb	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 11:32:22+00
+8bdb575d-d695-4a21-8520-e41b3e9165de	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 11:32:58+00
+fe1d6c90-7846-4cee-a412-ad2d7e0b6ba5	270ad7b7-7c4d-4823-b314-816b91773cb9	Created / Submitted	admin.pending-accounts.approve	f6f7626a-d7c2-4388-b085-0cf0f429d588	Role: System Admin; Route: admin.pending-accounts.approve; HTTP 302	127.0.0.1	2026-11-08 11:33:24+00
+2f692145-e7e3-4f9f-91ca-14533793d7a1	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 11:33:31+00
+831128ea-91b5-49f8-97f3-09d3d2a19d31	2005b54a-b45b-437a-bb5a-e167c8137a02	Logged in	session	\N	Successful login; role: faculty	127.0.0.1	2026-11-08 11:33:40+00
+137fd219-6432-429c-9f13-6b88ea11b4ec	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-08 11:33:48+00
+0384272d-f128-476e-8c77-49b97bfd040b	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-08 11:36:53+00
+3df3a58b-2134-482d-81da-062511c00500	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-08 13:12:35+00
+0baabf15-686e-42be-a37d-fd18d08b46b3	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 13:12:50+00
+3909f318-e7db-41a1-af86-f3529a31e558	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 13:15:03+00
+33accd1c-f4e2-47f4-8cbd-dd1f29196141	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 13:15:16+00
+c6af1be4-5bc7-4032-9f0a-f9ce3c44dce6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-08 14:46:36+00
+6fbfcc29-988e-4b6e-bb42-74f2e99eeb70	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 14:46:46+00
+045290a5-5a76-432e-8b48-36e386967720	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 14:57:56+00
+ca174345-041f-4e5f-848e-634b17dd7db1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 14:58:32+00
+e6483b1c-dc8c-480d-ae52-b1602f5a2d22	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 15:09:45+00
+1a942afc-3b2f-4b17-8577-c1effc1b6ea9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-08 15:51:57+00
+163a3e7e-3d5e-45d6-86c9-a4aaec2daefb	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	328589e9-163a-442e-9d39-a1ae06f2abd7	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-08 16:01:57+00
+cbac858a-db2c-49c2-97d8-c23385890a79	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	328589e9-163a-442e-9d39-a1ae06f2abd7	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-08 16:02:20+00
+5487e1fb-0128-4a70-be5d-f9287eebfa99	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:02:58+00
+2748ece0-dd2f-451b-ab41-cabc805ba876	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:10:30+00
+394faeb3-8ea4-4659-92fe-c3e95daaf133	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:10:42+00
+95936678-0b0e-40e0-9f6d-541fc4c6b1e1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:11:15+00
+b5482e28-a855-449f-a5fe-714788ec28b4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:14:37+00
+24b93d55-6a7b-466e-856a-9bfff966c7f2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-08 16:19:11+00
+8190b490-dbbc-47d8-8c6f-6a33c8ec2ccf	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 16:19:38+00
+0f5e58b0-3f92-4bf9-a0f8-9020f49cfeba	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 16:21:21+00
+d2d6ecac-236f-47b9-82cf-df2e6379b546	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 16:21:35+00
+9d0d6fa7-8ed0-4936-ae77-4490ebd6ce43	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-08 16:30:58+00
+df7c377a-dc60-4e49-9ac3-5ee9f65d0cc5	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-08 16:31:07+00
+832dd68f-f1ae-49ac-8588-cc0822c5a807	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-08 16:31:36+00
+c0b170b7-1a62-47d2-b032-d8214c6d333f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 16:32:35+00
+7dc0395f-e7b0-4b89-be3d-492f9df72d28	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:38:19+00
+e1a1f338-12ff-4761-abf7-7356ae67fddd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged out	session	\N	User logged out; role: department_chair	127.0.0.1	2026-11-08 16:47:31+00
+e5921a2a-aad9-4416-8f45-c55e603dc393	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-08 16:47:47+00
+16faeeb0-1e93-4e30-8277-73abe7754ae3	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-08 16:48:08+00
+9a40d12b-419f-4ef7-902a-a32285e39596	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-08 16:48:20+00
+b9455fa5-ebbf-4620-a186-35e7cf32cc34	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-08 16:50:30+00
+5e40b7c3-0cf8-4596-97ce-58a61403f73b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-09 08:27:27+00
+3e2cf2c6-aba8-450b-a9b9-6e9fb2fc143b	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-09 08:32:26+00
+7edfdfe0-74ff-4c7d-943e-1744fe787c25	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged in	session	\N	Successful login; role: dean	127.0.0.1	2026-11-09 08:32:38+00
+9f8df0c2-ecbf-437d-a8be-ef0c4f6c649d	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Logged out	session	\N	User logged out; role: dean	127.0.0.1	2026-11-09 08:34:44+00
+f20fce80-a9ba-46e7-bb93-acfc7b6ab8da	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-09 08:38:10+00
+2b44f26f-1b90-4e9b-a82a-5fbc7198dc88	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-09 08:40:24+00
+e1417f78-22c9-4ca9-9473-31d16f1b3e30	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged in	session	\N	Successful login; role: system_admin	127.0.0.1	2026-11-09 08:59:30+00
+f25ca839-bf54-48cd-8dac-9484c6327e38	270ad7b7-7c4d-4823-b314-816b91773cb9	Logged out	session	\N	User logged out; role: system_admin	127.0.0.1	2026-11-09 09:00:10+00
+c2ddafb5-fe33-4c15-aa21-837502696815	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-10 04:31:28+00
+de979580-afb0-401a-9bbe-b587b42b0917	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-10 04:33:20+00
+3c237f52-adac-4f87-8b00-dc6bf2d5bc2a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-10 04:33:53+00
+cdc12249-5808-43a0-b799-4f294be4966a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Logged in	session	\N	Successful login; role: department_chair	127.0.0.1	2026-11-10 10:55:11+00
+32b20779-8596-4cb7-b10b-0aaa0f47ffd2	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	21b2f9df-fd35-4f6e-a08e-b10a6ef3b928	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-10 11:18:17+00
+6ad2d79e-81bb-4648-a0a0-142276b91c30	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 11:30:25+00
+4eb32af0-c9e5-4fae-a7b1-97ed0932591e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 11:31:45+00
+08252b61-c031-48a3-b0e1-56c40b0f851d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 11:32:36+00
+e788e461-fc94-4ebc-9af4-6d33f0a4c9db	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 11:32:50+00
+0ffa088a-353f-423f-ad64-72d462bf76c0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 11:33:07+00
+20f32c83-3caa-478d-b0fb-abbe51192143	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 11:34:20+00
+dd05d89f-ba5a-4c92-aa90-9b4dd6607e23	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 11:35:49+00
+3bf030e9-5244-4cac-9177-cfeb1aa56ddd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 11:37:32+00
+37abc56f-a0fc-4dbb-8666-b7e59d8f16c4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	fc598609-8ce3-40f0-af52-48d4e7e5803e	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-10 11:40:48+00
+dc2c1f57-47d4-4198-b6e2-b6a1780e7f27	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a08a-6633-71da-a16e-269a62efff07	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 11:49:14+00
+123386d7-a70b-49e3-ace6-206b8b61d08d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a08a-6633-71da-a16e-269a62efff07	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 11:49:20+00
+2643f624-0484-4c70-8f67-52fb0348222d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a08a-6633-71da-a16e-269a62efff07	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 11:50:19+00
+1158b5a5-ef1a-4d87-928e-5a961957a61a	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a08a-6633-71da-a16e-269a62efff07	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 11:52:19+00
+9942951c-06b4-4cc0-9c79-aca4d2cd8270	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a08a-6633-71da-a16e-269a62efff07	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 12:02:04+00
+3adc8405-810e-49e6-946d-89c4cc5a5656	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:03:43+00
+def0b816-ebdc-4c37-8bf0-2298a8bb6f20	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:06:27+00
+2ae17e8f-004c-48ea-ba67-61e02f0d5dd6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:08:44+00
+87545151-a354-46d5-abcc-8d7ba5f892e4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:09:35+00
+e53e67cc-0d5a-4a10-b6c1-7f2189b14273	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:10:33+00
+bed11221-25b3-4954-851f-c63c40b46eb8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:12:50+00
+57e7f9c9-3a7c-4473-ad29-7abd1d02e622	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:15:51+00
+453f6e61-b564-4164-a6b0-6f1c2116682d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:17:13+00
+f93c6145-c4b4-4250-9cea-eb61830e98e5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:17:27+00
+7e3811b6-0f77-4da2-9417-b89a6a5511d1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:18:18+00
+d26b6eb0-9fe8-4cf1-b4ca-eb9cbd15f3bd	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:20:34+00
+2c079acd-a709-4a02-bed6-6fd87164af0c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-11-10 12:27:26+00
+6656a95b-0141-40f0-b8dc-720504f0bdf0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-11-10 12:27:40+00
+e3561ef5-14b4-44c3-8839-04a5e5978b9e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 500	127.0.0.1	2026-11-10 12:28:38+00
+9ebf324b-1f8b-40f7-b0fb-7fd08c7727c8	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:31:46+00
+1fe7c32e-c087-4872-9add-88120249db1c	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:45:15+00
+af260860-3cec-4715-8a64-cba38d8186f4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:48:24+00
+946df73c-a05f-4322-84ca-d3f3643a5d91	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:51:40+00
+2821f153-7954-4985-9558-e954316b5c07	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:51:58+00
+5eae5942-cf58-4ec2-a833-1f607285ec88	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:52:28+00
+98f59663-b1cd-4389-bb8b-a818f95843b4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 12:57:35+00
+bbb8b6e2-ad70-4894-ac5c-4072c6f19972	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 12:58:40+00
+39593fed-155f-47c3-be52-65e2b9817947	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 13:02:53+00
+f8a52ae4-136e-4552-a7a3-4d24aef751d3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 13:14:58+00
+adffaede-8286-4f07-8874-e32aa243b49b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 13:16:33+00
+0573ce8f-8f17-4eca-a251-65bb9a2ebc9e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbs.store	\N	Role: Department Chair; Route: chair.pbs.store; HTTP 422	127.0.0.1	2026-11-10 13:22:35+00
+32569d3d-f681-4f55-bc05-6a9231e66da3	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 13:34:52+00
+6bb3b64e-ed3f-4899-aa64-24945db5a1a4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 13:35:28+00
+95442016-2531-49f8-afc1-eeb136990335	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	63670ec5-d87d-4b8e-8062-cf64d8907d68	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-10 14:10:58+00
+04a2d7ba-e961-4fc2-a3d4-66f7d1df73a6	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:11:43+00
+1fdd5d57-5358-447b-81aa-6b976aff4daa	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:15:04+00
+ffe16997-845b-4224-9895-8d5dd1a08b05	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:24:48+00
+ae243326-7c1b-45f1-abe7-e38d17fb5830	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:28:39+00
+70f3448c-b8b1-47e9-8474-2d62143077bf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:47:00+00
+b8ba1d29-b872-4598-915d-ace2db74f4e4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:47:51+00
+755ce414-a299-408d-9c94-035561ff94a1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:52:36+00
+1800a133-2532-4508-bba6-6161504fd282	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:56:24+00
+387ea02d-aa3c-4cec-891b-3a51646b0a17	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 422	127.0.0.1	2026-11-10 14:59:03+00
+acfc1b85-8360-48cb-b402-b2b9360c47df	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	f49cb8f7-4d32-4db9-a589-93a754eb9512	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-10 15:07:31+00
+f1754c1d-04be-44b7-ac8c-441d0cea4d91	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:26+00
+a4e04db1-77f4-4957-a678-0ac62d86bf4e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:28+00
+7ec99e9f-5217-4924-ac20-29ce766dfdd4	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:30+00
+c4a644ec-7959-4839-889b-965c98b543b9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:31+00
+5653c2a2-bee6-4397-b3bd-badf29283627	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:33+00
+1056e991-5fa1-4fcc-a409-e51d50eb1725	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.faculty_load.special-positions.store	\N	Role: Department Chair; Route: chair.faculty_load.special-positions.store; HTTP 302	127.0.0.1	2026-11-10 17:00:35+00
+618cd27e-85dd-4a3e-a3f9-4f8eeba348a9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1baec-8076-7080-a841-079a4c219fe9	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 17:01:24+00
+e9d87969-428a-40c6-956c-b53474af8292	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1baec-8076-7080-a841-079a4c219fe9	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 17:01:29+00
+59d5120f-4f70-4f22-b366-7694304ad400	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 17:09:44+00
+e457921d-83a2-42d6-bec8-abbfb5647d1e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 17:09:50+00
+df9f360a-0bbe-4c6a-af3d-8df8933c1117	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:12:43+00
+80e96d52-39e5-4098-8663-3aab11f03ca9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:13:33+00
+e5fe7fb8-de82-4b01-bab1-583ddb7ced8d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 500	127.0.0.1	2026-11-10 17:14:03+00
+45b62a26-5f9c-4b08-ae3a-c7ad16f26e97	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:21:39+00
+d0d74498-f15f-482b-ba5a-7376e0e31487	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:21:54+00
+41e12345-4cff-4f74-9436-a7ac7d929e8f	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:23:01+00
+d0c8c74f-8eee-4ac3-be1c-c3cc64ab5eb9	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.faculty_load.special-position	01a1a081-6875-705e-9bbf-aad9f2b675f8	Role: Department Chair; Route: chair.faculty_load.special-position; HTTP 302	127.0.0.1	2026-11-10 17:23:15+00
+d52646c4-866f-43b4-8a05-1840e6010165	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	ef854190-cad4-4b7b-90df-cf8077f75b35	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-10 17:35:53+00
+90bf7db5-6570-46ec-b7a2-020ea96a3c81	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 17:36:34+00
+41831537-67da-4379-8f3b-951a9fd055e7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	d0a6a3a5-a075-47b8-9328-215c509b7bea	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-10 17:37:12+00
+16a8abc1-99c6-44da-9c5e-82b9d06d5f0e	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Deleted	chair.pbt.destroy	476cbf5b-6f2e-446b-b7e5-a6ec46859d18	Role: Department Chair; Route: chair.pbt.destroy; HTTP 200	127.0.0.1	2026-11-10 17:37:40+00
+d9fa829c-7da4-4b2b-a27f-9c22f981bbf7	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 17:38:35+00
+97156784-c84b-49df-903e-408f88b1c371	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 17:40:41+00
+60c6b8a4-e24e-4a16-b0c9-fbf3ca69210b	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Updated	chair.pbt.update	c7487a01-8869-40d1-baff-ce99ebca8994	Role: Department Chair; Route: chair.pbt.update; HTTP 200	127.0.0.1	2026-11-10 17:41:17+00
+c2b39a94-b259-4f82-b2fb-f483002cc004	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 17:42:58+00
+9f06e01d-2e72-44ec-ba12-9fe4b10389ca	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 17:43:21+00
+24a2d651-a6f0-44f9-bd85-acf35f5de6bf	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 17:45:19+00
+89a1afe9-4248-4f9d-9ce1-a2300cff2609	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 17:46:42+00
+5b432683-2393-460d-91d8-093b63418389	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Failed Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 422	127.0.0.1	2026-11-10 17:46:56+00
+7b6ab085-06e8-4fb4-ac62-4a40e42db562	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Created / Submitted	chair.pbt.store	\N	Role: Department Chair; Route: chair.pbt.store; HTTP 200	127.0.0.1	2026-11-10 17:47:15+00
 \.
 
 
@@ -5845,10 +7580,6 @@ b592a3ca-d9f7-48e5-b878-64fbabd49571	41a4e102-068a-4a65-8e1d-70e5289f99ef	UPDATE
 
 COPY public.biometric_credential (bio_id, bio_usr_id, bio_fingerprint_hash, bio_registered_at, bio_is_active) FROM stdin;
 01b7b3ac-dc59-479d-beee-293481ddd695	270ad7b7-7c4d-4823-b314-816b91773cb9	fp_hash_admin	2026-07-15 15:05:38.115564+00	t
-e7f59f83-e495-4794-a14e-3a90576a674f	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	fp_hash_dean	2026-07-15 15:05:38.115564+00	t
-70193938-4012-4f95-b57b-104acf10108a	41a4e102-068a-4a65-8e1d-70e5289f99ef	fp_hash_chair	2026-07-15 15:05:38.115564+00	t
-6c03b0e7-2871-4b8f-ad41-232b863286d2	56b56f76-e432-490c-a35b-b4f588ddf716	fp_hash_faculty1	2026-07-15 15:05:38.115564+00	t
-797ae7e1-686f-4dae-8971-80ca5c42a6a6	ea9ad791-09c3-4f91-a464-c3bb72922747	fp_hash_faculty2	2026-07-15 15:05:38.115564+00	t
 \.
 
 
@@ -5869,15 +7600,98 @@ COPY public.cache_locks (key, owner, expiration) FROM stdin;
 
 
 --
+-- Data for Name: college; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.college (college_id, college_name, college_code, college_created_at) FROM stdin;
+dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	College of Engineering	COE	2026-07-15 15:02:46.174993+00
+01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	College of Education	COED	2026-07-15 15:02:46.174993+00
+bb09daa1-3065-4718-b08f-e4569311ace3	College of Arts and Sciences	CAS	2026-07-15 15:02:46.174993+00
+d2762742-5d6f-4013-9124-1cd3105c2708	College of Technology	COT	2026-07-15 15:02:46.174993+00
+c5d5cb3b-eda7-4f13-99b1-f7602a749b30	College of Computer Information and Communication Technology	CCICT	2026-07-15 15:02:46.174993+00
+\.
+
+
+--
+-- Data for Name: course; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.course (course_id, course_college_id, course_dept_id, course_code, course_name, course_lecture_hours, course_lab_hours, course_is_active, course_created_at, course_updated_at, course_year_level, course_semester, course_units, course_category) FROM stdin;
+221d8268-bbc3-427d-8e18-3d6457d3c2fb	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 111	Introduction to Computing	2.0	3.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	CC
+d601231f-8bf9-44c1-979d-47b0862983b2	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-MMW	Mathematics in the Modern World	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	GEC
+dd991fe9-a724-441d-a9c2-a2b383f8d75c	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEE-GPSP	Gender and Society with Peace Studies	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	GEE
+b4a35934-3cb8-43ff-8510-7594adb302fd	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-PC	Purposive Communication	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	GEC
+ecf095e8-8be4-4fa7-9486-14f3a5ef310c	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 112	Computer Programming 1 (Lec)	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	2.00	CC
+97146de0-2d72-4a5f-9122-e23a6dd73a25	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-STS	Science, Technology and Society	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	GEC
+3caf369d-7064-4af3-991a-c4e9adb43741	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-US	Understanding the Self	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	GEC
+23b04717-a9f5-422d-a358-9682b8290757	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 123 L	Computer Programming 2 (Lab)	0.0	9.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	CC
+129c7c27-0333-482e-a1b2-adaebad32452	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 214	Data Structures and Algorithms (Lec)	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	2.00	CC
+29315385-4ca1-4ec1-8650-e3638858a6b9	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 214 L	Data Structures and Algorithms (Lab)	0.0	9.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	CC
+84f9ed60-bdf0-49a6-8778-57ff0178396b	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	NSTP 2	National Service Training Program 2 (CWTS 2/LTS 2/ROTC 2)	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	NSTP
+88bddbe2-6c57-42d4-8a25-17208a560fbe	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-LWR	Life and Works of Rizal	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	GEC
+814c196c-d04f-4c82-a43c-6d36b46dbc7c	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PATHFit4	Physical Activities Towards Health and Fitness 4: Dance/Sports/Martial Arts/Group Exercise/Outdoor and Adventure Activities	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	2.00	PE
+c422befe-115d-40cb-8528-5dcac6ddfd42	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-TCW	The Contemporary World	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	GEC
+75eb53eb-4458-41c5-b317-2a9623fb7d12	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 213	Professional Issues in Information Systems	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	PC
+0e9dc814-f4d8-4018-b905-0793be99baf7	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-PEE	People and the Earth's Ecosystems	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	GEC
+46e3227c-c233-48a0-816f-5beeff1e720c	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 225 L	Information Management (Lab)	0.0	9.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	CC
+de4ef0a6-5a60-4a20-b4f1-9de55824cf47	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 226	Business Process Management	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	PC
+9751862a-6d6a-417e-9834-26e920dfebba	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEE-TEM	The Entrepreneurial Mind	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	GEE
+15e22461-23f8-4a88-9581-ac0d8fb2ede0	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 5	Foundations of Software Engineering	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	AP
+efa79181-f225-4ad9-b5ae-1b28bb2dfdb3	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 4114	Capstone Project 2	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	4	1	3.00	PC
+9daf1d2c-9d9f-4c70-8e37-701efd8ae642	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 4113	IS Strategy, Management and Acquisition	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	4	1	3.00	PC
+589bc794-8034-49c3-828e-ae52c10185b7	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	P Elec 1	Data Mining	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	P Elec
+8bab364d-dbe5-42d1-bd60-c1b6039bc861	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-RPH	Readings in Philippine History	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	GEC
+9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 112 L	Computer Programming 1 (Lab)	0.0	9.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	CC
+a3d2f648-c2d3-4277-951c-8b33f6832b01	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 317	Systems Analysis and Design (Lec)	2.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	2.00	PC
+060fb1de-bd77-4c8b-8b3c-0ed17999ec33	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 122	Organization and Management Concepts	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	PC
+0b9d7201-1ec8-4600-a970-7d99b32720f9	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 225	IT Infrastructure and Network Technologies	2.0	3.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	PC
+3796036e-8010-48ac-b6e3-af139bdc7557	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-AA	Art Appreciation	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	GEC
+404ecfbf-4665-4c7e-b1ef-7665aa6b4108	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 1	Computer Architecture and Organization	2.0	3.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	AP
+48f229a6-59fd-45e7-b534-b9db10ebeb24	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 123	Computer Programming 2 (Lec)	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	2.00	CC
+6792b81a-307d-48fc-838c-0dfadea6bf32	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEE-ES	Environmental Science	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	GEE
+6c0961e0-4b83-41c1-a21f-a80c677d4a8a	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 214	Financial Management	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	PC
+7450f516-d06c-48a9-b19b-17e7f575e2cf	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 121	Fundamentals of Information Systems	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	3.00	PC
+b020043f-6784-4cf2-9478-c5ad23714052	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 225	Information Management (Lec)	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	2.00	CC
+b8533f26-4339-44ba-b2ac-becc3ee54bdb	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	NSTP 1	National Service Training Program 1 (CWTS 1/LTS 1/ROTC 1)	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	3.00	NSTP
+d263bef3-06d8-425d-a5e9-5d369bc41127	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 3212	Capstone Project 1	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	PC
+d14a8916-ada0-4c92-9ca1-d50b34690032	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEE-FE	Functional English	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	4	1	3.00	GEE
+e032b16d-40fa-42a5-8a4d-4c5c02abfa4e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 2	Web I: Client Development	2.0	3.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	2	3.00	AP
+e7e06ddc-5e1d-427c-9127-4caf6e3f8be4	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	P Elec 2	Customer Relationship Management	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	P Elec
+f61b7055-01a4-4933-8c68-c8c9436c4a75	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	GEC-E	Ethics	3.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	3.00	GEC
+43d5c948-d863-4c0c-a021-56233464fca1	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PATHFit3	Physical Activities Towards Health and Fitness 3: Dance/Sports/Martial Arts/Group Exercise/Outdoor and Adventure Activities	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	2	1	2.00	PE
+8cd451f2-cca7-4a4e-b7d1-ef1e541b60ef	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PATHFit1	Physical Activities Towards Health and Fitness 1: Movement Competency Training	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	1	2.00	PE
+d900be4c-6d99-4d5c-9131-fce21e372f88	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PATHFit2	Physical Activities Towards Health and Fitness 2: Exercise-based Fitness Activities	2.0	0.0	t	2026-10-07 02:40:56.295271+00	2026-10-07 02:40:56.295271+00	1	2	2.00	PE
+889f0785-1a4f-4053-93d1-04a2a651374d	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 319	Evaluation of Business Performance	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	PC
+8f28b4b7-8177-45d0-bb26-48b7f2627643	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 3110	Quantitative Methods	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	PC
+b39c8352-4307-4883-822f-66943f54d698	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	PC 224	Networking 1	2.0	3.0	t	2026-10-28 05:53:06.268189+00	2026-10-28 05:53:06.268189+00	2	2	3.00	PC
+f9c0dc38-b211-4b81-a294-7c28110d973d	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 6	System Administration and Maintenance	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	AP
+d987712f-57cc-495f-8a5f-e9fc386844a1	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	CC 326	Applications Development and Emerging Technologies	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	CC
+b962e1fc-98cc-4657-b897-70538c312cf4	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	P Elec 4	IT Audit and Controls	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	4	1	3.00	P Elec
+2c5be148-1d93-4b4d-a08d-3c49df7613e2	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	P Elec 3	Enterprise Systems	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	4	1	3.00	P Elec
+56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 317 L	Systems Analysis and Design (Lab)	0.0	9.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	PC
+02b2203a-e29e-43fb-b3cb-81111a5a4aec	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 4215	On-the-Job Training (OJT)	0.0	729.0	t	2026-10-07 03:22:11.792601+00	2026-10-07 03:22:11.792601+00	4	2	9.00	PC
+4fa74092-1469-450e-be91-a9c015cf2bcf	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 4	Database Administration DBMS	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	AP
+15f66c86-9bf9-42ef-bca3-4b10320842dd	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 318	Enterprise Architecture	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	PC
+054be96b-7b81-4d29-af1c-64f8a4a1b461	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	PC 3211	IS Project Management I	3.0	0.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 02:57:28.735813+00	3	2	3.00	PC
+129760c4-d92f-4695-a7e3-71e8dcac525f	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	AP 3	Web II Development	2.0	3.0	t	2026-10-07 02:57:28.735813+00	2026-10-07 03:20:10.33823+00	3	1	3.00	AP
+153ff80c-ba8f-4758-b4ac-2b2fb2bc4416	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	PC 212	Quantitative Methods (Modeling & Simulation)	3.0	0.0	t	2026-10-28 05:41:39.150802+00	2026-10-28 05:41:39.150802+00	2	1	3.00	PC
+2ea11643-7229-4a16-a29b-aec277663981	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	PC 121	Discrete Mathematics	3.0	0.0	t	2026-10-28 05:38:08.328973+00	2026-10-28 05:38:08.328973+00	1	2	3.00	PC
+47e5a6b0-ceda-4438-a078-29469c317ce9	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	P Elec 1	Object-Oriented Programming	2.0	3.0	t	2026-10-28 05:43:16.910096+00	2026-10-28 05:43:16.910096+00	2	1	3.00	P Elec
+54c20c9e-003d-4614-affc-6f52aff300bd	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	P Elect 3 	Platform Technologies	2.0	3.0	t	2026-10-28 05:54:29.571862+00	2026-10-28 05:54:29.571862+00	2	2	3.00	P Elec
+5b078561-bcf4-4d3d-b35c-b2f432ce17fb	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	AP 3 	ASP.NET	2.0	3.0	t	2026-10-28 05:55:46.163682+00	2026-10-28 05:55:46.163682+00	2	2	3.00	AP
+6ba85deb-a5a7-4527-87fc-624db5b11bf2	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	PC 223	Integrative Programming and Technologies 1	2.0	3.0	t	2026-10-28 05:52:11.919672+00	2026-10-28 05:52:11.919672+00	2	2	3.00	PC
+748bc0ff-9511-47d1-842d-845b679e8901	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	P Elec 2	Web Systems and Technologies	2.0	3.0	t	2026-10-28 05:44:24.400207+00	2026-10-28 05:44:24.400207+00	2	1	3.00	P Elec
+c55f8061-08b2-4728-9656-7216110e27c8	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	REC	Research, Extension and Consultation Time	0.0	0.0	t	2026-10-27 04:40:23.239696+00	2026-10-27 04:40:23.239696+00	\N	1	\N	
+\.
+
+
+--
 -- Data for Name: dean; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.dean (dean_id, dean_usr_id, dean_first_name, dean_middle_name, dean_last_name, dean_suffix, dean_phone_number, dean_gmail, dean_office_address, dean_profile_image, dean_assigned_at, dean_dept_id, dean_prog_id, dean_employee_id, dean_gender, dean_civil_status, dean_dob, dean_nationality, dean_profile_image_public_id, dean_bio) FROM stdin;
-c9fb747c-05a7-410d-aaf9-99a07194f794	ea9ad791-09c3-4f91-a464-c3bb72922747	Emmanuel	D.	Reyes	\N	09201234567	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	bb09daa1-3065-4718-b08f-e4569311ace3	\N	\N	\N	\N	\N	\N	\N	\N
-1e861607-fb8a-4dc7-ad87-25237eb8075f	41a4e102-068a-4a65-8e1d-70e5289f99ef	Maria	S.	Santos	\N	09211234567	chair.ccict@ctu.edu.ph	Lapu-Lapu City	\N	2026-07-15 15:02:55.862627+00	d2762742-5d6f-4013-9124-1cd3105c2708	\N	\N	\N	\N	\N	\N	\N	\N
-e4b6c925-9647-4d2b-bfd7-e8c5d2c3aa47	270ad7b7-7c4d-4823-b314-816b91773cb9	Pedro	B.	Garcia	\N	09181234567	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	\N	\N	\N	\N	\N	\N	\N	\N
-4916e80e-1cc2-467b-be21-366b484def4b	bf0e723a-e3f6-4446-a4ff-e72738cdc0c9	Carlos	\N	Mendoza	\N	09190000000	carlos.mendoza@ctu.edu.ph	Cebu City	\N	2026-07-17 14:23:53.460898+00	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	\N	\N	\N	\N	\N	\N	\N	\N
-2bc08823-8770-41ff-a8ad-71795272cf99	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Juana	B.	Dela	Sr.	09123456789	juana@gmail.com	corner San Juan St., Cebu City, Cebu	https://res.cloudinary.com/dlsr0ebdd/image/upload/v1790441922/skedyul/dean-avatars/dean_2bc08823-8770-41ff-a8ad-71795272cf99.jpg	2026-07-15 15:02:55.862627+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	\N	\N	Female	Married	2004-02-03	Filipino	skedyul/dean-avatars/dean_2bc08823-8770-41ff-a8ad-71795272cf99	WOWWW
+COPY public.dean (dean_id, dean_usr_id, dean_first_name, dean_middle_name, dean_last_name, dean_suffix, dean_phone_number, dean_gmail, dean_office_address, dean_profile_image, dean_assigned_at, dean_college_id, dean_dept_id, dean_employee_id, dean_gender, dean_civil_status, dean_dob, dean_nationality, dean_profile_image_public_id, dean_bio, dean_address) FROM stdin;
+e4b6c925-9647-4d2b-bfd7-e8c5d2c3aa47	270ad7b7-7c4d-4823-b314-816b91773cb9	Pedro	B.	Garcia	\N	09181234567	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	\N	\N	\N	\N	\N	\N	\N	\N	\N
+ce02d743-22d2-49fc-ba62-803f9d566dc7	bc02c426-ac11-4fb4-93d5-eb6804b7974e	Jose  Maria	S	Garcia	II	+639974453635	\N	\N	ce02d743-22d2-49fc-ba62-803f9d566dc7_1793690858.jpg	2026-11-03 07:26:19.924313+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03112026	Male	Married	1966-07-17	Filipino	\N	half pogi and half gwapo	Cebu City
 \.
 
 
@@ -5885,12 +7699,17 @@ e4b6c925-9647-4d2b-bfd7-e8c5d2c3aa47	270ad7b7-7c4d-4823-b314-816b91773cb9	Pedro	
 -- Data for Name: department; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.department (dept_id, dept_name, dept_code, dept_created_at) FROM stdin;
-c5d5cb3b-eda7-4f13-99b1-f7602a749b30	College of Computing Information and Communication Technology	CCICT	2026-07-15 15:02:46.174993+00
-dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	College of Engineering	COE	2026-07-15 15:02:46.174993+00
-01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	College of Education	COED	2026-07-15 15:02:46.174993+00
-bb09daa1-3065-4718-b08f-e4569311ace3	College of Arts and Sciences	CAS	2026-07-15 15:02:46.174993+00
-d2762742-5d6f-4013-9124-1cd3105c2708	College of Technology	COT	2026-07-15 15:02:46.174993+00
+COPY public.department (dept_id, dept_college_id, dept_name, dept_code, dept_created_at) FROM stdin;
+8de117bd-ed91-45dc-9ad4-f75eede0cb38	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Science in Information Technology	BSIT	2026-07-15 15:02:46.174993+00
+5694bc6e-69e8-4dfd-b78b-35af1289ad11	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Science in Information Systems	BSIS	2026-07-15 15:02:46.174993+00
+9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Industrial Technology major in Computer Technology	BIT-CT	2026-07-15 15:02:46.174993+00
+2b49e2f9-c446-4638-ac77-c420404f27a5	bb09daa1-3065-4718-b08f-e4569311ace3	Department of Psychology and Social Sciences	DPSS	2026-11-03 08:03:20.823985+00
+2801daef-1f0e-4dda-83ab-6822f33d0ebd	bb09daa1-3065-4718-b08f-e4569311ace3	Department of Human Kinetics	DHK	2026-11-03 08:05:23.665622+00
+9f11764f-3280-4285-ae76-4fae84a24e85	bb09daa1-3065-4718-b08f-e4569311ace3	Department of Communication	DCOMM	2026-11-03 08:05:53.065404+00
+ebbcc28a-1629-4202-982e-118a43f5925e	bb09daa1-3065-4718-b08f-e4569311ace3	Department of Pure Sciences	DPS	2026-11-03 08:06:24.942472+00
+0483afc1-fa10-4aaa-bc97-539cc539f6ef	bb09daa1-3065-4718-b08f-e4569311ace3	Department of English and Literary Studies	DELS	2026-11-03 08:07:09.02179+00
+7f2aa08f-6780-45ee-b16d-5955f8347733	bb09daa1-3065-4718-b08f-e4569311ace3	Departamento ng Filipino at Ibang Mga Wika	DFIW	2026-11-03 08:07:51.688691+00
+b4204316-9b9d-477a-8df5-295f903d2d94	bb09daa1-3065-4718-b08f-e4569311ace3	Department of Mathematics and Statistics	DMS	2026-11-03 08:08:28.84012+00
 \.
 
 
@@ -5898,28 +7717,10 @@ d2762742-5d6f-4013-9124-1cd3105c2708	College of Technology	COT	2026-07-15 15:02:
 -- Data for Name: department_chair; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.department_chair (dc_id, dc_usr_id, dc_dept_id, dc_first_name, dc_middle_name, dc_last_name, dc_suffix, dc_phone_number, dc_gmail, dc_address, dc_profile_image, dc_assigned_at, dc_prog_id, dc_employee_id, dc_gender, dc_civil_status, dc_dob, dc_nationality) FROM stdin;
-73673a05-8a7a-4e85-ac81-79730ff40cfc	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	Juan	A.	Dela Cruz	\N	09183333333	juan@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
-9f9394f8-7c61-4b6f-8100-d5bbbfa3c284	56b56f76-e432-490c-a35b-b4f588ddf716	bb09daa1-3065-4718-b08f-e4569311ace3	Christopher	C.	Dignos	\N	09184444444	christopher@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
-67faa0f0-a98c-4ad5-a5f8-8330f7c1141a	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Pedro	B.	Garcia	\N	09182222222	pedro@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
-c005d277-5430-4566-8bc8-c2fdd96d02e0	ea9ad791-09c3-4f91-a464-c3bb72922747	d2762742-5d6f-4013-9124-1cd3105c2708	Emmanuel	R.	Reyes	\N	09185555555	emmanuel@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	\N	\N	\N	\N	\N
-cb3ee758-bb9d-43d7-bebd-d567f86dd883	41a4e102-068a-4a65-8e1d-70e5289f99ef	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Maria	S.	Santos	\N	09181111111	chair.ccict@ctu.edu.ph	Cebu City	\N	2026-07-15 15:02:55.862627+00	\N	\N	\N	\N	\N	\N
-b8faf6e3-c9a7-4718-b974-b2c6c020eb75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Noreen	B.	Fuentes	Ph.D	09170000010	noreen.fuentes@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	\N	\N	\N	\N	\N
-d7b63c0d-375a-45ab-be0f-a03cd0f14504	0180a717-2d4b-4d0d-a418-153b7b24911e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Pet Andrew	P.	Nacua	Ph.D	09170000011	pet.nacua@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N
-1e0fe4bd-42d5-4867-901a-6fe2a5e871cf	3abae64c-f024-4897-940b-fb4531d720ee	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Marie Joy	B.	Alit	Ph.D	09170000012	mariejoy.alit@ctu.edu.ph	Cebu City	\N	2026-07-18 06:03:37.813106+00	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	\N	\N	\N	\N	\N
-\.
-
-
---
--- Data for Name: fac_preference; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.fac_preference (fpref_id, fpref_fac_id, fpref_subj_id, fpref_preferred_day, fpref_preferred_start, fpref_preference_score, fpref_created_at) FROM stdin;
-bc7f1b36-5435-47bb-a810-b7ac1bcdc4b3	71a00f35-6a60-4165-8c14-85c402eaada1	4a4abb03-6a8f-47b6-a380-c6f9e4c0df47	Monday	08:00:00	5	2026-07-15 15:03:17.202207+00
-ec7b9958-bb26-4f7d-968a-5784c720eea9	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	2af0aa4c-2697-4cc5-bf2b-fa13c24ec3a8	Tuesday	09:00:00	5	2026-07-15 15:03:17.202207+00
-54b3c10b-1582-4529-9a33-3b4f91197ee2	c980c068-8108-4881-85f6-0d8df6a70870	75fb12d1-3626-45fb-b09c-6a61aea1fd03	Wednesday	10:00:00	4	2026-07-15 15:03:17.202207+00
-8942ed65-8b42-49c9-9cdc-8098d10353ef	56e063b6-76e5-4382-85c9-89296f4cc916	2df9b47a-70ed-4f45-833f-c4f0f8320746	Thursday	01:00:00	4	2026-07-15 15:03:17.202207+00
-9bf88b52-2c59-44d3-9aeb-a6c28f464591	bec360f4-9e21-4e8b-9429-0d5f2079d187	99ba581e-ac78-4217-b3ad-3669926651ec	Friday	08:30:00	5	2026-07-15 15:03:17.202207+00
+COPY public.department_chair (dc_id, dc_usr_id, dc_college_id, dc_first_name, dc_middle_name, dc_last_name, dc_suffix, dc_phone_number, dc_gmail, dc_address, dc_profile_image, dc_assigned_at, dc_dept_id, dc_employee_id, dc_gender, dc_civil_status, dc_dob, dc_nationality, dc_bio) FROM stdin;
+b8faf6e3-c9a7-4718-b974-b2c6c020eb75	335c70b6-c19a-4214-8b7b-fb771a2c9e02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Noreen	B.	Fuentes	\N	09172560010	noreen.fuentes@ctu.edu.ph	Cebu City	b8faf6e3-c9a7-4718-b974-b2c6c020eb75_1791436898.png	2026-07-18 06:03:37.813106+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	927202602	Female	Married	1960-06-27	Filipino	Associate Professor II/ BSIS Program Chair\nCollege of Computer, Information and Communications Technology / Information Systems Department
+d7b63c0d-375a-45ab-be0f-a03cd0f14504	0180a717-2d4b-4d0d-a418-153b7b24911e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Pet Andrew	P.	Nacua	Ph.D	09170000011	pet.nacua@ctu.edu.ph	Cebu City	d7b63c0d-375a-45ab-be0f-a03cd0f14504_1793691410.jpg	2026-07-18 06:03:37.813106+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N	\N
+01a1a51d-a083-7264-b95d-1da1fe06fa1c	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	bb09daa1-3065-4718-b08f-e4569311ace3	Raamah	C.	Rosales	\N	+639695462213	\N	Cebu City, Cebu	\N	2026-11-04 05:52:23.52338+00	ebbcc28a-1629-4202-982e-118a43f5925e	1103202601	Male	Married	1980-11-03	Filipino	\N
 \.
 
 
@@ -5928,11 +7729,6 @@ ec7b9958-bb26-4f7d-968a-5784c720eea9	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	2af0aa
 --
 
 COPY public.fac_specialization (fspec_id, fspec_fac_id, fspec_specialization) FROM stdin;
-c02c825a-1dcd-4ff4-89f9-73d14b221f9f	71a00f35-6a60-4165-8c14-85c402eaada1	Web Development
-a6c0f600-8bfe-4bc2-950a-73d17fe7472c	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	Database Systems
-e31892ad-5039-4863-98bb-f435e48498ba	c980c068-8108-4881-85f6-0d8df6a70870	Networking
-c4851e44-56f2-457b-b6d2-38c4d7da9be3	56e063b6-76e5-4382-85c9-89296f4cc916	Computer Engineering
-e1604a4f-e289-4777-b6d5-a6db1d140919	bec360f4-9e21-4e8b-9429-0d5f2079d187	Industrial Technology
 \.
 
 
@@ -5940,12 +7736,42 @@ e1604a4f-e289-4777-b6d5-a6db1d140919	bec360f4-9e21-4e8b-9429-0d5f2079d187	Indust
 -- Data for Name: faculty; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.faculty (fac_id, fac_usr_id, fac_dept_id, fac_first_name, fac_middle_name, fac_last_name, fac_suffix, fac_phone_number, fac_gmail, fac_address, fac_employment_type, fac_rank, fac_profile_image, fac_created_at, fac_updated_at, fac_prog_id, fac_employee_id, fac_gender, fac_civil_status, fac_dob, fac_nationality) FROM stdin;
-91c58e81-54ce-4ce1-8c49-b78324b9e2c8	ea9ad791-09c3-4f91-a464-c3bb72922747	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Emmanuel	R.	Reyes	\N	09170000002	emmanuel@ctu.edu.ph	Cebu City	full_time	Instructor II	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	\N	\N	\N	\N	\N
-71a00f35-6a60-4165-8c14-85c402eaada1	56b56f76-e432-490c-a35b-b4f588ddf716	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Christopher	C.	Dignos	\N	09170000001	christopher@ctu.edu.ph	Cebu City	full_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N
-c980c068-8108-4881-85f6-0d8df6a70870	270ad7b7-7c4d-4823-b314-816b91773cb9	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Mark	L.	Perez	\N	09170000003	mark@ctu.edu.ph	Cebu City	part_time	Instructor I	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
-56e063b6-76e5-4382-85c9-89296f4cc916	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Juan	A.	Dela Cruz	\N	09170000004	juan@ctu.edu.ph	Cebu City	full_time	Associate Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	beb8e158-62d2-42b6-9e3a-abf0df585860	\N	\N	\N	\N	\N
-bec360f4-9e21-4e8b-9429-0d5f2079d187	41a4e102-068a-4a65-8e1d-70e5289f99ef	d2762742-5d6f-4013-9124-1cd3105c2708	Maria	S.	Santos	\N	09170000005	maria@ctu.edu.ph	Cebu City	full_time	Assistant Professor	\N	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	\N	\N	\N	\N	\N
+COPY public.faculty (fac_id, fac_usr_id, fac_college_id, fac_first_name, fac_middle_name, fac_last_name, fac_suffix, fac_phone_number, fac_gmail, fac_address, fac_employment_type, fac_rank, fac_profile_image, fac_created_at, fac_updated_at, fac_dept_id, fac_employee_id, fac_gender, fac_civil_status, fac_dob, fac_nationality, fac_bio, fac_special_position, fac_special_position_max_hours, fac_bachelors_degree, fac_masters_degree, fac_doctorate_degree) FROM stdin;
+01a1a081-6875-705e-9bbf-aad9f2b675f8	80e78fb0-6908-422c-ae9e-cc31a7a29f04	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Albert	D.	Maghanoy	\N	+639990000001	\N	Cebu City	full_time	Assistant Professor I	01a1a081-6875-705e-9bbf-aad9f2b675f8_c1005810-3d30-449f-9b46-caf23beff3af.jpg	2026-11-03 08:23:17+00	2026-11-10 17:23:14+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03132026	Male	Married	1982-08-21	Filipino	\N	\N	\N	Bachelor of Science in Information Technology	Master of Information Technology	na
+01a1a087-4c19-70da-8f2e-872c5804e5a1	0a6013f9-0b25-4383-a1f9-f81cac3ea32d	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Janet	S.	Ugang	\N	+639990000002	\N	Cebu City	full_time	Instructor III	\N	2026-11-03 08:29:43+00	2026-11-03 08:29:43+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03142026	Female	Married	1987-09-09	Filipino	\N	\N	\N	\N	\N	\N
+01a11004-1aa5-7125-9178-590a1a432970	d2468e93-6a49-4532-8eae-b5ab3f0dd090	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Gerry Ritz	R.	Densing	\N	+639123948519	\N	Skina mambaling	full_time	College/University Professor	01a11004-1aa5-7125-9178-590a1a432970_e0c15036-4cd4-47ea-9225-3a8a9248ebec.jpg	2026-10-06 07:01:06+00	2026-11-03 08:40:19+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	10062026001	Male	Single	\N	Filipino	\N	\N	\N	Bachelor of Science in Information Systems	Master of Information Technology	Doctor of Information Technology
+ac6adea7-6397-426f-9fa1-b9e51749b665	0180a717-2d4b-4d0d-a418-153b7b24911e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Pet Andrew	P.	Nacua	Ph.D	09170000011	\N	Cebu City	full_time	\N	\N	2026-10-01 09:21:41.133736+00	2026-10-01 09:21:41.133736+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N
+01a1a087-fa7a-710b-9b72-5fb699d3fad7	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	bb09daa1-3065-4718-b08f-e4569311ace3	Raamah	C.	Rosales	\N	+639695462213	\N	Cebu City, Cebu	full_time	\N	\N	2026-11-03 08:30:28+00	2026-11-04 06:00:52+00	ebbcc28a-1629-4202-982e-118a43f5925e	1103202601	Male	Married	1980-11-03	Filipino	\N	\N	\N	\N	\N	\N
+01a1a048-1a3d-708c-bc17-93d208cbc837	bc02c426-ac11-4fb4-93d5-eb6804b7974e	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Jose  Maria	S	Garcia	II	+639974453635	\N	Cebu City	full_time	\N	01a1a048-1a3d-708c-bc17-93d208cbc837_c92a7899-e39c-4b75-b3a2-08dfce958d7a.jpg	2026-11-03 07:20:42+00	2026-11-03 07:26:21+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03112026	Male	Married	1966-07-17	Filipino	half pogi and half gwapo	College Dean	9.00	Bachelor of Science in Information Technology	Master of Information Technology	Doctor of Information Technology
+01a1a070-d483-73bd-a2a6-20329281ddab	e891982b-d1b2-45c8-a64f-e2c5615e433a	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	John Rey	E.	Furtos	\N	+639990000000	\N	Cebu City	full_time	Instructor I	01a1a070-d483-73bd-a2a6-20329281ddab_643dfe65-cca0-413c-8956-f852ec79d00a.jpg	2026-11-03 08:05:11+00	2026-11-05 03:21:06+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03122026	Male	\N	1982-05-17	Filipino	\N	College Secretary	16.00	Bachelor of Science in Information Systems	Master of Business Administration	na
+33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	335c70b6-c19a-4214-8b7b-fb771a2c9e02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Noreen	B.	Fuentes	\N	09170000010	\N	Cebu City	full_time	\N	\N	2026-10-01 09:21:41.133736+00	2026-11-01 01:16:50+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	927202602	Female	Married	1960-06-27	Filipino	\N	\N	\N	BS in Computer Engg	MST-CS	Doctor of Philosophy/Doctor in Information Technology
+01a1a03e-600f-72b2-be2b-199e54a81312	32ab44ac-a571-4128-8306-8d6f38c050f6	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Oddyssy	Aying	Subingsubing	\N	+639497820262	\N	Cebu City	full_time	Instructor III	01a1a03e-600f-72b2-be2b-199e54a81312_32ac8457-4f6c-43ac-8984-6475d5bc3f35.png	2026-11-03 07:10:04+00	2026-11-03 07:16:21+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03182004	Male	Married	2004-03-18	Filipino	\N	\N	\N	Bachelor of Science in Information Systems	Master of Information Technology	Doctor of Information Technology
+01a1a081-7f25-7366-88dc-ca46e4d8782f	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Suzette	B.	Bacus	\N	+63917384625	\N	Cebu City	full_time	Instructor II	\N	2026-11-03 08:23:23+00	2026-11-03 08:30:32+00	8de117bd-ed91-45dc-9ad4-f75eede0cb38	2026-2563	Female	Married	1977-07-12	Filipino	\N	\N	\N	Bachelor of Science in Information Technology	Master of Information Technology	Ph.D.
+01a1baec-8076-7080-a841-079a4c219fe9	2005b54a-b45b-437a-bb5a-e167c8137a02	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Black	N/A	Pink	\N	+639562364587	\N	Babag I	full_time	Professor I	\N	2026-11-08 11:30:23+00	2026-11-08 11:30:23+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	1108202601	Female	Single	1994-02-01	Korean	\N	\N	\N	\N	\N	\N
+01a1a08a-6633-71da-a16e-269a62efff07	d126364e-680c-4fe5-879b-52a849cf8e19	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Emelie	C.	Villaceran	\N	+639990000003	\N	Cebu City	full_time	Instructor I	01a1a08a-6633-71da-a16e-269a62efff07_aa58d97d-7371-4592-b5f2-3c424f4abbef.jpg	2026-11-03 08:33:07+00	2026-11-10 12:02:03+00	5694bc6e-69e8-4dfd-b78b-35af1289ad11	03152026	Female	Married	1970-02-24	Filipino	\N	PERG Chair	16.00	Bachelor of Science in Information Technology	Master of Information Technology	Doctor of Philosophy
+\.
+
+
+--
+-- Data for Name: faculty_account_reviews; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.faculty_account_reviews (fvr_id, fvr_usr_id, fvr_id_photo_path, fvr_status, fvr_reviewed_by, fvr_reviewed_at, created_at, updated_at, fvr_applicant_name, fvr_applicant_email, fvr_decision_note) FROM stdin;
+8ca485d0-0485-45d0-9a90-c6fc1794f224	8cf04253-216f-493e-9724-7450f19d5955	faculty-id-verification/BIcVQyCCNCN42zo5wkjB0nbRFafHBOdeKcPwxkWx.png	rejected	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-10-06 00:05:43	2026-10-05 17:12:24	2026-10-06 00:05:43	Sakura Haruno Uchiha	sakurauchiha59@ctu.edu.ph	No ID Fictional Character
+0ff7a695-dc13-4cb5-a999-23e6bde2cf0b	0af0827c-cb31-477f-a44d-2c7404fbb2de	faculty-id-verification/Odf9Kx7BtTuOAMhOsqmjswSasp8pvkSjrNlpfb7Y.png	rejected	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-10-06 05:38:27	2026-10-06 05:37:35	2026-10-06 05:38:27	Donita Tanghal Tumulak	donita@ctu.edu.ph	Not my face
+168f3fdd-6615-4e26-8c6e-1ef2ff17c493	625f49bd-e051-4b34-a55d-58f4028daa0a	faculty-id-verification/1EzCJsbVDXAMFCVAqN2y9tfs7VEVYa9bjwrDdCjG.jpg	rejected	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-10-27 04:07:25	2026-10-27 04:06:10	2026-10-27 04:07:25	Neil James M Obeso Jr	tristan0922@gmail.com	use another account
+1d27e246-7ce6-437c-9f56-3d36a849f257	692d94e8-9428-47e3-9842-d1f331084603	faculty-id-verification/fN9YUQDvLMCQjlWdbeCll16CD0sBRxi1ntqsy4zF.png	rejected	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-01 01:32:43	2026-10-06 05:43:21	2026-11-01 01:32:43	Donita Tanghal Tumulak	donita@ctu.edu.ph	No ID
+e7c7dd9f-cc3e-42eb-9e40-89980764cc19	32ab44ac-a571-4128-8306-8d6f38c050f6	faculty-id-verification/FYyZV2PQ5k08UsIYz9c68xwDCqvc7N89SOnj0u4n.png	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 07:12:04	2026-11-03 07:10:05	2026-11-03 07:12:04	\N	\N	\N
+a1fa86d6-84d4-4a11-9bba-251e088f4634	bc02c426-ac11-4fb4-93d5-eb6804b7974e	faculty-id-verification/CWOFwyUqzZqDwLv063GrwYJqduzTk7ZtUrhCj2as.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 07:21:50	2026-11-03 07:20:42	2026-11-03 07:21:50	\N	\N	\N
+6257f202-a6c3-45aa-b511-4296e1f50ac7	e891982b-d1b2-45c8-a64f-e2c5615e433a	faculty-id-verification/9QmNVbnflqP0zhkJlAv1dCdZuWQnC8XXmEctdW55.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:07:07	2026-11-03 08:05:11	2026-11-03 08:07:07	\N	\N	\N
+d57ab905-7f9a-4de4-847e-4ba3c7bcfac2	f86e6a21-7652-46b1-941a-61589fe4a60d	faculty-id-verification/WInXXnp1HWCrM5TY60oYQ32Uc9WZe2bQnL4AYL2e.png	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:15:53	2026-11-03 08:15:37	2026-11-03 08:15:53	\N	\N	\N
+e8cd8376-6a99-4344-8446-9159c05a9fe5	80e78fb0-6908-422c-ae9e-cc31a7a29f04	faculty-id-verification/bcJDx1lslYpTMQk1l9PztQFRNF2S4gxCeD3ZG3M3.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:25:24	2026-11-03 08:23:18	2026-11-03 08:25:24	\N	\N	\N
+8f56fa7d-5767-4df7-a072-450ed0a6275c	03ffd937-4f2b-4984-bce1-22b9bf2a29a9	faculty-id-verification/H070y1gfd9gjXwlLQ675pnRmOi6thi5BSXXuVdBz.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:28:38	2026-11-03 08:23:23	2026-11-03 08:28:38	\N	\N	\N
+1fb1299f-33d4-4e86-a994-b5ad75e7b435	0a6013f9-0b25-4383-a1f9-f81cac3ea32d	faculty-id-verification/jIJl7tZatpzXpIwIehyjMAKSx9D7a7K4XKrk8RwF.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:30:22	2026-11-03 08:29:44	2026-11-03 08:30:22	\N	\N	\N
+f4621259-120e-465b-9ec7-567c11393625	cc1bb940-ddcc-43b4-b9f7-316954fe8da0	faculty-id-verification/XUDJVCyglymfGcCEXJ1WokGpU5XB1ZMjj1vNGymM.png	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:32:21	2026-11-03 08:30:29	2026-11-03 08:32:21	\N	\N	\N
+fefa2366-a955-46f1-bb2b-5d243dfe86b7	d126364e-680c-4fe5-879b-52a849cf8e19	faculty-id-verification/QhP9QWI3Q1EAAepUoi75Of9qYbpvWJzg4giTsSvm.jpg	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-03 08:34:05	2026-11-03 08:33:07	2026-11-03 08:34:05	\N	\N	\N
+8b3c02b2-40c2-40f8-9ff6-90a8d4ebb4f7	b73fc6f4-e667-4f9b-af80-4ec7b4e9269a	faculty-id-verification/Js2aQRh0JEmOwitexQxPGdGcjzQBYl4ctuzDMqVt.png	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-05 02:30:46	2026-11-05 02:29:25	2026-11-05 02:30:46	\N	\N	\N
+f6f7626a-d7c2-4388-b085-0cf0f429d588	2005b54a-b45b-437a-bb5a-e167c8137a02	faculty-id-verification/n5HMtOA4HMk3hMkH2ydaBgR3PumokfYebGtbkOTr.png	approved	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-11-08 11:33:19	2026-11-08 11:30:24	2026-11-08 11:33:19	\N	\N	\N
 \.
 
 
@@ -6012,6 +7838,24 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 11	2026_09_26_121724_remove_settings_columns	8
 12	2026_09_26_143833_profile_images	9
 13	2026_09_26_154339_dean_bio	10
+14	2026_09_27_055415_lockouts_fields	11
+15	2026_10_05_120000_allow_multiple_schedule_sessions_per_study_load	12
+16	2026_10_06_000000_create_faculty_account_reviews_table	13
+17	2026_10_06_120000_add_rejection_decision_to_faculty_account_reviews	14
+18	2026_10_07_000000_add_schedule_snapshot_to_schedule_submissions	15
+19	2026_10_07_010000_add_faculty_id_to_schedule_submissions	16
+20	2026_10_09_091627_create_personal_access_tokens_table	17
+21	2026_10_05_130000_add_college_assignment_to_rooms	18
+22	2026_10_07_000000_add_special_position_load_to_faculty	18
+23	2026_10_26_120000_add_shift_to_schedule_and_study_load	18
+24	2026_10_27_051022_add_rec_subject_and_nullable_sections	19
+25	2026_10_27_053630_relax_room_uniqueness_constraint	20
+26	2026_10_28_000000_remove_room_location_column	21
+27	2026_10_31_181025_add_degree_fields_to_faculty_table	22
+28	2026_11_04_114417_create_schedule_archives_table	23
+29	2026_11_05_152030_increase_workload_max_hours	24
+30	2026_11_05_154640_add_is_evening_to_section_table	25
+31	2026_11_09_000000_enforce_30_hour_workload_limit	26
 \.
 
 
@@ -6020,11 +7864,36 @@ COPY public.migrations (id, migration, batch) FROM stdin;
 --
 
 COPY public.notification (notif_id, notif_usr_id, notif_title, notif_message, notif_type, notif_is_read, notif_created_at, notif_updated_at) FROM stdin;
-d26b7f76-a879-4fcd-a04f-41f6ffaebf0f	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	Schedule Approval	CCICT schedule is ready for approval.	approval	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
-762d13ee-5192-4013-9f18-a60fc78fad10	56b56f76-e432-490c-a35b-b4f588ddf716	Teaching Assignment	You have been assigned a new subject.	assignment	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
-2a855c78-7e13-4053-b284-e66cec1715c8	ea9ad791-09c3-4f91-a464-c3bb72922747	Reminder	Please update your faculty preferences.	warning	f	2026-07-15 15:05:53.620819+00	2026-07-15 15:05:53.620819+00
-4abba15e-673b-4838-bb98-d2dfd66f1dce	41a4e102-068a-4a65-8e1d-70e5289f99ef	Faculty Load	Faculty workloads have been submitted.	info	t	2026-07-15 15:05:53.620819+00	2026-09-14 04:25:47+00
 a5c57ddc-3746-428f-a710-60df9a567053	270ad7b7-7c4d-4823-b314-816b91773cb9	System Backup	Daily backup completed successfully.	info	t	2026-07-15 15:05:53.620819+00	2026-09-26 11:57:33+00
+01a10d17-70ed-7035-b3c9-235f52ea5c3e	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Nami N Bell submitted a registration for review.	new_user	f	2026-10-05 17:23:22+00	2026-10-05 17:23:22+00
+01a10fb7-a64f-7004-901c-c66d975c8479	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Donita Tanghal Tumulak submitted a registration for review.	new_user	f	2026-10-06 05:37:36+00	2026-10-06 05:37:36+00
+01a10fbc-edb7-7066-9302-e307db502d04	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Donita Tanghal Tumulak submitted a registration for review.	new_user	f	2026-10-06 05:43:22+00	2026-10-06 05:43:22+00
+01a11004-1d69-7008-b496-7f2c994bd78e	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Gerry Ritz R. Densing submitted a registration for review.	new_user	f	2026-10-06 07:01:07+00	2026-10-06 07:01:07+00
+01a115f3-21c5-731a-b367-aba267a64416	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Monkey D. Dragon submitted a registration for review.	new_user	f	2026-10-07 10:40:17+00	2026-10-07 10:40:17+00
+d997452a-9711-4fea-ab41-db984db15894	0180a717-2d4b-4d0d-a418-153b7b24911e	schedule submission reminder	need to submit within this week for the schedules	info	f	2026-10-08 06:26:07+00	2026-10-08 06:26:07+00
+01a16d3a-2ccf-72e0-bfca-c0e344d840d3	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Oddyssy Aying Subingsubing submitted a registration for review.	new_user	f	2026-10-24 09:24:51+00	2026-10-24 09:24:51+00
+01a17b89-7dd2-73b6-a035-1d8d7ef73c9a	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Neil James M Obeso Jr submitted a registration for review.	new_user	f	2026-10-27 04:06:10+00	2026-10-27 04:06:10+00
+01a17b8d-a495-70d5-8c6b-5cc3ddad3855	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Neil James D. Urobosa Sr submitted a registration for review.	new_user	f	2026-10-27 04:10:42+00	2026-10-27 04:10:42+00
+01a191b9-bbc6-713b-91c3-e0db42a102ff	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Stephebn Subinngsubing Dignos Na submitted a registration for review.	new_user	f	2026-10-31 11:30:30+00	2026-10-31 11:30:30+00
+01a194b3-0292-70f9-add4-ff072e872b1c	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Rante A. Subingsubing Na submitted a registration for review.	new_user	f	2026-11-01 01:22:02+00	2026-11-01 01:22:02+00
+01a194c3-c34f-720e-abde-d44e7ab8b6a3	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Rante A. Subingsubing Na submitted a registration for review.	new_user	f	2026-11-01 01:40:19+00	2026-11-01 01:40:19+00
+01a194d4-259c-7293-bb74-b3cd9a80a292	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Rante S. Subingsubing Na submitted a registration for review.	new_user	f	2026-11-01 01:58:13+00	2026-11-01 01:58:13+00
+84103714-7db2-45fe-89e5-921b913ed554	335c70b6-c19a-4214-8b7b-fb771a2c9e02	schedule submission reminder	need to submit within this week for the schedules	info	t	2026-10-08 06:26:07+00	2026-11-01 05:12:00+00
+01a1a033-9e0e-73b2-b43e-18c7047507f0	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Jose  Maria S Garcia II submitted a registration for review.	new_user	f	2026-11-03 06:58:19+00	2026-11-03 06:58:19+00
+01a1a036-f26f-7014-8e6c-3bc5e28fe026	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Jose  Maria S Garcia II submitted a registration for review.	new_user	f	2026-11-03 07:01:57+00	2026-11-03 07:01:57+00
+01a1a03a-c036-716b-a1ee-ee1e1e65a3d7	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Oddyssy Aying Subingsubing submitted a registration for review.	new_user	f	2026-11-03 07:06:07+00	2026-11-03 07:06:07+00
+01a1a03e-645e-73a6-a810-a36409ffb12f	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Oddyssy Aying Subingsubing submitted a registration for review.	new_user	f	2026-11-03 07:10:05+00	2026-11-03 07:10:05+00
+01a1a048-1c4d-71fd-bc9c-d9b004379635	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Jose  Maria S Garcia II submitted a registration for review.	new_user	f	2026-11-03 07:20:42+00	2026-11-03 07:20:42+00
+01a1a06a-673f-71ba-bb9f-348145319524	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	John Rey E. Furtos submitted a registration for review.	new_user	f	2026-11-03 07:58:10+00	2026-11-03 07:58:10+00
+01a1a070-d7ec-721d-a8a9-3ee5c6fb895d	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	John Rey E. Furtos submitted a registration for review.	new_user	f	2026-11-03 08:05:12+00	2026-11-03 08:05:12+00
+01a1a07a-6b78-707e-9ad6-8bee548ace05	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Raamah C Rosales submitted a registration for review.	new_user	f	2026-11-03 08:15:39+00	2026-11-03 08:15:39+00
+01a1a081-6a7f-7126-aa97-3cf98f1feba7	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Albert D. Maghanoy submitted a registration for review.	new_user	f	2026-11-03 08:23:18+00	2026-11-03 08:23:18+00
+01a1a081-813c-7320-b580-4a066c901509	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Suzette B. Bacus submitted a registration for review.	new_user	f	2026-11-03 08:23:24+00	2026-11-03 08:23:24+00
+01a1a087-4e26-7204-b76e-21dd6024149b	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Janet S. Ugang submitted a registration for review.	new_user	f	2026-11-03 08:29:44+00	2026-11-03 08:29:44+00
+01a1a088-07c4-70b9-bdb7-ac871b2bd989	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Raamah C. Rosales submitted a registration for review.	new_user	f	2026-11-03 08:30:31+00	2026-11-03 08:30:31+00
+01a1a08a-6859-7225-9123-17be3357260f	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Emelie C. Villaceran submitted a registration for review.	new_user	f	2026-11-03 08:33:07+00	2026-11-03 08:33:07+00
+01a1a98a-2c5a-72b7-8196-e7bf978d6181	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Boom Bayah Esmeringhoy III submitted a registration for review.	new_user	f	2026-11-05 02:29:27+00	2026-11-05 02:29:27+00
+01a1baec-8251-72ef-a4eb-580daf0783fe	270ad7b7-7c4d-4823-b314-816b91773cb9	New faculty account pending approval	Black N/A Pink submitted a registration for review.	new_user	f	2026-11-08 11:30:24+00	2026-11-08 11:30:24+00
 \.
 
 
@@ -6037,15 +7906,18 @@ COPY public.password_reset_tokens (email, token, created_at) FROM stdin;
 
 
 --
--- Data for Name: program; Type: TABLE DATA; Schema: public; Owner: postgres
+-- Data for Name: personal_access_tokens; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.program (prog_id, prog_dept_id, prog_name, prog_code, prog_created_at) FROM stdin;
-8de117bd-ed91-45dc-9ad4-f75eede0cb38	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Science in Information Technology	BSIT	2026-07-15 15:02:46.174993+00
-5694bc6e-69e8-4dfd-b78b-35af1289ad11	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Science in Information Systems	BSIS	2026-07-15 15:02:46.174993+00
-beb8e158-62d2-42b6-9e3a-abf0df585860	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Bachelor of Science in Computer Engineering	BSCPE	2026-07-15 15:02:46.174993+00
-69310995-f8bc-4ff9-9032-14f9e6ef2eb7	d2762742-5d6f-4013-9124-1cd3105c2708	Bachelor of Science in Industrial Technology	BSINDTECH	2026-07-15 15:02:46.174993+00
-9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	Bachelor of Industrial Technology major in Computer Technology	BIT-CT	2026-07-15 15:02:46.174993+00
+COPY public.personal_access_tokens (id, tokenable_type, tokenable_id, name, token, abilities, last_used_at, expires_at, created_at, updated_at) FROM stdin;
+14	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	cb9f0fc84aaf19a68100304cfe1280a9bced15da59c02ce1c5e764cb66332c6c	["faculty:read"]	2026-10-26 07:03:49	\N	2026-10-26 07:00:46	2026-10-26 07:03:49
+8	App\\Models\\User	4cb977d8-e643-43f9-b1cd-5bacccaf2e90	Skedyul Faculty Mobile	e03c958a865025f82642f2e089c52f3a7e2411cd8648142155cd01c52377d6f8	["faculty:read"]	2026-10-14 05:44:42	\N	2026-10-14 05:44:36	2026-10-14 05:44:42
+16	App\\Models\\User	b4bb728c-861e-4ed9-b6ef-4ededcc5bfcc	Skedyul Faculty Mobile	a2dca2d9296edde1907279f5dd4a10d5f84fddb0973a7611209868981d12ef82	["faculty:read"]	2026-10-26 13:45:58	\N	2026-10-26 13:45:56	2026-10-26 13:45:58
+17	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	bda0c63c45b4fab8548121095cefc064fbe0b381856d673ffb1be7801efe6909	["faculty:read"]	\N	\N	2026-10-31 20:12:35	2026-10-31 20:12:35
+18	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	2851533a58615596bc81a8140ac754cce229ccd3c24c3211f42f2308f14d1f9b	["faculty:read"]	2026-11-01 01:16:27	\N	2026-10-31 20:40:27	2026-11-01 01:16:27
+19	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	1807c19e4f39f5023dfd96f1f8e5bdd6dc936e0fa0912db51e3479b710515430	["faculty:read"]	2026-11-07 04:58:44	\N	2026-11-07 04:58:42	2026-11-07 04:58:44
+5	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	d53f2798fe718aba2a6b5ebaf21a35b32824e5eb59e0c01e3305ae136484143d	["faculty:read"]	2026-10-09 11:14:12	\N	2026-10-09 11:14:09	2026-10-09 11:14:12
+13	App\\Models\\User	335c70b6-c19a-4214-8b7b-fb771a2c9e02	Skedyul Faculty Mobile	3030b8b074c88e96ebdf15d50a0d7356c3dcb19e9758a3a4b6204611c6509c97	["faculty:read"]	2026-10-24 10:23:45	\N	2026-10-24 10:21:30	2026-10-24 10:23:45
 \.
 
 
@@ -6053,12 +7925,38 @@ beb8e158-62d2-42b6-9e3a-abf0df585860	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	Bachel
 -- Data for Name: room; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.room (room_id, room_name, room_building, room_location, room_type, room_capacity, room_is_available, room_created_at, room_updated_at) FROM stdin;
-ed195474-f14a-4f1b-8a0e-3f8b1e377d4b	Computer Laboratory 1	CCICT Building	Ground Floor	Laboratory	40	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00
-712d805b-0f9f-490d-98ec-72547ac36104	Computer Laboratory 2	CCICT Building	Second Floor	Laboratory	40	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00
-005e0bf9-90c1-4328-a11b-dd41e935247c	Room 301	Engineering Building	Third Floor	Lecture	45	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00
-18751cd8-03d3-4e81-b202-9bb01141479c	Smart Classroom	Technology Building	Second Floor	Lecture	50	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00
-ba0519d1-cda5-4a39-a3d6-dae792eb8366	Networking Laboratory	CCICT Building	Third Floor	Laboratory	35	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00
+COPY public.room (room_id, room_name, room_building, room_type, room_capacity, room_is_available, room_created_at, room_updated_at, room_college_id) FROM stdin;
+005e0bf9-90c1-4328-a11b-dd41e935247c	Room 301	Engineering Building	Lecture	45	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
+18751cd8-03d3-4e81-b202-9bb01141479c	Smart Classroom	Technology Building	Lecture	50	t	2026-07-15 15:02:46.174993+00	2026-07-15 15:02:46.174993+00	\N
+ed195474-f14a-4f1b-8a0e-3f8b1e377d4b	Computer Laboratory 1	CCICT Building	Laboratory	40	t	2026-07-15 15:02:46.174993+00	2026-10-05 11:11:19+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+712d805b-0f9f-490d-98ec-72547ac36104	Computer Laboratory 2	CCICT Building	Laboratory	40	t	2026-07-15 15:02:46.174993+00	2026-10-05 11:11:27+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+ba0519d1-cda5-4a39-a3d6-dae792eb8366	Networking Laboratory	CCICT Building	Laboratory	35	t	2026-07-15 15:02:46.174993+00	2026-10-05 11:11:37+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bc2-0543-7291-8245-b4aa9535a39d	NICT-804	NCCICT Building	Laboratory	50	t	2026-10-27 05:07:55+00	2026-10-27 06:22:44+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bc0-df9f-71d9-9c74-d3c001aa7636	NICT-803	NCCICT Building	Laboratory	50	t	2026-10-27 05:06:40+00	2026-10-27 06:22:52+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a176e0-3cda-73eb-abd5-d05a057346cf	NICT-802	NCCICT Building	Laboratory	50	t	2026-10-26 06:22:49+00	2026-10-27 06:23:01+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bcd-ddbc-729c-84e8-c2965d70ec2c	NICT-701	NCCICT Building	Lecture	50	t	2026-10-27 05:20:51+00	2026-10-27 06:23:11+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bc2-7ffa-70e7-ad0b-1425dec9e6cf	NICT-805	NCCICT Building	Laboratory	50	t	2026-10-27 05:08:26+00	2026-10-27 06:23:31+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bc3-0846-70f7-838f-78f46a9c229f	NICT-806	NCCICT Building	Laboratory	50	t	2026-10-27 05:09:01+00	2026-10-27 06:23:42+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bc3-e393-732e-936f-8d7d53bd790e	NICT-807	NCCICT Building	Laboratory	50	t	2026-10-27 05:09:57+00	2026-10-27 06:23:57+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bcc-65bb-7120-b431-3c89f25ccded	NICT-808	NCCICT Building	Laboratory	50	t	2026-10-27 05:19:15+00	2026-10-27 06:24:43+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bcc-f742-7317-adf8-51246c2d8cdd	NICT-809	NCCICT Building	Laboratory	50	t	2026-10-27 05:19:52+00	2026-10-27 06:24:56+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bf9-6f71-7398-b483-83e9a64e5ffc	NICT-702	NCICCT Building	Lecture	50	t	2026-10-27 06:08:27+00	2026-10-27 06:25:23+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bfa-6247-73a9-b57a-90b0e8213149	NICT-703	NCICCT Building	Lecture	50	t	2026-10-27 06:09:29+00	2026-10-27 06:25:34+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bfd-3b82-7254-8b81-4481eef3759c	NICT-704	NCICCT Building	Lecture	50	t	2026-10-27 06:12:35+00	2026-10-27 06:25:43+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bfd-a2c0-717d-9ac9-7a2d9664898d	NICT-705	NCICCT Building	Lecture	50	t	2026-10-27 06:13:02+00	2026-10-27 06:25:57+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bfe-0c49-70c5-bf4a-04ed2299b141	NICT-706	NCICCT Building	Lecture	50	t	2026-10-27 06:13:29+00	2026-10-27 06:26:08+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bfe-5c34-71d1-92de-103dcb66defe	NICT-707	NCICCT Building	Lecture	50	t	2026-10-27 06:13:49+00	2026-10-27 06:26:21+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bff-0d7b-739d-b84a-467ca4fc5fa7	NICT-708	NCICCT Building	Lecture	50	t	2026-10-27 06:14:35+00	2026-10-27 06:26:34+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17bff-bf7f-7254-b603-6c7f491731ee	NICT-709	NCICCT Building	Lecture	50	t	2026-10-27 06:15:20+00	2026-10-27 06:26:43+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c01-22df-7386-9f83-908d579df931	NICT-601	NCICCT Building	Laboratory	50	t	2026-10-27 06:16:51+00	2026-10-27 06:27:07+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c01-9594-7329-9a15-d70c42621d70	NICT-602	NCICCT Building	Laboratory	50	t	2026-10-27 06:17:21+00	2026-10-27 06:27:18+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c02-3fe8-708f-a00c-04376fddf85c	NICT-603	NCICCT Building	Laboratory	50	t	2026-10-27 06:18:04+00	2026-10-27 06:27:28+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c02-bfb8-7070-bbde-b163456119e5	NICT-604	NCICCT Building	Laboratory	50	t	2026-10-27 06:18:37+00	2026-10-27 06:27:41+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c03-045a-71f0-8a7a-b235f135a727	NICT-605	NCICCT Building	Laboratory	50	t	2026-10-27 06:18:54+00	2026-10-27 06:27:51+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c03-a9f0-73a5-87be-99e46e353412	NICT-606	NCICCT Building	Laboratory	50	t	2026-10-27 06:19:37+00	2026-10-27 06:28:03+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c0b-c140-734b-8471-7a4167dadb84	NICT-608	NCICCT Building	Laboratory	50	t	2026-10-27 06:28:27+00	2026-10-27 06:28:27+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c0c-18ef-7349-b50d-8486197666c0	NICT-607	NCICCT Building	Laboratory	50	t	2026-10-27 06:28:50+00	2026-10-27 06:28:50+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
+01a17c0c-75c3-7142-aa32-54dc3f652f07	NICT-609	NCICCT Building	Laboratory	50	t	2026-10-27 06:29:13+00	2026-10-27 06:29:13+00	c5d5cb3b-eda7-4f13-99b1-f7602a749b30
 \.
 
 
@@ -6066,12 +7964,62 @@ ba0519d1-cda5-4a39-a3d6-dae792eb8366	Networking Laboratory	CCICT Building	Third 
 -- Data for Name: schedule; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.schedule (sch_id, sch_load_id, sch_fac_id, sch_subj_id, sch_sec_id, sch_room_id, sch_sem_id, sch_day, sch_start_time, sch_end_time, sch_status, sch_is_active, sch_created_by, sch_created_at, sch_updated_at) FROM stdin;
-e8293a23-bf8a-43ae-81cc-a3ff79452ad5	38543a56-7151-4b26-94e2-f5b989cf0469	71a00f35-6a60-4165-8c14-85c402eaada1	4a4abb03-6a8f-47b6-a380-c6f9e4c0df47	ec8600da-1c7c-4fd6-a67e-e665bc5157d1	ed195474-f14a-4f1b-8a0e-3f8b1e377d4b	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	Monday	08:00:00	11:00:00	published	t	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	2026-07-15 15:03:40.332265+00
-83dba3a1-07db-4c40-aaa6-179d7ee03da6	c25c9289-c654-41e2-8a3a-103bc1b37776	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	2af0aa4c-2697-4cc5-bf2b-fa13c24ec3a8	81603ad3-7337-4ae5-ae9f-c9456f3641bb	712d805b-0f9f-490d-98ec-72547ac36104	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	Monday	01:00:00	04:00:00	published	t	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	2026-07-15 15:03:40.332265+00
-85199bb6-274a-449b-a861-2490204c45b6	fd066d28-dacf-4610-8ab1-6169bec440c9	56e063b6-76e5-4382-85c9-89296f4cc916	2df9b47a-70ed-4f45-833f-c4f0f8320746	06988bfc-08c2-4fc7-ae9c-7fe6c491bdfe	005e0bf9-90c1-4328-a11b-dd41e935247c	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	Tuesday	08:00:00	11:00:00	published	t	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	2026-07-15 15:03:40.332265+00
-a19cd1dc-69c9-4154-bfad-24c240d19862	3d35fab3-e07a-4ff2-82b5-18d2d85585cc	c980c068-8108-4881-85f6-0d8df6a70870	75fb12d1-3626-45fb-b09c-6a61aea1fd03	36afdb09-814e-4bbf-b287-61e5480163b7	18751cd8-03d3-4e81-b202-9bb01141479c	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	Wednesday	09:00:00	12:00:00	draft	t	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	2026-07-15 15:03:40.332265+00
-9ce5359b-c72c-4b12-80bc-96238a47db7d	0690cc5d-f4d2-4806-887d-a8f6edbf712c	bec360f4-9e21-4e8b-9429-0d5f2079d187	99ba581e-ac78-4217-b3ad-3669926651ec	7ad85261-33d4-4332-9801-d86f76b08cb1	ba0519d1-cda5-4a39-a3d6-dae792eb8366	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	Thursday	08:00:00	11:00:00	published	t	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	2026-07-15 15:03:40.332265+00
+COPY public.schedule (sch_id, sch_load_id, sch_fac_id, sch_course_id, sch_sec_id, sch_room_id, sch_sem_id, sch_day, sch_start_time, sch_end_time, sch_status, sch_is_active, sch_created_by, sch_created_at, sch_updated_at, sch_mis_code, sch_shift) FROM stdin;
+c1ac7966-cb6f-4faa-972d-77d5e0d0d96f	6c1389dd-1b37-4093-b935-904ca5fa64ed	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	b39f2514-7cec-427c-b482-ad9acdf7db4f	01a17bcc-65bb-7120-b431-3c89f25ccded	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 10:17:59+00	2026-11-04 10:18:39+00	\N	day
+db3a2457-8ec0-4bca-89ce-8af54c52e1d3	6b5a248d-d383-4986-8dc2-3de8a788d456	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	52d55b72-a0b5-44d8-a3cf-cb61a2feedc1	01a17bcc-f742-7317-adf8-51246c2d8cdd	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	16:00:00	21:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 12:53:35+00	2026-11-04 12:53:35+00	\N	evening
+4c629b1a-e26e-476d-b20a-115ec2cbc4c0	08348508-98b6-4e8d-ae26-67c110c7e747	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	6bd5e6b4-76be-4edb-90ee-f7cb6c55e2b4	01a17bcc-f742-7317-adf8-51246c2d8cdd	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	16:00:00	21:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 12:53:57+00	2026-11-04 12:53:57+00	\N	evening
+322ca05e-404e-4638-9c3f-ece2f95d8996	9c235c41-2503-488d-a202-5cef1b225604	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	15f66c86-9bf9-42ef-bca3-4b10320842dd	6336b405-e9be-4787-96d3-bd3089e48da9	01a17bfe-0c49-70c5-bf4a-04ed2299b141	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	13:00:00	15:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 11:07:09+00	2026-11-04 14:28:33+00	\N	day
+ba231c3b-b91d-421c-806a-ed6f3da49bcd	9c235c41-2503-488d-a202-5cef1b225604	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	15f66c86-9bf9-42ef-bca3-4b10320842dd	6336b405-e9be-4787-96d3-bd3089e48da9	01a17bfe-0c49-70c5-bf4a-04ed2299b141	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 11:07:58+00	2026-11-04 14:30:39+00	\N	day
+419ae72c-ea75-45fe-b4cd-949dfddc754f	94d00935-754f-44ed-bdba-81a46d484f74	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	c55f8061-08b2-4728-9656-7216110e27c8	\N	\N	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 14:31:47+00	2026-11-04 14:31:47+00	\N	day
+4058597c-6dbb-41c4-a3e4-10653b452702	94d00935-754f-44ed-bdba-81a46d484f74	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	c55f8061-08b2-4728-9656-7216110e27c8	\N	\N	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 14:32:04+00	2026-11-04 14:32:04+00	\N	day
+3ec05839-466c-4a70-9eab-b3817e4866a6	042b19a9-82d9-4706-aabb-73810b43e297	01a1a070-d483-73bd-a2a6-20329281ddab	a3d2f648-c2d3-4277-951c-8b33f6832b01	6336b405-e9be-4787-96d3-bd3089e48da9	01a17c01-22df-7386-9f83-908d579df931	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	07:00:00	09:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:48:56+00	2026-11-05 02:48:56+00	\N	day
+1943dabf-ae16-4689-8903-75a3c9d9be5d	1b1a2a90-efe3-46af-b812-5bd57d04503d	01a1a070-d483-73bd-a2a6-20329281ddab	221d8268-bbc3-427d-8e18-3d6457d3c2fb	d5a17999-4c46-4008-8a68-15c219866d25	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	09:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:53:50+00	2026-11-05 02:53:50+00	\N	day
+60320397-72ea-4de8-a76f-86d7363c0655	3ae674ec-3fdc-4564-ae2c-559d6c3dd951	01a1a070-d483-73bd-a2a6-20329281ddab	a3d2f648-c2d3-4277-951c-8b33f6832b01	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	16:30:00	18:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 03:24:20+00	2026-11-05 03:24:20+00	\N	evening
+32fa3f22-268c-4bef-aa7f-0379913f6798	917d8648-c78e-466d-b78b-efe60afde918	01a1a048-1a3d-708c-bc17-93d208cbc837	9751862a-6d6a-417e-9834-26e920dfebba	03cfe1ca-5358-42f8-8975-b1d3b3c982ff	01a17c0c-75c3-7142-aa32-54dc3f652f07	462c1f14-8433-47f1-8569-9daeedc758a5	Saturday	09:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 02:50:34+00	2026-11-06 02:50:34+00	\N	day
+1f5fea61-5a04-419e-ae83-d3f0672aa1b2	8f218c48-8125-4346-8d8a-0ec29d1f6013	01a11004-1aa5-7125-9178-590a1a432970	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	16:30:00	19:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:05:18+00	2026-11-06 03:05:18+00	\N	evening
+ce6cb234-ae4f-4c30-9431-0e62cdef77b0	df447d85-a228-40fb-89d6-f3639eb0c092	01a1a03e-600f-72b2-be2b-199e54a81312	8bab364d-dbe5-42d1-bd60-c1b6039bc861	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c01-22df-7386-9f83-908d579df931	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	16:30:00	19:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:09:41+00	2026-11-06 03:09:41+00	\N	evening
+cabe7e8c-8dd6-490b-a1b2-330427bd2761	9558fc9b-480f-462d-962e-5d07f0695331	01a1a048-1a3d-708c-bc17-93d208cbc837	9751862a-6d6a-417e-9834-26e920dfebba	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c0c-75c3-7142-aa32-54dc3f652f07	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	16:30:00	18:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:16:53+00	2026-11-06 03:16:53+00	\N	evening
+6fb8d1a9-a145-429d-9741-68f057ec79a0	746ebb64-064f-4dca-ba32-2acdf3f4e587	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	efa79181-f225-4ad9-b5ae-1b28bb2dfdb3	6bd5e6b4-76be-4edb-90ee-f7cb6c55e2b4	01a17c0c-75c3-7142-aa32-54dc3f652f07	462c1f14-8433-47f1-8569-9daeedc758a5	Saturday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:22:05+00	2026-11-06 03:22:05+00	\N	day
+1bdd0460-31c6-4148-a60d-bf9d170dc8e1	4faacb79-0e97-405f-8343-5561b6d03ff6	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	16:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:09:33+00	2026-11-10 12:09:33+00	\N	evening
+328589e9-163a-442e-9d39-a1ae06f2abd7	75539ea8-2ae8-4201-bfc0-347c15e7c558	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	01a17c0b-c140-734b-8471-7a4167dadb84	462c1f14-8433-47f1-8569-9daeedc758a5	Saturday	07:30:00	09:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-08 15:51:56+00	2026-11-08 16:02:18+00	\N	day
+16af4b4f-5ecb-4715-8623-36b293279d27	f8f35617-9adc-4749-8056-f48b9b6c17cf	01a1a08a-6633-71da-a16e-269a62efff07	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	b453cf9f-6802-4b9b-b9f7-c9ae578563f6	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	16:30:00	18:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:08:42+00	2026-11-10 12:08:42+00	\N	evening
+8c633a50-22c3-438d-a8af-822cd81a8bb4	5d52c857-93f4-4225-8851-24e10c5a5d5e	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	b453cf9f-6802-4b9b-b9f7-c9ae578563f6	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	16:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:31:44+00	2026-11-10 12:31:44+00	\N	evening
+f49cb8f7-4d32-4db9-a589-93a754eb9512	5d52c857-93f4-4225-8851-24e10c5a5d5e	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Saturday	08:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:57:33+00	2026-11-10 15:07:28+00	\N	day
+c7487a01-8869-40d1-baff-ce99ebca8994	8f8e3f8c-f522-482a-ae61-55a7f2a183ba	01a1a08a-6633-71da-a16e-269a62efff07	c55f8061-08b2-4728-9656-7216110e27c8	\N	\N	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:40:40+00	2026-11-10 17:41:15+00	\N	day
+7fc84490-540a-4441-90ca-118c5d7a6158	7f88d2fe-83b1-479d-af16-671524f07acf	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	a9326d77-b132-4a11-abc6-5889ef05ebb6	01a17bcc-65bb-7120-b431-3c89f25ccded	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 10:35:59+00	2026-11-04 10:59:49+00	\N	day
+8047555a-c3a3-4d54-99cd-0c7c7253bc66	fd775898-f015-4a74-add8-7453dc77d994	01a11004-1aa5-7125-9178-590a1a432970	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	16:30:00	18:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:06:17+00	2026-11-06 03:06:17+00	\N	evening
+271d54a9-fe33-4958-98d7-88fc27d132f1	51907221-56a1-457e-b56e-c5ecab92dce0	01a1a087-4c19-70da-8f2e-872c5804e5a1	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	46b38b07-eb74-4ea7-a105-51779a082ea8	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	08:00:00	11:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 13:46:17+00	2026-11-04 13:46:17+00	\N	day
+01e70c31-9690-4c59-8369-9fa9c66c0047	51907221-56a1-457e-b56e-c5ecab92dce0	01a1a087-4c19-70da-8f2e-872c5804e5a1	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	46b38b07-eb74-4ea7-a105-51779a082ea8	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	08:00:00	11:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 13:46:27+00	2026-11-04 13:46:27+00	\N	day
+648a43aa-ee5f-45ca-a470-dacd0d3f5a93	e850f153-6fac-4d6d-bf7b-badf837f1181	01a1a087-4c19-70da-8f2e-872c5804e5a1	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	00ce7ab3-99cf-4b89-a1e1-09771e599a45	01a17c01-22df-7386-9f83-908d579df931	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	09:00:00	10:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 16:18:51+00	2026-11-04 16:18:51+00	\N	day
+924937b7-2c29-419a-a34d-983d7311990b	84e780bd-2926-43f0-8093-78faf4e570e7	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	6336b405-e9be-4787-96d3-bd3089e48da9	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	07:00:00	10:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:50:55+00	2026-11-05 02:50:55+00	\N	day
+b9452dae-d006-4ecd-837b-3555e1ce2de1	84e780bd-2926-43f0-8093-78faf4e570e7	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	6336b405-e9be-4787-96d3-bd3089e48da9	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	07:00:00	10:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:50:59+00	2026-11-05 02:50:59+00	\N	day
+209adf6f-6890-4c9e-bcff-13979271e967	84e780bd-2926-43f0-8093-78faf4e570e7	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	6336b405-e9be-4787-96d3-bd3089e48da9	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	07:00:00	10:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:51:03+00	2026-11-05 02:51:03+00	\N	day
+b26347fe-566f-4f92-b938-c5341cbb0fcd	1b1a2a90-efe3-46af-b812-5bd57d04503d	01a1a070-d483-73bd-a2a6-20329281ddab	221d8268-bbc3-427d-8e18-3d6457d3c2fb	d5a17999-4c46-4008-8a68-15c219866d25	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	10:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:56:29+00	2026-11-05 02:56:29+00	\N	day
+cb71a731-112e-4f7c-b2a6-e14da2246834	75539ea8-2ae8-4201-bfc0-347c15e7c558	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	16:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 03:56:31+00	2026-11-05 03:56:31+00	\N	evening
+08e16e78-ce28-44ec-98f0-bf0938699c54	f6f4163f-4122-49db-8d8c-652e9128a183	01a1a070-d483-73bd-a2a6-20329281ddab	221d8268-bbc3-427d-8e18-3d6457d3c2fb	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c01-9594-7329-9a15-d70c42621d70	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	16:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 02:43:26+00	2026-11-06 02:43:26+00	\N	evening
+334e2290-6bdd-4d8a-9887-0999e4a108f3	4087e488-4d41-433a-ab0c-05c546341331	01a1a03e-600f-72b2-be2b-199e54a81312	8cd451f2-cca7-4a4e-b7d1-ef1e541b60ef	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	18:30:00	20:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:07:38+00	2026-11-06 03:07:38+00	\N	evening
+39c3c6a0-eb3c-4f1d-866e-0293b02a54ef	9558fc9b-480f-462d-962e-5d07f0695331	01a1a048-1a3d-708c-bc17-93d208cbc837	9751862a-6d6a-417e-9834-26e920dfebba	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17c0c-75c3-7142-aa32-54dc3f652f07	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	20:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:14:01+00	2026-11-06 03:14:01+00	\N	evening
+c5cd7e8e-dcf9-4fa7-9240-1e3c2a43a4de	aabcd22f-265c-420f-8f32-499bce0786c4	01a1a03e-600f-72b2-be2b-199e54a81312	d601231f-8bf9-44c1-979d-47b0862983b2	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	01a17bcd-ddbc-729c-84e8-c2965d70ec2c	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	18:30:00	21:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:18:16+00	2026-11-06 03:18:16+00	\N	evening
+2e6b40d2-1fcb-46fa-b6f0-6532595b3971	19aaf95a-7e0c-4b59-9c0d-8f77993aaa28	ac6adea7-6397-426f-9fa1-b9e51749b665	221d8268-bbc3-427d-8e18-3d6457d3c2fb	32c670ec-2065-4d2d-b409-51456a537b50	01a17bfd-3b82-7254-8b81-4481eef3759c	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-30 07:03:17+00	2026-10-30 07:03:17+00	\N	evening
+3dddf33a-bbd3-4a69-8059-91357b7c8591	d4d81cb7-dd67-4530-a8bc-70a7e46daff9	01a1a08a-6633-71da-a16e-269a62efff07	a3d2f648-c2d3-4277-951c-8b33f6832b01	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	01a17c01-22df-7386-9f83-908d579df931	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	13:00:00	15:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:31:43+00	2026-11-10 11:31:43+00	\N	day
+45450e76-f099-4de5-9867-d3ac19e03444	0cd325fa-4660-4fba-a8d0-505780240ebc	01a1a08a-6633-71da-a16e-269a62efff07	129760c4-d92f-4695-a7e3-71e8dcac525f	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:33:05+00	2026-11-10 11:33:05+00	\N	day
+ae9d881f-25ef-4fdf-82a8-b6e75991e5f7	2c8c1f75-78ee-41f2-a9ca-89f572801ab3	01a1a08a-6633-71da-a16e-269a62efff07	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Tuesday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:34:07+00	2026-11-10 11:34:07+00	\N	day
+f9b58852-e37a-4cd3-8867-7ffbdcfad89f	2c8c1f75-78ee-41f2-a9ca-89f572801ab3	01a1a08a-6633-71da-a16e-269a62efff07	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:34:13+00	2026-11-10 11:34:13+00	\N	day
+c795795c-b635-4883-a5a1-9768f9de30fd	2c8c1f75-78ee-41f2-a9ca-89f572801ab3	01a1a08a-6633-71da-a16e-269a62efff07	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	01a17c02-3fe8-708f-a00c-04376fddf85c	462c1f14-8433-47f1-8569-9daeedc758a5	Thursday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:34:18+00	2026-11-10 11:34:18+00	\N	day
+7007b932-88da-47f4-8a8e-7089be392acf	f9fb035e-2d5d-43d6-ad6d-268e241a46f7	01a1a08a-6633-71da-a16e-269a62efff07	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Monday	16:30:00	18:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:06:25+00	2026-11-10 12:06:25+00	\N	evening
+5940e087-b1ce-43aa-b365-dfa21f26f3d2	4faacb79-0e97-405f-8343-5561b6d03ff6	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	16:30:00	20:30:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:45:14+00	2026-11-10 12:45:14+00	\N	evening
+63670ec5-d87d-4b8e-8062-cf64d8907d68	ad1eb7d8-cc2c-4103-954b-51d11fd41743	01a1a08a-6633-71da-a16e-269a62efff07	129760c4-d92f-4695-a7e3-71e8dcac525f	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	01a17c03-a9f0-73a5-87be-99e46e353412	462c1f14-8433-47f1-8569-9daeedc758a5	Saturday	13:00:00	18:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 13:02:51+00	2026-11-10 14:10:55+00	\N	day
+b6d73e5e-0a6b-49e3-8dac-676436ea6d4d	8f8e3f8c-f522-482a-ae61-55a7f2a183ba	01a1a08a-6633-71da-a16e-269a62efff07	c55f8061-08b2-4728-9656-7216110e27c8	\N	\N	462c1f14-8433-47f1-8569-9daeedc758a5	Friday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:38:34+00	2026-11-10 17:38:34+00	\N	day
+8dd143c1-9eda-486f-a233-e271083ba6f3	d2f8e54d-c165-4705-a950-ad1a2f950baa	01a1baec-8076-7080-a841-079a4c219fe9	9751862a-6d6a-417e-9834-26e920dfebba	46b38b07-eb74-4ea7-a105-51779a082ea8	01a17bfa-6247-73a9-b57a-90b0e8213149	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	13:00:00	16:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:45:18+00	2026-11-10 17:45:18+00	\N	day
+840d6321-2e59-4073-9e51-cf9d4294b25b	882337c6-ae8d-4abe-97aa-153c6dff2fab	01a1baec-8076-7080-a841-079a4c219fe9	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	5409f47c-a640-4593-951f-19cfc779af9a	01a17bc3-0846-70f7-838f-78f46a9c229f	462c1f14-8433-47f1-8569-9daeedc758a5	Wednesday	07:00:00	12:00:00	draft	t	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:47:14+00	2026-11-10 17:47:14+00	\N	day
+\.
+
+
+--
+-- Data for Name: schedule_archives; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.schedule_archives (sar_id, sar_sch_id, sar_sem_id, sar_ay_id, sar_fac_id, sar_course_id, sar_sec_id, sar_room_id, sar_day, sar_start_time, sar_end_time, sar_shift, sar_status, sar_is_active, sar_description, sar_created_by, sar_updated_by, sar_archived_at, created_at, updated_at) FROM stdin;
 \.
 
 
@@ -6079,12 +8027,11 @@ a19cd1dc-69c9-4154-bfad-24c240d19862	3d35fab3-e07a-4ff2-82b5-18d2d85585cc	c980c0
 -- Data for Name: schedule_submission; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.schedule_submission (schsub_id, schsub_dept_id, schsub_sem_id, schsub_submitted_by, schsub_submitted_at, schsub_reviewed_by, schsub_reviewed_at, schsub_status, schsub_remarks) FROM stdin;
-0a69335c-8827-437d-adae-43d1b512e14a	bb09daa1-3065-4718-b08f-e4569311ace3	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	56b56f76-e432-490c-a35b-b4f588ddf716	2026-07-15 15:03:40.332265+00	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-17 07:49:32+00	returned	\N
-2a80b1f3-6614-4331-bd87-2800fbe1c210	01c2dac6-6375-4e5e-a2a7-1838c3a6fd1b	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-15 15:03:40.332265+00	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-17 07:48:43+00	pending	\N
-09180762-8a56-4818-bedc-eb7a28b60487	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	41a4e102-068a-4a65-8e1d-70e5289f99ef	2026-07-15 15:03:40.332265+00	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-15 15:03:40.332265+00	pending	Approved for publication.
-cd82e92e-0651-4d69-98cd-3f99c1fcbd42	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:40.332265+00	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-15 15:03:40.332265+00	pending	No conflicts detected.
-466ad2ba-a861-4fe1-84ca-490e8b0683cb	d2762742-5d6f-4013-9124-1cd3105c2708	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ea9ad791-09c3-4f91-a464-c3bb72922747	2026-07-15 15:03:40.332265+00	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-07-17 08:19:45+00	approved	\N
+COPY public.schedule_submission (schsub_id, schsub_dept_id, schsub_sem_id, schsub_submitted_by, schsub_submitted_at, schsub_reviewed_by, schsub_reviewed_at, schsub_status, schsub_remarks, schsub_schedule_snapshot, schsub_fac_id) FROM stdin;
+be8015ed-cbe0-4bdf-aac5-4784927801ad	5694bc6e-69e8-4dfd-b78b-35af1289ad11	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-07 06:07:19+00	\N	\N	pending	\N	[{"schedule_id":"6f3509ac-606e-4d32-9bc6-3df0e6d41410","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-A","room":"Computer Laboratory 1","day":"Tuesday","start_time":"07:00:00","end_time":"12:00:00"},{"schedule_id":"941738d5-2e64-4ec7-b098-c70eaa0b7aa0","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-B","room":"Computer Laboratory 1","day":"Wednesday","start_time":"07:00:00","end_time":"12:00:00"},{"schedule_id":"17b4ff84-96cd-4819-80d9-e3a2c4acaacb","faculty":"Noreen B. Fuentes","subject_code":"PC 318","subject_name":"Enterprise Architecture","section":"BSIS 3-A","room":"Computer Laboratory 1","day":"Thursday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"3225c1e2-d642-4acf-a902-32da7ed36f86","faculty":"Noreen B. Fuentes","subject_code":"PC 318","subject_name":"Enterprise Architecture","section":"BSIS 3-A","room":"Computer Laboratory 1","day":"Friday","start_time":"13:00:00","end_time":"16:00:00"},{"schedule_id":"1c6cece4-b4ac-46f1-b960-8b9e77658d17","faculty":"Gerry Ritz R. Densing","subject_code":"CC 112 L","subject_name":"Computer Programming 1 (Lab)","section":"BSIS 1-A","room":"Computer Laboratory 2","day":"Wednesday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"28e14207-c379-4ef8-9461-657de7927bbd","faculty":"Gerry Ritz R. Densing","subject_code":"CC 112 L","subject_name":"Computer Programming 1 (Lab)","section":"BSIS 1-A","room":"Computer Laboratory 2","day":"Thursday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"41451ae6-c2e7-43f5-a9db-7956b4b2f1a1","faculty":"Gerry Ritz R. Densing","subject_code":"CC 112 L","subject_name":"Computer Programming 1 (Lab)","section":"BSIS 1-A","room":"Computer Laboratory 2","day":"Monday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"d01a5e78-47d5-48b9-aa5c-df571d00ee4c","faculty":"Gerry Ritz R. Densing","subject_code":"CC 112 L","subject_name":"Computer Programming 1 (Lab)","section":"BSIS 1-A","room":"Computer Laboratory 2","day":"Tuesday","start_time":"13:00:00","end_time":"16:00:00"}]	\N
+a36a47b5-6030-4fc0-b7eb-6dd251e84c6c	5694bc6e-69e8-4dfd-b78b-35af1289ad11	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 13:10:48+00	\N	\N	pending	\N	[{"schedule_id":"c1ac7966-cb6f-4faa-972d-77d5e0d0d96f","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-A","room":"NICT-808","day":"Tuesday","start_time":"07:00:00","end_time":"12:00:00"},{"schedule_id":"322ca05e-404e-4638-9c3f-ece2f95d8996","faculty":"Noreen B. Fuentes","subject_code":"PC 318","subject_name":"Enterprise Architecture","section":"BSIS 3-A","room":"NICT-706","day":"Thursday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"ba231c3b-b91d-421c-806a-ed6f3da49bcd","faculty":"Noreen B. Fuentes","subject_code":"PC 318","subject_name":"Enterprise Architecture","section":"BSIS 3-A","room":"NICT-706","day":"Friday","start_time":"13:00:00","end_time":"16:00:00"},{"schedule_id":"db3a2457-8ec0-4bca-89ce-8af54c52e1d3","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-2","room":"NICT-809","day":"Tuesday","start_time":"16:00:00","end_time":"21:00:00"},{"schedule_id":"4c629b1a-e26e-476d-b20a-115ec2cbc4c0","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-1","room":"NICT-809","day":"Wednesday","start_time":"16:00:00","end_time":"21:00:00"},{"schedule_id":"7fc84490-540a-4441-90ca-118c5d7a6158","faculty":"Noreen B. Fuentes","subject_code":"P Elec 3","subject_name":"Enterprise Systems","section":"BSIS 4-B","room":"NICT-808","day":"Wednesday","start_time":"07:00:00","end_time":"12:00:00"},{"schedule_id":"db9ccc46-6189-4630-ae6f-00912a17e828","faculty":"Noreen B. Fuentes","subject_code":"CC 111","subject_name":"Introduction to Computing","section":"BSIS 1-1","room":"NICT-809","day":"Thursday","start_time":"16:00:00","end_time":"21:00:00"}]	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d
+034ef485-4ee9-4322-8bc2-e4821d6eb68d	5694bc6e-69e8-4dfd-b78b-35af1289ad11	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-31 13:31:45+00	\N	\N	pending	\N	[{"schedule_id":"d5d4df1d-f034-4da5-b72c-83f93cc49215","faculty":"Rizza P. Sayloon","subject_code":"CC 214 L","subject_name":"Data Structures and Algorithms (Lab)","section":"BSIS 2-A","room":"Computer Laboratory 2","day":"Thursday","start_time":"07:00:00","end_time":"12:00:00"},{"schedule_id":"5732476c-7557-4185-a926-e2232be20e7b","faculty":"Rizza P. Sayloon","subject_code":"CC 214 L","subject_name":"Data Structures and Algorithms (Lab)","section":"BSIS 2-A","room":"Computer Laboratory 2","day":"Monday","start_time":"09:00:00","end_time":"10:00:00"},{"schedule_id":"9325480d-67fc-4b9d-b3e3-8ec424a30672","faculty":"Rizza P. Sayloon","subject_code":"CC 214 L","subject_name":"Data Structures and Algorithms (Lab)","section":"BSIS 2-A","room":"Computer Laboratory 2","day":"Tuesday","start_time":"09:00:00","end_time":"10:00:00"},{"schedule_id":"16fe0338-396b-4360-8cfe-841819b4f538","faculty":"Rizza P. Sayloon","subject_code":"CC 214 L","subject_name":"Data Structures and Algorithms (Lab)","section":"BSIS 2-A","room":"Computer Laboratory 2","day":"Wednesday","start_time":"09:00:00","end_time":"10:00:00"},{"schedule_id":"92a47478-a2ca-4b41-b9b2-03dba3bf0220","faculty":"Rizza P. Sayloon","subject_code":"PC 214","subject_name":"Financial Management","section":"BSIS 2-A","room":"Smart Classroom","day":"Tuesday","start_time":"13:00:00","end_time":"16:00:00"},{"schedule_id":"4f8aa09e-f4f0-4b09-b7cd-60e1f79c4f5d","faculty":"Rizza P. Sayloon","subject_code":"CC 214 L","subject_name":"Data Structures and Algorithms (Lab)","section":"BSIS 2-A","room":"Computer Laboratory 2","day":"Friday","start_time":"09:00:00","end_time":"10:00:00"}]	\N
+027fecd3-3b9b-4a9e-ade2-e5262e879d15	5694bc6e-69e8-4dfd-b78b-35af1289ad11	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-31 13:52:40+00	\N	\N	pending	\N	[{"schedule_id":"c1271548-de48-4177-b12e-6f0021f3dfb5","faculty":"Monkey D. Luffy","subject_code":"AP 4","subject_name":"Database Administration DBMS","section":"BSIS 3-B","room":"Computer Laboratory 1","day":"Monday","start_time":"17:30:00","end_time":"19:30:00"},{"schedule_id":"ad0d3507-b425-4d40-bf85-597700ff83c8","faculty":"Monkey D. Luffy","subject_code":"AP 4","subject_name":"Database Administration DBMS","section":"BSIS 3-B","room":"Computer Laboratory 1","day":"Thursday","start_time":"17:30:00","end_time":"19:30:00"},{"schedule_id":"978546d4-be2a-47f5-94ea-cdb4e3baad77","faculty":"Monkey D. Luffy","subject_code":"GEC-MMW","subject_name":"Mathematics in the Modern World","section":"BSIS 1-B","room":"Networking Laboratory","day":"Wednesday","start_time":"13:00:00","end_time":"15:00:00"},{"schedule_id":"c03c65dd-3f78-44f4-88b8-5314ffeca351","faculty":"Monkey D. Luffy","subject_code":"CC 111","subject_name":"Introduction to Computing","section":"BSIS 1-A","room":"Computer Laboratory 1","day":"Monday","start_time":"09:30:00","end_time":"10:30:00"}]	\N
 \.
 
 
@@ -6092,25 +8039,47 @@ cd82e92e-0651-4d69-98cd-3f99c1fcbd42	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	244d6e
 -- Data for Name: section; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.section (sec_id, sec_prog_id, sec_ay_id, sec_sem_id, sec_name, sec_year_level, sec_no_of_student, sec_max_capacity, sec_status, sec_created_at, sec_updated_at) FROM stdin;
-ec8600da-1c7c-4fd6-a67e-e665bc5157d1	8de117bd-ed91-45dc-9ad4-f75eede0cb38	ceaa38d7-0d5c-48ae-a811-68b24925a534	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	BSIT-1A	1	38	40	active	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-81603ad3-7337-4ae5-ae9f-c9456f3641bb	8de117bd-ed91-45dc-9ad4-f75eede0cb38	ceaa38d7-0d5c-48ae-a811-68b24925a534	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	BSIT-2A	2	36	40	active	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-06988bfc-08c2-4fc7-ae9c-7fe6c491bdfe	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	ceaa38d7-0d5c-48ae-a811-68b24925a534	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	BSCS-1A	1	35	40	active	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-36afdb09-814e-4bbf-b287-61e5480163b7	beb8e158-62d2-42b6-9e3a-abf0df585860	ceaa38d7-0d5c-48ae-a811-68b24925a534	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	BSCPE-1A	1	32	40	active	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-7ad85261-33d4-4332-9801-d86f76b08cb1	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	ceaa38d7-0d5c-48ae-a811-68b24925a534	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	BSINDTECH-1A	1	30	40	active	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-\.
-
-
---
--- Data for Name: section_subject; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.section_subject (ssub_id, ssub_sec_id, ssub_subj_id) FROM stdin;
-5b6abe9a-4f4d-43d9-8fea-9223f2398484	ec8600da-1c7c-4fd6-a67e-e665bc5157d1	4a4abb03-6a8f-47b6-a380-c6f9e4c0df47
-d8d489ba-c71b-4387-a022-ed46b12cb415	81603ad3-7337-4ae5-ae9f-c9456f3641bb	2af0aa4c-2697-4cc5-bf2b-fa13c24ec3a8
-2664e883-691d-4b29-9b80-0d94f73997cc	06988bfc-08c2-4fc7-ae9c-7fe6c491bdfe	2df9b47a-70ed-4f45-833f-c4f0f8320746
-2bd33942-ce48-4578-8f85-437fc974b332	36afdb09-814e-4bbf-b287-61e5480163b7	75fb12d1-3626-45fb-b09c-6a61aea1fd03
-82663a00-b8ab-4e87-aae1-17a0c4b6dff1	7ad85261-33d4-4332-9801-d86f76b08cb1	99ba581e-ac78-4217-b3ad-3669926651ec
+COPY public.section (sec_id, sec_dept_id, sec_ay_id, sec_sem_id, sec_name, sec_year_level, sec_no_of_student, sec_max_capacity, sec_status, sec_created_at, sec_updated_at, sec_is_evening) FROM stdin;
+bad18a12-2748-4334-982b-97c089235076	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-1A	1	25	40	active	2026-11-04 15:27:01+00	2026-11-04 15:27:03+00	f
+cada9017-e27c-4762-b3eb-5e450bca500b	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-B	1	33	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+a5543bd6-54c7-4be9-8ced-11a78a23e691	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 2-A	2	32	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+077175b0-235b-4e70-933f-c53c6161188c	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 2-B	2	30	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+6336b405-e9be-4787-96d3-bd3089e48da9	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 3-A	3	29	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 3-B	3	28	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+b39f2514-7cec-427c-b482-ad9acdf7db4f	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 4-A	4	27	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+a9326d77-b132-4a11-abc6-5889ef05ebb6	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 4-B	4	25	40	active	2026-09-30 08:22:29.298999+00	2026-09-30 08:22:29.298999+00	f
+46b38b07-eb74-4ea7-a105-51779a082ea8	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-A	1	48	40	active	2026-09-30 08:22:29.298999+00	2026-10-01 03:24:20+00	f
+d5a17999-4c46-4008-8a68-15c219866d25	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-A	1	40	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+e8e9b4c3-46a6-4134-b5d3-f5da754d1a92	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-B	1	38	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+12de1585-67d3-41dd-9d73-1f87d27715ff	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 2-A	2	35	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+573c1bc9-82da-4acb-85c1-b01b0b215803	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 2-B	2	36	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+1f91582c-9941-40dc-a99a-bd1d536c01d6	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 3-A	3	32	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+dde6347f-5b24-4e45-9b9a-9b24fc91ccb2	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 3-B	3	30	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+47cc4247-5e18-4672-afe7-6d02097c3252	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 4-A	4	28	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+5a2b8b7f-e6cc-4097-bfa7-b4544080b572	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 4-B	4	27	40	active	2026-10-01 06:13:40.308865+00	2026-10-01 06:13:40.308865+00	f
+b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-1B	1	30	50	active	2026-10-26 05:49:18.050154+00	2026-10-26 05:49:18.050154+00	f
+32c670ec-2065-4d2d-b409-51456a537b50	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-1A	1	30	50	active	2026-10-26 05:52:35.179492+00	2026-10-26 05:52:35.179492+00	f
+00ce7ab3-99cf-4b89-a1e1-09771e599a45	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-2A	1	25	50	active	2026-10-26 05:53:42.265163+00	2026-10-26 05:53:42.265163+00	f
+b453cf9f-6802-4b9b-b9f7-c9ae578563f6	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-2B	1	30	50	active	2026-10-26 05:51:44.384476+00	2026-10-26 05:51:44.384476+00	f
+a4f150a1-97b0-4506-b2a5-c38e60c8c6ed	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-2A	1	25	40	active	2026-11-04 15:30:47+00	2026-11-04 15:30:48+00	f
+21007b48-90f3-478d-9f17-863617c394d4	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 2-2	2	25	40	active	2026-11-04 15:37:08+00	2026-11-04 15:37:09+00	t
+484bb3c0-4bad-4d9f-901a-cd6871570f72	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 2-2	2	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+487b76d1-9b5f-4959-aead-b6dcacbe9ea0	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 3-1	3	25	40	active	2026-11-04 15:37:46+00	2026-11-04 15:37:47+00	t
+519ecca4-8cf0-4f8f-8136-d2f627d9bf03	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 2-1	2	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+52d55b72-a0b5-44d8-a3cf-cb61a2feedc1	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 4-2	4	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+5409f47c-a640-4593-951f-19cfc779af9a	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 3-1	3	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+6bd5e6b4-76be-4edb-90ee-f7cb6c55e2b4	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 4-1	4	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+6f77b080-7dd2-4a8a-ae35-90f666159b9d	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 4-1	4	25	40	active	2026-11-04 15:40:24+00	2026-11-04 15:40:25+00	t
+03cfe1ca-5358-42f8-8975-b1d3b3c982ff	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-1	1	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 1-2	1	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	5694bc6e-69e8-4dfd-b78b-35af1289ad11	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIS 3-2	3	0	50	active	2026-11-04 12:51:53.982757+00	2026-11-04 12:51:53.982757+00	t
+b43c2585-4f52-48d7-8e46-e05152983cb9	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-1	1	25	40	active	2026-11-04 15:21:29+00	2026-11-04 15:21:31+00	t
+dc3aea16-1418-4612-97a8-cb387b54f6ca	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-2	1	25	40	active	2026-11-04 15:29:36+00	2026-11-04 15:29:37+00	t
+7b1b465d-e27b-44d0-a592-43954d83ab54	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 2-1	2	25	40	active	2026-11-04 15:35:09+00	2026-11-04 15:35:11+00	t
+773e1d3f-e751-4e81-8f57-ec1d43f852f5	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 3-2	3	25	40	active	2026-11-04 15:38:24+00	2026-11-04 15:38:25+00	t
+a097a3e5-d720-42c0-8886-53409a140c68	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 4-2	4	25	40	active	2026-11-04 15:41:01+00	2026-11-04 15:41:03+00	t
+e8317cc3-1cb0-4dab-b789-393914ef8d9f	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-1B	1	25	40	active	2026-11-04 15:28:39+00	2026-11-04 15:28:40+00	t
+295ed94c-1601-4d8f-bb22-56b793f8a4cb	8de117bd-ed91-45dc-9ad4-f75eede0cb38	0e90a55c-51ba-4d90-868d-3b91051ce5a0	462c1f14-8433-47f1-8569-9daeedc758a5	BSIT 1-2B	1	25	40	active	2026-11-04 15:33:46+00	2026-11-04 15:33:47+00	t
 \.
 
 
@@ -6119,12 +8088,8 @@ d8d489ba-c71b-4387-a022-ed46b12cb415	81603ad3-7337-4ae5-ae9f-c9456f3641bb	2af0aa
 --
 
 COPY public.semester (sem_id, sem_ay_id, sem_name, sem_start_date, sem_end_date, sem_is_active, sem_created_at) FROM stdin;
-4be9ba82-adf8-4625-a376-d18b4dddd352	ceaa38d7-0d5c-48ae-a811-68b24925a534	Second Semester	2026-01-12	2026-05-30	f	2026-07-15 15:02:46.174993+00
-485b73a3-fe9d-4bf5-894f-4724e0c260b9	fbd45845-3a8b-4484-8cc5-0312408111e2	First Semester	2024-08-05	2024-12-20	f	2026-07-15 15:02:46.174993+00
-26e8ea67-4058-44cc-8b76-614368754057	fbd45845-3a8b-4484-8cc5-0312408111e2	Second Semester	2025-01-13	2025-05-30	f	2026-07-15 15:02:46.174993+00
-e1cddb17-e1a6-4c80-841e-81a7a95e96d7	929e267e-ac05-41eb-bbeb-dd7f5cd273e3	First Semester	2026-08-03	2026-12-18	f	2026-07-15 15:02:46.174993+00
-244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	First Semester	2025-08-04	2025-12-20	f	2026-07-15 15:02:46.174993+00
-f19da36a-54e7-4f86-8c0b-94a82ec827bc	7f59daaa-01ff-44c3-babe-0efeb21e1cb0	1st Semester	2020-08-20	2021-01-01	t	2026-09-26 05:23:37.777397+00
+0d030558-166f-4f05-8a6d-093af4b1ffee	0e90a55c-51ba-4d90-868d-3b91051ce5a0	2nd Semester	2026-08-01	2026-12-20	f	2026-09-30 08:18:55.204565+00
+462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	1st Semester	2026-08-01	2026-12-20	t	2026-09-30 08:18:55.204565+00
 \.
 
 
@@ -6140,26 +8105,42 @@ COPY public.sessions (id, user_id, ip_address, user_agent, payload, last_activit
 -- Data for Name: study_load; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.study_load (sl_id, sl_fac_id, sl_subj_id, sl_sec_id, sl_sem_id, sl_assigned_by, sl_assigned_at, sl_status) FROM stdin;
-38543a56-7151-4b26-94e2-f5b989cf0469	71a00f35-6a60-4165-8c14-85c402eaada1	4a4abb03-6a8f-47b6-a380-c6f9e4c0df47	ec8600da-1c7c-4fd6-a67e-e665bc5157d1	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:17.202207+00	approved
-c25c9289-c654-41e2-8a3a-103bc1b37776	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	2af0aa4c-2697-4cc5-bf2b-fa13c24ec3a8	81603ad3-7337-4ae5-ae9f-c9456f3641bb	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:17.202207+00	approved
-fd066d28-dacf-4610-8ab1-6169bec440c9	56e063b6-76e5-4382-85c9-89296f4cc916	2df9b47a-70ed-4f45-833f-c4f0f8320746	06988bfc-08c2-4fc7-ae9c-7fe6c491bdfe	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:17.202207+00	submitted
-3d35fab3-e07a-4ff2-82b5-18d2d85585cc	c980c068-8108-4881-85f6-0d8df6a70870	75fb12d1-3626-45fb-b09c-6a61aea1fd03	36afdb09-814e-4bbf-b287-61e5480163b7	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:17.202207+00	draft
-0690cc5d-f4d2-4806-887d-a8f6edbf712c	bec360f4-9e21-4e8b-9429-0d5f2079d187	99ba581e-ac78-4217-b3ad-3669926651ec	7ad85261-33d4-4332-9801-d86f76b08cb1	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-07-15 15:03:17.202207+00	approved
-\.
-
-
---
--- Data for Name: subject; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.subject (subj_id, subj_dept_id, subj_prog_id, subj_code, subj_name, subj_lecture_hours, subj_lab_hours, subj_is_active, subj_created_at, subj_updated_at) FROM stdin;
-4a4abb03-6a8f-47b6-a380-c6f9e4c0df47	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	IT101	Introduction to Computing	3.0	3.0	t	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-2af0aa4c-2697-4cc5-bf2b-fa13c24ec3a8	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	8de117bd-ed91-45dc-9ad4-f75eede0cb38	IT102	Computer Programming 1	2.0	3.0	t	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-2df9b47a-70ed-4f45-833f-c4f0f8320746	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	CS101	Discrete Structures	3.0	0.0	t	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-75fb12d1-3626-45fb-b09c-6a61aea1fd03	dbabab7c-f8f5-48fb-86ec-a7cb11af1a8c	beb8e158-62d2-42b6-9e3a-abf0df585860	CPE101	Digital Logic Design	2.0	3.0	t	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-99ba581e-ac78-4217-b3ad-3669926651ec	d2762742-5d6f-4013-9124-1cd3105c2708	69310995-f8bc-4ff9-9032-14f9e6ef2eb7	IND101	Industrial Safety	3.0	0.0	t	2026-07-15 15:02:55.862627+00	2026-07-15 15:02:55.862627+00
-6eb2d3e3-26a9-4fd8-a0e8-ef185871dafd	c5d5cb3b-eda7-4f13-99b1-f7602a749b30	9a9867c0-72f6-4c74-a8e6-5bff9ddce7b7	CS146	IT AUDIT AND CONTROLS	1.0	2.0	f	2026-09-03 09:56:36+00	2026-09-03 09:56:36+00
+COPY public.study_load (sl_id, sl_fac_id, sl_course_id, sl_sec_id, sl_sem_id, sl_assigned_by, sl_assigned_at, sl_status, sl_shift) FROM stdin;
+51907221-56a1-457e-b56e-c5ecab92dce0	01a1a087-4c19-70da-8f2e-872c5804e5a1	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	46b38b07-eb74-4ea7-a105-51779a082ea8	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 13:46:17+00	draft	day
+94d00935-754f-44ed-bdba-81a46d484f74	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	c55f8061-08b2-4728-9656-7216110e27c8	\N	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 14:31:47+00	draft	day
+e850f153-6fac-4d6d-bf7b-badf837f1181	01a1a087-4c19-70da-8f2e-872c5804e5a1	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	00ce7ab3-99cf-4b89-a1e1-09771e599a45	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 16:18:50+00	draft	day
+042b19a9-82d9-4706-aabb-73810b43e297	01a1a070-d483-73bd-a2a6-20329281ddab	a3d2f648-c2d3-4277-951c-8b33f6832b01	6336b405-e9be-4787-96d3-bd3089e48da9	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:48:56+00	draft	day
+84e780bd-2926-43f0-8093-78faf4e570e7	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	6336b405-e9be-4787-96d3-bd3089e48da9	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:50:55+00	draft	day
+1b1a2a90-efe3-46af-b812-5bd57d04503d	01a1a070-d483-73bd-a2a6-20329281ddab	221d8268-bbc3-427d-8e18-3d6457d3c2fb	d5a17999-4c46-4008-8a68-15c219866d25	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 02:53:50+00	draft	day
+3ae674ec-3fdc-4564-ae2c-559d6c3dd951	01a1a070-d483-73bd-a2a6-20329281ddab	a3d2f648-c2d3-4277-951c-8b33f6832b01	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 03:24:20+00	draft	evening
+75539ea8-2ae8-4201-bfc0-347c15e7c558	01a1a070-d483-73bd-a2a6-20329281ddab	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-05 03:56:31+00	draft	evening
+f6f4163f-4122-49db-8d8c-652e9128a183	01a1a070-d483-73bd-a2a6-20329281ddab	221d8268-bbc3-427d-8e18-3d6457d3c2fb	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 02:43:26+00	draft	evening
+917d8648-c78e-466d-b78b-efe60afde918	01a1a048-1a3d-708c-bc17-93d208cbc837	9751862a-6d6a-417e-9834-26e920dfebba	03cfe1ca-5358-42f8-8975-b1d3b3c982ff	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 02:50:34+00	draft	evening
+19aaf95a-7e0c-4b59-9c0d-8f77993aaa28	ac6adea7-6397-426f-9fa1-b9e51749b665	221d8268-bbc3-427d-8e18-3d6457d3c2fb	32c670ec-2065-4d2d-b409-51456a537b50	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-30 07:03:16+00	draft	evening
+6c1389dd-1b37-4093-b935-904ca5fa64ed	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	b39f2514-7cec-427c-b482-ad9acdf7db4f	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 10:17:59+00	draft	day
+7f88d2fe-83b1-479d-af16-671524f07acf	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	a9326d77-b132-4a11-abc6-5889ef05ebb6	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 10:35:59+00	draft	day
+9c235c41-2503-488d-a202-5cef1b225604	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	15f66c86-9bf9-42ef-bca3-4b10320842dd	6336b405-e9be-4787-96d3-bd3089e48da9	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 11:07:09+00	draft	day
+6b5a248d-d383-4986-8dc2-3de8a788d456	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	52d55b72-a0b5-44d8-a3cf-cb61a2feedc1	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 12:53:34+00	draft	evening
+08348508-98b6-4e8d-ae26-67c110c7e747	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	2c5be148-1d93-4b4d-a08d-3c49df7613e2	6bd5e6b4-76be-4edb-90ee-f7cb6c55e2b4	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 12:53:57+00	draft	evening
+889bf404-3024-4943-99e6-dc5b0e8e12e5	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	221d8268-bbc3-427d-8e18-3d6457d3c2fb	03cfe1ca-5358-42f8-8975-b1d3b3c982ff	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-04 12:55:10+00	draft	evening
+8f218c48-8125-4346-8d8a-0ec29d1f6013	01a11004-1aa5-7125-9178-590a1a432970	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:05:18+00	draft	evening
+fd775898-f015-4a74-add8-7453dc77d994	01a11004-1aa5-7125-9178-590a1a432970	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:06:17+00	draft	evening
+4087e488-4d41-433a-ab0c-05c546341331	01a1a03e-600f-72b2-be2b-199e54a81312	8cd451f2-cca7-4a4e-b7d1-ef1e541b60ef	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:07:38+00	draft	evening
+df447d85-a228-40fb-89d6-f3639eb0c092	01a1a03e-600f-72b2-be2b-199e54a81312	8bab364d-dbe5-42d1-bd60-c1b6039bc861	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:09:41+00	draft	evening
+9558fc9b-480f-462d-962e-5d07f0695331	01a1a048-1a3d-708c-bc17-93d208cbc837	9751862a-6d6a-417e-9834-26e920dfebba	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:14:01+00	draft	evening
+aabcd22f-265c-420f-8f32-499bce0786c4	01a1a03e-600f-72b2-be2b-199e54a81312	d601231f-8bf9-44c1-979d-47b0862983b2	88f0fb6b-6483-4f3c-9f5b-55ad9d3c124d	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:18:16+00	draft	evening
+746ebb64-064f-4dca-ba32-2acdf3f4e587	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	efa79181-f225-4ad9-b5ae-1b28bb2dfdb3	6bd5e6b4-76be-4edb-90ee-f7cb6c55e2b4	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-06 03:22:05+00	draft	evening
+d4d81cb7-dd67-4530-a8bc-70a7e46daff9	01a1a08a-6633-71da-a16e-269a62efff07	a3d2f648-c2d3-4277-951c-8b33f6832b01	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:31:42+00	draft	day
+0cd325fa-4660-4fba-a8d0-505780240ebc	01a1a08a-6633-71da-a16e-269a62efff07	129760c4-d92f-4695-a7e3-71e8dcac525f	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:33:05+00	draft	day
+2c8c1f75-78ee-41f2-a9ca-89f572801ab3	01a1a08a-6633-71da-a16e-269a62efff07	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	cac58350-f856-41ad-bdbc-7fe2e2f8ccd1	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 11:34:06+00	draft	day
+f9fb035e-2d5d-43d6-ad6d-268e241a46f7	01a1a08a-6633-71da-a16e-269a62efff07	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:06:25+00	draft	evening
+f8f35617-9adc-4749-8056-f48b9b6c17cf	01a1a08a-6633-71da-a16e-269a62efff07	ecf095e8-8be4-4fa7-9486-14f3a5ef310c	b453cf9f-6802-4b9b-b9f7-c9ae578563f6	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:08:42+00	draft	evening
+4faacb79-0e97-405f-8343-5561b6d03ff6	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	b5cbceae-f8a7-4c26-ab2b-e6d3a874ab56	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:09:32+00	draft	evening
+5d52c857-93f4-4225-8851-24e10c5a5d5e	01a1a08a-6633-71da-a16e-269a62efff07	9c20c4c7-2a9d-4f3e-9527-3f1adb6ce097	b453cf9f-6802-4b9b-b9f7-c9ae578563f6	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 12:31:42+00	draft	evening
+ad1eb7d8-cc2c-4103-954b-51d11fd41743	01a1a08a-6633-71da-a16e-269a62efff07	129760c4-d92f-4695-a7e3-71e8dcac525f	87f891a2-e64d-4fe6-bb95-b7a8ba63d5d2	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 13:02:51+00	draft	evening
+8f8e3f8c-f522-482a-ae61-55a7f2a183ba	01a1a08a-6633-71da-a16e-269a62efff07	c55f8061-08b2-4728-9656-7216110e27c8	\N	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:38:33+00	draft	day
+d2f8e54d-c165-4705-a950-ad1a2f950baa	01a1baec-8076-7080-a841-079a4c219fe9	9751862a-6d6a-417e-9834-26e920dfebba	46b38b07-eb74-4ea7-a105-51779a082ea8	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:45:17+00	draft	day
+882337c6-ae8d-4abe-97aa-153c6dff2fab	01a1baec-8076-7080-a841-079a4c219fe9	56ff4a31-5c3c-4a4f-9c9e-84f751f8e033	5409f47c-a640-4593-951f-19cfc779af9a	462c1f14-8433-47f1-8569-9daeedc758a5	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-11-10 17:47:13+00	draft	evening
 \.
 
 
@@ -6186,7 +8167,10 @@ a722401a-8e82-4f3f-b770-628dc3366f31	current_academic_year	2025-2026	270ad7b7-7c
 01a0ddb0-eadb-72dc-ae70-71990f3d5453	notif_login_activity	0	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:29:15.176931+00
 01a0ddae-f4ef-7266-8330-54b7af58839c	notif_new_user_registration	1	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:27:06.769017+00
 01a0ddaf-10b3-70a7-9b0c-e36039d6339d	notif_faculty_overload	1	270ad7b7-7c4d-4823-b314-816b91773cb9	2026-09-26 12:27:13.784826+00
-01a0e0d1-957a-7352-9921-27c8671593f5	dean_notif_faculty_overload	0	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	2026-09-27 03:03:47.881612+00
+01a11718-70f5-714e-808f-5646cd98dfac	chair_notif_faculty_overload	0	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-07 16:00:40.73044+00
+01a1171e-1d5b-71ff-b9fa-4524b6b0b1dc	chair_notif_user_335c70b6-c19a-4214-8b7b-fb771a2c9e02_chair_notif_faculty_overload	1	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-10-07 16:06:52.554497+00
+01a0e167-ae29-71a8-aa9b-fd8a4519d308	usr_session_timeout_minutes	15	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-09-27 05:47:44.587843+00
+01a0e167-af41-7148-aa6f-d324a63f2854	usr_max_login_attempts	10	335c70b6-c19a-4214-8b7b-fb771a2c9e02	2026-09-27 05:47:44.863851+00
 \.
 
 
@@ -6196,10 +8180,15 @@ a722401a-8e82-4f3f-b770-628dc3366f31	current_academic_year	2025-2026	270ad7b7-7c
 
 COPY public.token_blacklist (tbl_id, tbl_usr_id, tbl_token, tbl_revoked_at) FROM stdin;
 07547411-5972-406f-b756-e5dedf0e4189	270ad7b7-7c4d-4823-b314-816b91773cb9	token_admin_001	2026-07-15 15:05:47.220445+00
-2b2224ac-45e6-4f13-a4bb-e8fda255193b	d42f3fb1-34f9-4e1c-8ebe-c401d9fe1112	token_dean_001	2026-07-15 15:05:47.220445+00
-5800814a-18d1-4b8e-ad6b-f860e218f760	41a4e102-068a-4a65-8e1d-70e5289f99ef	token_chair_001	2026-07-15 15:05:47.220445+00
-9762c359-1575-4504-aff2-281fd44415c0	56b56f76-e432-490c-a35b-b4f588ddf716	token_faculty1_001	2026-07-15 15:05:47.220445+00
-ed5be699-73d0-4a4b-979a-f97886cfd126	ea9ad791-09c3-4f91-a464-c3bb72922747	token_faculty2_001	2026-07-15 15:05:47.220445+00
+\.
+
+
+--
+-- Data for Name: webauthn_credentials; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.webauthn_credentials (id, usr_id, credential_id, public_key, sign_count, transports, device_name, created_at, last_used_at, credential_record) FROM stdin;
+01a176f2-4224-7056-82c8-dfafe8d8ea36	335c70b6-c19a-4214-8b7b-fb771a2c9e02	ihDOogK2fHuUamFAKhR9rQ	pQECAyYgASFYIFtNIIYNqCUyIEAEyKkWV6kBoFAyBOmA111WOVUP_3cOIlggrGWwNjQP2arsNL1GWfgia6a7qvPQXCqWfovla03HrPc	0	["hybrid", "internal"]	This device	2026-10-26 06:42:30.554367+00	2026-10-26 06:43:39+00	{"type": "public-key", "aaguid": "ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4", "counter": 0, "trustPath": [], "transports": ["hybrid", "internal"], "userHandle": "MzM1YzcwYjZjMTlhNDIxNDhiN2JmYjc3MWEyYzllMDI", "backupStatus": true, "uvInitialized": true, "backupEligible": true, "attestationType": "none", "credentialPublicKey": "pQECAyYgASFYIFtNIIYNqCUyIEAEyKkWV6kBoFAyBOmA111WOVUP_3cOIlggrGWwNjQP2arsNL1GWfgia6a7qvPQXCqWfovla03HrPc", "publicKeyCredentialId": "ihDOogK2fHuUamFAKhR9rQ"}
 \.
 
 
@@ -6208,11 +8197,15 @@ ed5be699-73d0-4a4b-979a-f97886cfd126	ea9ad791-09c3-4f91-a464-c3bb72922747	token_
 --
 
 COPY public.workload (wl_id, wl_fac_id, wl_sem_id, wl_ay_id, wl_type, wl_total_hours, wl_created_at, wl_updated_at) FROM stdin;
-6c3bab5f-49ef-42fd-9398-b5a720987c5a	71a00f35-6a60-4165-8c14-85c402eaada1	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	regular	18.0	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-171e95f8-12cd-43b4-b6ad-a8432089c52d	91c58e81-54ce-4ce1-8c49-b78324b9e2c8	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	regular	21.0	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-7f603b03-2e1d-4a00-88fb-b5658ef01816	c980c068-8108-4881-85f6-0d8df6a70870	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	part_time	12.0	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-1f57f9ba-519c-4f20-86e6-62517d7f4b11	56e063b6-76e5-4382-85c9-89296f4cc916	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	regular	24.0	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
-9fa31ab6-55ec-4a28-aeaf-9c59293e8500	bec360f4-9e21-4e8b-9429-0d5f2079d187	244d6e08-d6e0-4dbb-b59c-aace0e0b6348	ceaa38d7-0d5c-48ae-a811-68b24925a534	regular	20.0	2026-07-15 15:03:17.202207+00	2026-07-15 15:03:17.202207+00
+78952102-e989-4513-9c6f-e69f421b0322	01a1a087-4c19-70da-8f2e-872c5804e5a1	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	11.0	2026-11-04 13:46:28+00	2026-11-04 16:18:51+00
+d8d76b94-6a26-44cf-b6a8-255e1a5fd1ba	01a1a08a-6633-71da-a16e-269a62efff07	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	43.0	2026-11-05 14:46:45+00	2026-11-10 17:41:16+00
+e331c9f6-12bc-4b06-b171-e15307f93406	01a1baec-8076-7080-a841-079a4c219fe9	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	12.0	2026-11-10 17:45:19+00	2026-11-10 17:47:15+00
+5d5e679e-f5dd-408d-bd18-ff04fb80e8dd	01a11004-1aa5-7125-9178-590a1a432970	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	11.0	2026-10-06 07:39:40+00	2026-11-06 03:06:18+00
+049fe9a5-aa13-4d37-bc17-bc91a084344e	ac6adea7-6397-426f-9fa1-b9e51749b665	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	5.0	2026-10-30 07:03:19+00	2026-10-30 07:03:19+00
+375c189e-9591-4cf1-87d3-fe43ed63f8d6	01a1a048-1a3d-708c-bc17-93d208cbc837	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	6.0	2026-11-06 02:50:35+00	2026-11-06 03:16:54+00
+6fe59ff4-76ef-415c-8655-666210b5dbbe	01a1a03e-600f-72b2-be2b-199e54a81312	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	8.0	2026-11-04 11:14:56+00	2026-11-06 03:18:17+00
+d6dbf77b-8bf5-4a7c-9f65-74f31647f01b	33a4cf3b-17f5-4d74-a70f-0ec5f0b2fd1d	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	33.0	2026-10-07 05:38:45+00	2026-11-06 03:22:06+00
+bb2bea3d-293a-4af6-9134-5d636aaaf1e0	01a1a070-d483-73bd-a2a6-20329281ddab	462c1f14-8433-47f1-8569-9daeedc758a5	0e90a55c-51ba-4d90-868d-3b91051ce5a0	regular	32.0	2026-11-04 13:13:23+00	2026-11-08 16:02:19+00
 \.
 
 
@@ -6307,6 +8300,16 @@ COPY realtime.schema_migrations (version, inserted_at) FROM stdin;
 20260914120000	2026-09-24 12:22:22
 20260916120000	2026-09-24 12:22:22
 20260922120000	2026-09-24 12:22:22
+20260925120000	2026-09-30 05:13:43
+20260928120000	2026-10-05 07:53:57
+20261002120000	2026-10-08 05:13:56
+20261008120000	2026-10-22 10:36:57
+20261009120000	2026-10-22 10:36:57
+20261007120000	2026-11-09 08:34:21
+20261022120000	2026-11-09 08:34:21
+20261027120000	2026-11-09 08:34:21
+20261029120000	2026-11-09 08:34:21
+20261103130000	2026-11-09 08:34:21
 \.
 
 
@@ -6315,6 +8318,14 @@ COPY realtime.schema_migrations (version, inserted_at) FROM stdin;
 --
 
 COPY realtime.subscription (id, subscription_id, entity, filters, claims, created_at, action_filter, selected_columns) FROM stdin;
+\.
+
+
+--
+-- Data for Name: bucket_lifecycle_states; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+COPY storage.bucket_lifecycle_states (bucket_id, generation, next_run_at, claim_id, claim_until, continuation, last_started_at, last_completed_at, last_success_at, last_result, failure_count, last_error, updated_at) FROM stdin;
 \.
 
 
@@ -6343,13 +8354,20 @@ COPY storage.buckets_vectors (id, type, created_at, updated_at) FROM stdin;
 
 
 --
+-- Data for Name: lifecycle_abandoned_artifacts; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
+--
+
+COPY storage.lifecycle_abandoned_artifacts (bucket_id, key, name, version, attempted_at) FROM stdin;
+\.
+
+
+--
 -- Data for Name: migrations; Type: TABLE DATA; Schema: storage; Owner: supabase_storage_admin
 --
 
 COPY storage.migrations (id, name, hash, executed_at) FROM stdin;
 0	create-migrations-table	e18db593bcde2aca2a408c4d1100f6abba2195df	2026-09-24 12:22:22.560544
 1	initialmigration	6ab16121fbaa08bbd11b712d05f358f9b555d777	2026-09-24 12:22:22.569833
-2	storage-schema	f6a1fa2c93cbcd16d4e487b362e45fca157a8dbd	2026-09-24 12:22:22.57477
 3	pathtoken-column	2cb1b0004b817b29d5b0a971af16bafeede4b70d	2026-09-24 12:22:22.5935
 4	add-migrations-rls	427c5b63fe1c5937495d9c635c263ee7a5905058	2026-09-24 12:22:22.611309
 5	add-size-functions	79e081a1455b63666c1294a440f8ad4b1e6a7f84	2026-09-24 12:22:22.616447
@@ -6409,7 +8427,6 @@ COPY storage.migrations (id, name, hash, executed_at) FROM stdin;
 59	drop-unused-functions	38456f13e39691c2bbb4b5151d0d1cdbabd4a8c4	2026-09-24 12:22:23.32224
 60	optimize-existing-functions-again	db35e1c91a9201e59f4fef8d972c2f277d68b157	2026-09-24 12:22:23.327933
 61	mark-filename-immutable	fe0096517ae9d60aaec1d110172ba9036dc66bb7	2026-09-24 12:22:23.334979
-62	object-versioning-core	0b855f00ff3be0bfca91efee02a9858912491a9a	2026-09-24 12:22:23.341952
 63	fix-search-name-relative-to-prefix	c7485e417624f795ce8bb2da21927f48e088904d	2026-09-24 12:22:23.349592
 64	fix-search-by-timestamp-sqli	0af424ecd388a39bb1645184b222185a12149675	2026-09-24 12:22:23.357033
 65	objects-key-version-index	da319c4b89ba800ce795d1b699f3a70675138058	2026-09-24 12:22:23.370336
@@ -6420,6 +8437,15 @@ COPY storage.migrations (id, name, hash, executed_at) FROM stdin;
 70	list-objects-with-versions	5c17c3777616cd8d7b18b82835525fa3205af57b	2026-09-24 12:22:23.419337
 71	objects-delete-marker-index	6d14858e66c66f8d6accf8a2630aefd1527fddba	2026-09-24 12:22:23.444767
 72	drop-bucketid-objname-index	302beb09e1b469d7d4db19566f2389d280b64aa3	2026-09-24 12:22:23.451403
+2	storage-schema	cdc19a79b298ce37cc730487821a1a7b06b98105	2026-09-24 12:22:22.57477
+73	revoke-grants-to-unused-operations	ba9244051be09f22f714fc0170a2539f8b5f0e68	2026-10-14 05:28:20.578083
+62	object-versioning-core	c6567e688f8c4a76887e7c1b117b2d58f4feccba	2026-09-24 12:22:23.341952
+74	unlock-object-versioning	dacb58ecb37678de855505b3e1c5aec0d5df7894	2026-11-03 01:19:02.518565
+75	enforce-bucket-lifecycle-update-role	8454a556116c985db857d3b99de94a31a68ad273	2026-11-04 05:07:27.598216
+76	noncurrent-lifecycle	052cbe11956fd14b85861fc19537c0303b73010e	2026-11-04 05:07:27.622268
+77	noncurrent-lifecycle-archived-order-index	d68b03438a987aa1324a0fca68f7078cb2ffb849	2026-11-04 05:07:27.826271
+78	noncurrent-lifecycle-archived-due-index	c82ba0e577ec5c3496b1077ff385ce4645497698	2026-11-04 05:07:27.836306
+79	lifecycle-writer-coordination	3b38458424d2099e6b2e3cb4233590060f527fe1	2026-11-04 05:07:27.83845
 \.
 
 
@@ -6488,7 +8514,14 @@ SELECT pg_catalog.setval('public.jobs_id_seq', 1, false);
 -- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.migrations_id_seq', 13, true);
+SELECT pg_catalog.setval('public.migrations_id_seq', 31, true);
+
+
+--
+-- Name: personal_access_tokens_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.personal_access_tokens_id_seq', 19, true);
 
 
 --
@@ -6883,6 +8916,14 @@ ALTER TABLE ONLY public.cache
 
 
 --
+-- Name: course course_dept_code_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.course
+    ADD CONSTRAINT course_dept_code_unique UNIQUE (course_dept_id, course_code);
+
+
+--
 -- Name: dean dean_dean_usr_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -6903,7 +8944,7 @@ ALTER TABLE ONLY public.dean
 --
 
 ALTER TABLE ONLY public.department_chair
-    ADD CONSTRAINT department_chair_dc_usr_id_dc_dept_id_key UNIQUE (dc_usr_id, dc_dept_id);
+    ADD CONSTRAINT department_chair_dc_usr_id_dc_dept_id_key UNIQUE (dc_usr_id, dc_college_id);
 
 
 --
@@ -6915,35 +8956,19 @@ ALTER TABLE ONLY public.department_chair
 
 
 --
--- Name: department department_dept_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: college department_dept_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.department
-    ADD CONSTRAINT department_dept_code_key UNIQUE (dept_code);
-
-
---
--- Name: department department_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.department
-    ADD CONSTRAINT department_pkey PRIMARY KEY (dept_id);
+ALTER TABLE ONLY public.college
+    ADD CONSTRAINT department_dept_code_key UNIQUE (college_code);
 
 
 --
--- Name: fac_preference fac_preference_fpref_fac_id_fpref_subj_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: college department_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.fac_preference
-    ADD CONSTRAINT fac_preference_fpref_fac_id_fpref_subj_id_key UNIQUE (fpref_fac_id, fpref_subj_id);
-
-
---
--- Name: fac_preference fac_preference_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.fac_preference
-    ADD CONSTRAINT fac_preference_pkey PRIMARY KEY (fpref_id);
+ALTER TABLE ONLY public.college
+    ADD CONSTRAINT department_pkey PRIMARY KEY (college_id);
 
 
 --
@@ -6960,6 +8985,22 @@ ALTER TABLE ONLY public.fac_specialization
 
 ALTER TABLE ONLY public.fac_specialization
     ADD CONSTRAINT fac_specialization_pkey PRIMARY KEY (fspec_id);
+
+
+--
+-- Name: faculty_account_reviews faculty_account_reviews_fvr_usr_id_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.faculty_account_reviews
+    ADD CONSTRAINT faculty_account_reviews_fvr_usr_id_unique UNIQUE (fvr_usr_id);
+
+
+--
+-- Name: faculty_account_reviews faculty_account_reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.faculty_account_reviews
+    ADD CONSTRAINT faculty_account_reviews_pkey PRIMARY KEY (fvr_id);
 
 
 --
@@ -7051,19 +9092,35 @@ ALTER TABLE ONLY public.password_reset_tokens
 
 
 --
--- Name: program program_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: personal_access_tokens personal_access_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.program
-    ADD CONSTRAINT program_pkey PRIMARY KEY (prog_id);
+ALTER TABLE ONLY public.personal_access_tokens
+    ADD CONSTRAINT personal_access_tokens_pkey PRIMARY KEY (id);
 
 
 --
--- Name: program program_prog_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: personal_access_tokens personal_access_tokens_token_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.program
-    ADD CONSTRAINT program_prog_code_key UNIQUE (prog_code);
+ALTER TABLE ONLY public.personal_access_tokens
+    ADD CONSTRAINT personal_access_tokens_token_unique UNIQUE (token);
+
+
+--
+-- Name: department program_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.department
+    ADD CONSTRAINT program_pkey PRIMARY KEY (dept_id);
+
+
+--
+-- Name: department program_prog_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.department
+    ADD CONSTRAINT program_prog_code_key UNIQUE (dept_code);
 
 
 --
@@ -7075,11 +9132,11 @@ ALTER TABLE ONLY public.room
 
 
 --
--- Name: room room_room_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: schedule_archives schedule_archives_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.room
-    ADD CONSTRAINT room_room_name_key UNIQUE (room_name);
+ALTER TABLE ONLY public.schedule_archives
+    ADD CONSTRAINT schedule_archives_pkey PRIMARY KEY (sar_id);
 
 
 --
@@ -7091,11 +9148,11 @@ ALTER TABLE ONLY public.schedule
 
 
 --
--- Name: schedule schedule_sch_load_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: schedule_submission schedule_submission_dept_sem_fac_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.schedule
-    ADD CONSTRAINT schedule_sch_load_id_key UNIQUE (sch_load_id);
+ALTER TABLE ONLY public.schedule_submission
+    ADD CONSTRAINT schedule_submission_dept_sem_fac_unique UNIQUE (schsub_dept_id, schsub_sem_id, schsub_fac_id);
 
 
 --
@@ -7104,14 +9161,6 @@ ALTER TABLE ONLY public.schedule
 
 ALTER TABLE ONLY public.schedule_submission
     ADD CONSTRAINT schedule_submission_pkey PRIMARY KEY (schsub_id);
-
-
---
--- Name: schedule_submission schedule_submission_schsub_dept_id_schsub_sem_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.schedule_submission
-    ADD CONSTRAINT schedule_submission_schsub_dept_id_schsub_sem_id_key UNIQUE (schsub_dept_id, schsub_sem_id);
 
 
 --
@@ -7127,23 +9176,7 @@ ALTER TABLE ONLY public.section
 --
 
 ALTER TABLE ONLY public.section
-    ADD CONSTRAINT section_sec_prog_id_sec_name_sec_ay_id_sec_sem_id_key UNIQUE (sec_prog_id, sec_name, sec_ay_id, sec_sem_id);
-
-
---
--- Name: section_subject section_subject_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.section_subject
-    ADD CONSTRAINT section_subject_pkey PRIMARY KEY (ssub_id);
-
-
---
--- Name: section_subject section_subject_ssub_sec_id_ssub_subj_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.section_subject
-    ADD CONSTRAINT section_subject_ssub_sec_id_ssub_subj_id_key UNIQUE (ssub_sec_id, ssub_subj_id);
+    ADD CONSTRAINT section_sec_prog_id_sec_name_sec_ay_id_sec_sem_id_key UNIQUE (sec_dept_id, sec_name, sec_ay_id, sec_sem_id);
 
 
 --
@@ -7175,23 +9208,15 @@ ALTER TABLE ONLY public.study_load
 --
 
 ALTER TABLE ONLY public.study_load
-    ADD CONSTRAINT study_load_sl_fac_id_sl_subj_id_sl_sec_id_sl_sem_id_key UNIQUE (sl_fac_id, sl_subj_id, sl_sec_id, sl_sem_id);
+    ADD CONSTRAINT study_load_sl_fac_id_sl_subj_id_sl_sec_id_sl_sem_id_key UNIQUE (sl_fac_id, sl_course_id, sl_sec_id, sl_sem_id);
 
 
 --
--- Name: subject subject_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: course subject_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.subject
-    ADD CONSTRAINT subject_pkey PRIMARY KEY (subj_id);
-
-
---
--- Name: subject subject_subj_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.subject
-    ADD CONSTRAINT subject_subj_code_key UNIQUE (subj_code);
+ALTER TABLE ONLY public.course
+    ADD CONSTRAINT subject_pkey PRIMARY KEY (course_id);
 
 
 --
@@ -7239,7 +9264,7 @@ ALTER TABLE ONLY public.token_blacklist
 --
 
 ALTER TABLE ONLY public.department_chair
-    ADD CONSTRAINT uq_dc_prog UNIQUE (dc_prog_id);
+    ADD CONSTRAINT uq_dc_prog UNIQUE (dc_dept_id);
 
 
 --
@@ -7247,7 +9272,23 @@ ALTER TABLE ONLY public.department_chair
 --
 
 ALTER TABLE ONLY public.dean
-    ADD CONSTRAINT uq_dean_dept UNIQUE (dean_dept_id);
+    ADD CONSTRAINT uq_dean_dept UNIQUE (dean_college_id);
+
+
+--
+-- Name: webauthn_credentials webauthn_credentials_credential_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.webauthn_credentials
+    ADD CONSTRAINT webauthn_credentials_credential_id_key UNIQUE (credential_id);
+
+
+--
+-- Name: webauthn_credentials webauthn_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.webauthn_credentials
+    ADD CONSTRAINT webauthn_credentials_pkey PRIMARY KEY (id);
 
 
 --
@@ -7299,6 +9340,14 @@ ALTER TABLE ONLY realtime.schema_migrations
 
 
 --
+-- Name: bucket_lifecycle_states bucket_lifecycle_states_pkey; Type: CONSTRAINT; Schema: storage; Owner: supabase_storage_admin
+--
+
+ALTER TABLE ONLY storage.bucket_lifecycle_states
+    ADD CONSTRAINT bucket_lifecycle_states_pkey PRIMARY KEY (bucket_id);
+
+
+--
 -- Name: buckets_analytics buckets_analytics_pkey; Type: CONSTRAINT; Schema: storage; Owner: supabase_storage_admin
 --
 
@@ -7320,6 +9369,14 @@ ALTER TABLE ONLY storage.buckets
 
 ALTER TABLE ONLY storage.buckets_vectors
     ADD CONSTRAINT buckets_vectors_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lifecycle_abandoned_artifacts lifecycle_abandoned_artifacts_pkey; Type: CONSTRAINT; Schema: storage; Owner: supabase_storage_admin
+--
+
+ALTER TABLE ONLY storage.lifecycle_abandoned_artifacts
+    ADD CONSTRAINT lifecycle_abandoned_artifacts_pkey PRIMARY KEY (bucket_id, key);
 
 
 --
@@ -7903,6 +9960,13 @@ CREATE INDEX cache_locks_expiration_index ON public.cache_locks USING btree (exp
 
 
 --
+-- Name: faculty_account_reviews_fvr_status_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX faculty_account_reviews_fvr_status_index ON public.faculty_account_reviews USING btree (fvr_status);
+
+
+--
 -- Name: idx_al_target; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -7917,45 +9981,52 @@ CREATE INDEX idx_al_usr ON public.audit_log USING btree (al_usr_id);
 
 
 --
+-- Name: idx_course_year_sem; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_course_year_sem ON public.course USING btree (course_dept_id, course_year_level, course_semester) WHERE (course_is_active = true);
+
+
+--
 -- Name: idx_dc_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_dc_dept ON public.department_chair USING btree (dc_dept_id);
+CREATE INDEX idx_dc_dept ON public.department_chair USING btree (dc_college_id);
 
 
 --
 -- Name: idx_dc_prog; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_dc_prog ON public.department_chair USING btree (dc_prog_id);
+CREATE INDEX idx_dc_prog ON public.department_chair USING btree (dc_dept_id);
 
 
 --
 -- Name: idx_dean_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_dean_dept ON public.dean USING btree (dean_dept_id);
+CREATE INDEX idx_dean_dept ON public.dean USING btree (dean_college_id);
 
 
 --
 -- Name: idx_dean_prog; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_dean_prog ON public.dean USING btree (dean_prog_id);
+CREATE INDEX idx_dean_prog ON public.dean USING btree (dean_dept_id);
 
 
 --
 -- Name: idx_faculty_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_faculty_dept ON public.faculty USING btree (fac_dept_id);
+CREATE INDEX idx_faculty_dept ON public.faculty USING btree (fac_college_id);
 
 
 --
 -- Name: idx_faculty_prog; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_faculty_prog ON public.faculty USING btree (fac_prog_id);
+CREATE INDEX idx_faculty_prog ON public.faculty USING btree (fac_dept_id);
 
 
 --
@@ -7963,13 +10034,6 @@ CREATE INDEX idx_faculty_prog ON public.faculty USING btree (fac_prog_id);
 --
 
 CREATE INDEX idx_faculty_usr ON public.faculty USING btree (fac_usr_id);
-
-
---
--- Name: idx_fpref_fac; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_fpref_fac ON public.fac_preference USING btree (fpref_fac_id);
 
 
 --
@@ -7997,7 +10061,7 @@ CREATE INDEX idx_notif_usr ON public.notification USING btree (notif_usr_id);
 -- Name: idx_prog_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_prog_dept ON public.program USING btree (prog_dept_id);
+CREATE INDEX idx_prog_dept ON public.department USING btree (dept_college_id);
 
 
 --
@@ -8053,7 +10117,7 @@ CREATE INDEX idx_section_ay ON public.section USING btree (sec_ay_id);
 -- Name: idx_section_prog; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_section_prog ON public.section USING btree (sec_prog_id);
+CREATE INDEX idx_section_prog ON public.section USING btree (sec_dept_id);
 
 
 --
@@ -8092,31 +10156,17 @@ CREATE INDEX idx_sl_sem ON public.study_load USING btree (sl_sem_id);
 
 
 --
--- Name: idx_ssub_sec; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_ssub_sec ON public.section_subject USING btree (ssub_sec_id);
-
-
---
--- Name: idx_ssub_subj; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX idx_ssub_subj ON public.section_subject USING btree (ssub_subj_id);
-
-
---
 -- Name: idx_subj_dept; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_subj_dept ON public.subject USING btree (subj_dept_id);
+CREATE INDEX idx_subj_dept ON public.course USING btree (course_college_id);
 
 
 --
 -- Name: idx_subj_prog; Type: INDEX; Schema: public; Owner: postgres
 --
 
-CREATE INDEX idx_subj_prog ON public.subject USING btree (subj_prog_id);
+CREATE INDEX idx_subj_prog ON public.course USING btree (course_dept_id);
 
 
 --
@@ -8141,6 +10191,27 @@ CREATE INDEX jobs_queue_index ON public.jobs USING btree (queue);
 
 
 --
+-- Name: personal_access_tokens_expires_at_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX personal_access_tokens_expires_at_index ON public.personal_access_tokens USING btree (expires_at);
+
+
+--
+-- Name: personal_access_tokens_tokenable_type_tokenable_id_index; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX personal_access_tokens_tokenable_type_tokenable_id_index ON public.personal_access_tokens USING btree (tokenable_type, tokenable_id);
+
+
+--
+-- Name: room_name_location_building_unique; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX room_name_location_building_unique ON public.room USING btree (room_name, COALESCE(room_building, ''::character varying));
+
+
+--
 -- Name: sessions_last_activity_index; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -8155,6 +10226,13 @@ CREATE INDEX sessions_user_id_index ON public.sessions USING btree (user_id);
 
 
 --
+-- Name: webauthn_credentials_usr_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX webauthn_credentials_usr_id_idx ON public.webauthn_credentials USING btree (usr_id);
+
+
+--
 -- Name: ix_realtime_subscription_entity; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -8162,17 +10240,17 @@ CREATE INDEX ix_realtime_subscription_entity ON realtime.subscription USING btre
 
 
 --
--- Name: messages_inserted_at_topic_index; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
+-- Name: messages_replay_index; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
 --
 
-CREATE INDEX messages_inserted_at_topic_index ON ONLY realtime.messages USING btree (inserted_at DESC, topic) WHERE ((extension = 'broadcast'::text) AND (private IS TRUE));
+CREATE INDEX messages_replay_index ON ONLY realtime.messages USING btree (topic, inserted_at DESC, COALESCE(expires_at, 'infinity'::timestamp without time zone)) WHERE ((extension = 'broadcast'::text) AND (private = true));
 
 
 --
--- Name: subscription_subscription_id_entity_filters_action_filter_selec; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
+-- Name: subscription_subscription_id_entity_filters_hash_key; Type: INDEX; Schema: realtime; Owner: supabase_realtime_admin
 --
 
-CREATE UNIQUE INDEX subscription_subscription_id_entity_filters_action_filter_selec ON realtime.subscription USING btree (subscription_id, entity, filters, action_filter, COALESCE(selected_columns, '{}'::text[]));
+CREATE UNIQUE INDEX subscription_subscription_id_entity_filters_hash_key ON realtime.subscription USING btree (subscription_id, entity, realtime.filters_hash(filters), action_filter, COALESCE(selected_columns, '{}'::text[]));
 
 
 --
@@ -8180,6 +10258,13 @@ CREATE UNIQUE INDEX subscription_subscription_id_entity_filters_action_filter_se
 --
 
 CREATE UNIQUE INDEX bname ON storage.buckets USING btree (name);
+
+
+--
+-- Name: bucket_lifecycle_states_due_idx; Type: INDEX; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE INDEX bucket_lifecycle_states_due_idx ON storage.bucket_lifecycle_states USING btree (next_run_at, bucket_id) WHERE (next_run_at IS NOT NULL);
 
 
 --
@@ -8232,10 +10317,31 @@ CREATE UNIQUE INDEX idx_objects_null_version ON storage.objects USING btree (buc
 
 
 --
+-- Name: lifecycle_abandoned_artifacts_attempted_at_idx; Type: INDEX; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE INDEX lifecycle_abandoned_artifacts_attempted_at_idx ON storage.lifecycle_abandoned_artifacts USING btree (attempted_at);
+
+
+--
 -- Name: name_prefix_search; Type: INDEX; Schema: storage; Owner: supabase_storage_admin
 --
 
 CREATE INDEX name_prefix_search ON storage.objects USING btree (name text_pattern_ops);
+
+
+--
+-- Name: objects_archived_due_idx; Type: INDEX; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE INDEX objects_archived_due_idx ON storage.objects USING btree (bucket_id, archived_at, name COLLATE "C") INCLUDE (id, version, is_delete_marker) WHERE (archived_at IS NOT NULL);
+
+
+--
+-- Name: objects_archived_order_uq; Type: INDEX; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE UNIQUE INDEX objects_archived_order_uq ON storage.objects USING btree (bucket_id, name COLLATE "C", archived_at) WHERE (archived_at IS NOT NULL);
 
 
 --
@@ -8264,6 +10370,20 @@ CREATE TRIGGER tr_check_filters BEFORE INSERT OR UPDATE ON realtime.subscription
 --
 
 CREATE TRIGGER enforce_bucket_name_length_trigger BEFORE INSERT OR UPDATE OF name ON storage.buckets FOR EACH ROW EXECUTE FUNCTION storage.enforce_bucket_name_length();
+
+
+--
+-- Name: buckets enforce_versioning_status_transition; Type: TRIGGER; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TRIGGER enforce_versioning_status_transition BEFORE UPDATE OF versioning_status ON storage.buckets FOR EACH ROW EXECUTE FUNCTION storage.enforce_versioning_status_transition();
+
+
+--
+-- Name: buckets protect_active_lifecycle_states; Type: TRIGGER; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TRIGGER protect_active_lifecycle_states BEFORE DELETE ON storage.buckets FOR EACH ROW EXECUTE FUNCTION storage.protect_active_lifecycle_states();
 
 
 --
@@ -8306,6 +10426,20 @@ CREATE TRIGGER protect_objects_delete BEFORE DELETE ON storage.objects FOR EACH 
 --
 
 CREATE TRIGGER update_objects_updated_at BEFORE UPDATE ON storage.objects FOR EACH ROW EXECUTE FUNCTION storage.update_updated_at_column();
+
+
+--
+-- Name: buckets wake_lifecycle_on_policy_write; Type: TRIGGER; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TRIGGER wake_lifecycle_on_policy_write AFTER INSERT OR UPDATE OF lifecycle_configuration_generation ON storage.buckets FOR EACH ROW EXECUTE FUNCTION storage.wake_lifecycle_state();
+
+
+--
+-- Name: buckets wake_lifecycle_on_versioning_enable; Type: TRIGGER; Schema: storage; Owner: supabase_storage_admin
+--
+
+CREATE TRIGGER wake_lifecycle_on_versioning_enable AFTER UPDATE OF versioning_status ON storage.buckets FOR EACH ROW WHEN ((new.lifecycle_configuration IS NOT NULL)) EXECUTE FUNCTION storage.wake_lifecycle_state();
 
 
 --
@@ -8521,7 +10655,7 @@ ALTER TABLE ONLY public.biometric_credential
 --
 
 ALTER TABLE ONLY public.dean
-    ADD CONSTRAINT dean_dean_dept_id_fkey FOREIGN KEY (dean_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+    ADD CONSTRAINT dean_dean_dept_id_fkey FOREIGN KEY (dean_college_id) REFERENCES public.college(college_id) ON DELETE CASCADE;
 
 
 --
@@ -8529,7 +10663,7 @@ ALTER TABLE ONLY public.dean
 --
 
 ALTER TABLE ONLY public.dean
-    ADD CONSTRAINT dean_dean_prog_id_fkey FOREIGN KEY (dean_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+    ADD CONSTRAINT dean_dean_prog_id_fkey FOREIGN KEY (dean_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
 
 
 --
@@ -8545,7 +10679,7 @@ ALTER TABLE ONLY public.dean
 --
 
 ALTER TABLE ONLY public.department_chair
-    ADD CONSTRAINT department_chair_dc_dept_id_fkey FOREIGN KEY (dc_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+    ADD CONSTRAINT department_chair_dc_dept_id_fkey FOREIGN KEY (dc_college_id) REFERENCES public.college(college_id) ON DELETE CASCADE;
 
 
 --
@@ -8553,7 +10687,7 @@ ALTER TABLE ONLY public.department_chair
 --
 
 ALTER TABLE ONLY public.department_chair
-    ADD CONSTRAINT department_chair_dc_prog_id_fkey FOREIGN KEY (dc_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+    ADD CONSTRAINT department_chair_dc_prog_id_fkey FOREIGN KEY (dc_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
 
 
 --
@@ -8562,22 +10696,6 @@ ALTER TABLE ONLY public.department_chair
 
 ALTER TABLE ONLY public.department_chair
     ADD CONSTRAINT department_chair_dc_usr_id_fkey FOREIGN KEY (dc_usr_id) REFERENCES public."USER"(usr_id) ON DELETE CASCADE;
-
-
---
--- Name: fac_preference fac_preference_fpref_fac_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.fac_preference
-    ADD CONSTRAINT fac_preference_fpref_fac_id_fkey FOREIGN KEY (fpref_fac_id) REFERENCES public.faculty(fac_id) ON DELETE CASCADE;
-
-
---
--- Name: fac_preference fac_preference_fpref_subj_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.fac_preference
-    ADD CONSTRAINT fac_preference_fpref_subj_id_fkey FOREIGN KEY (fpref_subj_id) REFERENCES public.subject(subj_id) ON DELETE CASCADE;
 
 
 --
@@ -8593,7 +10711,7 @@ ALTER TABLE ONLY public.fac_specialization
 --
 
 ALTER TABLE ONLY public.faculty
-    ADD CONSTRAINT faculty_fac_dept_id_fkey FOREIGN KEY (fac_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+    ADD CONSTRAINT faculty_fac_dept_id_fkey FOREIGN KEY (fac_college_id) REFERENCES public.college(college_id) ON DELETE CASCADE;
 
 
 --
@@ -8601,7 +10719,7 @@ ALTER TABLE ONLY public.faculty
 --
 
 ALTER TABLE ONLY public.faculty
-    ADD CONSTRAINT faculty_fac_prog_id_fkey FOREIGN KEY (fac_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+    ADD CONSTRAINT faculty_fac_prog_id_fkey FOREIGN KEY (fac_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
 
 
 --
@@ -8621,11 +10739,11 @@ ALTER TABLE ONLY public.notification
 
 
 --
--- Name: program program_prog_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: department program_prog_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.program
-    ADD CONSTRAINT program_prog_dept_id_fkey FOREIGN KEY (prog_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.department
+    ADD CONSTRAINT program_prog_dept_id_fkey FOREIGN KEY (dept_college_id) REFERENCES public.college(college_id) ON DELETE CASCADE;
 
 
 --
@@ -8681,7 +10799,7 @@ ALTER TABLE ONLY public.schedule
 --
 
 ALTER TABLE ONLY public.schedule
-    ADD CONSTRAINT schedule_sch_subj_id_fkey FOREIGN KEY (sch_subj_id) REFERENCES public.subject(subj_id) ON DELETE CASCADE;
+    ADD CONSTRAINT schedule_sch_subj_id_fkey FOREIGN KEY (sch_course_id) REFERENCES public.course(course_id) ON DELETE CASCADE;
 
 
 --
@@ -8690,6 +10808,14 @@ ALTER TABLE ONLY public.schedule
 
 ALTER TABLE ONLY public.schedule_submission
     ADD CONSTRAINT schedule_submission_schsub_dept_id_fkey FOREIGN KEY (schsub_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+
+
+--
+-- Name: schedule_submission schedule_submission_schsub_fac_id_foreign; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.schedule_submission
+    ADD CONSTRAINT schedule_submission_schsub_fac_id_foreign FOREIGN KEY (schsub_fac_id) REFERENCES public.faculty(fac_id) ON DELETE SET NULL;
 
 
 --
@@ -8729,7 +10855,7 @@ ALTER TABLE ONLY public.section
 --
 
 ALTER TABLE ONLY public.section
-    ADD CONSTRAINT section_sec_prog_id_fkey FOREIGN KEY (sec_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+    ADD CONSTRAINT section_sec_prog_id_fkey FOREIGN KEY (sec_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
 
 
 --
@@ -8738,22 +10864,6 @@ ALTER TABLE ONLY public.section
 
 ALTER TABLE ONLY public.section
     ADD CONSTRAINT section_sec_sem_id_fkey FOREIGN KEY (sec_sem_id) REFERENCES public.semester(sem_id) ON DELETE CASCADE;
-
-
---
--- Name: section_subject section_subject_ssub_sec_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.section_subject
-    ADD CONSTRAINT section_subject_ssub_sec_id_fkey FOREIGN KEY (ssub_sec_id) REFERENCES public.section(sec_id) ON DELETE CASCADE;
-
-
---
--- Name: section_subject section_subject_ssub_subj_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.section_subject
-    ADD CONSTRAINT section_subject_ssub_subj_id_fkey FOREIGN KEY (ssub_subj_id) REFERENCES public.subject(subj_id) ON DELETE CASCADE;
 
 
 --
@@ -8801,23 +10911,23 @@ ALTER TABLE ONLY public.study_load
 --
 
 ALTER TABLE ONLY public.study_load
-    ADD CONSTRAINT study_load_sl_subj_id_fkey FOREIGN KEY (sl_subj_id) REFERENCES public.subject(subj_id) ON DELETE CASCADE;
+    ADD CONSTRAINT study_load_sl_subj_id_fkey FOREIGN KEY (sl_course_id) REFERENCES public.course(course_id) ON DELETE CASCADE;
 
 
 --
--- Name: subject subject_subj_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: course subject_subj_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.subject
-    ADD CONSTRAINT subject_subj_dept_id_fkey FOREIGN KEY (subj_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.course
+    ADD CONSTRAINT subject_subj_dept_id_fkey FOREIGN KEY (course_college_id) REFERENCES public.college(college_id) ON DELETE CASCADE;
 
 
 --
--- Name: subject subject_subj_prog_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: course subject_subj_prog_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.subject
-    ADD CONSTRAINT subject_subj_prog_id_fkey FOREIGN KEY (subj_prog_id) REFERENCES public.program(prog_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.course
+    ADD CONSTRAINT subject_subj_prog_id_fkey FOREIGN KEY (course_dept_id) REFERENCES public.department(dept_id) ON DELETE CASCADE;
 
 
 --
@@ -8834,6 +10944,14 @@ ALTER TABLE ONLY public.system_setting
 
 ALTER TABLE ONLY public.token_blacklist
     ADD CONSTRAINT token_blacklist_tbl_usr_id_fkey FOREIGN KEY (tbl_usr_id) REFERENCES public."USER"(usr_id) ON DELETE CASCADE;
+
+
+--
+-- Name: webauthn_credentials webauthn_credentials_usr_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.webauthn_credentials
+    ADD CONSTRAINT webauthn_credentials_usr_id_fkey FOREIGN KEY (usr_id) REFERENCES public."USER"(usr_id) ON DELETE CASCADE;
 
 
 --
@@ -8858,6 +10976,14 @@ ALTER TABLE ONLY public.workload
 
 ALTER TABLE ONLY public.workload
     ADD CONSTRAINT workload_wl_sem_id_fkey FOREIGN KEY (wl_sem_id) REFERENCES public.semester(sem_id) ON DELETE CASCADE;
+
+
+--
+-- Name: bucket_lifecycle_states bucket_lifecycle_states_bucket_id_fkey; Type: FK CONSTRAINT; Schema: storage; Owner: supabase_storage_admin
+--
+
+ALTER TABLE ONLY storage.bucket_lifecycle_states
+    ADD CONSTRAINT bucket_lifecycle_states_bucket_id_fkey FOREIGN KEY (bucket_id) REFERENCES storage.buckets(id) ON DELETE CASCADE;
 
 
 --
@@ -9033,6 +11159,18 @@ ALTER TABLE public.cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cache_locks ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: college; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.college ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: course; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.course ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: dean; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9051,12 +11189,6 @@ ALTER TABLE public.department ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.department_chair ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: fac_preference; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.fac_preference ENABLE ROW LEVEL SECURITY;
-
---
 -- Name: fac_specialization; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9067,6 +11199,12 @@ ALTER TABLE public.fac_specialization ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.faculty ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: faculty_account_reviews; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.faculty_account_reviews ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: failed_jobs; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -9117,10 +11255,10 @@ ALTER TABLE public.notification ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.password_reset_tokens ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: program; Type: ROW SECURITY; Schema: public; Owner: postgres
+-- Name: personal_access_tokens; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
-ALTER TABLE public.program ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.personal_access_tokens ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: room; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -9135,6 +11273,12 @@ ALTER TABLE public.room ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: schedule_archives; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.schedule_archives ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: schedule_submission; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9145,12 +11289,6 @@ ALTER TABLE public.schedule_submission ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.section ENABLE ROW LEVEL SECURITY;
-
---
--- Name: section_subject; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.section_subject ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: semester; Type: ROW SECURITY; Schema: public; Owner: postgres
@@ -9171,12 +11309,6 @@ ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.study_load ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: subject; Type: ROW SECURITY; Schema: public; Owner: postgres
---
-
-ALTER TABLE public.subject ENABLE ROW LEVEL SECURITY;
-
---
 -- Name: system_backup; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9195,6 +11327,12 @@ ALTER TABLE public.system_setting ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.token_blacklist ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: webauthn_credentials; Type: ROW SECURITY; Schema: public; Owner: postgres
+--
+
+ALTER TABLE public.webauthn_credentials ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: workload; Type: ROW SECURITY; Schema: public; Owner: postgres
 --
 
@@ -9205,6 +11343,12 @@ ALTER TABLE public.workload ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: bucket_lifecycle_states; Type: ROW SECURITY; Schema: storage; Owner: supabase_storage_admin
+--
+
+ALTER TABLE storage.bucket_lifecycle_states ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: buckets; Type: ROW SECURITY; Schema: storage; Owner: supabase_storage_admin
@@ -9223,6 +11367,12 @@ ALTER TABLE storage.buckets_analytics ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE storage.buckets_vectors ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: lifecycle_abandoned_artifacts; Type: ROW SECURITY; Schema: storage; Owner: supabase_storage_admin
+--
+
+ALTER TABLE storage.lifecycle_abandoned_artifacts ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: migrations; Type: ROW SECURITY; Schema: storage; Owner: supabase_storage_admin
@@ -11768,6 +13918,14 @@ GRANT ALL ON FUNCTION realtime.apply_rls(wal jsonb, max_record_bytes integer) TO
 
 
 --
+-- Name: FUNCTION authorize(role_name text, topic_name text, claims text, sub text, headers text, read_extensions text[], write_extensions text[], OUT read_allowed boolean[], OUT write_allowed boolean[]); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+GRANT ALL ON FUNCTION realtime.authorize(role_name text, topic_name text, claims text, sub text, headers text, read_extensions text[], write_extensions text[], OUT read_allowed boolean[], OUT write_allowed boolean[]) TO postgres;
+GRANT ALL ON FUNCTION realtime.authorize(role_name text, topic_name text, claims text, sub text, headers text, read_extensions text[], write_extensions text[], OUT read_allowed boolean[], OUT write_allowed boolean[]) TO dashboard_user;
+
+
+--
 -- Name: FUNCTION broadcast_changes(topic_name text, event_name text, operation text, table_name text, table_schema text, new record, old record, level text); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -11820,6 +13978,17 @@ GRANT ALL ON FUNCTION realtime.check_equality_op(op realtime.equality_op, type_ 
 
 
 --
+-- Name: FUNCTION filters_hash(filters realtime.user_defined_filter[]); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+GRANT ALL ON FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) TO postgres;
+GRANT ALL ON FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) TO dashboard_user;
+GRANT ALL ON FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) TO anon;
+GRANT ALL ON FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) TO authenticated;
+GRANT ALL ON FUNCTION realtime.filters_hash(filters realtime.user_defined_filter[]) TO service_role;
+
+
+--
 -- Name: FUNCTION is_visible_through_filters(columns realtime.wal_column[], filters realtime.user_defined_filter[]); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
 --
 
@@ -11836,6 +14005,14 @@ GRANT ALL ON FUNCTION realtime.is_visible_through_filters(columns realtime.wal_c
 
 GRANT ALL ON FUNCTION realtime.list_changes(publication name, slot_name name, max_changes integer, max_record_bytes integer) TO postgres;
 GRANT ALL ON FUNCTION realtime.list_changes(publication name, slot_name name, max_changes integer, max_record_bytes integer) TO dashboard_user;
+
+
+--
+-- Name: FUNCTION list_changes_sync(publication name, slot_name name, max_changes integer, max_record_bytes integer); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+GRANT ALL ON FUNCTION realtime.list_changes_sync(publication name, slot_name name, max_changes integer, max_record_bytes integer) TO postgres;
+GRANT ALL ON FUNCTION realtime.list_changes_sync(publication name, slot_name name, max_changes integer, max_record_bytes integer) TO dashboard_user;
 
 
 --
@@ -11863,6 +14040,14 @@ GRANT ALL ON FUNCTION realtime.send(payload jsonb, event text, topic text, priva
 
 GRANT ALL ON FUNCTION realtime.send_binary(payload bytea, event text, topic text, private boolean) TO postgres;
 GRANT ALL ON FUNCTION realtime.send_binary(payload bytea, event text, topic text, private boolean) TO dashboard_user;
+
+
+--
+-- Name: FUNCTION settled_changes(slot_name name, max_changes integer, VARIADIC opts text[]); Type: ACL; Schema: realtime; Owner: supabase_realtime_admin
+--
+
+GRANT ALL ON FUNCTION realtime.settled_changes(slot_name name, max_changes integer, VARIADIC opts text[]) TO postgres;
+GRANT ALL ON FUNCTION realtime.settled_changes(slot_name name, max_changes integer, VARIADIC opts text[]) TO dashboard_user;
 
 
 --
@@ -11901,6 +14086,38 @@ GRANT ALL ON FUNCTION realtime.topic() TO dashboard_user;
 
 GRANT ALL ON FUNCTION realtime.wal2json_escape_identifier(name text) TO postgres;
 GRANT ALL ON FUNCTION realtime.wal2json_escape_identifier(name text) TO dashboard_user;
+
+
+--
+-- Name: FUNCTION delete_lifecycle_objects(object_ids uuid[]); Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+REVOKE ALL ON FUNCTION storage.delete_lifecycle_objects(object_ids uuid[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION storage.delete_lifecycle_objects(object_ids uuid[]) TO postgres;
+GRANT ALL ON FUNCTION storage.delete_lifecycle_objects(object_ids uuid[]) TO service_role;
+
+
+--
+-- Name: FUNCTION protect_active_lifecycle_states(); Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+REVOKE ALL ON FUNCTION storage.protect_active_lifecycle_states() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean); Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+REVOKE ALL ON FUNCTION storage.reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION storage.reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean) TO postgres;
+GRANT ALL ON FUNCTION storage.reconcile_lifecycle_state(target_bucket_id text, policy_changed boolean) TO service_role;
+
+
+--
+-- Name: FUNCTION wake_lifecycle_state(); Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+REVOKE ALL ON FUNCTION storage.wake_lifecycle_state() FROM PUBLIC;
 
 
 --
@@ -12238,6 +14455,24 @@ GRANT ALL ON TABLE public.cache_locks TO service_role;
 
 
 --
+-- Name: TABLE college; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.college TO anon;
+GRANT ALL ON TABLE public.college TO authenticated;
+GRANT ALL ON TABLE public.college TO service_role;
+
+
+--
+-- Name: TABLE course; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.course TO anon;
+GRANT ALL ON TABLE public.course TO authenticated;
+GRANT ALL ON TABLE public.course TO service_role;
+
+
+--
 -- Name: TABLE dean; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12265,15 +14500,6 @@ GRANT ALL ON TABLE public.department_chair TO service_role;
 
 
 --
--- Name: TABLE fac_preference; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.fac_preference TO anon;
-GRANT ALL ON TABLE public.fac_preference TO authenticated;
-GRANT ALL ON TABLE public.fac_preference TO service_role;
-
-
---
 -- Name: TABLE fac_specialization; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12289,6 +14515,15 @@ GRANT ALL ON TABLE public.fac_specialization TO service_role;
 GRANT ALL ON TABLE public.faculty TO anon;
 GRANT ALL ON TABLE public.faculty TO authenticated;
 GRANT ALL ON TABLE public.faculty TO service_role;
+
+
+--
+-- Name: TABLE faculty_account_reviews; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.faculty_account_reviews TO anon;
+GRANT ALL ON TABLE public.faculty_account_reviews TO authenticated;
+GRANT ALL ON TABLE public.faculty_account_reviews TO service_role;
 
 
 --
@@ -12391,12 +14626,21 @@ GRANT ALL ON TABLE public.password_reset_tokens TO service_role;
 
 
 --
--- Name: TABLE program; Type: ACL; Schema: public; Owner: postgres
+-- Name: TABLE personal_access_tokens; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.program TO anon;
-GRANT ALL ON TABLE public.program TO authenticated;
-GRANT ALL ON TABLE public.program TO service_role;
+GRANT ALL ON TABLE public.personal_access_tokens TO anon;
+GRANT ALL ON TABLE public.personal_access_tokens TO authenticated;
+GRANT ALL ON TABLE public.personal_access_tokens TO service_role;
+
+
+--
+-- Name: SEQUENCE personal_access_tokens_id_seq; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON SEQUENCE public.personal_access_tokens_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.personal_access_tokens_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.personal_access_tokens_id_seq TO service_role;
 
 
 --
@@ -12418,6 +14662,15 @@ GRANT ALL ON TABLE public.schedule TO service_role;
 
 
 --
+-- Name: TABLE schedule_archives; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.schedule_archives TO anon;
+GRANT ALL ON TABLE public.schedule_archives TO authenticated;
+GRANT ALL ON TABLE public.schedule_archives TO service_role;
+
+
+--
 -- Name: TABLE schedule_submission; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12433,15 +14686,6 @@ GRANT ALL ON TABLE public.schedule_submission TO service_role;
 GRANT ALL ON TABLE public.section TO anon;
 GRANT ALL ON TABLE public.section TO authenticated;
 GRANT ALL ON TABLE public.section TO service_role;
-
-
---
--- Name: TABLE section_subject; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.section_subject TO anon;
-GRANT ALL ON TABLE public.section_subject TO authenticated;
-GRANT ALL ON TABLE public.section_subject TO service_role;
 
 
 --
@@ -12472,15 +14716,6 @@ GRANT ALL ON TABLE public.study_load TO service_role;
 
 
 --
--- Name: TABLE subject; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.subject TO anon;
-GRANT ALL ON TABLE public.subject TO authenticated;
-GRANT ALL ON TABLE public.subject TO service_role;
-
-
---
 -- Name: TABLE system_backup; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12508,6 +14743,15 @@ GRANT ALL ON TABLE public.token_blacklist TO service_role;
 
 
 --
+-- Name: TABLE webauthn_credentials; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.webauthn_credentials TO anon;
+GRANT ALL ON TABLE public.webauthn_credentials TO authenticated;
+GRANT ALL ON TABLE public.webauthn_credentials TO service_role;
+
+
+--
 -- Name: TABLE workload; Type: ACL; Schema: public; Owner: postgres
 --
 
@@ -12526,14 +14770,6 @@ GRANT ALL ON TABLE realtime.messages TO dashboard_user;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO anon;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO authenticated;
 GRANT SELECT,INSERT,UPDATE ON TABLE realtime.messages TO service_role;
-
-
---
--- Name: TABLE schema_migrations; Type: ACL; Schema: realtime; Owner: supabase_admin
---
-
-GRANT ALL ON TABLE realtime.schema_migrations TO postgres;
-GRANT ALL ON TABLE realtime.schema_migrations TO dashboard_user;
 
 
 --
@@ -12559,14 +14795,22 @@ GRANT USAGE ON SEQUENCE realtime.subscription_id_seq TO service_role;
 
 
 --
+-- Name: TABLE bucket_lifecycle_states; Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+GRANT ALL ON TABLE storage.bucket_lifecycle_states TO postgres;
+GRANT ALL ON TABLE storage.bucket_lifecycle_states TO service_role;
+
+
+--
 -- Name: TABLE buckets; Type: ACL; Schema: storage; Owner: supabase_storage_admin
 --
 
 REVOKE ALL ON TABLE storage.buckets FROM supabase_storage_admin;
 GRANT ALL ON TABLE storage.buckets TO supabase_storage_admin WITH GRANT OPTION;
 GRANT ALL ON TABLE storage.buckets TO service_role;
-GRANT ALL ON TABLE storage.buckets TO authenticated;
-GRANT ALL ON TABLE storage.buckets TO anon;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.buckets TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.buckets TO anon;
 GRANT ALL ON TABLE storage.buckets TO postgres WITH GRANT OPTION;
 
 
@@ -12575,8 +14819,8 @@ GRANT ALL ON TABLE storage.buckets TO postgres WITH GRANT OPTION;
 --
 
 GRANT ALL ON TABLE storage.buckets_analytics TO service_role;
-GRANT ALL ON TABLE storage.buckets_analytics TO authenticated;
-GRANT ALL ON TABLE storage.buckets_analytics TO anon;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.buckets_analytics TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.buckets_analytics TO anon;
 
 
 --
@@ -12584,8 +14828,16 @@ GRANT ALL ON TABLE storage.buckets_analytics TO anon;
 --
 
 GRANT SELECT ON TABLE storage.buckets_vectors TO service_role;
-GRANT SELECT ON TABLE storage.buckets_vectors TO authenticated;
 GRANT SELECT ON TABLE storage.buckets_vectors TO anon;
+GRANT SELECT ON TABLE storage.buckets_vectors TO authenticated;
+
+
+--
+-- Name: TABLE lifecycle_abandoned_artifacts; Type: ACL; Schema: storage; Owner: supabase_storage_admin
+--
+
+GRANT ALL ON TABLE storage.lifecycle_abandoned_artifacts TO postgres;
+GRANT ALL ON TABLE storage.lifecycle_abandoned_artifacts TO service_role;
 
 
 --
@@ -12595,8 +14847,8 @@ GRANT SELECT ON TABLE storage.buckets_vectors TO anon;
 REVOKE ALL ON TABLE storage.objects FROM supabase_storage_admin;
 GRANT ALL ON TABLE storage.objects TO supabase_storage_admin WITH GRANT OPTION;
 GRANT ALL ON TABLE storage.objects TO service_role;
-GRANT ALL ON TABLE storage.objects TO authenticated;
-GRANT ALL ON TABLE storage.objects TO anon;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.objects TO authenticated;
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE storage.objects TO anon;
 GRANT ALL ON TABLE storage.objects TO postgres WITH GRANT OPTION;
 
 
@@ -12623,8 +14875,8 @@ GRANT SELECT ON TABLE storage.s3_multipart_uploads_parts TO anon;
 --
 
 GRANT SELECT ON TABLE storage.vector_indexes TO service_role;
-GRANT SELECT ON TABLE storage.vector_indexes TO authenticated;
 GRANT SELECT ON TABLE storage.vector_indexes TO anon;
+GRANT SELECT ON TABLE storage.vector_indexes TO authenticated;
 
 
 --
@@ -12942,5 +15194,5 @@ ALTER EVENT TRIGGER pgrst_drop_watch OWNER TO supabase_admin;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qxiToOh3TzjTtV9tx8aexssct5CdjhsF3q2azMj73xidAtZVwkRhq07053U39wJ
+\unrestrict UseyCe6xbVQn9mXIwjtWaiMlgUTxZIg1vkhBOfNgbjZELjbaHIQD7f6L4tbTCT0
 
