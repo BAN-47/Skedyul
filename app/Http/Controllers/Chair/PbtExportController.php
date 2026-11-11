@@ -48,6 +48,7 @@ class PbtExportController extends Controller
         $semester ??= Semester::with('academicYear')
             ->orderByDesc('sem_start_date')
             ->first();
+
         $semesters = Semester::with('academicYear')
             ->orderByDesc('sem_start_date')
             ->get()
@@ -56,10 +57,11 @@ class PbtExportController extends Controller
                     ?? $option->academicYear?->ay_year_label
                     ?? '';
                 $yearLabel = $year !== '' ? str_replace('-', ' - ', $year) : '';
+
                 $option->label = trim(
                     ($option->sem_name ?? '')
-                    . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
-                    . ($option->sem_is_active ? ' (Current)' : '')
+                        . ($yearLabel !== '' ? ', AY ' . $yearLabel : '')
+                        . ($option->sem_is_active ? ' (Current)' : '')
                 );
 
                 return $option;
@@ -519,7 +521,11 @@ class PbtExportController extends Controller
         }
 
         if ($day === 'saturday') {
-            return $start >= (16 * 60) + 30 && $end <= 22 * 60;
+            // Put Saturday classes that do not fit the Day worksheet
+            // into the Evening worksheet's full-day weekend timetable.
+            return $start >= 7 * 60
+                && $end <= 22 * 60
+                && !$this->isDaySchedule($schedule);
         }
 
         return $day === 'sunday'
