@@ -50,6 +50,7 @@ function filterSubjectsByCategory() {
         opt.dataset.semester = sub.sem || "";
         opt.dataset.category = sub.cat || "";
         opt.dataset.courseCode = sub.code || "";
+        opt.dataset.courseName = sub.name || "";
         opt.dataset.lectureHours = sub.lecHours || 0;
         opt.dataset.labHours = sub.labHours || 0;
 
@@ -469,6 +470,58 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     }
 }
 
+function isSelectedOjtCourse() {
+    const select = document.getElementById('add-subject');
+    const option = select?.options[select.selectedIndex];
+    const code = (option?.dataset.courseCode || '').toLowerCase();
+    const name = (option?.dataset.courseName || '').toLowerCase();
+    return code.includes('ojt') || name.includes('on-the-job training');
+}
+
+function renderOjtSectionPicker() {
+    const wrap = document.getElementById('add-ojt-sections');
+    if (!wrap) return;
+    const deptId = document.getElementById('add-department')?.value || '';
+    const sections = (window.COLLEGE_SECTIONS?.[deptId] || []).filter((section) => Number(section.year) === 4);
+    wrap.innerHTML = '';
+    if (!sections.length) {
+        wrap.textContent = 'No Year 4 sections are available in this program.';
+        return;
+    }
+    sections.forEach((section) => {
+        const label = document.createElement('label');
+        label.className = 'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-indigo-50';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = 'add-ojt-section[]';
+        input.value = section.id;
+        input.className = 'ojt-section-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500';
+        const text = document.createElement('span');
+        text.textContent = section.name;
+        label.append(input, text);
+        wrap.appendChild(label);
+    });
+}
+
+function updateOjtSectionPicker() {
+    const isOjt = isSelectedOjtCourse();
+    document.getElementById('add-single-section-wrap')?.classList.toggle('hidden', isOjt);
+    document.getElementById('add-ojt-sections-wrap')?.classList.toggle('hidden', !isOjt);
+    document.getElementById('add-ojt-summary-wrap')?.classList.toggle('hidden', !isOjt);
+    if (!isOjt) {
+        document.querySelectorAll('.ojt-section-checkbox').forEach((checkbox) => { checkbox.checked = false; });
+    }
+    updateOjtSummaryNotice();
+}
+
+function updateOjtSummaryNotice() {
+    const isEvening = document.getElementById('add-ojt-is-evening')?.checked || false;
+    const notice = document.getElementById('add-ojt-summary-notice');
+    if (notice) {
+        notice.textContent = `The 5 OJT units will count in the ${isEvening ? 'Evening' : 'Day'} summary.`;
+    }
+}
+
 // Wire up section → subject filter for Add + Edit modals
 document.addEventListener("DOMContentLoaded", () => {
     const addDept = document.getElementById("add-department");
@@ -509,6 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 opt.dataset.semester = sub.sem;
                 opt.dataset.category = sub.cat;
                 opt.dataset.courseCode = sub.code;
+                opt.dataset.courseName = sub.name;
                 opt.dataset.lectureHours = sub.lecHours;
                 opt.dataset.labHours = sub.labHours;
                 subjectSelect.appendChild(opt);
@@ -523,6 +577,8 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             filterSubjectsBySection("add-section", "add-subject");
+            renderOjtSectionPicker();
+            updateOjtSectionPicker();
         });
     }
 
@@ -539,6 +595,9 @@ document.addEventListener("DOMContentLoaded", () => {
             filterSubjectsByCategory();
         });
     }
+
+    document.getElementById('add-subject')?.addEventListener('change', updateOjtSectionPicker);
+    document.getElementById('add-ojt-is-evening')?.addEventListener('change', updateOjtSummaryNotice);
 
     const editDept = document.getElementById("edit-department");
     if (editDept) {
@@ -622,6 +681,12 @@ function restoreAddAnotherState() {
     }
 
     document.getElementById("add-subject").value = state.subject || "";
+    updateOjtSectionPicker();
+    document.getElementById('add-ojt-is-evening').checked = Boolean(state.ojtIsEvening);
+    updateOjtSummaryNotice();
+    document.querySelectorAll('.ojt-section-checkbox').forEach((input) => {
+        input.checked = (state.sections || []).includes(input.value);
+    });
     document.getElementById("add-room").value = state.room || "";
     openModal("modal-add-schedule");
 }
@@ -642,6 +707,8 @@ function openAddModal(day, startTime) {
 
     // Reset subject filter (show all until a section is chosen)
     filterSubjectsBySection("add-section", "add-subject");
+    renderOjtSectionPicker();
+    updateOjtSectionPicker();
 
     document.querySelectorAll(".add-day-checkbox").forEach((input) => {
         input.checked = input.value === (day || "");
@@ -650,6 +717,8 @@ function openAddModal(day, startTime) {
     document.getElementById("add-end").value = startTime
         ? addMinutesToTime(startTime, 60)
         : "";
+    document.getElementById('add-ojt-is-evening').checked = false;
+    updateOjtSummaryNotice();
 
     setAddButtonsLoading(false);
     openModal("modal-add-schedule");
@@ -666,6 +735,10 @@ function submitAdd(keepOpen = false) {
     const isRec = selectedOpt
         ? selectedOpt.getAttribute("data-course-code") === "REC"
         : false;
+    const isOjt = isSelectedOjtCourse();
+    const selectedSectionIds = isOjt
+        ? [...document.querySelectorAll('.ojt-section-checkbox:checked')].map((input) => input.value)
+        : [];
 
     const payload = {
         subj_id: subjId,
@@ -676,6 +749,8 @@ function submitAdd(keepOpen = false) {
             document.getElementById("add-program")?.value ||
             "",
         sec_id: secId || null,
+        sec_ids: isOjt ? selectedSectionIds : undefined,
+        ojt_is_evening: isOjt ? document.getElementById('add-ojt-is-evening').checked : undefined,
         room_id: roomId || null,
         days: [...document.querySelectorAll(".add-day-checkbox:checked")].map(
             (input) => input.value,
@@ -698,8 +773,10 @@ function submitAdd(keepOpen = false) {
         showInlineError("add-error", m);
         return;
     }
-    if (!isRec && (!payload.sec_id || !payload.room_id)) {
-        const m = "Please select section and room (not required for REC).";
+    if ((!isRec && !isOjt && !payload.sec_id) || (isOjt && !selectedSectionIds.length) || (!isRec && !payload.room_id)) {
+        const m = isOjt
+            ? "Please select at least one Year 4 section and a room for OJT."
+            : "Please select section and room (not required for REC).";
         showToast(m);
         showInlineError("add-error", m);
         return;
@@ -748,6 +825,8 @@ function submitAdd(keepOpen = false) {
                             JSON.stringify({
                             department: document.getElementById("add-department").value,
                             section: document.getElementById("add-section").value,
+                            sections: selectedSectionIds,
+                            ojtIsEvening: document.getElementById('add-ojt-is-evening').checked,
                             subject: document.getElementById("add-subject").value,
                             room: document.getElementById("add-room").value,
                             category: document.getElementById("add-category").value,

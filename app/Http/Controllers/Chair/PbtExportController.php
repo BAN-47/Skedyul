@@ -109,6 +109,7 @@ class PbtExportController extends Controller
             'subject',
             'section.program',
             'room',
+            'studyLoad',
         ])
             ->where('sch_fac_id', $faculty->fac_id)
             ->where('sch_sem_id', $semester->sem_id)
@@ -252,7 +253,9 @@ class PbtExportController extends Controller
             $sheet,
             $daySchedules,
             self::DAY_TEMPLATE_COURSE_FIRST_ROW,
-            self::DAY_TEMPLATE_COURSE_LAST_ROW
+            self::DAY_TEMPLATE_COURSE_LAST_ROW,
+            $schedules,
+            'day'
         );
 
         $this->fillLoadTotals(
@@ -262,11 +265,13 @@ class PbtExportController extends Controller
             36,
             37,
             38,
-            39
+            39,
+            $schedules,
+            'day'
         );
 
         foreach ($daySchedules as $schedule) {
-            $this->writeDaySchedule($sheet, $schedule);
+            $this->writeDaySchedule($sheet, $schedule, $schedules);
         }
     }
 
@@ -307,7 +312,9 @@ class PbtExportController extends Controller
             $sheet,
             $eveningSchedules,
             self::EVENING_TEMPLATE_COURSE_FIRST_ROW,
-            self::EVENING_TEMPLATE_COURSE_LAST_ROW
+            self::EVENING_TEMPLATE_COURSE_LAST_ROW,
+            $schedules,
+            'evening'
         );
 
         $this->fillLoadTotals(
@@ -317,11 +324,13 @@ class PbtExportController extends Controller
             38,
             39,
             40,
-            41
+            41,
+            $schedules,
+            'evening'
         );
 
         foreach ($eveningSchedules as $schedule) {
-            $this->writeEveningSchedule($sheet, $schedule);
+            $this->writeEveningSchedule($sheet, $schedule, $schedules);
         }
     }
 
@@ -334,12 +343,18 @@ class PbtExportController extends Controller
         }
     }
 
-    private function fillCourseRows($sheet, $schedules, int $firstRow, int $lastRow): void
+    private function fillCourseRows($sheet, $schedules, int $firstRow, int $lastRow, $allSchedules, string $summaryShift): void
     {
-        $courses = $schedules
-            ->filter(fn($schedule) => $schedule->subject && $schedule->section)
-            ->unique(fn($schedule) => $schedule->sch_course_id . ':' . $schedule->sch_sec_id)
-            ->values();
+        $courseRows = $schedules
+            ->filter(fn ($schedule) => $schedule->subject && $schedule->section
+                && !\App\Services\ScheduleAssignmentService::isOjt($schedule->subject))
+            ->unique(fn ($schedule) => $schedule->sch_course_id . ':' . $schedule->sch_sec_id);
+        $ojtRows = $allSchedules
+            ->filter(fn ($schedule) => $schedule->subject && $schedule->section
+                && \App\Services\ScheduleAssignmentService::isOjt($schedule->subject)
+                && (($schedule->studyLoad?->sl_ojt_is_evening ? 'evening' : 'day') === $summaryShift))
+            ->unique('sch_course_id');
+        $courses = $courseRows->concat($ojtRows)->values();
 
         $availableRows = $lastRow - $firstRow + 1;
 
@@ -351,12 +366,18 @@ class PbtExportController extends Controller
 
         foreach ($courses as $index => $schedule) {
             $row = $firstRow + $index;
-            $section = $schedule->section;
+            $course = $schedule->subject;
+            $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
+            $courseSections = $isOjt
+                ? $allSchedules->where('sch_course_id', $schedule->sch_course_id)->map(fn ($item) => $item->section)->filter()->unique('sec_id')
+                : collect([$schedule->section])->filter();
+            $sectionNames = $courseSections->pluck('sec_name')->filter()->implode(', ');
+            $studentCount = $courseSections->sum(fn ($section) => (int) ($section->sec_no_of_student ?? 0));
 
-            $sheet->setCellValue('A' . $row, $schedule->subject->course_code ?? '');
-            $sheet->setCellValue('B' . $row, $schedule->subject->course_name ?? '');
-            $sheet->setCellValue('D' . $row, $section->sec_name ?? '');
-            $sheet->setCellValue('E' . $row, (int) ($section->sec_no_of_student ?? 0));
+            $sheet->setCellValue('A' . $row, $course->course_code ?? '');
+            $sheet->setCellValue('B' . $row, $course->course_name ?? '');
+            $sheet->setCellValue('D' . $row, $sectionNames);
+            $sheet->setCellValue('E' . $row, $studentCount);
         }
     }
 
@@ -367,9 +388,15 @@ class PbtExportController extends Controller
         int $preparationsRow,
         int $unitsRow,
         int $hoursRow,
-        int $designationRow
+        int $designationRow,
+        $allSchedules,
+        string $summaryShift
     ): void {
-        $scheduleIds = $schedules->pluck('sch_id')->filter()->all();
+        $ojtScheduleIds = $allSchedules
+            ->filter(fn ($schedule) => \App\Services\ScheduleAssignmentService::isOjt($schedule->subject)
+                && (($schedule->studyLoad?->sl_ojt_is_evening ? 'evening' : 'day') === $summaryShift))
+            ->pluck('sch_id');
+        $scheduleIds = $schedules->pluck('sch_id')->merge($ojtScheduleIds)->filter()->unique()->all();
         $studyLoads = $scheduleIds
             ? Study_Load::with('subject')
                 ->where('sl_fac_id', $faculty->fac_id)
@@ -385,11 +412,27 @@ class PbtExportController extends Controller
             ->unique()
             ->count();
 
-        $units = $studyLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0));
+        $countedOjt = [];
+        $units = $studyLoads->sum(function ($load) use (&$countedOjt) {
+            $course = $load->subject;
+            if (\App\Services\ScheduleAssignmentService::isOjt($course)) {
+                $courseId = (string) $course->course_id;
+                if (isset($countedOjt[$courseId])) return 0;
+                $countedOjt[$courseId] = true;
+            }
+            return \App\Services\ScheduleAssignmentService::courseUnits($course);
+        });
 
-        $hours = $studyLoads->sum(
-            fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
-        );
+        $countedOjtHours = [];
+        $hours = $studyLoads->sum(function ($load) use (&$countedOjtHours) {
+            $course = $load->subject;
+            if (\App\Services\ScheduleAssignmentService::isOjt($course)) {
+                $courseId = (string) $course->course_id;
+                if (isset($countedOjtHours[$courseId])) return 0;
+                $countedOjtHours[$courseId] = true;
+            }
+            return \App\Services\ScheduleAssignmentService::courseHours($course);
+        });
 
         $sheet->setCellValue('C' . $preparationsRow, $preparations);
         $sheet->setCellValue('C' . $unitsRow, $units);
@@ -540,7 +583,7 @@ class PbtExportController extends Controller
         return ((int) date('G', $timestamp) * 60) + (int) date('i', $timestamp);
     }
 
-    private function writeDaySchedule($sheet, Schedule $schedule): void
+    private function writeDaySchedule($sheet, Schedule $schedule, $allSchedules): void
     {
         $dayColumns = [
             'monday' => 11,
@@ -563,11 +606,12 @@ class PbtExportController extends Controller
             $schedule,
             $dayColumns[$day],
             $baseRow + (int) ceil(($start - $baseMinutes) / 20),
-            $baseRow + (int) ceil(($end - $baseMinutes) / 20) - 1
+            $baseRow + (int) ceil(($end - $baseMinutes) / 20) - 1,
+            $this->sectionNamesForSchedule($schedule, $allSchedules)
         );
     }
 
-    private function writeEveningSchedule($sheet, Schedule $schedule): void
+    private function writeEveningSchedule($sheet, Schedule $schedule, $allSchedules): void
     {
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
@@ -601,11 +645,28 @@ class PbtExportController extends Controller
             $schedule,
             $column,
             $baseRow + (int) ceil((($start - $baseMinutes) * $rowsPerHour) / 60),
-            $baseRow + (int) ceil((($end - $baseMinutes) * $rowsPerHour) / 60) - 1
+            $baseRow + (int) ceil((($end - $baseMinutes) * $rowsPerHour) / 60) - 1,
+            $this->sectionNamesForSchedule($schedule, $allSchedules)
         );
     }
 
-    private function writeScheduleBlock($sheet, Schedule $schedule, int $column, int $firstRow, int $lastRow): void
+    private function sectionNamesForSchedule(Schedule $schedule, $allSchedules): string
+    {
+        if (!\App\Services\ScheduleAssignmentService::isOjt($schedule->subject)) {
+            return $schedule->section->sec_name ?? 'Section';
+        }
+
+        return $allSchedules->where('sch_course_id', $schedule->sch_course_id)
+            ->where('sch_day', $schedule->sch_day)
+            ->filter(fn ($item) => substr((string) $item->sch_start_time, 0, 5) === substr((string) $schedule->sch_start_time, 0, 5)
+                && substr((string) $item->sch_end_time, 0, 5) === substr((string) $schedule->sch_end_time, 0, 5))
+            ->map(fn ($item) => $item->section?->sec_name)
+            ->filter()
+            ->unique()
+            ->implode(', ');
+    }
+
+    private function writeScheduleBlock($sheet, Schedule $schedule, int $column, int $firstRow, int $lastRow, ?string $sectionNames = null): void
     {
         $firstRow = max(15, $firstRow);
         $lastRow = max($firstRow, $lastRow);
@@ -617,7 +678,7 @@ class PbtExportController extends Controller
         }
 
         $courseCode = $schedule->subject->course_code ?? 'Course';
-        $sectionName = $schedule->section->sec_name ?? 'Section';
+        $sectionName = $sectionNames ?: ($schedule->section->sec_name ?? 'Section');
         $roomName = $schedule->room->room_name ?? 'Room not assigned';
 
         if ($courseCode === 'REC') {
