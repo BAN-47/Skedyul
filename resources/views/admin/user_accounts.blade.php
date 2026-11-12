@@ -283,9 +283,15 @@
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label class="field-label">Password</label>
-            <input name="password" type="password"
-              placeholder="Temporary password" required minlength="8"
-              class="field-input">
+            <div class="relative">
+              <input name="password" id="add-password" type="password"
+                placeholder="Temporary password" required minlength="8"
+                class="field-input pr-10">
+              <button type="button" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                onclick="togglePasswordVisibility('add-password', this)">
+                👁
+              </button>
+            </div>
           </div>
 
           <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
@@ -362,7 +368,7 @@
 
         <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
           <div class="grid grid-cols-2 gap-3 mb-3">
-            <div class="role-field" data-roles="faculty" style="display:none;">
+            <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
               <label class="field-label">Rank / Title</label>
               <select name="usr_rank_title" class="field-input">
                 <option value="">-- Select Rank --</option>
@@ -909,6 +915,17 @@
         : 'No special-position limit.';
     }
 
+
+function togglePasswordVisibility(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
 
     function openModal(id) {
       document.getElementById(id)?.classList.add('active');

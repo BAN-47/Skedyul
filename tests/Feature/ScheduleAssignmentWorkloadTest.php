@@ -51,7 +51,7 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         $this->assertSame(3.0, $scheduler->facultyHoursForShift($facultyId, $secondSemesterId, 'evening'));
     }
 
-    public function test_each_shift_has_its_own_30_hour_default_limit(): void
+    public function test_part_time_limit_is_shared_across_day_and_evening(): void
     {
         $fullTime = new Faculty(['fac_employment_type' => 'full_time']);
         $partTime = new Faculty(['fac_employment_type' => 'part_time']);
@@ -61,6 +61,22 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         $this->assertSame(30.0, ScheduleAssignmentService::facultyMaxHours($fullTime, 'evening'));
         $this->assertSame(30.0, ScheduleAssignmentService::facultyMaxHours($partTime, 'day'));
         $this->assertSame(30.0, ScheduleAssignmentService::facultyMaxHours($partTime, 'evening'));
+
+        $facultyId = (string) Str::uuid();
+        $semesterId = (string) Str::uuid();
+        $this->addLoad($facultyId, $semesterId, 'day', 16);
+        $this->addLoad($facultyId, $semesterId, 'evening', 13);
+
+        $scheduler = app(ScheduleAssignmentService::class);
+        $partTimeHours = $scheduler->facultyHoursForLimit($partTime, $facultyId, $semesterId, 'evening');
+        $this->assertSame(29.0, $partTimeHours);
+        $this->assertGreaterThan(
+            ScheduleAssignmentService::facultyMaxHours($partTime, 'evening'),
+            $partTimeHours + 2
+        );
+
+        $fullTimeHours = $scheduler->facultyHoursForLimit($fullTime, $facultyId, $semesterId, 'evening');
+        $this->assertSame(13.0, $fullTimeHours);
     }
 
     public function test_perg_chair_day_workload_limit_is_16_hours(): void
@@ -127,7 +143,7 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         $this->assertTrue($validator->passes(), $validator->errors()->first());
     }
 
-    public function test_remaining_evening_capacity_is_not_blocked_by_day_hours(): void
+    public function test_full_time_evening_capacity_remains_separate_from_day_hours(): void
     {
         $facultyId = (string) Str::uuid();
         $semesterId = (string) Str::uuid();
@@ -135,7 +151,8 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         $this->addLoad($facultyId, $semesterId, 'evening', 13);
 
         $scheduler = app(ScheduleAssignmentService::class);
-        $eveningAfterAssignment = $scheduler->facultyHoursForShift($facultyId, $semesterId, 'evening') + 9;
+        $fullTime = new Faculty(['fac_employment_type' => 'full_time']);
+        $eveningAfterAssignment = $scheduler->facultyHoursForLimit($fullTime, $facultyId, $semesterId, 'evening') + 9;
 
         $this->assertSame(16.0, $scheduler->facultyHoursForShift($facultyId, $semesterId, 'day'));
         $this->assertSame(13.0, $scheduler->facultyHoursForShift($facultyId, $semesterId, 'evening'));

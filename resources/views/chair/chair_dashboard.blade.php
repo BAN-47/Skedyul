@@ -83,7 +83,7 @@
           <div class="card-header">
             <div>
               <div class="card-title">Faculty Load Summary</div>
-              <div class="card-sub">{{ $deptChair->program->prog_code ?? '' }} &middot; Day caps follow designation; Evening is 30h; part-time is 30h per shift</div>
+              <div class="card-sub">{{ $deptChair->program->prog_code ?? '' }} &middot; Day caps follow designation; Evening is 30h; part-time Day + Evening share one 30h cap</div>
             </div>
           </div>
           <table>
@@ -94,24 +94,28 @@
               @forelse($facultyLoad as $fl)
                 @php
                   $dayColor = match($fl['day']['status']) {
+                      'Overload'   => 'text-red-600',
                       'Near Max'   => 'text-amber-600',
                       'Full'       => 'text-red-600',
                       'Part-time'  => 'text-cyan-600',
                       default      => 'text-green-600',
                   };
                   $eveningColor = match($fl['evening']['status']) {
+                      'Overload'   => 'text-red-600',
                       'Near Max'   => 'text-amber-600',
                       'Full'       => 'text-red-600',
                       'Part-time'  => 'text-cyan-600',
                       default      => 'text-green-600',
                   };
                   $dayBadge = match($fl['day']['status']) {
+                      'Overload'  => 'badge-red',
                       'Near Max'  => 'badge-amber',
                       'Full'      => 'badge-red',
                       'Part-time' => 'badge-teal',
                       default     => 'badge-green',
                   };
                   $eveningBadge = match($fl['evening']['status']) {
+                      'Overload'  => 'badge-red',
                       'Near Max'  => 'badge-amber',
                       'Full'      => 'badge-red',
                       'Part-time' => 'badge-teal',
@@ -123,9 +127,22 @@
                   <td>{{ $fl['special_position'] ?: '—' }}</td>
                   @foreach (['day', 'evening'] as $shift)
                     @php $color = $shift === 'day' ? $dayColor : $eveningColor; @endphp
-                    <td><span class="font-mono font-bold {{ $color }}">{{ $fl[$shift]['hours'] }}h</span><span class="text-xs text-slate-400"> / {{ $fl[$shift]['max_hours'] }}h</span><div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div></td>
+                    <td><span class="font-mono font-bold {{ $color }}">{{ $fl[$shift]['hours'] }}h</span>
+                      @if ($fl['employment'] === 'part_time')
+                        <div class="text-xs text-slate-500">Counts toward shared cap</div>
+                      @else
+                        <span class="text-xs text-slate-400"> / {{ $fl[$shift]['max_hours'] }}h</span>
+                        <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div>
+                      @endif
+                    </td>
                   @endforeach
-                  <td><div><span class="badge {{ $dayBadge }}">Day: {{ $fl['day']['status'] }}</span></div><div class="mt-1"><span class="badge {{ $eveningBadge }}">Evening: {{ $fl['evening']['status'] }}</span></div></td>
+                  <td>
+                    @if ($fl['employment'] === 'part_time')
+                      <span class="badge {{ $dayBadge }}">Shared: {{ $fl['day']['status'] }}</span>
+                    @else
+                      <div><span class="badge {{ $dayBadge }}">Day: {{ $fl['day']['status'] }}</span></div><div class="mt-1"><span class="badge {{ $eveningBadge }}">Evening: {{ $fl['evening']['status'] }}</span></div>
+                    @endif
+                  </td>
                 </tr>
               @empty
                 <tr><td colspan="5" class="text-center text-slate-400 py-4">No faculty in this department yet.</td></tr>
@@ -147,12 +164,12 @@
               <div class="workload-name mb-2">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}{{ $fl['special_position'] ? ' · '.$fl['special_position'] : '' }}</div>
               @if ($fl['employment'] === 'part_time')
                 @php
-                  $hours = $fl['day']['hours'] + $fl['evening']['hours'];
+                  $hours = $fl['day']['limit_hours'];
                   $remaining = max(0, 30 - $hours);
                   $percent = min(100, round($hours / 30 * 100));
-                  $state = $hours >= 30 ? 'Full' : ($hours >= 27 ? 'Near Max' : 'Part-time');
-                  $barColor = match($state) { 'Near Max' => 'bg-amber-600', 'Full' => 'bg-red-600', default => 'bg-cyan-600' };
-                  $textColor = match($state) { 'Near Max' => 'text-amber-600', 'Full' => 'text-red-600', default => 'text-cyan-600' };
+                  $state = $hours > 30 ? 'Overload' : ($hours >= 30 ? 'Full' : ($hours >= 27 ? 'Near Max' : 'Part-time'));
+                  $barColor = match($state) { 'Overload', 'Full' => 'bg-red-600', 'Near Max' => 'bg-amber-600', default => 'bg-cyan-600' };
+                  $textColor = match($state) { 'Overload', 'Full' => 'text-red-600', 'Near Max' => 'text-amber-600', default => 'text-cyan-600' };
                 @endphp
                 <div class="workload-header mt-1">
                   <div class="text-xs font-semibold text-slate-600">Total</div>
@@ -164,8 +181,8 @@
                 @foreach (['day' => 'Day', 'evening' => 'Evening'] as $shift => $label)
                   @php
                     $state = $fl[$shift]['status'];
-                    $barColor = match($state) { 'Near Max' => 'bg-amber-600', 'Full' => 'bg-red-600', 'Part-time' => 'bg-cyan-600', default => 'bg-green-600' };
-                    $textColor = match($state) { 'Near Max' => 'text-amber-600', 'Full' => 'text-red-600', 'Part-time' => 'text-cyan-600', default => 'text-green-600' };
+                    $barColor = match($state) { 'Overload', 'Full' => 'bg-red-600', 'Near Max' => 'bg-amber-600', 'Part-time' => 'bg-cyan-600', default => 'bg-green-600' };
+                    $textColor = match($state) { 'Overload', 'Full' => 'text-red-600', 'Near Max' => 'text-amber-600', 'Part-time' => 'text-cyan-600', default => 'text-green-600' };
                   @endphp
                   <div class="workload-header mt-1">
                     <div class="text-xs font-semibold text-slate-600">{{ $label }}</div>

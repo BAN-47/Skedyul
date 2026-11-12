@@ -50,9 +50,13 @@ class DeanDashboardController extends Controller
             $dayMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'day');
             $eveningMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'evening');
             $hours = $dayHours + $eveningHours;
-            $maxHours = $dayMaxHours + $eveningMaxHours;
-            $dayStatus = $dayHours > $dayMaxHours ? 'Overload' : ($dayHours >= $dayMaxHours - 3 ? 'Near Max' : 'Available');
-            $eveningStatus = $eveningHours > $eveningMaxHours ? 'Overload' : ($eveningHours >= $eveningMaxHours - 3 ? 'Near Max' : 'Available');
+            $isPartTime = $member->fac_employment_type === 'part_time';
+            $maxHours = $isPartTime
+                ? \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS
+                : $dayMaxHours + $eveningMaxHours;
+            $status = $hours > $maxHours
+                ? 'Overload'
+                : ($hours >= $maxHours - 3 ? 'Near Max' : 'Available');
 
             return [
                 'faculty' => $member,
@@ -62,9 +66,7 @@ class DeanDashboardController extends Controller
                 'day_max_hours' => $dayMaxHours,
                 'evening_hours' => $eveningHours,
                 'evening_max_hours' => $eveningMaxHours,
-                'status' => in_array('Overload', [$dayStatus, $eveningStatus], true)
-                    ? 'Overload'
-                    : (in_array('Near Max', [$dayStatus, $eveningStatus], true) ? 'Near Max' : 'Available'),
+                'status' => $status,
             ];
         });
 

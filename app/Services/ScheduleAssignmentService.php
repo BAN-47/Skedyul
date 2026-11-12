@@ -173,12 +173,23 @@ class ScheduleAssignmentService
                     $studyLoad?->sl_shift,
                     (bool) ($studyLoad?->schedules_exists ?? false)
                 );
-                $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
-                $additionalHours = (!$studyLoad || $studyLoad->sl_shift !== $workloadShift) ? $courseHours : 0;
+                $currentHours = $this->facultyHoursForLimit(
+                    $faculty,
+                    $data['fac_id'],
+                    $data['sem_id'],
+                    $workloadShift
+                );
+                $additionalHours = (!$studyLoad || (
+                    $studyLoad->sl_shift !== $workloadShift
+                    && $faculty->fac_employment_type !== 'part_time'
+                )) ? $courseHours : 0;
                 $hoursAfterAssignment = $currentHours + $additionalHours;
                 $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                 if ($hoursAfterAssignment > $maxHours) {
-                    throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$additionalHours} hours, totaling {$hoursAfterAssignment} against the {$maxHours}-hour limit.");
+                    $workloadName = $faculty->fac_employment_type === 'part_time'
+                        ? 'combined Day and Evening'
+                        : $workloadShift;
+                    throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadName} workload; this course adds {$additionalHours} hours, totaling {$hoursAfterAssignment} against the {$maxHours}-hour limit.");
                 }
 
                 if (!$studyLoad) {
@@ -341,11 +352,20 @@ class ScheduleAssignmentService
                         ? 'evening'
                         : ($sourceLoad->sl_shift ?? 'day');
                     if ($sourceWorkloadShift !== $workloadShift && !$targetLoad) {
-                        $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
-                        $projectedHours = $currentHours + $courseHours;
+                        $currentHours = $this->facultyHoursForLimit(
+                            $faculty,
+                            $data['fac_id'],
+                            $data['sem_id'],
+                            $workloadShift
+                        );
+                        $hoursToAdd = $faculty->fac_employment_type === 'part_time' ? 0 : $courseHours;
+                        $projectedHours = $currentHours + $hoursToAdd;
                         $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                         if ($projectedHours > $maxHours) {
-                            throw new RuntimeException("LOAD_LIMIT:Cannot move {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$courseHours} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
+                            $workloadName = $faculty->fac_employment_type === 'part_time'
+                                ? 'combined Day and Evening'
+                                : $workloadShift;
+                            throw new RuntimeException("LOAD_LIMIT:Cannot move {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadName} workload; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
                         }
                     }
 
@@ -359,7 +379,12 @@ class ScheduleAssignmentService
                         $schedule->sch_load_id = $sourceLoad->sl_id;
                     }
                 } elseif (!$isSameLoad || $targetLoadNeedsShiftMove) {
-                    $currentHours = $this->facultyHoursForShift($data['fac_id'], $data['sem_id'], $workloadShift);
+                    $currentHours = $this->facultyHoursForLimit(
+                        $faculty,
+                        $data['fac_id'],
+                        $data['sem_id'],
+                        $workloadShift
+                    );
                     $replacingSameFacultyLoad = $schedule->sch_fac_id === $data['fac_id'] && $schedule->sch_sem_id === $data['sem_id'];
                     $sourceLoad = Study_Load::with('section')->find($schedule->sch_load_id);
                     $sourceWorkloadShift = $sourceLoad?->section?->sec_is_evening
@@ -369,15 +394,35 @@ class ScheduleAssignmentService
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
                     $willRemoveOldLoad = !$oldLoadHasOtherSchedules;
-                    if ($replacingSameFacultyLoad && $willRemoveOldLoad && $sourceWorkloadShift === $workloadShift) {
+                    if (
+                        $replacingSameFacultyLoad
+                        && $willRemoveOldLoad
+                        && (
+                            $sourceWorkloadShift === $workloadShift
+                            || $faculty->fac_employment_type === 'part_time'
+                        )
+                    ) {
                         $oldCourse = Course::find($schedule->sch_course_id);
                         $currentHours -= $oldCourse ? self::courseHours($oldCourse) : 0;
                     }
-                    $hoursToAdd = (!$targetLoad || $targetLoadNeedsShiftMove) ? $courseHours : 0;
+                    $hoursToAdd = 0;
+                    if (!$targetLoad || $targetLoadNeedsShiftMove) {
+                        $hoursToAdd = $courseHours;
+                        if (
+                            $faculty->fac_employment_type === 'part_time'
+                            && $targetLoad
+                            && !$isSameLoad
+                        ) {
+                            $hoursToAdd = 0;
+                        }
+                    }
                     $projectedHours = $currentHours + $hoursToAdd;
                     $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                     if ($projectedHours > $maxHours) {
-                        throw new RuntimeException("LOAD_LIMIT:Cannot assign {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadShift} workload; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
+                        $workloadName = $faculty->fac_employment_type === 'part_time'
+                            ? 'combined Day and Evening'
+                            : $workloadShift;
+                        throw new RuntimeException("LOAD_LIMIT:Cannot assign {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadName} workload; this course adds {$hoursToAdd} hours, totaling {$projectedHours} against the {$maxHours}-hour limit.");
                     }
                     if (!$targetLoad) {
                         $targetLoad = Study_Load::create([
@@ -471,6 +516,17 @@ class ScheduleAssignmentService
             ->with('subject')
             ->get()
             ->sum(fn($load) => self::courseHours($load->subject));
+    }
+
+    public function facultyHoursForLimit(
+        Faculty $faculty,
+        string $facultyId,
+        string $semesterId,
+        string $shift
+    ): float {
+        return $faculty->fac_employment_type === 'part_time'
+            ? $this->facultyHours($facultyId, $semesterId)
+            : $this->facultyHoursForShift($facultyId, $semesterId, $shift);
     }
 
     public static function courseHours(?Course $course): float

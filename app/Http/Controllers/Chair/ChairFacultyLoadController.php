@@ -115,19 +115,20 @@ class ChairFacultyLoadController extends Controller
                 $totalUnits = $loads->sum(fn ($sl) => (float) ($sl->subject?->course_units ?? 0));
                 $isPartTime = $f->fac_employment_type === 'part_time';
                 $shiftHours = $loads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
-                $totalHours = $shiftHours;
+                $combinedHours = $allLoads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
+                $hoursAgainstLimit = $isPartTime ? $combinedHours : $shiftHours;
                 $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)->filter()->unique()->implode(', ');
                 $maxHours = ScheduleAssignmentService::facultyMaxHours($f, $shift);
-                $remaining = max(0, $maxHours - $totalHours);
+                $remaining = max(0, $maxHours - $hoursAgainstLimit);
                 $nearMaxBuffer = min(self::NEAR_MAX_BUFFER, max(1, $maxHours * 0.2));
 
-                if ($totalHours > $maxHours) {
+                if ($hoursAgainstLimit > $maxHours) {
                     $statusLabel = 'Over Limit'; $statusBadge = 'badge-red';
-                } elseif ($totalHours >= $maxHours) {
+                } elseif ($hoursAgainstLimit >= $maxHours) {
                     $statusLabel = 'Full'; $statusBadge = 'badge-red';
-                } elseif ($totalHours >= $maxHours - $nearMaxBuffer) {
+                } elseif ($hoursAgainstLimit >= $maxHours - $nearMaxBuffer) {
                     $statusLabel = 'Near Max'; $statusBadge = 'badge-amber';
-                } elseif ($totalHours <= 0) {
+                } elseif ($hoursAgainstLimit <= 0) {
                     $statusLabel = $isPartTime ? 'Part-time' : 'Available';
                     $statusBadge = $isPartTime ? 'badge-teal' : 'badge-blue';
                 } elseif ($isPartTime) {
@@ -138,7 +139,8 @@ class ChairFacultyLoadController extends Controller
 
                 return [$shift => [
                     'total_units' => $totalUnits,
-                    'total_hours' => $totalHours,
+                    'total_hours' => $shiftHours,
+                    'limit_hours' => $hoursAgainstLimit,
                     'remaining' => $remaining,
                     'max_hours' => $maxHours,
                     'is_part_time' => $isPartTime,
@@ -150,6 +152,29 @@ class ChairFacultyLoadController extends Controller
 
             $day = $shifts['day'];
             $evening = $shifts['evening'];
+            $isPartTime = $f->fac_employment_type === 'part_time';
+            $totalHours = $day['total_hours'] + $evening['total_hours'];
+            $totalMaxHours = $isPartTime
+                ? ScheduleAssignmentService::PART_TIME_MAX_HOURS
+                : $day['max_hours'] + $evening['max_hours'];
+            $totalNearMaxBuffer = min(self::NEAR_MAX_BUFFER, max(1, $totalMaxHours * 0.2));
+            if ($isPartTime) {
+                $totalStatusLabel = $day['status_label'];
+                $totalStatusBadge = $day['status_badge'];
+            } elseif ($totalHours > $totalMaxHours) {
+                $totalStatusLabel = 'Over Limit';
+                $totalStatusBadge = 'badge-red';
+            } elseif ($totalHours >= $totalMaxHours) {
+                $totalStatusLabel = 'Full';
+                $totalStatusBadge = 'badge-red';
+            } elseif ($totalHours >= $totalMaxHours - $totalNearMaxBuffer) {
+                $totalStatusLabel = 'Near Max';
+                $totalStatusBadge = 'badge-amber';
+            } else {
+                $totalStatusLabel = 'Separate shift limits';
+                $totalStatusBadge = 'badge-blue';
+            }
+
             return [
                 'id' => $f->fac_id,
                 'name' => trim("{$f->fac_first_name} {$f->fac_last_name}"),
@@ -159,9 +184,10 @@ class ChairFacultyLoadController extends Controller
                     ? self::SPECIAL_POSITION_MAX_HOURS[$f->fac_special_position] ?? null : null,
                 'subjects' => collect([$day['subjects'], $evening['subjects']])->reject(fn ($codes) => $codes === '—')->unique()->implode(', ') ?: '—',
                 'total_units' => $day['total_units'] + $evening['total_units'],
-                'total_hours' => $day['total_hours'] + $evening['total_hours'],
-                'total_status_label' => 'Separate shift limits',
-                'total_status_badge' => 'badge-blue',
+                'total_hours' => $totalHours,
+                'total_max_hours' => $totalMaxHours,
+                'total_status_label' => $totalStatusLabel,
+                'total_status_badge' => $totalStatusBadge,
                 'day' => $day,
                 'evening' => $evening,
             ];
@@ -227,13 +253,19 @@ class ChairFacultyLoadController extends Controller
         }
 
         $scheduler = app(ScheduleAssignmentService::class);
-        $currentHours = $scheduler->facultyHoursForShift($data['fac_id'], $data['sem_id'], $data['shift']);
+        $currentHours = $scheduler->facultyHoursForLimit(
+            $faculty,
+            $data['fac_id'],
+            $data['sem_id'],
+            $data['shift']
+        );
 
         if (($currentHours + $subjectHours) > $maxHours) {
             $label = $isPartTime ? 'part-time' : 'full-time';
             return response()->json([
                 'success' => false,
-                'message' => "Teaching-hour limit exceeded ({$label} max {$maxHours} hours). "
+                'message' => "Teaching-hour limit exceeded ({$label} max {$maxHours} hours"
+                    . ($isPartTime ? ' shared across Day and Evening' : '') . "). "
                     . "Currently {$currentHours} hours; adding {$subjectHours} hours would total "
                     . ($currentHours + $subjectHours) . " hours.",
             ], 422);

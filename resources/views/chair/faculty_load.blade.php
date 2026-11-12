@@ -58,7 +58,7 @@
                             &middot; Total load limit 30 teaching hours
                             &middot; Day limits follow faculty designation
                             &middot; Evening limit {{ \App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS }} teaching hours
-                            &middot; Part-time limit {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }} hours per shift
+                            &middot; Part-time limit {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }} hours shared across Day and Evening
                         </div>
                     </div>
                     <form method="GET" action="{{ route('chair.faculty_load') }}" class="flex flex-col gap-1">
@@ -124,7 +124,7 @@
                                                         <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(($fl['special_position'] ?? '') === $position)>{{ $position }}</option>
                                                     @endforeach
                                                 </select>
-                                                <span data-position-cap class="text-xs text-slate-500">{{ 'Day cap: '.($fl['special_position_max_hours'] ?? \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS).'h · Evening cap: '.\App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS.'h' }}</span>
+                                                <span data-position-cap class="text-xs text-slate-500">{{ $fl['employment'] === 'part_time' ? 'Shared Day + Evening cap: '.\App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS.'h' : 'Day cap: '.($fl['special_position_max_hours'] ?? \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS).'h · Evening cap: '.\App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS.'h' }}</span>
                                                 <button type="submit" class="rounded-lg bg-blue-50 px-2 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Save</button>
                                             </form>
                                         </td>
@@ -132,17 +132,28 @@
                                         <td>
                                             <span class="font-mono font-bold">{{ $fl['total_units'] }}u</span>
                                             <div class="text-xs text-slate-500">{{ $fl['total_hours'] }}h combined across shifts</div>
+                                            @if ($fl['employment'] === 'part_time')
+                                                <div class="text-xs text-slate-500">{{ $fl['total_hours'] }}h / {{ $fl['total_max_hours'] }}h shared limit</div>
+                                            @endif
                                             <span class="badge {{ $fl['total_status_badge'] }}">{{ $fl['total_status_label'] }}</span>
                                         </td>
                                         @foreach (['day', 'evening'] as $shift)
                                             <td>
-                                                <div class="font-mono font-bold">{{ $fl[$shift]['total_hours'] }}h <span class="text-xs font-normal text-slate-400">/ {{ $fl[$shift]['max_hours'] }}h</span></div>
-                                                <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left</div>
+                                                <div class="font-mono font-bold">{{ $fl[$shift]['total_hours'] }}h</div>
+                                                @if ($fl['employment'] === 'part_time')
+                                                    <div class="text-xs text-slate-500">Counts toward shared limit</div>
+                                                @else
+                                                    <div class="text-xs text-slate-500">{{ $fl[$shift]['remaining'] }}h left of {{ $fl[$shift]['max_hours'] }}h</div>
+                                                @endif
                                             </td>
                                         @endforeach
                                         <td>
-                                            <div><span class="badge {{ $fl['day']['status_badge'] }}">Day: {{ $fl['day']['status_label'] }}</span></div>
-                                            <div class="mt-1"><span class="badge {{ $fl['evening']['status_badge'] }}">Evening: {{ $fl['evening']['status_label'] }}</span></div>
+                                            @if ($fl['employment'] === 'part_time')
+                                                <div><span class="badge {{ $fl['day']['status_badge'] }}">Shared: {{ $fl['day']['status_label'] }}</span></div>
+                                            @else
+                                                <div><span class="badge {{ $fl['day']['status_badge'] }}">Day: {{ $fl['day']['status_label'] }}</span></div>
+                                                <div class="mt-1"><span class="badge {{ $fl['evening']['status_badge'] }}">Evening: {{ $fl['evening']['status_label'] }}</span></div>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
@@ -186,7 +197,7 @@
                     const option = select.selectedOptions[0];
                     const maxHours = option.dataset.maxHours;
                     cap.textContent = select.form.closest('tr').querySelector('td:nth-child(2)')?.textContent.trim() === 'Part-time'
-                        ? `Day cap: {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}h · Evening cap: {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}h`
+                        ? `Shared Day + Evening cap: {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}h`
                         : `Day cap: ${maxHours || {{ \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS }}}h · Evening cap: {{ \App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS }}h`;
                 };
                 select.addEventListener('change', syncCap);

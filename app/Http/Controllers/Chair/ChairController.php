@@ -83,20 +83,23 @@ class ChairController extends Controller
                 $shiftHours = (float) $loads->sum(
                     fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
                 );
-                $totalHours = $f->fac_employment_type === 'part_time'
+                $combinedHours = $f->fac_employment_type === 'part_time'
                     ? (float) $allLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
-                    : $shiftHours;
-                $remaining = max(0, $maxHours - $totalHours);
-                $percent = min(100, (int) round(($totalHours / max(1, $maxHours)) * 100));
+                    : null;
+                $hoursAgainstLimit = $combinedHours ?? $shiftHours;
+                $remaining = max(0, $maxHours - $hoursAgainstLimit);
+                $percent = min(100, (int) round(($hoursAgainstLimit / max(1, $maxHours)) * 100));
                 $status = match (true) {
-                    $totalHours >= $maxHours => 'Full',
-                    $totalHours >= $maxHours - 3 => 'Near Max',
+                    $hoursAgainstLimit > $maxHours => 'Overload',
+                    $hoursAgainstLimit >= $maxHours => 'Full',
+                    $hoursAgainstLimit >= $maxHours - 3 => 'Near Max',
                     $f->fac_employment_type === 'part_time' => 'Part-time',
                     default => 'OK',
                 };
 
                 return [$shift => [
-                    'hours' => $totalHours,
+                    'hours' => $shiftHours,
+                    'limit_hours' => $hoursAgainstLimit,
                     'remaining' => $remaining,
                     'percent' => $percent,
                     'max_hours' => $maxHours,
@@ -164,8 +167,11 @@ class ChairController extends Controller
         $unreadCount    = $notifications->where('notif_is_read', false)->count();
         $facultyAtMaxLoadCount = $facultyLoad
             ->filter(fn ($load) =>
-                $load['day']['hours'] >= $load['day']['max_hours']
-                || $load['evening']['hours'] >= $load['evening']['max_hours']
+                $load['day']['limit_hours'] >= $load['day']['max_hours']
+                || (
+                    $load['employment'] !== 'part_time'
+                    && $load['evening']['limit_hours'] >= $load['evening']['max_hours']
+                )
             )
             ->count();
 
