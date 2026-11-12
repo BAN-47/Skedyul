@@ -18,12 +18,6 @@
             @include('partials.admin_header', ['title' => 'Schedule Archives'])
 
             <main class="page-content">
-                <div class="mb-4">
-                    <h1 class="text-xl font-extrabold text-slate-900">Schedule Archives</h1>
-                    <p class="mt-1 text-sm text-slate-500">
-                        Read-only schedules from previous academic years. Viewing archives never changes schedules.
-                    </p>
-                </div>
 
                 @if (!$archiveTableAvailable)
                     <div class="card border border-amber-200 bg-amber-50 text-sm text-amber-800">

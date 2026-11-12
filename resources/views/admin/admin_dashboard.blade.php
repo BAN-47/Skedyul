@@ -113,6 +113,25 @@
                 </div>
             </div>
 
+            {{-- ══ DEPT FACULTY STATS ══ --}}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Department Faculty Distribution</div>
+                        <div class="card-sub">Faculty count per department</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                    @foreach($deptFacultyStats as $dept)
+                        <div class="flex flex-col items-center justify-center rounded-xl bg-slate-50 px-3 py-3 border border-slate-100">
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tight text-center">{{ $dept->dept_code }}</div>
+                            <div class="text-xl font-extrabold text-slate-800">{{ $dept->faculty_count }}</div>
+                            <div class="text-[10px] text-slate-500">Faculty</div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
             <div class="card mb-4">
                 <div class="card-header">
                     <div>
