@@ -186,6 +186,27 @@
                   <input class="field-input" id="ay-end" type="date" value="{{ $ayEnd }}">
                 </div>
               </div>
+              
+              @php
+                $inactiveSemester = \App\Models\Semester::query()
+                    ->where('sem_is_active', false)
+                    ->where('sem_ay_id', optional($activeYear)->ay_id)
+                    ->first();
+              @endphp
+
+              <div class="mb-1" @if(!$inactiveSemester) style="display:none;" @endif>
+                <label class="field-label">Enable Advance Plotting</label>
+                <div class="flex items-center gap-2">
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="ay-plotting-enabled"
+                          {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'checked' : '' }}
+                          onchange="togglePlottingEnabled('{{ optional($inactiveSemester)->sem_id }}', this)">
+                    <span class="toggle-track {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
+                  </label>
+                  <span class="text-[12px] text-slate-600">Allow chairs to access the other semester for advance plotting</span>
+                </div>
+              </div>
+
               <p class="text-[11px] text-slate-400 mt-1 mb-2">
                 When 1st semester end date passes, the system switches to 2nd semester.
                 When 2nd ends, you will be prompted to set the next academic year.
@@ -418,6 +439,7 @@ async function saveAcademicYear() {
     sem_name: (document.getElementById('ay-semester').value || '').trim(),
     sem_start_date: document.getElementById('ay-start').value || '',
     sem_end_date: document.getElementById('ay-end').value || '',
+    sem_is_plotting_enabled: document.getElementById('ay-plotting-enabled').checked,
   };
   if (!payload.ay_academic_year || !payload.sem_name || !payload.sem_start_date || !payload.sem_end_date) {
     showToast('Please fill academic year, semester, start date, and end date.');
@@ -490,6 +512,27 @@ function savePassword() {
       document.getElementById('pwd-confirm').value = '';
     })
     .catch(function () { showToast('Network error updating password'); });
+}
+
+function togglePlottingEnabled(semId, el) {
+  fetch('/admin/semester/' + semId + '/toggle-plotting', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrfToken(),
+    },
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      showToast('Status updated!');
+      const track = el.nextElementSibling;
+      el.checked ? track.classList.add('on') : track.classList.remove('on');
+    } else {
+      showToast(data.message);
+      el.checked = !el.checked;
+    }
+  });
 }
 
 function toggleSwitch(el) {

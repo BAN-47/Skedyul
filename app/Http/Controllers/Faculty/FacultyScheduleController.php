@@ -42,6 +42,7 @@ class FacultyScheduleController extends Controller
         $semesters = Semester::with('academicYear')
             ->orderByDesc('sem_start_date')
             ->get()
+            ->filter(fn($sem) => $sem->sem_is_active || $sem->sem_is_plotting_enabled)
             ->map(function (Semester $semester) {
                 $year = $semester->academicYear?->ay_academic_year
                     ?? $semester->academicYear?->ay_year_label

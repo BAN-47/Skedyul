@@ -29,6 +29,7 @@ class AcademicYearController extends Controller
                 'sem_name' => 'required|string|in:1st Semester,2nd Semester',
                 'sem_start_date' => 'required|date',
                 'sem_end_date' => 'required|date|after:sem_start_date',
+                'sem_is_plotting_enabled' => 'sometimes|boolean',
                 'confirm_new_academic_year' => 'sometimes|boolean',
             ]);
         } catch (ValidationException $e) {
@@ -93,6 +94,9 @@ class AcademicYearController extends Controller
                     ->where('sem_name', $semName)
                     ->first();
 
+                // Always enable plotting for active semesters
+                $plottingEnabled = true;
+
                 if (! $sem) {
                     $semId = (string) Str::uuid();
                     $insert = [
@@ -102,6 +106,7 @@ class AcademicYearController extends Controller
                         'sem_start_date' => $validated['sem_start_date'],
                         'sem_end_date' => $validated['sem_end_date'],
                         'sem_is_active' => true,
+                        'sem_is_plotting_enabled' => $plottingEnabled,
                     ];
                     DB::table('semester')->insert($insert);
                 } else {
@@ -109,6 +114,7 @@ class AcademicYearController extends Controller
                         'sem_start_date' => $validated['sem_start_date'],
                         'sem_end_date' => $validated['sem_end_date'],
                         'sem_is_active' => true,
+                        'sem_is_plotting_enabled' => $plottingEnabled,
                     ];
                     DB::table('semester')->where('sem_id', $sem->sem_id)->update($update);
                 }
@@ -263,4 +269,27 @@ class AcademicYearController extends Controller
         }
     }
 
+    public function togglePlotting(Request $request, $id)
+    {
+        $semester = DB::table('semester')->where('sem_id', $id)->first();
+        
+        if (!$semester) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Semester not found.'
+            ], 404);
+        }
+
+        $newValue = !$semester->sem_is_plotting_enabled;
+        
+        DB::table('semester')->where('sem_id', $id)->update([
+            'sem_is_plotting_enabled' => $newValue,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Advance plotting status updated.',
+            'enabled' => $newValue,
+        ]);
+    }
 }
