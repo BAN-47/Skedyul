@@ -283,7 +283,7 @@
 
             <div>
               <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Middle Name <span class="text-red-500" aria-hidden="true">*</span></label>
-              <input name="usr_middle_name" value="{{ old('usr_middle_name') }}" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600" autocomplete="additional-name">
+              <input name="usr_middle_name" value="{{ old('usr_middle_name') }}" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs outline-none focus:border-blue-600" autocomplete="additional-name">
             </div>
 
             <div>
@@ -378,7 +378,7 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Special Position (Optional)</label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Special Designation (Optional)</label>
               <select id="register-special-position" name="special_position" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="">None</option>
                 @foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
