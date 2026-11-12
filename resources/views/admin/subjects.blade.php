@@ -62,12 +62,7 @@
                     </div>
                 @endif
 
-                <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <div class="text-[20px] font-extrabold text-slate-900">Courses</div>
-                        <div class="mt-1 text-[13px] text-slate-500">BIT-CT · BSIS · BSIT — filter by program, year
-                            &amp; semester</div>
-                    </div>
+                <div class="mb-4 flex flex-wrap items-end justify-end gap-3">
                     <button type="button" onclick="openModal('modal-add-subject')" class="btn btn-primary">+ Add
                         Course</button>
                 </div>

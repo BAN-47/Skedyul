@@ -310,25 +310,25 @@
           <div>
             <label class="field-label">First Name</label>
             <input name="usr_first_name" placeholder="Juan"
-              required class="field-input" autocapitalize="words">
+              required class="field-input capitalize" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Middle Name</label>
-            <input name="usr_middle_name" placeholder="A."
-              class="field-input" autocapitalize="words">
+            <input name="usr_middle_name" placeholder="M.I. or M.D."
+              class="field-input capitalize" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Last Name</label>
             <input name="usr_last_name" placeholder="Dela Cruz"
-              required class="field-input" autocapitalize="words">
+              required class="field-input capitalize" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Suffix</label>
             <input name="usr_suffix" placeholder="Jr., Sr., III"
-              class="field-input" autocapitalize="words">
+              class="field-input capitalize" autocapitalize="words">
           </div>
         </div>
 
