@@ -99,16 +99,16 @@
                 $colorIndex = crc32($displayName) % count($colors);
                 $avatarColor = $colors[$colorIndex];
                 $avatarUrl = match ($user->usr_role) {
-                  'faculty' => $user->faculty?->fac_profile_image
-                    ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image)
-                    : null,
-                  'dean' => $user->dean?->dean_profile_image
-                    ? asset('images/dean_profile/' . $user->dean->dean_profile_image)
-                    : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
-                  'department_chair' => $user->deptChair?->dc_profile_image
-                    ? asset('images/chair_profile/' . $user->deptChair->dc_profile_image)
-                    : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
-                  default => null,
+                'faculty' => $user->faculty?->fac_profile_image
+                ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image)
+                : null,
+                'dean' => $user->dean?->dean_profile_image
+                ? asset('images/dean_profile/' . $user->dean->dean_profile_image)
+                : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                'department_chair' => $user->deptChair?->dc_profile_image
+                ? asset('images/chair_profile/' . $user->deptChair->dc_profile_image)
+                : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                default => null,
                 };
 
                 $roleLabels = [
@@ -138,9 +138,9 @@
                         class="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[13px] font-extrabold text-white flex-shrink-0 overflow-hidden"
                         style="background:{{ $avatarColor }};">
                         @if($avatarUrl)
-                          <img src="{{ $avatarUrl }}" alt="{{ $displayName }} profile photo" class="h-full w-full object-cover">
+                        <img src="{{ $avatarUrl }}" alt="{{ $displayName }} profile photo" class="h-full w-full object-cover">
                         @else
-                          {{ strtoupper(substr($displayName, 0, 1)) }}
+                        {{ strtoupper(substr($displayName, 0, 1)) }}
                         @endif
                       </div>
 
@@ -160,7 +160,7 @@
                         {{ $roleLabels[$user->usr_role] ?? ucfirst($user->usr_role) }}
                       </span>
                       @if ($user->faculty?->fac_special_position)
-                        <span class="text-[11px] text-slate-500">{{ $user->faculty->fac_special_position }} · {{ rtrim(rtrim(number_format((float) $user->faculty->fac_special_position_max_hours, 2), '0'), '.') }}h/week</span>
+                      <span class="text-[11px] text-slate-500">{{ $user->faculty->fac_special_position }} · {{ rtrim(rtrim(number_format((float) $user->faculty->fac_special_position_max_hours, 2), '0'), '.') }}h/week</span>
                       @endif
                     </div>
                   </td>
@@ -304,25 +304,25 @@
           <div>
             <label class="field-label">First Name</label>
             <input name="usr_first_name" placeholder="Juan"
-              required class="field-input">
+              required class="field-input" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Middle Name</label>
             <input name="usr_middle_name" placeholder="A."
-              class="field-input">
+              class="field-input" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Last Name</label>
             <input name="usr_last_name" placeholder="Dela Cruz"
-              required class="field-input">
+              required class="field-input" autocapitalize="words">
           </div>
 
           <div>
             <label class="field-label">Suffix</label>
             <input name="usr_suffix" placeholder="Jr., Sr., III"
-              class="field-input">
+              class="field-input" autocapitalize="words">
           </div>
         </div>
 
@@ -394,7 +394,7 @@
             <select id="add-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('add')">
               <option value="">None</option>
               @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
               @endforeach
             </select>
             <p id="add-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>
@@ -454,7 +454,7 @@
             <select id="add-department" data-department-select name="dept_id" class="field-input">
               <option value="">— Select department —</option>
               @foreach(($departments ?? []) as $dept)
-                <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
+              <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
                 {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
@@ -661,7 +661,7 @@
             <select id="edit-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('edit')">
               <option value="">None</option>
               @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
               @endforeach
             </select>
             <p id="edit-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>
@@ -722,11 +722,11 @@
 
           <div>
             <label class="field-label">Department</label>
-              <select id="edit-department" data-department-select
+            <select id="edit-department" data-department-select
               name="dept_id" class="field-input">
               <option value="">— Select department —</option>
               @foreach(($departments ?? []) as $dept)
-                <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
+              <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">
                 {{ $dept->dept_name }} ({{ $dept->dept_code }})
               </option>
               @endforeach
@@ -904,9 +904,9 @@
       const note = document.getElementById(`${which}-special-position-cap`);
       if (!select || !note) return;
       const maxHours = select.selectedOptions[0]?.dataset.maxHours;
-      note.textContent = maxHours
-        ? `Fixed teaching-load limit: ${maxHours} hours per week.`
-        : 'No special-position limit.';
+      note.textContent = maxHours ?
+        `Fixed teaching-load limit: ${maxHours} hours per week.` :
+        'No special-position limit.';
     }
 
 
@@ -931,18 +931,18 @@
           .map(option => option.cloneNode(true));
       }
 
-      const selectedId = preferredDepartmentId === undefined
-        ? department.value
-        : String(preferredDepartmentId || '');
+      const selectedId = preferredDepartmentId === undefined ?
+        department.value :
+        String(preferredDepartmentId || '');
       const matching = department._allDepartmentOptions
         .filter(option => option.dataset.college === college.value);
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = !college.value
-        ? 'Select a college first'
-        : matching.length
-          ? 'Select department'
-          : 'No departments available for this college';
+      placeholder.textContent = !college.value ?
+        'Select a college first' :
+        matching.length ?
+        'Select department' :
+        'No departments available for this college';
       placeholder.selected = true;
 
       department.replaceChildren(placeholder, ...matching.map(option => option.cloneNode(true)));
@@ -1463,8 +1463,8 @@
       const email = (row.dataset.email || '').toLowerCase();
       const role = (row.dataset.role || '').toLowerCase();
       const specialPosition = (row.dataset.specialPosition || '').toLowerCase();
-      return name.includes(q) || firstName.includes(q) || lastName.includes(q)
-        || email.includes(q) || role.includes(q) || specialPosition.includes(q);
+      return name.includes(q) || firstName.includes(q) || lastName.includes(q) ||
+        email.includes(q) || role.includes(q) || specialPosition.includes(q);
     }
 
     function getFilteredRows() {
@@ -1482,7 +1482,9 @@
       const start = (currentPage - 1) * USERS_PER_PAGE;
       const end = start + USERS_PER_PAGE;
 
-      rows.forEach(row => { row.style.display = 'none'; });
+      rows.forEach(row => {
+        row.style.display = 'none';
+      });
       filtered.forEach((row, i) => {
         row.style.display = (i >= start && i < end) ? '' : 'none';
       });
@@ -1491,9 +1493,9 @@
       const to = Math.min(end, total);
       const info = document.getElementById('page-info');
       if (info) {
-        info.textContent = total === 0
-          ? 'No users found'
-          : 'Showing ' + from + '–' + to + ' of ' + total + ' users (page ' + currentPage + ' of ' + totalPages + ')';
+        info.textContent = total === 0 ?
+          'No users found' :
+          'Showing ' + from + '–' + to + ' of ' + total + ' users (page ' + currentPage + ' of ' + totalPages + ')';
       }
 
       const btnPrev = document.getElementById('btn-prev');
@@ -1519,7 +1521,10 @@
           b.type = 'button';
           b.textContent = String(p);
           b.className = 'btn min-w-[36px] text-center ' + (p === currentPage ? 'btn-primary' : 'btn-secondary');
-          b.addEventListener('click', function () { currentPage = p; renderUserPage(); });
+          b.addEventListener('click', function() {
+            currentPage = p;
+            renderUserPage();
+          });
           nums.appendChild(b);
         }
       }
