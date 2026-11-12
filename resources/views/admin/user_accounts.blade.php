@@ -315,7 +315,7 @@
 
           <div>
             <label class="field-label">Middle Name</label>
-            <input name="usr_middle_name" placeholder="A."
+            <input name="usr_middle_name" placeholder="M.I. or M.D."
               class="field-input" autocapitalize="words">
           </div>
 
