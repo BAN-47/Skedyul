@@ -141,7 +141,7 @@
                             </div>
 
                             @php
-                                // One row per course+section assignment for the selected teacher
+                                // OJT is one shared course row; other courses stay split by section.
                                 $pbtCourseRows = $summarySchedules
                                     ->filter(function ($s) {
                                         $course = $s->course ?? $s->subject;
@@ -151,11 +151,11 @@
                                             && ($course->course_name ?? $course->subj_name ?? null)
                                                 !== 'Research, Extension and Consultation Time';
                                     })
-                                    ->unique(
-                                        fn($s) => ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) .
-                                            '|' .
-                                            ($s->sch_sec_id ?? ''),
-                                    )
+                                    ->unique(function ($s) {
+                                        $course = $s->course ?? $s->subject;
+                                        $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
+                                        return ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) . ($isOjt ? '' : '|' . ($s->sch_sec_id ?? ''));
+                                    })
                                     ->values();
                             @endphp
 
@@ -183,21 +183,29 @@
                                                 $course = $s->course ?? $s->subject;
                                                 $code = $course->course_code ?? ($course->subj_code ?? '—');
                                                 $title = $course->course_name ?? ($course->subj_name ?? '—');
-                                                $courseUnits = $course->course_units ?? 0;
+                                                $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
+                                                $courseUnits = \App\Services\ScheduleAssignmentService::courseUnits($course);
                                                 $courseHours = \App\Services\ScheduleAssignmentService::courseHours(
                                                     $course,
                                                 );
-                                                $courseMeetings = $summarySchedules
-                                                    ->where('sch_course_id', $s->sch_course_id)
-                                                    ->where('sch_sec_id', $s->sch_sec_id);
+                                                $courseMeetings = $summarySchedules->where('sch_course_id', $s->sch_course_id);
+                                                if (!$isOjt) {
+                                                    $courseMeetings = $courseMeetings->where('sch_sec_id', $s->sch_sec_id);
+                                                }
                                                 $meetingHours = fn($meeting) => \Illuminate\Support\Carbon::parse(
                                                     $meeting->sch_start_time,
                                                 )->diffInMinutes(
                                                     \Illuminate\Support\Carbon::parse($meeting->sch_end_time),
                                                 ) / 60;
-                                                $scheduledHours = $courseMeetings->sum($meetingHours);
-                                                $secName = optional($s->section)->sec_name ?? '—';
-                                                $studs =
+                                                $scheduledHours = $isOjt
+                                                    ? $courseMeetings->unique(fn ($meeting) => $meeting->sch_day.'|'.$meeting->sch_start_time.'|'.$meeting->sch_end_time)->sum($meetingHours)
+                                                    : $courseMeetings->sum($meetingHours);
+                                                $secName = $isOjt
+                                                    ? $courseMeetings->map(fn ($meeting) => $meeting->section?->sec_name)->filter()->unique()->implode(', ')
+                                                    : (optional($s->section)->sec_name ?? '—');
+                                                $studs = $isOjt
+                                                    ? $courseMeetings->map(fn ($meeting) => $meeting->section)->filter()->unique('sec_id')->sum(fn ($section) => (int) $section->sec_no_of_student)
+                                                    :
                                                     optional($s->section)->sec_no_of_student ??
                                                     (optional($s->section)->sec_max_capacity ?? '—');
                                             @endphp
@@ -525,6 +533,16 @@
                                             $course = $s->course ?? $s->subject;
                                             $courseCode = $course?->course_code ?? $course?->subj_code;
                                             $courseName = $course?->course_name ?? $course?->subj_name;
+                                            $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
+                                            $sharedSectionNames = $isOjt
+                                                ? $summarySchedules->filter(fn ($meeting) =>
+                                                    $meeting->sch_course_id === $s->sch_course_id
+                                                    && $meeting->sch_day === $s->sch_day
+                                                    && substr((string) $meeting->sch_start_time, 0, 5) === substr((string) $s->sch_start_time, 0, 5)
+                                                    && substr((string) $meeting->sch_end_time, 0, 5) === substr((string) $s->sch_end_time, 0, 5)
+                                                    && $meeting->sch_room_id === $s->sch_room_id
+                                                )->map(fn ($meeting) => $meeting->section?->sec_name)->filter()->unique()->implode(', ')
+                                                : ($s->section->sec_name ?? '');
                                             $isRec = $courseCode === 'REC'
                                                 || $courseName === 'Research, Extension and Consultation Time';
                                         @endphp
@@ -555,7 +573,7 @@
                                                     {{ $isRec ? ($courseName ?? 'Research, Extension and Consultation Time') : ($courseCode ?? '—') }}
                                                 </div>
                                                 <div class="text-[11.5px] font-semibold mt-1">
-                                                    {{ $s->section->sec_name ?? '' }}</div>
+                                                    {{ $sharedSectionNames }}</div>
                                                 @if ($s->room)
                                                     <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
                                                         {{ $s->room->room_name }}</div>
@@ -650,7 +668,7 @@
                 </div>
 
                 {{-- ── SECTION (triggers subject filter) ── --}}
-                <div class="mb-3">
+                <div class="mb-3" id="add-single-section-wrap">
                     <label class="field-label">Section</label>
                     <select id="add-section" class="field-input"
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
@@ -659,6 +677,19 @@
                             <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
                         @endforeach
                     </select>
+                </div>
+                <div class="mb-3 hidden" id="add-ojt-sections-wrap">
+                    <span class="field-label">Year 4 sections <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
+                    <div id="add-ojt-sections" class="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2"></div>
+                </div>
+                <div class="mb-3 hidden" id="add-ojt-summary-wrap">
+                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                        <input type="checkbox" id="add-ojt-is-evening" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                        <span>Is Evening?</span>
+                    </label>
+                    <p id="add-ojt-summary-notice" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800" role="status" aria-live="polite">
+                        The 5 OJT units will count in the Day summary.
+                    </p>
                 </div>
 
                 {{-- ── SUBJECT + CATEGORY (side by side) ── --}}
@@ -681,6 +712,7 @@
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                                     data-dept-id="{{ $sub->course_dept_id ?? '' }}"
                                     data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
+                                    data-course-name="{{ $sub->course_name ?? $sub->subj_name ?? '' }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
                                     data-category="{{ $sub->course_category ?? '' }}"

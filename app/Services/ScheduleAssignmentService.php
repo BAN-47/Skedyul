@@ -127,6 +127,51 @@ class ScheduleAssignmentService
         }
     }
 
+    /** Add a shared course across selected sections and days as one transaction. */
+    public function assignMultipleSections(array $data): array
+    {
+        $sectionIds = array_values(array_unique($data['sec_ids'] ?? []));
+        $days = array_values(array_unique($data['days'] ?? []));
+        if (!$sectionIds || !$days) {
+            return ['success' => false, 'conflict' => false, 'message' => 'Choose at least one Year 4 section and one day.'];
+        }
+
+        try {
+            return DB::transaction(function () use ($data, $sectionIds, $days) {
+                $created = [];
+                $course = Course::findOrFail($data['subj_id']);
+                if (self::isOjt($course)) {
+                    Study_Load::where('sl_fac_id', $data['fac_id'])
+                        ->where('sl_course_id', $course->course_id)
+                        ->where('sl_sem_id', $data['sem_id'])
+                        ->update(['sl_ojt_is_evening' => (bool) ($data['ojt_is_evening'] ?? false)]);
+                }
+                foreach ($sectionIds as $sectionId) {
+                    foreach ($days as $day) {
+                        $dayData = $data;
+                        unset($dayData['days'], $dayData['sec_ids']);
+                        $dayData['sec_id'] = $sectionId;
+                        $dayData['day'] = $day;
+                        $result = $this->assign($dayData, syncWorkload: false, refreshResponse: false);
+                        if (empty($result['success'])) {
+                            throw new RuntimeException('__MULTI_SECTION_FAIL__' . json_encode($result));
+                        }
+                        $created[] = $result['schedule'];
+                    }
+                }
+
+                $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                return ['success' => true, 'message' => 'Shared OJT schedule added for the selected Year 4 sections.', 'schedules' => $created];
+            });
+        } catch (RuntimeException $e) {
+            if (str_starts_with($e->getMessage(), '__MULTI_SECTION_FAIL__')) {
+                return json_decode(substr($e->getMessage(), strlen('__MULTI_SECTION_FAIL__')), true)
+                    ?: ['success' => false, 'conflict' => false, 'message' => 'Unable to add the shared OJT schedule.'];
+            }
+            throw $e;
+        }
+    }
+
     public function assign(array $data, bool $syncWorkload = true, bool $refreshResponse = true): array
     {
         if (!$this->facultyAccountIsActive($data['fac_id'])) {
@@ -144,6 +189,7 @@ class ScheduleAssignmentService
             $result = DB::transaction(function () use ($data, $syncWorkload) {
                 $course = Course::findOrFail($data['subj_id']);
                 $isRec = $course->course_code === 'REC';
+                $isOjt = self::isOjt($course);
                 $faculty = $this->lockConflictResources($data, $isRec);
 
                 if ($conflict = $this->findConflict($data, $isRec)) {
@@ -179,10 +225,14 @@ class ScheduleAssignmentService
                     $data['sem_id'],
                     $workloadShift
                 );
+                $hasExistingSharedOjt = self::isOjt($course) && Study_Load::where('sl_fac_id', $data['fac_id'])
+                    ->where('sl_course_id', $course->course_id)
+                    ->where('sl_sem_id', $data['sem_id'])
+                    ->exists();
                 $additionalHours = (!$studyLoad || (
                     $studyLoad->sl_shift !== $workloadShift
                     && $faculty->fac_employment_type !== 'part_time'
-                )) ? $courseHours : 0;
+                )) && !$hasExistingSharedOjt ? $courseHours : 0;
                 $hoursAfterAssignment = $currentHours + $additionalHours;
                 $maxHours = self::facultyMaxHours($faculty, $workloadShift);
                 if ($hoursAfterAssignment > $maxHours) {
@@ -197,15 +247,24 @@ class ScheduleAssignmentService
                         'sl_fac_id' => $data['fac_id'],
                         'sl_course_id' => $data['subj_id'],
                         'sl_shift' => $workloadShift,
+                        'sl_ojt_is_evening' => $isOjt ? (bool) ($data['ojt_is_evening'] ?? false) : false,
                         'sl_sec_id' => $data['sec_id'] ?? null,
                         'sl_sem_id' => $data['sem_id'],
                         'sl_assigned_by' => Auth::id(),
                         'sl_status'      => 'approved',
                         'sl_assigned_at' => now(),
                     ]);
-                } elseif ($studyLoad->sl_shift !== $workloadShift) {
-                    $studyLoad->sl_shift = $workloadShift;
-                    $studyLoad->save();
+                } else {
+                    $needsSave = false;
+                    if ($studyLoad->sl_shift !== $workloadShift) {
+                        $studyLoad->sl_shift = $workloadShift;
+                        $needsSave = true;
+                    }
+                    if ($isOjt && (bool) $studyLoad->sl_ojt_is_evening !== (bool) ($data['ojt_is_evening'] ?? false)) {
+                        $studyLoad->sl_ojt_is_evening = (bool) ($data['ojt_is_evening'] ?? false);
+                        $needsSave = true;
+                    }
+                    if ($needsSave) $studyLoad->save();
                 }
 
                 $scheduleData = [
@@ -482,40 +541,74 @@ class ScheduleAssignmentService
 
     public function delete(string $scheduleId): array
     {
-        $schedule = Schedule::findOrFail($scheduleId);
-        $loadId = $schedule->sch_load_id;
-        $facultyId = $schedule->sch_fac_id;
-        $semesterId = $schedule->sch_sem_id;
-        $schedule->delete();
+        return DB::transaction(function () use ($scheduleId) {
+            $schedule = Schedule::with('subject')->findOrFail($scheduleId);
+            $facultyId = $schedule->sch_fac_id;
+            $semesterId = $schedule->sch_sem_id;
 
-        // Free up the study load so the same faculty/subject/section/semester
-        // combo can be rescheduled later without hitting the unique constraint.
-        Study_Load::whereKey($loadId)->whereDoesntHave('schedules')->delete();
-        $this->syncWorkload($facultyId, $semesterId);
+            $schedulesToDelete = self::isOjt($schedule->subject)
+                ? Schedule::query()
+                    ->where('sch_fac_id', $facultyId)
+                    ->where('sch_sem_id', $semesterId)
+                    ->where('sch_is_active', $schedule->sch_is_active)
+                    ->where('sch_course_id', $schedule->sch_course_id)
+                    ->where('sch_day', $schedule->sch_day)
+                    ->where('sch_room_id', $schedule->sch_room_id)
+                    ->where('sch_start_time', $schedule->sch_start_time)
+                    ->where('sch_end_time', $schedule->sch_end_time)
+                    ->get()
+                : collect([$schedule]);
 
-        return ['success' => true, 'message' => 'Schedule deleted.'];
+            $loadIds = $schedulesToDelete->pluck('sch_load_id')->filter()->unique();
+            Schedule::whereIn('sch_id', $schedulesToDelete->pluck('sch_id'))->delete();
+
+            // Keep a study load while it still has schedules on another day.
+            Study_Load::whereIn('sl_id', $loadIds)->whereDoesntHave('schedules')->delete();
+            $this->syncWorkload($facultyId, $semesterId);
+
+            return [
+                'success' => true,
+                'message' => self::isOjt($schedule->subject)
+                    ? 'Shared OJT schedule deleted for all selected sections.'
+                    : 'Schedule deleted.',
+            ];
+        });
     }
 
     public function facultyHours(string $facultyId, string $semesterId): float
     {
-        $hours = DB::table('study_load as sl')
-            ->join('course as c', 'c.course_id', '=', 'sl.sl_course_id')
-            ->where('sl.sl_fac_id', $facultyId)
-            ->where('sl.sl_sem_id', $semesterId)
-            ->sum(DB::raw('COALESCE(c.course_lecture_hours, 0) + COALESCE(c.course_lab_hours, 0)'));
-
-        return (float) $hours;
+        $loads = Study_Load::query()
+            ->where('sl_fac_id', $facultyId)
+            ->where('sl_sem_id', $semesterId)
+            ->with('subject')
+            ->get();
+        return self::sumLoadCourseHours($loads);
     }
 
     public function facultyHoursForShift(string $facultyId, string $semesterId, string $shift): float
     {
-        return (float) Study_Load::query()
+        $loads = Study_Load::query()
             ->where('sl_fac_id', $facultyId)
             ->where('sl_sem_id', $semesterId)
             ->where('sl_shift', $shift)
             ->with('subject')
-            ->get()
-            ->sum(fn($load) => self::courseHours($load->subject));
+            ->get();
+
+        return self::sumLoadCourseHours($loads);
+    }
+
+    private static function sumLoadCourseHours($loads): float
+    {
+        $countedOjt = [];
+        return (float) $loads->sum(function ($load) use (&$countedOjt) {
+            $course = $load->subject;
+            if (self::isOjt($course)) {
+                $id = (string) $course->course_id;
+                if (isset($countedOjt[$id])) return 0;
+                $countedOjt[$id] = true;
+            }
+            return self::courseHours($course);
+        });
     }
 
     public function facultyHoursForLimit(
@@ -534,6 +627,20 @@ class ScheduleAssignmentService
         return $course
             ? (float) ($course->course_lecture_hours ?? 0) + (float) ($course->course_lab_hours ?? 0)
             : 0.0;
+    }
+
+    public static function isOjt(?Course $course): bool
+    {
+        if (!$course) return false;
+        $code = mb_strtolower((string) $course->course_code);
+        $name = mb_strtolower((string) $course->course_name);
+        return str_contains($code, 'ojt') || str_contains($name, 'on-the-job training');
+    }
+
+    public static function courseUnits(?Course $course): float
+    {
+        if (!$course) return 0.0;
+        return self::isOjt($course) ? 5.0 : (float) ($course->course_units ?? 0);
     }
 
     private function facultyAccountIsActive(string $facultyId): bool
@@ -618,6 +725,8 @@ class ScheduleAssignmentService
 
     private function findConflict(array $data, bool $isRec = false, ?string $excludeScheduleId = null): ?string
     {
+        $course = Course::find($data['subj_id'] ?? null);
+        $isSharedOjt = self::isOjt($course);
         $base = Schedule::query()
             ->where('sch_sem_id', $data['sem_id'])
             ->where('sch_day', $data['day'])
@@ -632,7 +741,14 @@ class ScheduleAssignmentService
         $facultyClash = (clone $base)->where('sch_fac_id', $data['fac_id'])
             ->with(['subject', 'section', 'faculty'])
             ->first();
-        if ($facultyClash) {
+        $sameSharedOjtMeeting = $isSharedOjt && $facultyClash
+            && self::isOjt($facultyClash->subject)
+            && $facultyClash->sch_course_id === $course?->course_id
+            && (string) $facultyClash->sch_sec_id !== (string) ($data['sec_id'] ?? '')
+            && $facultyClash->sch_room_id === ($data['room_id'] ?? null)
+            && substr((string) $facultyClash->sch_start_time, 0, 5) === substr((string) $data['start_time'], 0, 5)
+            && substr((string) $facultyClash->sch_end_time, 0, 5) === substr((string) $data['end_time'], 0, 5);
+        if ($facultyClash && !$sameSharedOjtMeeting) {
             $professor = $this->professorName($facultyClash);
             $section = $this->sectionName($facultyClash);
             return "Professor {$professor} already has {$this->codeOf($facultyClash)} with {$section} on {$data['day']} ({$facultyClash->sch_start_time}–{$facultyClash->sch_end_time}), which overlaps this time.";
@@ -642,7 +758,7 @@ class ScheduleAssignmentService
             $roomClash = (clone $base)->where('sch_room_id', $data['room_id'])
                 ->with(['subject', 'section', 'faculty', 'room'])
                 ->first();
-            if ($roomClash) {
+            if ($roomClash && !$sameSharedOjtMeeting) {
                 $room = $roomClash->room->room_name ?? 'the selected room';
                 return "Room {$room} is already used by {$this->professorName($roomClash)} for {$this->codeOf($roomClash)} with {$this->sectionName($roomClash)} on {$data['day']} ({$roomClash->sch_start_time}–{$roomClash->sch_end_time}).";
             }

@@ -34,9 +34,9 @@ class Departments extends Model
         return $this->belongsTo(College::class, 'dept_college_id', 'college_id');
     }
 
-    public function sections()
+    public function faculty()
     {
-        return $this->hasMany(Section::class, 'sec_dept_id', 'dept_id');
+        return $this->hasMany(Faculty::class, 'fac_dept_id', 'dept_id');
     }
 
     public function subjects()

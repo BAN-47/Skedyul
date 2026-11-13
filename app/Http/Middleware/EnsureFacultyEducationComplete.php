@@ -14,10 +14,7 @@ class EnsureFacultyEducationComplete
         $user = $request->user();
         $faculty = $user?->faculty;
 
-        if ($faculty && collect([
-            $faculty->fac_bachelors_degree,
-            $faculty->fac_employment_type === 'full_time' ? $faculty->fac_masters_degree : null,
-        ])->contains(fn ($degree) => blank($degree))) {
+        if ($faculty && blank($faculty->fac_bachelors_degree)) {
             return redirect()->to(URL::temporarySignedRoute(
                 'faculty.education.edit',
                 now()->addDays(7),

@@ -8,6 +8,7 @@ use App\Models\SystemSetting;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -40,18 +41,18 @@ class AcademicYearController extends Controller
         }
 
         $yearLabel = $this->normalizeYear($validated['ay_academic_year']);
-        $semName = $validated['sem_name'];
         $academicYears = DB::table('academic_year')->get();
         $existingYear = $academicYears->first(function ($row) use ($yearLabel) {
             return $this->normalizeYear((string) ($row->ay_academic_year ?? '')) === $yearLabel
                 || $this->normalizeYear((string) ($row->ay_year_label ?? '')) === $yearLabel;
         });
+        $isNewAcademicYear = ! $existingYear;
 
-        if (! $existingYear && ! $request->boolean('confirm_new_academic_year')) {
+        if ($isNewAcademicYear && ! $request->boolean('confirm_new_academic_year')) {
             return response()->json([
                 'success' => false,
                 'confirmation_required' => true,
-                'message' => 'You are starting a new academic year. Previous schedules will not be deleted. The chair schedule view will switch to the new year. Continue?',
+                'message' => 'Creating a new academic year will archive the previous year’s 1st and 2nd semester schedules, reset schedule plotting, and turn Advance Plotting off. The new year will start in 1st Semester. Continue?',
             ], 409);
         }
 
@@ -62,8 +63,22 @@ class AcademicYearController extends Controller
             ], 422);
         }
 
+        if ($isNewAcademicYear && ! Schema::hasTable('schedule_archives')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Schedule Archives are not available yet. Apply the schedule archives database migration before creating a new academic year.',
+            ], 422);
+        }
+
+        $semName = $isNewAcademicYear ? '1st Semester' : $validated['sem_name'];
+
         try {
-            $result = DB::transaction(function () use ($validated, $yearLabel, $semName, $existingYear) {
+            $result = DB::transaction(function () use ($validated, $yearLabel, $semName, $existingYear, $isNewAcademicYear) {
+                $previousYear = DB::table('academic_year')->where('ay_is_active', true)->first();
+                if ($isNewAcademicYear && $previousYear) {
+                    $this->archiveAcademicYearSchedules($previousYear->ay_id);
+                }
+
                 // 1) Academic year: find or create, set active
                 DB::table('academic_year')->update(['ay_is_active' => false]);
 
@@ -88,6 +103,9 @@ class AcademicYearController extends Controller
 
                 // Only update a semester belonging to this academic year.
                 DB::table('semester')->update(['sem_is_active' => false]);
+                if ($isNewAcademicYear && self::hasColumn('semester', 'sem_is_plotting_enabled')) {
+                    DB::table('semester')->update(['sem_is_plotting_enabled' => false]);
+                }
 
                 $sem = DB::table('semester')
                     ->where('sem_ay_id', $ayId)
@@ -121,6 +139,7 @@ class AcademicYearController extends Controller
 
                 return [
                     'label' => $yearLabel.' · '.$semName,
+                    'archived_year' => $isNewAcademicYear ? ($previousYear?->ay_academic_year ?? null) : null,
                 ];
             });
         } catch (\Throwable $e) {
@@ -134,9 +153,56 @@ class AcademicYearController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Current period set to '.$result['label'],
+            'message' => 'Current period set to '.$result['label'].($result['archived_year'] ? '. Previous academic year schedules were archived and advance plotting was reset.' : ''),
             'label' => $result['label'].' (Current)',
         ]);
+    }
+
+    private function archiveAcademicYearSchedules(string $academicYearId): void
+    {
+        $semesterIds = DB::table('semester')
+            ->where('sem_ay_id', $academicYearId)
+            ->whereIn('sem_name', ['1st Semester', '2nd Semester'])
+            ->pluck('sem_id');
+
+        if ($semesterIds->isEmpty()) {
+            return;
+        }
+
+        $schedules = DB::table('schedule as sch')
+            ->whereIn('sch.sch_sem_id', $semesterIds)
+            ->whereNotExists(function ($query) {
+                $query->selectRaw('1')
+                    ->from('schedule_archives as sa')
+                    ->whereColumn('sa.sar_sch_id', 'sch.sch_id');
+            })
+            ->get();
+
+        foreach ($schedules->chunk(500) as $chunk) {
+            $now = now();
+            DB::table('schedule_archives')->insert($chunk->map(fn ($schedule) => [
+                'sar_id' => (string) Str::uuid(),
+                'sar_sch_id' => $schedule->sch_id,
+                'sar_sem_id' => $schedule->sch_sem_id,
+                'sar_ay_id' => $academicYearId,
+                'sar_fac_id' => $schedule->sch_fac_id,
+                'sar_course_id' => $schedule->sch_course_id,
+                'sar_sec_id' => $schedule->sch_sec_id,
+                'sar_room_id' => $schedule->sch_room_id,
+                'sar_day' => $schedule->sch_day,
+                'sar_start_time' => $schedule->sch_start_time,
+                'sar_end_time' => $schedule->sch_end_time,
+                'sar_shift' => $schedule->sch_shift,
+                'sar_status' => $schedule->sch_status,
+                'sar_is_active' => $schedule->sch_is_active,
+                'sar_description' => null,
+                'sar_created_by' => $schedule->sch_created_by,
+                'sar_updated_by' => null,
+                'sar_archived_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])->all());
+        }
     }
 
     /**

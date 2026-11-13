@@ -156,14 +156,9 @@
               <div class="grid grid-cols-2 gap-3 mb-3">
                 <div>
                   <label class="field-label">Academic Year</label>
-                  <input class="field-input" id="ay-year" list="ay-year-list"
+                  <input class="field-input" id="ay-year" data-active-year="{{ optional($activeYear)->ay_academic_year ?? optional($activeYear)->ay_year_label ?? '' }}"
                          value="{{ optional($activeYear)->ay_academic_year ?? '' }}"
                          placeholder="2027-2028">
-                  <datalist id="ay-year-list">
-                    @foreach($academicYears as $ay)
-                      <option value="{{ $ay->ay_academic_year }}"></option>
-                    @endforeach
-                  </datalist>
                   <p class="text-[11px] text-slate-400 mt-1">Type a new year (e.g. 2027-2028) to register it.</p>
                 </div>
                 <div>
@@ -172,7 +167,7 @@
                     <option value="1st Semester" @selected((optional($activeSemester)->sem_name ?? '') === '1st Semester')>1st Semester</option>
                     <option value="2nd Semester" @selected((optional($activeSemester)->sem_name ?? '') === '2nd Semester')>2nd Semester</option>
                   </select>
-                  <p class="text-[11px] text-slate-400 mt-1">Each semester is saved separately for its academic year.</p>
+                  <p class="text-[11px] text-slate-400 mt-1" id="ay-semester-note">Each semester is saved separately for its academic year.</p>
                 </div>
               </div>
 
@@ -483,6 +478,27 @@ async function saveAcademicYear() {
     showToast('Network error saving academic year');
   }
 }
+
+function updateAcademicYearMode() {
+  const yearInput = document.getElementById('ay-year');
+  const semesterInput = document.getElementById('ay-semester');
+  const note = document.getElementById('ay-semester-note');
+  if (!yearInput || !semesterInput) return;
+  const normalizeYear = (value) => String(value || '').trim().replace(/[–—−]/g, '-').replace(/\s*-\s*/g, '-');
+  const activeYear = normalizeYear(yearInput.dataset.activeYear);
+  const enteredYear = normalizeYear(yearInput.value);
+  const isNewYear = enteredYear !== '' && enteredYear !== activeYear;
+  semesterInput.disabled = isNewYear;
+  if (isNewYear) semesterInput.value = '1st Semester';
+  if (note) {
+    note.textContent = isNewYear
+      ? 'A new academic year always starts in 1st Semester. Its plotting starts fresh after you confirm.'
+      : 'Each semester is saved separately for its academic year.';
+  }
+}
+
+document.getElementById('ay-year')?.addEventListener('input', updateAcademicYearMode);
+updateAcademicYearMode();
 
 function savePassword() {
   var payload = {

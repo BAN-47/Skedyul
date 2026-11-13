@@ -29,12 +29,12 @@
                 @if(session('warning'))<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ session('warning') }}</div>@endif
                 @if($errors->any())<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
                 @foreach([
-                'fac_bachelors_degree' => ["Bachelor's Degree", 'e.g. Bachelor of Science in Information Systems'],
-                'fac_masters_degree' => ["Master's Degree", 'e.g. Master of Information Technology'],
-                'fac_doctorate_degree' => ["Doctorate Degree", 'e.g. Doctor of Information Technology'],
-                ] as $field => [$label, $placeholder])
+                'fac_bachelors_degree' => ["Bachelor's Degree", 'e.g. Bachelor of Science in Information Systems', true],
+                'fac_masters_degree' => ["Master's Degree", 'e.g. Master of Information Technology', false],
+                'fac_doctorate_degree' => ["Doctorate Degree", 'e.g. Doctor of Information Technology', false],
+                ] as $field => [$label, $placeholder, $isRequired])
                 <label class="block text-sm font-bold text-slate-700">{{ $label }}
-                    <input name="{{ $field }}" value="{{ old($field, $faculty->{$field}) }}" placeholder="{{ $placeholder }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-medium outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" @if($field==='fac_bachelors_degree' || ($field==='fac_masters_degree' && $faculty->fac_employment_type === 'full_time')) required @endif>
+                    <input name="{{ $field }}" value="{{ old($field, $faculty->{$field}) }}" placeholder="{{ $placeholder }}" class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-medium outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" @if($isRequired) required @endif>
                 </label>
                 @endforeach
                 <button class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">Save and Continue</button>

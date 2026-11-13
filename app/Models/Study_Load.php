@@ -28,6 +28,7 @@ class Study_Load extends Model
         'sl_fac_id',
         'sl_course_id',
         'sl_shift',
+        'sl_ojt_is_evening',
         'sl_subj_id',
         'sl_sec_id',
         'sl_sem_id',
@@ -37,6 +38,7 @@ class Study_Load extends Model
 
     protected $casts = [
         'sl_assigned_at' => 'datetime',
+        'sl_ojt_is_evening' => 'boolean',
     ];
 
     // ── Relationships ──────────────────────────────────────────────────────

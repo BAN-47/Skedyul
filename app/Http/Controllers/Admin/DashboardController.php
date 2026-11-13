@@ -137,6 +137,11 @@ class DashboardController extends Controller
 
         $dbRecords = $totalUsers + $totalSections + $subjectsOffered + $totalRooms;
 
+        // ---------- DEPT FACULTY STATS ----------
+        $deptFacultyStats = \App\Models\Departments::withCount(['faculty' => function($q) {
+            $q->whereHas('user', fn($u) => $u->where('usr_is_active', true));
+        }])->get();
+
         return view('admin.admin_dashboard', compact(
             'users',
             'roleCounts',
@@ -159,7 +164,8 @@ class DashboardController extends Controller
             'roomsOccupied',
             'dbRecords',
             'dbStatus',
-            'notifCount'
+            'notifCount',
+            'deptFacultyStats'
         ));
     }
 }
