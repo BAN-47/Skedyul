@@ -23,22 +23,10 @@
             <div class="flex-1 overflow-y-auto p-6 lg:p-8">
                 <div class="mx-auto max-w-7xl">
                     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-                        <div>
-                            <p class="mb-1 text-sm font-semibold uppercase tracking-wide text-blue-600">
-                                Schedule documents
-                            </p>
-                            <h1 class="text-2xl font-extrabold tracking-tight text-slate-900">
-                                Export Reports
-                            </h1>
-                            <p class="mt-1 max-w-2xl text-sm text-slate-500">
-                                Generate an individual Program by Teacher workbook from your department’s selected
-                                schedule.
-                            </p>
-                        </div>
 
                         @if ($semester)
                             <div class="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-                                <div class="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                                <div class="text-l underline font-semibold uppercase tracking-wide text-blue-600">
                                     Selected semester
                                 </div>
                                 <div class="mt-1 text-sm font-bold text-slate-800">
