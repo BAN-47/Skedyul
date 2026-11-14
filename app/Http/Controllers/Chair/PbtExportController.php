@@ -102,7 +102,7 @@ class PbtExportController extends Controller
 
         $faculty = Faculty::with(['user', 'program'])
             ->where('fac_id', $validated['faculty_id'])
-            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->firstOrFail();
 
         $schedules = Schedule::with([
@@ -346,11 +346,11 @@ class PbtExportController extends Controller
     private function fillCourseRows($sheet, $schedules, int $firstRow, int $lastRow, $allSchedules, string $summaryShift): void
     {
         $courseRows = $schedules
-            ->filter(fn ($schedule) => $schedule->subject && $schedule->section
+            ->filter(fn($schedule) => $schedule->subject && $schedule->section
                 && !\App\Services\ScheduleAssignmentService::isOjt($schedule->subject))
-            ->unique(fn ($schedule) => $schedule->sch_course_id . ':' . $schedule->sch_sec_id);
+            ->unique(fn($schedule) => $schedule->sch_course_id . ':' . $schedule->sch_sec_id);
         $ojtRows = $allSchedules
-            ->filter(fn ($schedule) => $schedule->subject && $schedule->section
+            ->filter(fn($schedule) => $schedule->subject && $schedule->section
                 && \App\Services\ScheduleAssignmentService::isOjt($schedule->subject)
                 && (($schedule->studyLoad?->sl_ojt_is_evening ? 'evening' : 'day') === $summaryShift))
             ->unique('sch_course_id');
@@ -369,10 +369,10 @@ class PbtExportController extends Controller
             $course = $schedule->subject;
             $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
             $courseSections = $isOjt
-                ? $allSchedules->where('sch_course_id', $schedule->sch_course_id)->map(fn ($item) => $item->section)->filter()->unique('sec_id')
+                ? $allSchedules->where('sch_course_id', $schedule->sch_course_id)->map(fn($item) => $item->section)->filter()->unique('sec_id')
                 : collect([$schedule->section])->filter();
             $sectionNames = $courseSections->pluck('sec_name')->filter()->implode(', ');
-            $studentCount = $courseSections->sum(fn ($section) => (int) ($section->sec_no_of_student ?? 0));
+            $studentCount = $courseSections->sum(fn($section) => (int) ($section->sec_no_of_student ?? 0));
 
             $sheet->setCellValue('A' . $row, $course->course_code ?? '');
             $sheet->setCellValue('B' . $row, $course->course_name ?? '');
@@ -393,20 +393,20 @@ class PbtExportController extends Controller
         string $summaryShift
     ): void {
         $ojtScheduleIds = $allSchedules
-            ->filter(fn ($schedule) => \App\Services\ScheduleAssignmentService::isOjt($schedule->subject)
+            ->filter(fn($schedule) => \App\Services\ScheduleAssignmentService::isOjt($schedule->subject)
                 && (($schedule->studyLoad?->sl_ojt_is_evening ? 'evening' : 'day') === $summaryShift))
             ->pluck('sch_id');
         $scheduleIds = $schedules->pluck('sch_id')->merge($ojtScheduleIds)->filter()->unique()->all();
         $studyLoads = $scheduleIds
             ? Study_Load::with('subject')
-                ->where('sl_fac_id', $faculty->fac_id)
-                ->whereHas('schedules', fn ($query) => $query->whereIn('sch_id', $scheduleIds))
-                ->get()
-                ->unique('sl_id')
+            ->where('sl_fac_id', $faculty->fac_id)
+            ->whereHas('schedules', fn($query) => $query->whereIn('sch_id', $scheduleIds))
+            ->get()
+            ->unique('sl_id')
             : collect();
 
         $preparations = $studyLoads
-            ->filter(fn ($load) => ($load->subject?->course_code ?? '') !== 'REC')
+            ->filter(fn($load) => ($load->subject?->course_code ?? '') !== 'REC')
             ->pluck('sl_course_id')
             ->filter()
             ->unique()
@@ -658,9 +658,9 @@ class PbtExportController extends Controller
 
         return $allSchedules->where('sch_course_id', $schedule->sch_course_id)
             ->where('sch_day', $schedule->sch_day)
-            ->filter(fn ($item) => substr((string) $item->sch_start_time, 0, 5) === substr((string) $schedule->sch_start_time, 0, 5)
+            ->filter(fn($item) => substr((string) $item->sch_start_time, 0, 5) === substr((string) $schedule->sch_start_time, 0, 5)
                 && substr((string) $item->sch_end_time, 0, 5) === substr((string) $schedule->sch_end_time, 0, 5))
-            ->map(fn ($item) => $item->section?->sec_name)
+            ->map(fn($item) => $item->section?->sec_name)
             ->filter()
             ->unique()
             ->implode(', ');
@@ -691,7 +691,7 @@ class PbtExportController extends Controller
 
         $paletteIndex = crc32((string) $schedule->sch_course_id) % count(self::CLASS_COLORS);
         $style = $sheet->getStyle($coordinate . ':' . $lastCoordinate);
-        
+
         if ($courseCode === 'REC') {
             $style->getFill()
                 ->setFillType(Fill::FILL_SOLID)

@@ -2,743 +2,868 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="csrf-token" content="{{ csrf_token() }}">
-  <title>SKEDYUL — Program by Section (PBS)</title>
-  @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @include('partials.favicon')
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>SKEDYUL — Program by Section (PBS)</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
-@php
-  // ── Defaults so this page renders before PbsController exists ──
-  $schedules      = $schedules      ?? collect();
-  $subjects       = $subjects       ?? collect();
-  $faculty        = $faculty        ?? collect();
-  $sections       = $sections       ?? collect();
-  $programs       = $programs       ?? collect();
-  $semesters      = $semesters      ?? collect();
-  $rooms          = $rooms          ?? collect();
-  $academicYears  = $academicYears  ?? collect();
-  $years          = $years          ?? [1, 2, 3, 4]; // year levels (1–4)
-  $filters          = $filters          ?? [];
-  $chairProgram     = $chairProgram     ?? null;
-  $chairDepartment  = $chairDepartment  ?? $chairProgram ?? null;
-  $departments      = $departments      ?? $programs ?? collect();
-  $programs         = $programs         ?? $departments ?? collect();
-  $activeSemester   = $activeSemester   ?? null;
-  $selectedSection  = $selectedSection  ?? null;
+    @php
+        // ── Defaults so this page renders before PbsController exists ──
+        $schedules = $schedules ?? collect();
+        $subjects = $subjects ?? collect();
+        $faculty = $faculty ?? collect();
+        $sections = $sections ?? collect();
+        $programs = $programs ?? collect();
+        $semesters = $semesters ?? collect();
+        $rooms = $rooms ?? collect();
+        $academicYears = $academicYears ?? collect();
+        $years = $years ?? [1, 2, 3, 4]; // year levels (1–4)
+        $filters = $filters ?? [];
+        $chairProgram = $chairProgram ?? null;
+        $chairDepartment = $chairDepartment ?? ($chairProgram ?? null);
+        $departments = $departments ?? ($programs ?? collect());
+        $programs = $programs ?? ($departments ?? collect());
+        $activeSemester = $activeSemester ?? null;
+        $selectedSection = $selectedSection ?? null;
 
-  $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  // Grid range depends on the Day/Evening shift toggle:
-  //   Day   → 7:00 AM–4:00 PM, with a noon break
-  //   Evening → 4:00 PM–10:00 PM
-  // 30-minute sub-rows so you can click a precise half-hour.
-  $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
+        // Grid range depends on the Day/Evening shift toggle:
+        //   Day   → 7:00 AM–4:00 PM, with a noon break
+        //   Evening → 4:00 PM–10:00 PM
+        // 30-minute sub-rows so you can click a precise half-hour.
+        $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
 
-  if ($shift === 'night') {
-      $gridStart = 16 * 60; // 4:00 PM
-      $gridEnd   = 22 * 60; // 10:00 PM
-  } else {
-      $gridStart = 7 * 60; // 7:00 AM
-      $gridEnd   = 16 * 60; // 4:00 PM
-  }
+        if ($shift === 'night') {
+            $gridStart = 16 * 60; // 4:00 PM
+            $gridEnd = 22 * 60; // 10:00 PM
+        } else {
+            $gridStart = 7 * 60; // 7:00 AM
+            $gridEnd = 16 * 60; // 4:00 PM
+        }
 
-  $slotMinutes = 30;
-  $slotCount   = intdiv($gridEnd - $gridStart, $slotMinutes);
+        $slotMinutes = 30;
+        $slotCount = intdiv($gridEnd - $gridStart, $slotMinutes);
 
-  $noonStart = 12 * 60;
-  $noonEnd   = 13 * 60;
-  // Only the Day shift's range actually contains the noon hour.
-  $showNoonBreak = $shift === 'day' && $noonStart >= $gridStart && $noonEnd <= $gridEnd;
+        $noonStart = 12 * 60;
+        $noonEnd = 13 * 60;
+        // Only the Day shift's range actually contains the noon hour.
+        $showNoonBreak = $shift === 'day' && $noonStart >= $gridStart && $noonEnd <= $gridEnd;
 
-  $selectedDate = $selectedDate ?? now();
-  if (is_string($selectedDate)) {
-      $selectedDate = \Illuminate\Support\Carbon::parse($selectedDate);
-  }
+        $selectedDate = $selectedDate ?? now();
+        if (is_string($selectedDate)) {
+            $selectedDate = \Illuminate\Support\Carbon::parse($selectedDate);
+        }
 
-  // Build occupied-cell lookup so we skip rendering click targets under
-  // existing schedule blocks (they already have their own edit/delete UI).
-  $occupied = [];
-  foreach ($schedules as $s) {
-      $dIdx = array_search($s->sch_day, $days, true);
-      if ($dIdx === false) continue;
-      $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
-      $end   = \Illuminate\Support\Carbon::parse($s->sch_end_time);
-      $sMin  = max(($start->hour * 60) + $start->minute, $gridStart);
-      $eMin  = min(($end->hour * 60) + $end->minute, $gridEnd);
-      for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
-          $rowIdx = intdiv($m - $gridStart, $slotMinutes);
-          $occupied[$dIdx . '-' . $rowIdx] = true;
-      }
-  }
-@endphp
+        // Build occupied-cell lookup so we skip rendering click targets under
+        // existing schedule blocks (they already have their own edit/delete UI).
+        $occupied = [];
+        foreach ($schedules as $s) {
+            $dIdx = array_search($s->sch_day, $days, true);
+            if ($dIdx === false) {
+                continue;
+            }
+            $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+            $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+            $sMin = max($start->hour * 60 + $start->minute, $gridStart);
+            $eMin = min($end->hour * 60 + $end->minute, $gridEnd);
+            for ($m = $sMin; $m < $eMin; $m += $slotMinutes) {
+                $rowIdx = intdiv($m - $gridStart, $slotMinutes);
+                $occupied[$dIdx . '-' . $rowIdx] = true;
+            }
+        }
+    @endphp
 
-<div class="app-shell">
+    <div class="app-shell">
 
-  @include('partials.chair_sidebar')
+        @include('partials.chair_sidebar')
 
-  {{-- ══════════ MAIN ══════════ --}}
-  <div class="app-main">
+        {{-- ══════════ MAIN ══════════ --}}
+        <div class="app-main">
 
-    {{-- TOPBAR --}}
-@include('partials.chair_header', ['title' => 'Program by Section (PBS)'])
+            {{-- TOPBAR --}}
+            @include('partials.chair_header', ['title' => 'Program by Section (PBS)'])
 
-    <div class="page-content" id="page-pbs">
+            <div class="page-content" id="page-pbs">
 
-      {{-- HEADING + ACTIONS --}}
-      <div class="flex items-center justify-between gap-3 mb-4">
-        <div class="flex items-center gap-2">
-          <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section Count</button>
-          <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
-        </div>
-      </div>
+                {{-- HEADING + ACTIONS --}}
+                <div class="flex items-center justify-between gap-3 mb-4">
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section
+                            Count</button>
+                        <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Download PBS
+                            Excel</button>
+                        <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
+                    </div>
+                </div>
 
-      <div class="flex justify-start -mt-2 mb-3">
-        <button type="button" id="schedule-summary-toggle" aria-expanded="false" aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()" class="btn btn-secondary inline-flex items-center gap-2">
-          <span>Summary</span><span aria-hidden="true">▦</span>
-        </button>
-      </div>
+                <div class="flex justify-start -mt-2 mb-3">
+                    <button type="button" id="schedule-summary-toggle" aria-expanded="false"
+                        aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()"
+                        class="btn btn-secondary inline-flex items-center gap-2">
+                        <span>Summary</span><span aria-hidden="true">▦</span>
+                    </button>
+                </div>
 
-      <div class="w-full">
+                <div class="w-full">
 
-                        {{-- ══════════ SUMMARY OF COURSES ══════════ --}}
-        <div id="schedule-summary-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/40 p-4 opacity-0 transition-opacity duration-200" role="dialog" aria-modal="true" aria-labelledby="schedule-summary-title" onclick="if(event.target === this) closeScheduleSummary()">
-        <aside id="schedule-summary-panel" class="card !p-0 w-[min(900px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto self-center shadow-2xl scale-95 transition-transform duration-200">
-          <div class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">
-            <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">
-            SUMMARY OF COURSES — {{ strtoupper($summaryShift ?? $selectedShift ?? 'day') }} WORKLOAD
-            </span>
-            <button type="button" onclick="closeScheduleSummary()" class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20" aria-label="Close summary">✕</button>
-          </div>
-          @php
-            $studentCount = optional($selectedSection)->sec_no_of_student
-                ?? optional($selectedSection)->sec_max_capacity
-                ?? null;
-            $summarySchedules = $summarySchedules ?? $schedules;
-            $courseSummary = $summarySchedules
-              ->filter(fn ($s) => ($s->course ?? $s->subject))
-              ->unique(fn ($s) => $s->sch_course_id ?? $s->sch_subj_id ?? spl_object_id($s))
-              ->values();
-            $summaryUnits = $courseSummary->sum(fn ($s) => (float) (($s->course ?? $s->subject)?->course_units ?? 0));
-            $summaryHours = $summarySchedules->sum(function ($s) {
-                $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
-                $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
-                return $start->diffInMinutes($end) / 60;
-            });
-          @endphp
-          <div class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-200 bg-slate-50 text-[11px] items-center">
-            <div class="px-2 py-1.5 font-bold text-slate-600 uppercase leading-tight">No. of<br>Students</div>
-            <div class="px-2 py-1 border-l border-slate-200">
-              <input type="number" id="section-student-count" min="0" max="500" step="1"
-                     class="w-full max-w-[72px] rounded border border-slate-300 px-2 py-0.5 text-[12px] font-extrabold text-slate-900"
-                     placeholder="50"
-                     value="{{ $studentCount ?? '' }}"
-                     {{ empty($selectedSection) ? 'disabled' : '' }}
-                     title="{{ empty($selectedSection) ? 'Select a section first' : 'Save the student count for '.$selectedSection->sec_name }}">
-            </div>
-          </div>
-          <div class="overflow-x-auto">
-          <div class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-600 uppercase">
-            <div class="px-1 py-1.5 text-center"><strong>Code</strong></div>
-            <div class="px-1 py-1.5 border-l border-slate-200 text-center"><strong>Course Title</strong></div>
-            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Units</strong></div>
-            <div class="px-0.5 py-1.5 border-l border-slate-200 text-center"><strong>Scheduled<br>Hours</strong></div>
-          </div>
-          <div class="p-0">
-            @forelse($courseSummary as $s)
-              @php
-                $course = $s->course ?? $s->subject;
-                $code = $course->course_code ?? $course->subj_code ?? '—';
-                $title = $course->course_name ?? $course->subj_name ?? '—';
-              @endphp
-              @php
-                $courseMeetings = $summarySchedules->where('sch_course_id', $s->sch_course_id);
-                $courseHours = (float) ($course->course_lecture_hours ?? 0) + (float) ($course->course_lab_hours ?? 0);
-                $scheduledHours = $courseMeetings->sum(function ($meeting) {
-                    return \Illuminate\Support\Carbon::parse($meeting->sch_start_time)
-                        ->diffInMinutes(\Illuminate\Support\Carbon::parse($meeting->sch_end_time)) / 60;
-                });
-              @endphp
-              <div class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 border-b border-slate-100 text-[10px]">
-                <div class="px-1 py-1.5 font-bold text-slate-800 break-words">{{ $code }}</div>
-                <div class="px-1 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">{{ $title }}</div>
-                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700">{{ $course->course_units ?? 0 }}</div>
-                <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700" title="{{ $scheduledHours }} of {{ $courseHours }} total hours scheduled">{{ $scheduledHours }}/{{ $courseHours }}</div>
-              </div>
-            @empty
-              <div class="p-3 text-center text-[11px] text-slate-400">
-                @if(empty($filters['section'] ?? null))
-                  Select a section to see its course summary.
-                @else
-                  No courses plotted yet for this section.
-                @endif
-              </div>
-            @endforelse
-          </div>
-          </div>
-          @if($selectedSection)
-            <div class="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10.5px] text-slate-700 space-y-1">
-              <div class="flex justify-between gap-2"><span class="font-bold">No. of Units:</span><span>{{ $summaryUnits }}u</span></div>
-              <div class="flex justify-between gap-2"><span class="font-bold">Scheduled Hours/Week:</span><span>{{ $summaryHours }}h</span></div>
-            </div>
-          @endif
-          @if($selectedSection)
-            <div class="px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10.5px] text-slate-500">
-              Section: <span class="font-bold text-slate-700">{{ $selectedSection->sec_name }}</span>
-            </div>
-          @endif
-        </aside>
-        </div>
+                    {{-- ══════════ SUMMARY OF COURSES ══════════ --}}
+                    <div id="schedule-summary-modal"
+                        class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/40 p-4 opacity-0 transition-opacity duration-200"
+                        role="dialog" aria-modal="true" aria-labelledby="schedule-summary-title"
+                        onclick="if(event.target === this) closeScheduleSummary()">
+                        <aside id="schedule-summary-panel"
+                            class="card !p-0 w-[min(900px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto self-center shadow-2xl scale-95 transition-transform duration-200">
+                            <div
+                                class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">
+                                <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">
+                                    SUMMARY OF COURSES — {{ strtoupper($summaryShift ?? ($selectedShift ?? 'day')) }}
+                                    WORKLOAD
+                                </span>
+                                <button type="button" onclick="closeScheduleSummary()"
+                                    class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20"
+                                    aria-label="Close summary">✕</button>
+                            </div>
+                            @php
+                                $studentCount =
+                                    optional($selectedSection)->sec_no_of_student ??
+                                    (optional($selectedSection)->sec_max_capacity ?? null);
+                                $summarySchedules = $summarySchedules ?? $schedules;
+                                $courseSummary = $summarySchedules
+                                    ->filter(fn($s) => $s->course ?? $s->subject)
+                                    ->unique(fn($s) => $s->sch_course_id ?? ($s->sch_subj_id ?? spl_object_id($s)))
+                                    ->values();
+                                $summaryUnits = $courseSummary->sum(
+                                    fn($s) => (float) (($s->course ?? $s->subject)?->course_units ?? 0),
+                                );
+                                $summaryHours = $summarySchedules->sum(function ($s) {
+                                    $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                                    $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                                    return $start->diffInMinutes($end) / 60;
+                                });
+                            @endphp
+                            <div
+                                class="grid grid-cols-[88px_1fr] gap-0 border-b border-slate-200 bg-slate-50 text-[11px] items-center">
+                                <div class="px-2 py-1.5 font-bold text-slate-600 uppercase leading-tight">No.
+                                    of<br>Students</div>
+                                <div class="px-2 py-1 border-l border-slate-200">
+                                    <input type="number" id="section-student-count" min="0" max="500"
+                                        step="1"
+                                        class="w-full max-w-[72px] rounded border border-slate-300 px-2 py-0.5 text-[12px] font-extrabold text-slate-900"
+                                        placeholder="50" value="{{ $studentCount ?? '' }}"
+                                        {{ empty($selectedSection) ? 'disabled' : '' }}
+                                        title="{{ empty($selectedSection) ? 'Select a section first' : 'Save the student count for ' . $selectedSection->sec_name }}">
+                                </div>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <div
+                                    class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 bg-slate-100 border-b border-slate-200 text-[9px] font-bold text-slate-600 uppercase">
+                                    <div class="px-1 py-1.5 text-center"><strong>Code</strong></div>
+                                    <div class="px-1 py-1.5 border-l border-slate-200 text-center"><strong>Course
+                                            Title</strong></div>
+                                    <div class="px-0.5 py-1.5 border-l border-slate-200 text-center">
+                                        <strong>Units</strong></div>
+                                    <div class="px-0.5 py-1.5 border-l border-slate-200 text-center">
+                                        <strong>Scheduled<br>Hours</strong></div>
+                                </div>
+                                <div class="p-0">
+                                    @forelse($courseSummary as $s)
+                                        @php
+                                            $course = $s->course ?? $s->subject;
+                                            $code = $course->course_code ?? ($course->subj_code ?? '—');
+                                            $title = $course->course_name ?? ($course->subj_name ?? '—');
+                                        @endphp
+                                        @php
+                                            $courseMeetings = $summarySchedules->where(
+                                                'sch_course_id',
+                                                $s->sch_course_id,
+                                            );
+                                            $courseHours =
+                                                (float) ($course->course_lecture_hours ?? 0) +
+                                                (float) ($course->course_lab_hours ?? 0);
+                                            $scheduledHours = $courseMeetings->sum(function ($meeting) {
+                                                return \Illuminate\Support\Carbon::parse(
+                                                    $meeting->sch_start_time,
+                                                )->diffInMinutes(
+                                                    \Illuminate\Support\Carbon::parse($meeting->sch_end_time),
+                                                ) / 60;
+                                            });
+                                        @endphp
+                                        <div
+                                            class="min-w-[280px] grid grid-cols-[48px_minmax(0,1fr)_28px_52px] gap-0 border-b border-slate-100 text-[10px]">
+                                            <div class="px-1 py-1.5 font-bold text-slate-800 break-words">
+                                                {{ $code }}</div>
+                                            <div
+                                                class="px-1 py-1.5 border-l border-slate-100 text-slate-600 leading-snug">
+                                                {{ $title }}</div>
+                                            <div
+                                                class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700">
+                                                {{ $course->course_units ?? 0 }}</div>
+                                            <div class="px-0.5 py-1.5 border-l border-slate-100 text-center text-slate-700"
+                                                title="{{ $scheduledHours }} of {{ $courseHours }} total hours scheduled">
+                                                {{ $scheduledHours }}/{{ $courseHours }}</div>
+                                        </div>
+                                    @empty
+                                        <div class="p-3 text-center text-[11px] text-slate-400">
+                                            @if (empty($filters['section'] ?? null))
+                                                Select a section to see its course summary.
+                                            @else
+                                                No courses plotted yet for this section.
+                                            @endif
+                                        </div>
+                                    @endforelse
+                                </div>
+                            </div>
+                            @if ($selectedSection)
+                                <div
+                                    class="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10.5px] text-slate-700 space-y-1">
+                                    <div class="flex justify-between gap-2"><span class="font-bold">No. of
+                                            Units:</span><span>{{ $summaryUnits }}u</span></div>
+                                    <div class="flex justify-between gap-2"><span class="font-bold">Scheduled
+                                            Hours/Week:</span><span>{{ $summaryHours }}h</span></div>
+                                </div>
+                            @endif
+                            @if ($selectedSection)
+                                <div
+                                    class="px-3 py-2 bg-slate-50 border-t border-slate-200 text-[10.5px] text-slate-500">
+                                    Section: <span
+                                        class="font-bold text-slate-700">{{ $selectedSection->sec_name }}</span>
+                                </div>
+                            @endif
+                        </aside>
+                    </div>
 
-        {{-- ══════════ PLOTTER ══════════ --}}
-        <section class="card !p-0 overflow-hidden">
+                    {{-- ══════════ PLOTTER ══════════ --}}
+                    <section class="card !p-0 overflow-hidden">
 
-          {{-- FILTER TOOLBAR — program locked to logged-in chair's program --}}
-          <div class="flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-b border-slate-200 bg-slate-50">
+                        {{-- FILTER TOOLBAR — program locked to logged-in chair's program --}}
+                        <div
+                            class="flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-b border-slate-200 bg-slate-50">
 
-            {{-- Department selector (combines program and department) --}}
-            <select id="filter-department" onchange="applyFilters()" class="pbs-filter min-w-[150px] bg-blue-50 border-blue-300 text-blue-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
-                <option value="">DEPARTMENT</option>
-                @foreach($allDepartments as $dept)
-                    <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
-                        {{ $dept->dept_code }}
-                    </option>
-                @endforeach
-            </select>
+                            {{-- Department selector (combines program and department) --}}
+                            <select id="filter-department" onchange="applyFilters()"
+                                class="pbs-filter min-w-[150px] bg-blue-50 border-blue-300 text-blue-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
+                                <option value="">DEPARTMENT</option>
+                                @foreach ($allDepartments as $dept)
+                                    <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
+                                        {{ $dept->dept_code }}
+                                    </option>
+                                @endforeach
+                            </select>
 
-            {{-- Sections only for this chair's program (BSIS 1-A, BSIS IV-A, …). Year is in the name. --}}
-            <select id="filter-section" onchange="applyFilters()" class="pbs-filter min-w-[130px]">
-              <option value="">SECTION</option>
-              @foreach($sections as $sec)
-                <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}" @selected(($filters['section'] ?? '') === $sec->sec_id)>
-                  {{ $sec->sec_name }}
-                </option>
-              @endforeach
-            </select>
+                            {{-- Sections only for this chair's program (BSIS 1-A, BSIS IV-A, …). Year is in the name. --}}
+                            <select id="filter-section" onchange="applyFilters()" class="pbs-filter min-w-[130px]">
+                                <option value="">SECTION</option>
+                                @foreach ($sections as $sec)
+                                    <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
+                                        data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}"
+                                        @selected(($filters['section'] ?? '') === $sec->sec_id)>
+                                        {{ $sec->sec_name }}
+                                    </option>
+                                @endforeach
+                            </select>
 
-            <label for="filter-semester" class="sr-only">Academic year and semester</label>
-            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter min-w-[190px]">
-              <option value="">Select semester</option>
-              @foreach($semesters as $semester)
-                <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
-                  {{ $semester->label }}
-                </option>
-              @endforeach
-            </select>
+                            <label for="filter-semester" class="sr-only">Academic year and semester</label>
+                            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter min-w-[190px]">
+                                <option value="">Select semester</option>
+                                @foreach ($semesters as $semester)
+                                    <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
+                                        {{ $semester->label }}
+                                    </option>
+                                @endforeach
+                            </select>
 
-            <div class="flex rounded-md overflow-hidden border border-slate-300">
-              <button type="button" id="shift-day" onclick="setShift('day')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
-              <button type="button" id="shift-night" onclick="setShift('night')" class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Evening</button>
-            </div>
+                            <div class="flex rounded-md overflow-hidden border border-slate-300">
+                                <button type="button" id="shift-day" onclick="setShift('day')"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
+                                <button type="button" id="shift-night" onclick="setShift('night')"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Evening</button>
+                            </div>
 
-            <div class="ml-auto text-[11px] text-slate-400 italic">
-              Click an empty time slot below to add a schedule
-            </div>
-          </div>
+                            <div class="ml-auto text-[11px] text-slate-400 italic">
+                                Click an empty time slot below to add a schedule
+                            </div>
+                        </div>
 
-          {{-- ══ WEEK GRID ══ --}}
-          <div class="overflow-x-auto">
-            <div class="min-w-[720px]">
+                        {{-- ══ WEEK GRID ══ --}}
+                        <div class="overflow-x-auto">
+                            <div class="min-w-[720px]">
 
-              {{-- header --}}
-              <div class="grid bg-slate-100 border-b border-slate-200"
-                   style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));">
-                <div class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">Time</div>
-                @foreach($days as $d)
-                  <div class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-l border-slate-200">{{ $d }}</div>
-                @endforeach
-              </div>
+                                {{-- header --}}
+                                <div class="grid bg-slate-100 border-b border-slate-200"
+                                    style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));">
+                                    <div
+                                        class="px-2 py-2 text-center text-[10.5px] font-bold uppercase tracking-wide text-slate-500">
+                                        Time</div>
+                                    @foreach ($days as $d)
+                                        <div
+                                            class="px-2 py-2 text-center text-[11.5px] font-bold text-slate-700 border-l border-slate-200">
+                                            {{ $d }}</div>
+                                    @endforeach
+                                </div>
 
-              {{-- body --}}
-              <div class="grid relative pbs-grid-body"
-                   style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));
+                                {{-- body --}}
+                                <div class="grid relative pbs-grid-body"
+                                    style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));
                           grid-template-rows: repeat({{ $slotCount }}, 26px);">
 
-                {{-- hourly-range time labels, each spans 2 sub-rows (one hour) --}}
-                @for($i = 0; $i < $slotCount; $i += 2)
-                  @php
-                    $mins     = $gridStart + ($i * $slotMinutes);
-                    $bandStart = \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), 0);
-                    $bandEnd   = (clone $bandStart)->addHour();
-                    $label = $bandStart->format('g') . '-' . $bandEnd->format('g') . ' ' . $bandEnd->format('A');
-                  @endphp
-                  <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-end text-[10.5px] font-semibold text-slate-500"
-                       style="grid-column: 1; grid-row: {{ $i + 1 }} / span 2;">
-                    {{ $label }}
-                  </div>
-                @endfor
+                                    {{-- hourly-range time labels, each spans 2 sub-rows (one hour) --}}
+                                    @for ($i = 0; $i < $slotCount; $i += 2)
+                                        @php
+                                            $mins = $gridStart + $i * $slotMinutes;
+                                            $bandStart = \Illuminate\Support\Carbon::createFromTime(
+                                                intdiv($mins, 60),
+                                                0,
+                                            );
+                                            $bandEnd = (clone $bandStart)->addHour();
+                                            $label =
+                                                $bandStart->format('g') .
+                                                '-' .
+                                                $bandEnd->format('g') .
+                                                ' ' .
+                                                $bandEnd->format('A');
+                                        @endphp
+                                        <div class="bg-slate-50 border-b border-slate-200 px-2 flex items-center justify-end text-[10.5px] font-semibold text-slate-500"
+                                            style="grid-column: 1; grid-row: {{ $i + 1 }} / span 2;">
+                                            {{ $label }}
+                                        </div>
+                                    @endfor
 
-                {{-- clickable empty cells (one per 30-min sub-row per day) --}}
-                @for($i = 0; $i < $slotCount; $i++)
-                  @php $mins = $gridStart + ($i * $slotMinutes); @endphp
-                  @for($c = 0; $c < count($days); $c++)
-                    @php
-                      $cellDay   = $days[$c];
-                      $cellTime  = \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('H:i');
-                      $isTaken   = isset($occupied[$c . '-' . $i]);
-                    @endphp
-                    @if($isTaken)
-                      <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
-                           style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"></div>
-                    @else
-                      <button type="button"
-                              onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
-                              class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
-                              style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
-                              title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}">
-                      </button>
-                    @endif
-                  @endfor
-                @endfor
+                                    {{-- clickable empty cells (one per 30-min sub-row per day) --}}
+                                    @for ($i = 0; $i < $slotCount; $i++)
+                                        @php $mins = $gridStart + ($i * $slotMinutes); @endphp
+                                        @for ($c = 0; $c < count($days); $c++)
+                                            @php
+                                                $cellDay = $days[$c];
+                                                $cellTime = \Illuminate\Support\Carbon::createFromTime(
+                                                    intdiv($mins, 60),
+                                                    $mins % 60,
+                                                )->format('H:i');
+                                                $isTaken = isset($occupied[$c . '-' . $i]);
+                                            @endphp
+                                            @if ($isTaken)
+                                                <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
+                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
+                                                </div>
+                                            @else
+                                                <button type="button"
+                                                    onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
+                                                    class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
+                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
+                                                    title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}">
+                                                </button>
+                                            @endif
+                                        @endfor
+                                    @endfor
 
-                {{-- NOON BREAK (Day shift only) --}}
-                @if($showNoonBreak)
-                  @php
-                    $noonRow  = intdiv($noonStart - $gridStart, $slotMinutes) + 1;
-                    $noonSpan = intdiv($noonEnd - $noonStart, $slotMinutes);
-                  @endphp
-                  <div class="z-10 flex items-center justify-center bg-slate-900 text-white text-[12px] font-bold tracking-[3px] pointer-events-none"
-                       style="grid-column: 2 / span {{ count($days) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
-                    NOON BREAK
-                  </div>
-                @endif
+                                    {{-- NOON BREAK (Day shift only) --}}
+                                    @if ($showNoonBreak)
+                                        @php
+                                            $noonRow = intdiv($noonStart - $gridStart, $slotMinutes) + 1;
+                                            $noonSpan = intdiv($noonEnd - $noonStart, $slotMinutes);
+                                        @endphp
+                                        <div class="z-10 flex items-center justify-center bg-slate-900 text-white text-[12px] font-bold tracking-[3px] pointer-events-none"
+                                            style="grid-column: 2 / span {{ count($days) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
+                                            NOON BREAK
+                                        </div>
+                                    @endif
 
-                {{-- SCHEDULE BLOCKS --}}
-                @foreach($schedules as $s)
-                  @php
-                    $dayIndex = array_search($s->sch_day, $days, true);
-                    if ($dayIndex === false) continue;
+                                    {{-- SCHEDULE BLOCKS --}}
+                                    @foreach ($schedules as $s)
+                                        @php
+                                            $dayIndex = array_search($s->sch_day, $days, true);
+                                            if ($dayIndex === false) {
+                                                continue;
+                                            }
 
-                    $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
-                    $end   = \Illuminate\Support\Carbon::parse($s->sch_end_time);
+                                            $start = \Illuminate\Support\Carbon::parse($s->sch_start_time);
+                                            $end = \Illuminate\Support\Carbon::parse($s->sch_end_time);
 
-                    $startMins = max(($start->hour * 60) + $start->minute, $gridStart);
-                    $endMins   = min(($end->hour * 60) + $end->minute, $gridEnd);
-                    if ($endMins <= $startMins) continue;
+                                            $startMins = max($start->hour * 60 + $start->minute, $gridStart);
+                                            $endMins = min($end->hour * 60 + $end->minute, $gridEnd);
+                                            if ($endMins <= $startMins) {
+                                                continue;
+                                            }
 
-                    $row  = intdiv($startMins - $gridStart, $slotMinutes) + 1;
-                    $span = max(1, (int) ceil(($endMins - $startMins) / $slotMinutes));
-                  @endphp
+                                            $row = intdiv($startMins - $gridStart, $slotMinutes) + 1;
+                                            $span = max(1, (int) ceil(($endMins - $startMins) / $slotMinutes));
+                                        @endphp
 
-                  <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
-                       style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
-                       data-schedule-id="{{ $s->sch_id }}"
-                       data-subject="{{ $s->sch_course_id ?? $s->sch_subj_id }}"
-                       data-faculty="{{ $s->sch_fac_id }}"
-                       data-section="{{ $s->sch_sec_id }}"
-                       data-room="{{ $s->sch_room_id }}"
-                       data-semester="{{ $s->sch_sem_id }}"
-                       data-day="{{ $s->sch_day }}"
-                       data-start="{{ substr($s->sch_start_time, 0, 5) }}"
-                       data-end="{{ substr($s->sch_end_time, 0, 5) }}">
+                                        <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
+                                            style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
+                                            data-schedule-id="{{ $s->sch_id }}"
+                                            data-subject="{{ $s->sch_course_id ?? $s->sch_subj_id }}"
+                                            data-faculty="{{ $s->sch_fac_id }}" data-section="{{ $s->sch_sec_id }}"
+                                            data-room="{{ $s->sch_room_id }}" data-semester="{{ $s->sch_sem_id }}"
+                                            data-day="{{ $s->sch_day }}"
+                                            data-start="{{ substr($s->sch_start_time, 0, 5) }}"
+                                            data-end="{{ substr($s->sch_end_time, 0, 5) }}">
 
-                    <div class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
-                      <button type="button" onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
-                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
-                      <button type="button" onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
-                              class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
+                                            <div
+                                                class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
+                                                <button type="button"
+                                                    onclick="event.stopPropagation(); openEditModal(this.closest('[data-schedule-id]'))"
+                                                    class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-slate-800">Edit</button>
+                                                <button type="button"
+                                                    onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
+                                                    class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
+                                            </div>
+
+                                            {{-- Vertically + horizontally centered content (matches wireframe) --}}
+                                            <div
+                                                class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
+                                                <div class="text-[13px] font-extrabold tracking-wide">
+                                                    {{ $s->course->course_code ?? ($s->subject->course_code ?? ($s->subject->subj_code ?? '—')) }}
+                                                </div>
+                                                @if ($s->faculty)
+                                                    <div class="text-[11.5px] font-semibold mt-1">Prof.
+                                                        {{ $s->faculty->fac_last_name }}</div>
+                                                @endif
+                                                @if ($s->room)
+                                                    <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
+                                                        {{ $s->room->room_name }}</div>
+                                                @elseif($s->section)
+                                                    <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
+                                                        {{ $s->section->sec_name }}</div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- DATE NAV --}}
+                        <div class="flex flex-col items-center gap-1 py-3 border-t border-slate-200 bg-slate-50">
+                            <div class="flex items-center gap-3">
+                                <button type="button" onclick="shiftDate(-1)"
+                                    class="w-7 h-7 rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center">‹</button>
+                                <div class="text-[13px] font-bold text-slate-700">
+                                    {{ $selectedDate->format('F j, Y (l)') }}</div>
+                                <button type="button" onclick="shiftDate(1)"
+                                    class="w-7 h-7 rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center">›</button>
+                            </div>
+                            <div class="text-[10.5px] text-slate-400" id="ph-clock"></div>
+                        </div>
+
+                    </section>
+                </div>
+                <div class="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm print:break-inside-avoid">
+                    <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
+                        <div class="flex min-h-28 flex-col justify-between text-center">
+                            <div class="text-left text-xs font-bold text-slate-700">Prepared by:</div>
+                            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
+                                {{ $signoff['prepared_by'] ?? 'Chair name unavailable' }}</div>
+                            <div class="text-xs text-slate-600">Program Coordinator / Chair</div>
+                        </div>
+                        <div class="flex min-h-28 flex-col justify-between text-center">
+                            <div class="text-left text-xs font-bold text-slate-700">Reviewed, Certified True and
+                                Correct:</div>
+                            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
+                                {{ $signoff['reviewed_by'] ?? 'CCICT Dean not assigned' }}</div>
+                            <div class="text-xs text-slate-600">Director / Dean, CCICT</div>
+                        </div>
+                        <div class="flex min-h-28 flex-col justify-between text-center">
+                            <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
+                            <input id="campus-director-name" type="text" maxlength="120"
+                                placeholder="Enter campus director name"
+                                class="w-full border-0 border-b border-slate-700 bg-transparent px-1 pb-1 text-center text-sm font-bold uppercase outline-none focus:ring-0">
+                            <div class="text-xs text-slate-600">Campus Director</div>
+                        </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                    {{-- Vertically + horizontally centered content (matches wireframe) --}}
-                    <div class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
-                      <div class="text-[13px] font-extrabold tracking-wide">{{ $s->course->course_code ?? $s->subject->course_code ?? $s->subject->subj_code ?? '—' }}</div>
-                      @if($s->faculty)
-                        <div class="text-[11.5px] font-semibold mt-1">Prof. {{ $s->faculty->fac_last_name }}</div>
-                      @endif
-                      @if($s->room)
-                        <div class="text-[11.5px] font-medium mt-0.5 opacity-95">{{ $s->room->room_name }}</div>
-                      @elseif($s->section)
-                        <div class="text-[11.5px] font-medium mt-0.5 opacity-95">{{ $s->section->sec_name }}</div>
-                      @endif
+
+    {{-- ══════════════ MODAL: ADD ══════════════ --}}
+    <div class="modal-overlay" id="modal-add-schedule">
+        <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
+            <div class="modal-header">
+                <div class="modal-title text-indigo-700">Add Schedule</div>
+                <button type="button" onclick="closeModal('modal-add-schedule')" class="modal-close">✕</button>
+            </div>
+
+            <div class="max-h-[62vh] overflow-y-auto pr-1">
+                {{-- ── FIXED FIELDS (top) ── --}}
+                <div class="mb-3">
+                    <label class="field-label">Semester</label>
+                    <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                        {{ optional($activeSemester)->label ?? 'No semester selected' }}
                     </div>
-                  </div>
-                @endforeach
+                    <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
+                </div>
 
-              </div>
+                <div>
+                    <label class="field-label">Department</label>
+                    <select id="add-department" class="field-input">
+                        <option value="">-- Select Department --</option>
+                        @foreach ($allDepartments as $dept)
+                            <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
+                                {{ $dept->dept_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- ── SECTION (triggers subject filter by year level) ── --}}
+                <div class="mb-3">
+                    <label class="field-label">Section</label>
+                    <select id="add-section" class="field-input"
+                        onchange="filterSubjectsBySection('add-section', 'add-subject')">
+                        <option value="">-- Select Section --</option>
+                        @foreach ($sections as $sec)
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
+                                data-year-level="{{ $sec->sec_year_level ?? '' }}"
+                                data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- ── SUBJECT + CATEGORY (side by side) ── --}}
+                <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-1">
+                        <label class="field-label">Category</label>
+                        <select id="add-category" class="field-input !py-[9px]"
+                            onchange="filterSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat }}" @selected($selectedCategory === $cat)>{{ $cat }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex-[3]">
+                        <label class="field-label">Subject/Course</label>
+                        <select id="add-subject" class="field-input">
+                            <option value="">-- Select Subject --</option>
+                            @foreach ($subjects as $sub)
+                                <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                                    data-dept-id="{{ $sub->course_dept_id ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? ($sub->subj_code ?? '') }}"
+                                    data-year-level="{{ $sub->course_year_level ?? '' }}"
+                                    data-semester="{{ $sub->course_semester ?? '' }}"
+                                    data-category="{{ $sub->course_category ?? '' }}"
+                                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                                    {{ $sub->course_code ?? $sub->subj_code }} —
+                                    {{ $sub->course_name ?? $sub->subj_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Professor</label>
+                    <div class="relative" id="pbs-teacher-picker">
+                        <input type="hidden" id="add-faculty" value="">
+                        <button type="button" id="pbs-teacher-trigger" onclick="togglePbsTeacherPicker()"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[13px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                            <span id="pbs-teacher-label" class="block truncate">Choose a professor</span>
+                            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor"
+                                aria-hidden="true">
+                                <path fill-rule="evenodd"
+                                    d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div id="pbs-teacher-panel"
+                            class="hidden absolute left-0 top-[calc(100%+6px)] z-[70] w-full min-w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+                            <div class="border-b border-slate-100 bg-slate-50 p-3">
+                                <div class="mb-2 text-sm font-bold text-slate-800">Select a professor</div>
+                                <input id="pbs-teacher-search" type="search" oninput="filterPbsTeachers(this.value)"
+                                    placeholder="Search by name..." autocomplete="off" aria-label="Search professors"
+                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                            </div>
+                            <div id="pbs-teacher-options" role="listbox" aria-label="Professors"
+                                class="max-h-52 overflow-y-auto p-2">
+                                @foreach ($faculty as $f)
+                                    @php $professorName = trim($f->fac_first_name.' '.$f->fac_last_name); @endphp
+                                    <button type="button" role="option" aria-selected="false"
+                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}"
+                                        data-label="{{ $professorName }}" onclick="selectPbsTeacher(this)"
+                                        class="pbs-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
+                                        <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
+                                        <span class="pbs-teacher-check hidden text-sm font-bold text-indigo-600"
+                                            aria-hidden="true">✓</span>
+                                    </button>
+                                @endforeach
+                                <div id="pbs-teacher-empty"
+                                    class="hidden px-3 py-6 text-center text-[13px] text-slate-500">No professors match
+                                    that search.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Room</label>
+                    <select id="add-room" class="field-input">
+                        <option value="">-- Select Room --</option>
+                        @foreach ($rooms as $r)
+                            <option value="{{ $r->room_id }}">
+                                {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or
+                            more)</span></span>
+                    <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        @foreach ($days as $d)
+                            <label
+                                class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
+                                <input type="checkbox" name="add-days[]" value="{{ $d }}"
+                                    class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span>{{ $d }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="field-label">Start Time</label>
+                        <input type="time" id="add-start" step="1800" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">End Time</label>
+                        <input type="time" id="add-end" step="1800" class="field-input">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Description (optional)</label>
+                    <textarea id="add-description" rows="3" class="field-input resize-y"></textarea>
+                </div>
+
             </div>
-          </div>
 
-          {{-- DATE NAV --}}
-          <div class="flex flex-col items-center gap-1 py-3 border-t border-slate-200 bg-slate-50">
-            <div class="flex items-center gap-3">
-              <button type="button" onclick="shiftDate(-1)"
-                      class="w-7 h-7 rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center">‹</button>
-              <div class="text-[13px] font-bold text-slate-700">{{ $selectedDate->format('F j, Y (l)') }}</div>
-              <button type="button" onclick="shiftDate(1)"
-                      class="w-7 h-7 rounded-full border border-slate-300 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center">›</button>
+            <div id="add-error" class="hidden mx-4 mb-3 rounded-lg border-2 border-red-400 bg-red-50 px-4 py-3">
+                <div class="flex items-start gap-2">
+                    <span class="mt-0.5 text-red-500 font-bold text-lg leading-none">⚠</span>
+                    <span id="add-error-msg" class="text-sm font-medium text-red-700 leading-snug"></span>
+                </div>
             </div>
-            <div class="text-[10.5px] text-slate-400" id="ph-clock"></div>
-          </div>
 
-        </section>
-      </div>
-      <div class="mt-8 rounded-xl border border-slate-200 bg-white p-5 shadow-sm print:break-inside-avoid">
-        <div class="grid grid-cols-1 gap-8 md:grid-cols-3">
-          <div class="flex min-h-28 flex-col justify-between text-center">
-            <div class="text-left text-xs font-bold text-slate-700">Prepared by:</div>
-            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">{{ $signoff['prepared_by'] ?? 'Chair name unavailable' }}</div>
-            <div class="text-xs text-slate-600">Program Coordinator / Chair</div>
-          </div>
-          <div class="flex min-h-28 flex-col justify-between text-center">
-            <div class="text-left text-xs font-bold text-slate-700">Reviewed, Certified True and Correct:</div>
-            <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">{{ $signoff['reviewed_by'] ?? 'CCICT Dean not assigned' }}</div>
-            <div class="text-xs text-slate-600">Director / Dean, CCICT</div>
-          </div>
-          <div class="flex min-h-28 flex-col justify-between text-center">
-            <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
-            <input id="campus-director-name" type="text" maxlength="120" placeholder="Enter campus director name"
-              class="w-full border-0 border-b border-slate-700 bg-transparent px-1 pb-1 text-center text-sm font-bold uppercase outline-none focus:ring-0">
-            <div class="text-xs text-slate-600">Campus Director</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-{{-- ══════════════ MODAL: ADD ══════════════ --}}
-<div class="modal-overlay" id="modal-add-schedule">
-  <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
-    <div class="modal-header">
-      <div class="modal-title text-indigo-700">Add Schedule</div>
-      <button type="button" onclick="closeModal('modal-add-schedule')" class="modal-close">✕</button>
-    </div>
-
-    <div class="max-h-[62vh] overflow-y-auto pr-1">
-      {{-- ── FIXED FIELDS (top) ── --}}
-      <div class="mb-3">
-        <label class="field-label">Semester</label>
-        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-          {{ optional($activeSemester)->label ?? 'No semester selected' }}
-        </div>
-        <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-      </div>
-
-      <div>
-        <label class="field-label">Department</label>
-        <select id="add-department" class="field-input">
-            <option value="">-- Select Department --</option>
-            @foreach($allDepartments as $dept)
-                <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
-                    {{ $dept->dept_name }}
-                </option>
-            @endforeach
-        </select>
-      </div>
-
-      {{-- ── SECTION (triggers subject filter by year level) ── --}}
-      <div class="mb-3">
-        <label class="field-label">Section</label>
-        <select id="add-section" class="field-input" onchange="filterSubjectsBySection('add-section', 'add-subject')">
-          <option value="">-- Select Section --</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      {{-- ── SUBJECT + CATEGORY (side by side) ── --}}
-      <div class="flex items-end gap-2 mb-3">
-        <div class="flex-1">
-          <label class="field-label">Category</label>
-          <select id="add-category" class="field-input !py-[9px]" onchange="filterSubjectsByCategory()">
-            <option value="">-- All --</option>
-            @foreach($categories as $cat)
-              <option value="{{ $cat }}" @selected($selectedCategory === $cat)>{{ $cat }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="flex-[3]">
-          <label class="field-label">Subject/Course</label>
-          <select id="add-subject" class="field-input">
-            <option value="">-- Select Subject --</option>
-            @foreach($subjects as $sub)
-              <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                      data-dept-id="{{ $sub->course_dept_id ?? '' }}"
-                      data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
-                      data-year-level="{{ $sub->course_year_level ?? '' }}"
-                      data-semester="{{ $sub->course_semester ?? '' }}"
-                      data-category="{{ $sub->course_category ?? '' }}"
-                      data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                      data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-                {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-              </option>
-            @endforeach
-          </select>
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Professor</label>
-        <div class="relative" id="pbs-teacher-picker">
-          <input type="hidden" id="add-faculty" value="">
-          <button type="button" id="pbs-teacher-trigger" onclick="togglePbsTeacherPicker()" aria-haspopup="listbox" aria-expanded="false"
-                  class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[13px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100">
-            <span id="pbs-teacher-label" class="block truncate">Choose a professor</span>
-            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
-          </button>
-          <div id="pbs-teacher-panel" class="hidden absolute left-0 top-[calc(100%+6px)] z-[70] w-full min-w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
-            <div class="border-b border-slate-100 bg-slate-50 p-3">
-              <div class="mb-2 text-sm font-bold text-slate-800">Select a professor</div>
-              <input id="pbs-teacher-search" type="search" oninput="filterPbsTeachers(this.value)" placeholder="Search by name..." autocomplete="off" aria-label="Search professors"
-                     class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modal-add-schedule')"
+                    class="btn btn-secondary">Cancel</button>
+                <button type="button" id="add-another-submit" onclick="submitAdd(true)"
+                    class="btn btn-secondary">Save &amp; Add Another</button>
+                <button type="button" id="add-submit" onclick="submitAdd()" class="btn btn-primary">Confirm
+                    Schedule</button>
             </div>
-            <div id="pbs-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
-              @foreach($faculty as $f)
-                @php $professorName = trim($f->fac_first_name.' '.$f->fac_last_name); @endphp
-                <button type="button" role="option" aria-selected="false" data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}" data-label="{{ $professorName }}"
-                        onclick="selectPbsTeacher(this)" class="pbs-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
-                  <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
-                  <span class="pbs-teacher-check hidden text-sm font-bold text-indigo-600" aria-hidden="true">✓</span>
-                </button>
-              @endforeach
-              <div id="pbs-teacher-empty" class="hidden px-3 py-6 text-center text-[13px] text-slate-500">No professors match that search.</div>
+        </div>
+    </div>
+
+
+    {{-- ══════════════ MODAL: EDIT ══════════════ --}}
+    <div class="modal-overlay" id="modal-edit-schedule">
+        <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
+            <div class="modal-header">
+                <div class="modal-title text-indigo-700">Edit Schedule</div>
+                <button type="button" onclick="closeModal('modal-edit-schedule')" class="modal-close">✕</button>
             </div>
-          </div>
+
+            <div class="max-h-[62vh] overflow-y-auto pr-1">
+                <div id="edit-error"
+                    class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3">
+                </div>
+                <div class="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[12px] text-blue-800">
+                    Changes apply to this schedule only. All other schedule rows stay unchanged.
+                </div>
+                <input type="hidden" id="edit-id">
+
+                {{-- FIXED FIELDS --}}
+                <div class="mb-3">
+                    <label class="field-label">Semester</label>
+                    <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                        {{ optional($activeSemester)->label ?? 'No semester selected' }}
+                    </div>
+                    <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Department</label>
+                    <select id="edit-department" class="field-input">
+                        <option value="">-- Select Department --</option>
+                        @foreach ($allDepartments as $dept)
+                            <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
+                                {{ $dept->dept_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- SECTION (triggers subject filter) --}}
+                <div class="mb-3">
+                    <label class="field-label">Section</label>
+                    <select id="edit-section" class="field-input">
+                        <option value="">-- Select Section --</option>
+                        @foreach ($sections as $sec)
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
+                                data-year-level="{{ $sec->sec_year_level ?? '' }}"
+                                data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                {{-- SUBJECT + CATEGORY --}}
+                <div class="flex items-end gap-2 mb-3">
+                    <div class="flex-1">
+                        <label class="field-label">Category</label>
+                        <select id="edit-category" class="field-input !py-[9px]"
+                            onchange="filterEditSubjectsByCategory()">
+                            <option value="">-- All --</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat }}">{{ $cat }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex-[3]">
+                        <label class="field-label">Subject/Course</label>
+                        <select id="edit-subject" class="field-input">
+                            <option value="">-- Select Subject --</option>
+                            @foreach ($subjects as $sub)
+                                <option value="{{ $sub->course_id ?? $sub->subj_id }}"
+                                    data-dept-id="{{ $sub->course_dept_id ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? ($sub->subj_code ?? '') }}"
+                                    data-year-level="{{ $sub->course_year_level ?? '' }}"
+                                    data-category="{{ $sub->course_category ?? '' }}"
+                                    data-semester="{{ $sub->course_semester ?? '' }}"
+                                    data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
+                                    data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
+                                    {{ $sub->course_code ?? $sub->subj_code }} —
+                                    {{ $sub->course_name ?? $sub->subj_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Professor</label>
+                    <select id="edit-faculty" class="field-input">
+                        <option value="">-- Select Professor --</option>
+                        @foreach ($faculty as $f)
+                            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Room</label>
+                    <select id="edit-room" class="field-input">
+                        <option value="">-- Select Room --</option>
+                        @foreach ($rooms as $r)
+                            <option value="{{ $r->room_id }}">
+                                {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Day</label>
+                    <select id="edit-day" class="field-input">
+                        <option value="">-- Select Day --</option>
+                        @foreach ($days as $d)
+                            <option value="{{ $d }}">{{ $d }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="field-label">Start Time</label>
+                        <input type="time" id="edit-start" step="1800" class="field-input">
+                    </div>
+                    <div>
+                        <label class="field-label">End Time</label>
+                        <input type="time" id="edit-end" step="1800" class="field-input">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Description (optional)</label>
+                    <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modal-edit-schedule')"
+                    class="btn btn-secondary">Cancel</button>
+                <button type="button" id="edit-submit" onclick="submitEdit()" class="btn btn-primary">Edit
+                    Schedule</button>
+            </div>
         </div>
-      </div>
-
-       <div class="mb-3">
-         <label class="field-label">Room</label>
-         <select id="add-room" class="field-input">
-           <option value="">-- Select Room --</option>
-           @foreach($rooms as $r)
-              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-           @endforeach
-         </select>
-       </div>
-
-      <div class="mb-3">
-        <span class="field-label">Days <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
-        <div class="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          @foreach($days as $d)
-            <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 hover:border-blue-300 hover:bg-blue-50">
-              <input type="checkbox" name="add-days[]" value="{{ $d }}" class="add-day-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-              <span>{{ $d }}</span>
-            </label>
-          @endforeach
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="field-label">Start Time</label>
-          <input type="time" id="add-start" step="1800" class="field-input">
-        </div>
-        <div>
-          <label class="field-label">End Time</label>
-          <input type="time" id="add-end" step="1800" class="field-input">
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Description (optional)</label>
-        <textarea id="add-description" rows="3" class="field-input resize-y"></textarea>
-      </div>
-
     </div>
 
-    <div id="add-error" class="hidden mx-4 mb-3 rounded-lg border-2 border-red-400 bg-red-50 px-4 py-3">
-      <div class="flex items-start gap-2">
-        <span class="mt-0.5 text-red-500 font-bold text-lg leading-none">⚠</span>
-        <span id="add-error-msg" class="text-sm font-medium text-red-700 leading-snug"></span>
-      </div>
-    </div>
 
-    <div class="modal-footer">
-      <button type="button" onclick="closeModal('modal-add-schedule')" class="btn btn-secondary">Cancel</button>
-      <button type="button" id="add-another-submit" onclick="submitAdd(true)" class="btn btn-secondary">Save &amp; Add Another</button>
-      <button type="button" id="add-submit" onclick="submitAdd()" class="btn btn-primary">Confirm Schedule</button>
-    </div>
-  </div>
-</div>
+    {{-- ══════════════ MODAL: DELETE ══════════════ --}}
+    <div class="modal-overlay" id="modal-delete-schedule">
+        <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
+            <div class="modal-header">
+                <div class="modal-title text-red-600">Delete Schedule</div>
+                <button type="button" onclick="closeModal('modal-delete-schedule')" class="modal-close">✕</button>
+            </div>
 
+            <div class="text-center">
+                <input type="hidden" id="delete-id">
 
-{{-- ══════════════ MODAL: EDIT ══════════════ --}}
-<div class="modal-overlay" id="modal-edit-schedule">
-  <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
-    <div class="modal-header">
-      <div class="modal-title text-indigo-700">Edit Schedule</div>
-      <button type="button" onclick="closeModal('modal-edit-schedule')" class="modal-close">✕</button>
-    </div>
+                <p class="text-[13px] font-semibold text-slate-700 mb-3">
+                    Are you sure you want to delete this specific schedule?
+                </p>
 
-    <div class="max-h-[62vh] overflow-y-auto pr-1">
-      <div id="edit-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 mb-3"></div>
-      <div class="mb-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[12px] text-blue-800">
-        Changes apply to this schedule only. All other schedule rows stay unchanged.
-      </div>
-      <input type="hidden" id="edit-id">
+                <p class="text-[12.5px] text-slate-600 mb-2">
+                    To confirm, please type
+                    <span class="font-mono font-bold text-slate-900" id="delete-code"></span>
+                    in the box below:
+                </p>
 
-      {{-- FIXED FIELDS --}}
-      <div class="mb-3">
-        <label class="field-label">Semester</label>
-        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-          {{ optional($activeSemester)->label ?? 'No semester selected' }}
+                <input type="text" id="delete-confirm" autocomplete="off" oninput="validateDeleteCode()"
+                    class="field-input text-center font-mono mb-3">
+
+                <p class="text-[11.5px] text-slate-500 mb-1">
+                    Note: When confirmed, this schedule won't be retrieved in any way.
+                </p>
+
+                <div id="delete-error"
+                    class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 text-left">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" onclick="closeModal('modal-delete-schedule')"
+                    class="btn btn-secondary">Cancel</button>
+                <button type="button" id="delete-submit" disabled onclick="submitDelete()"
+                    class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
+            </div>
         </div>
-        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Department</label>
-        <select id="edit-department" class="field-input">
-            <option value="">-- Select Department --</option>
-            @foreach($allDepartments as $dept)
-                <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
-                    {{ $dept->dept_name }}
-                </option>
-            @endforeach
-        </select>
-      </div>
-
-      {{-- SECTION (triggers subject filter) --}}
-      <div class="mb-3">
-        <label class="field-label">Section</label>
-        <select id="edit-section" class="field-input">
-          <option value="">-- Select Section --</option>
-          @foreach($sections as $sec)
-            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      {{-- SUBJECT + CATEGORY --}}
-      <div class="flex items-end gap-2 mb-3">
-        <div class="flex-1">
-          <label class="field-label">Category</label>
-          <select id="edit-category" class="field-input !py-[9px]" onchange="filterEditSubjectsByCategory()">
-            <option value="">-- All --</option>
-            @foreach($categories as $cat)
-              <option value="{{ $cat }}">{{ $cat }}</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="flex-[3]">
-          <label class="field-label">Subject/Course</label>
-          <select id="edit-subject" class="field-input">
-            <option value="">-- Select Subject --</option>
-            @foreach($subjects as $sub)
-              <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                      data-dept-id="{{ $sub->course_dept_id ?? '' }}"
-                      data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
-                      data-year-level="{{ $sub->course_year_level ?? '' }}"
-                      data-category="{{ $sub->course_category ?? '' }}"
-                      data-semester="{{ $sub->course_semester ?? '' }}"
-                      data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                      data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-                {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-              </option>
-            @endforeach
-          </select>
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Professor</label>
-        <select id="edit-faculty" class="field-input">
-          <option value="">-- Select Professor --</option>
-          @foreach($faculty as $f)
-            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}</option>
-          @endforeach
-        </select>
-      </div>
-
-       <div class="mb-3">
-         <label class="field-label">Room</label>
-         <select id="edit-room" class="field-input">
-           <option value="">-- Select Room --</option>
-           @foreach($rooms as $r)
-              <option value="{{ $r->room_id }}">{{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-           @endforeach
-         </select>
-       </div>
-
-      <div class="mb-3">
-        <label class="field-label">Day</label>
-        <select id="edit-day" class="field-input">
-          <option value="">-- Select Day --</option>
-          @foreach($days as $d)
-            <option value="{{ $d }}">{{ $d }}</option>
-          @endforeach
-        </select>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-          <label class="field-label">Start Time</label>
-          <input type="time" id="edit-start" step="1800" class="field-input">
-        </div>
-        <div>
-          <label class="field-label">End Time</label>
-          <input type="time" id="edit-end" step="1800" class="field-input">
-        </div>
-      </div>
-
-      <div class="mb-3">
-        <label class="field-label">Description (optional)</label>
-        <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
-      </div>
-
     </div>
 
-    <div class="modal-footer">
-      <button type="button" onclick="closeModal('modal-edit-schedule')" class="btn btn-secondary">Cancel</button>
-      <button type="button" id="edit-submit" onclick="submitEdit()" class="btn btn-primary">Edit Schedule</button>
-    </div>
-  </div>
-</div>
+
+    {{-- TOAST --}}
+    <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
 
-{{-- ══════════════ MODAL: DELETE ══════════════ --}}
-<div class="modal-overlay" id="modal-delete-schedule">
-  <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
-    <div class="modal-header">
-      <div class="modal-title text-red-600">Delete Schedule</div>
-      <button type="button" onclick="closeModal('modal-delete-schedule')" class="modal-close">✕</button>
-    </div>
-
-    <div class="text-center">
-      <input type="hidden" id="delete-id">
-
-      <p class="text-[13px] font-semibold text-slate-700 mb-3">
-        Are you sure you want to delete this specific schedule?
-      </p>
-
-      <p class="text-[12.5px] text-slate-600 mb-2">
-        To confirm, please type
-        <span class="font-mono font-bold text-slate-900" id="delete-code"></span>
-        in the box below:
-      </p>
-
-      <input type="text" id="delete-confirm" autocomplete="off" oninput="validateDeleteCode()"
-             class="field-input text-center font-mono mb-3">
-
-      <p class="text-[11.5px] text-slate-500 mb-1">
-        Note: When confirmed, this schedule won't be retrieved in any way.
-      </p>
-
-      <div id="delete-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700 text-left"></div>
-    </div>
-
-    <div class="modal-footer">
-      <button type="button" onclick="closeModal('modal-delete-schedule')" class="btn btn-secondary">Cancel</button>
-      <button type="button" id="delete-submit" disabled onclick="submitDelete()" class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
-    </div>
-  </div>
-</div>
-
-
-{{-- TOAST --}}
-<div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
-
-
-<script>
-  window.PBS_SELECTED_DATE = @json($selectedDate->toDateString());
-</script>
+    <script>
+        window.PBS_SELECTED_DATE = @json($selectedDate->toDateString());
+    </script>
     <script>
         window.PBS_SELECTED_DATE = @json($selectedDate ?? now()->toDateString());
         window.COLLEGE_SECTIONS = {
@@ -746,7 +871,13 @@
                 "{{ $dept->dept_id }}": [
                     @php $deptSections = $sections->where('sec_dept_id', $dept->dept_id); @endphp
                     @foreach ($deptSections as $sec)
-                        { id: "{{ $sec->sec_id }}", name: "{{ $sec->sec_name }}", dept: "{{ $sec->sec_dept_id }}", isEvening: "{{ $sec->sec_is_evening ? '1' : '0' }}", year: "{{ $sec->sec_year_level }}" },
+                        {
+                            id: "{{ $sec->sec_id }}",
+                            name: "{{ $sec->sec_name }}",
+                            dept: "{{ $sec->sec_dept_id }}",
+                            isEvening: "{{ $sec->sec_is_evening ? '1' : '0' }}",
+                            year: "{{ $sec->sec_year_level }}"
+                        },
                     @endforeach
                 ],
             @endforeach
@@ -755,77 +886,192 @@
             @foreach ($allDepartments as $dept)
                 "{{ $dept->dept_id }}": [
                     @foreach (($allSubjects ?? $subjects)->where('course_dept_id', $dept->dept_id) as $sub)
-                        { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", dept: "{{ $sub->course_dept_id ?? '' }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+                        {
+                            id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                            code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                            name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                            dept: "{{ $sub->course_dept_id ?? '' }}",
+                            year: "{{ $sub->course_year_level ?? '' }}",
+                            sem: "{{ $sub->course_semester ?? '' }}",
+                            cat: "{{ $sub->course_category ?? '' }}",
+                            lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                            labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                        },
                     @endforeach
                 ],
             @endforeach
         };
         window.ALL_SUBJECTS_LIST = [
             @foreach ($allSubjects as $sub)
-                { id: "{{ $sub->course_id ?? $sub->subj_id }}", code: "{{ $sub->course_code ?? $sub->subj_code }}", name: "{{ $sub->course_name ?? $sub->subj_name }}", year: "{{ $sub->course_year_level ?? '' }}", sem: "{{ $sub->course_semester ?? '' }}", cat: "{{ $sub->course_category ?? '' }}", dept: "{{ $sub->course_dept_id ?? '' }}", lecHours: "{{ $sub->course_lecture_hours ?? 0 }}", labHours: "{{ $sub->course_lab_hours ?? 0 }}" },
+                {
+                    id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                    code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                    name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                    year: "{{ $sub->course_year_level ?? '' }}",
+                    sem: "{{ $sub->course_semester ?? '' }}",
+                    cat: "{{ $sub->course_category ?? '' }}",
+                    dept: "{{ $sub->course_dept_id ?? '' }}",
+                    lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                    labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                },
             @endforeach
         ];
         window.ALL_CATEGORIES = @json($categories ?? []);
-        window.ACTIVE_COURSE_SEMESTER = @json($activeSemester && (str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') || str_contains(strtolower($activeSemester->sem_name ?? ''), 'second')) ? 2 : 1);
+        window.ACTIVE_COURSE_SEMESTER = @json(
+            $activeSemester &&
+            (str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') ||
+                str_contains(strtolower($activeSemester->sem_name ?? ''), 'second'))
+                ? 2
+                : 1);
     </script>
     <script src="{{ asset('js/pbs.js') }}" defer></script>
-<script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
+    <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
-@if(session('error') || session('success'))
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    showToast(@json(session('error') ?? session('success')));
-  });
-</script>
-@endif
-
-
-<script>
-function saveSectionStudents() {
-  const sectionId = document.getElementById('filter-section')?.value || '';
-  const input = document.getElementById('section-student-count');
-  const count = input ? parseInt(input.value, 10) : NaN;
-
-  if (!sectionId) {
-    showToast('Select a section first.');
-    return;
-  }
-  if (Number.isNaN(count) || count < 0) {
-    showToast('Enter a valid number of students (0 or more).');
-    return;
-  }
-
-  const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-  fetch('{{ route("chair.pbs.section.students") }}', {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-CSRF-TOKEN': csrf,
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    credentials: 'same-origin',
-    body: JSON.stringify({
-      sec_id: sectionId,
-      sec_no_of_student: count,
-    }),
-  })
-    .then(async (res) => {
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        showToast(data.message || 'Could not save student count');
-        return;
-      }
-      showToast(data.message || 'Student count saved');
-      if (input && data.sec_no_of_student != null) {
-        input.value = data.sec_no_of_student;
-      }
-    })
-    .catch(() => showToast('Network error saving student count'));
-}
-</script>
+    @if (session('error') || session('success'))
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                showToast(@json(session('error') ?? session('success')));
+            });
+        </script>
+    @endif
 
 
+    <script>
+        function saveSectionStudents() {
+            const sectionId = document.getElementById('filter-section')?.value || '';
+            const input = document.getElementById('section-student-count');
+            const count = input ? parseInt(input.value, 10) : NaN;
+
+            if (!sectionId) {
+                showToast('Select a section first.');
+                return;
+            }
+            if (Number.isNaN(count) || count < 0) {
+                showToast('Enter a valid number of students (0 or more).');
+                return;
+            }
+
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+            fetch('{{ route('chair.pbs.section.students') }}', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        sec_id: sectionId,
+                        sec_no_of_student: count,
+                    }),
+                })
+                .then(async (res) => {
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.success) {
+                        showToast(data.message || 'Could not save student count');
+                        return;
+                    }
+                    showToast(data.message || 'Student count saved');
+                    if (input && data.sec_no_of_student != null) {
+                        input.value = data.sec_no_of_student;
+                    }
+                })
+                .catch(() => showToast('Network error saving student count'));
+        }
+    </script>
+
+
+
+    <script>
+        async function downloadPbsExport() {
+            const section = document.getElementById('filter-section')?.value || '';
+            const semester = document.getElementById('filter-semester')?.value || '';
+            const studentCountInput = document.getElementById('section-student-count');
+            const campusDirectorInput = document.getElementById('campus-director-name');
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+            if (!section || !semester) {
+                const message = 'Select a section and semester before exporting the PBS.';
+                if (typeof showToast === 'function') showToast(message);
+                else window.alert(message);
+                return;
+            }
+
+            const count = Number(String(studentCountInput?.value ?? '').trim());
+            if (!Number.isInteger(count) || count < 0 || count > 500) {
+                const message = 'Enter a valid student count from 0 to 500 before exporting.';
+                if (typeof showToast === 'function') showToast(message);
+                else window.alert(message);
+                return;
+            }
+
+            if (window.__pbsExportInProgress) return;
+            window.__pbsExportInProgress = true;
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrf,
+                'X-Requested-With': 'XMLHttpRequest',
+            };
+
+            try {
+                const [countResponse, directorResponse] = await Promise.all([
+                    fetch(@json(route('chair.pbs.section.students')), {
+                        method: 'PUT',
+                        headers,
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            sec_id: section,
+                            sec_no_of_student: count
+                        }),
+                    }),
+                    fetch(@json(route('chair.mis.campus-director')), {
+                        method: 'PUT',
+                        headers,
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            campus_director: campusDirectorInput?.value?.trim() || ''
+                        }),
+                    }),
+                ]);
+
+                const [countData, directorData] = await Promise.all([
+                    countResponse.json().catch(() => ({})),
+                    directorResponse.json().catch(() => ({})),
+                ]);
+
+                if (!countResponse.ok || !countData.success) {
+                    throw new Error(countData.message || 'Could not save the student count.');
+                }
+                if (!directorResponse.ok || !directorData.success) {
+                    throw new Error(directorData.message || 'Could not save the campus director name.');
+                }
+
+                if (studentCountInput && countData.sec_no_of_student != null) {
+                    studentCountInput.value = countData.sec_no_of_student;
+                }
+
+                try {
+                    localStorage.setItem('skedyul.campusDirectorName', directorData.campus_director || '');
+                } catch (error) {
+                    // Export still uses the server-saved value if browser storage is unavailable.
+                }
+
+                const url = new URL(@json(route('chair.pbs.export')), window.location.origin);
+                url.searchParams.set('section', section);
+                url.searchParams.set('semester', semester);
+                window.location.assign(url.toString());
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Could not prepare the PBS export.';
+                if (typeof showToast === 'function') showToast(message);
+                else window.alert(message);
+            } finally {
+                window.__pbsExportInProgress = false;
+            }
+        }
+    </script>
 
 </body>
 

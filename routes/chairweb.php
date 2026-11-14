@@ -12,6 +12,7 @@ use App\Http\Controllers\Chair\PbtController;
 use App\Http\Controllers\Chair\PbtExportController;
 use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
+use App\Http\Controllers\Chair\PbsExportController;
 
 Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
@@ -34,6 +35,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
     Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
+
 
     // PBT — Program by Teacher
     Route::get('/pbt', [PbtController::class, 'index'])->name('chair.pbt');
@@ -69,6 +71,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     // Export reports and faculty PBT workbook
     Route::get('/export-reports', [PbtExportController::class, 'index'])->name('chair.export_reports');
     Route::get('/export-reports/pbt', [PbtExportController::class, 'download'])->name('chair.export_reports.pbt');
+    Route::get('/pbs/export', [PbsExportController::class, 'download'])->name('chair.pbs.export');
 
     Route::get('/settings', function () {
         return view('chair.settings');
