@@ -158,7 +158,12 @@ class MisController extends Controller
             }
 
             $schedules = $query->get()
-                ->filter(function ($schedule) use ($shift) {
+                ->filter(function ($schedule) use ($shift, $sectionId) {
+                    // If a specific section is selected, fetch all its day and evening schedules.
+                    if ($sectionId) {
+                        return true;
+                    }
+
                     try {
                         $hour = (int) Carbon::parse(
                             $schedule->sch_start_time
@@ -528,9 +533,14 @@ class MisController extends Controller
             ? $sections->firstWhere('sec_id', $sectionId)
             : null;
 
+        $sectionId = $filters['section'] ?? null;
         $shift = ($filters['shift'] ?? 'day') === 'night'
             ? 'Evening Program'
             : 'Day Program';
+
+        if ($sectionId) {
+            $shift = 'Day & Evening Program';
+        }
 
         $parts = [
             $shift,

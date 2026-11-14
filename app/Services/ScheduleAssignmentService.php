@@ -778,6 +778,146 @@ class ScheduleAssignmentService
         return null;
     }
 
+    /**
+     * Pairwise version of findConflict(), used when a PBT is submitted.
+     * Blank rooms and blank sections are not a match. REC skips room and
+     * section checks. One OJT meeting shared by several sections is allowed.
+     */
+    public function schedulesConflict(Schedule $first, Schedule $second): bool
+    {
+        if ($first->sch_id !== null && $first->sch_id === $second->sch_id) {
+            return false;
+        }
+
+        if (!$this->sameDay($first, $second) || !$this->timesOverlap($first, $second)) {
+            return false;
+        }
+
+        $sharedOjt = $this->isSharedOjtMeeting($first, $second);
+        $sameFaculty = (string) $first->sch_fac_id === (string) $second->sch_fac_id;
+
+        if ($sameFaculty && !$sharedOjt) {
+            return true;
+        }
+
+        $firstIsRec = $this->isRecSchedule($first);
+        $secondIsRec = $this->isRecSchedule($second);
+
+        if (
+            !$sharedOjt
+            && !$firstIsRec
+            && !$secondIsRec
+            && $this->sameFilledId($first->sch_room_id, $second->sch_room_id)
+        ) {
+            return true;
+        }
+
+        if (
+            !$firstIsRec
+            && !$secondIsRec
+            && $this->sameFilledId($first->sch_sec_id, $second->sch_sec_id)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public function submissionConflictCount($schedules, string $facultyId): int
+    {
+        $count = 0;
+        $items = collect($schedules)->values();
+
+        for ($left = 0; $left < $items->count(); $left++) {
+            for ($right = $left + 1; $right < $items->count(); $right++) {
+                $first = $items[$left];
+                $second = $items[$right];
+
+                if ($first->sch_fac_id !== $facultyId && $second->sch_fac_id !== $facultyId) {
+                    continue;
+                }
+
+                if ($this->schedulesConflict($first, $second)) {
+                    $count++;
+                }
+            }
+        }
+
+        return $count;
+    }
+
+    public function scheduleDetailsAreComplete($schedules): bool
+    {
+        $items = collect($schedules);
+
+        return $items->isNotEmpty() && $items->every(function (Schedule $schedule) {
+            if (!$schedule->faculty || !$schedule->subject) {
+                return false;
+            }
+
+            if ($this->isRecSchedule($schedule)) {
+                return true;
+            }
+
+            return (bool) $schedule->section;
+        });
+    }
+
+    private function isRecSchedule(Schedule $schedule): bool
+    {
+        return ($schedule->subject->course_code ?? '') === 'REC';
+    }
+
+    private function isSharedOjtMeeting(Schedule $first, Schedule $second): bool
+    {
+        $firstCourse = $first->subject;
+        $secondCourse = $second->subject;
+
+        return self::isOjt($firstCourse)
+            && self::isOjt($secondCourse)
+            && (string) $first->sch_course_id === (string) $second->sch_course_id
+            && (string) $first->sch_fac_id === (string) $second->sch_fac_id
+            && (string) $first->sch_sec_id !== (string) $second->sch_sec_id
+            && (string) ($first->sch_room_id ?? '') === (string) ($second->sch_room_id ?? '')
+            && $this->clock($first->sch_start_time) === $this->clock($second->sch_start_time)
+            && $this->clock($first->sch_end_time) === $this->clock($second->sch_end_time);
+    }
+
+    private function sameDay(Schedule $first, Schedule $second): bool
+    {
+        return strcasecmp(trim((string) $first->sch_day), trim((string) $second->sch_day)) === 0;
+    }
+
+    private function timesOverlap(Schedule $first, Schedule $second): bool
+    {
+        $firstStart = $this->clock($first->sch_start_time);
+        $firstEnd = $this->clock($first->sch_end_time);
+        $secondStart = $this->clock($second->sch_start_time);
+        $secondEnd = $this->clock($second->sch_end_time);
+
+        return $firstStart < $secondEnd && $secondStart < $firstEnd;
+    }
+
+    private function sameFilledId(mixed $left, mixed $right): bool
+    {
+        if ($left === null || $left === '' || $right === null || $right === '') {
+            return false;
+        }
+
+        return (string) $left === (string) $right;
+    }
+
+    private function clock(mixed $time): string
+    {
+        $value = substr(trim((string) $time), 0, 8);
+
+        if (preg_match('/^\d{2}:\d{2}$/', $value)) {
+            return $value . ':00';
+        }
+
+        return $value;
+    }
+
     private function codeOf(Schedule $schedule): string
     {
         return $schedule->subject->subj_code ?? 'another class';

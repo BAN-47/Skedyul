@@ -491,7 +491,7 @@
             </div>
             <div id="pbs-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
               @foreach($faculty as $f)
-                @php $professorName = trim($f->fac_first_name.' '.$f->fac_last_name); @endphp
+                @php $professorName = trim(implode(' ', array_filter([$f->fac_first_name, $f->fac_last_name, $f->fac_suffix]))); @endphp
                 <button type="button" role="option" aria-selected="false" data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}" data-label="{{ $professorName }}"
                         onclick="selectPbsTeacher(this)" class="pbs-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
                   <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
@@ -643,7 +643,7 @@
         <select id="edit-faculty" class="field-input">
           <option value="">-- Select Professor --</option>
           @foreach($faculty as $f)
-            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}</option>
+            <option value="{{ $f->fac_id }}">{{ trim(implode(' ', array_filter([$f->fac_first_name, $f->fac_last_name, $f->fac_suffix]))) }}</option>
           @endforeach
         </select>
       </div>

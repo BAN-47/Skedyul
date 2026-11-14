@@ -8,6 +8,7 @@ use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Schedule_Submission;
 use App\Models\Semester;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -103,16 +104,9 @@ class ScheduleSubmissionController extends Controller
                     ->values();
 
                 $scheduleCount = $selectedSchedules->count();
-                $scheduleDetailsComplete = $selectedSchedules->isNotEmpty()
-                    && $selectedSchedules->every(
-                        fn($schedule) =>
-                        $schedule->faculty
-                            && $schedule->subject
-                            && $schedule->section
-                            && $schedule->room
-                    );
-
-                $conflicts = $this->conflictCount(
+                $scheduler = app(ScheduleAssignmentService::class);
+                $scheduleDetailsComplete = $scheduler->scheduleDetailsAreComplete($selectedSchedules);
+                $conflicts = $scheduler->submissionConflictCount(
                     $allDepartmentSchedules,
                     $selectedFaculty->fac_id
                 );
@@ -204,19 +198,15 @@ class ScheduleSubmissionController extends Controller
                 ->withInput();
         }
 
-        if ($facultySchedules->contains(
-            fn($schedule) =>
-            !$schedule->faculty
-                || !$schedule->subject
-                || !$schedule->section
-                || !$schedule->room
-        )) {
+        $scheduler = app(ScheduleAssignmentService::class);
+
+        if (!$scheduler->scheduleDetailsAreComplete($facultySchedules)) {
             return back()
-                ->with('error', 'Every class in this PBT must have a faculty member, course, section, and room.')
+                ->with('error', 'Every class in this PBT must have a faculty member and course. A section is required except for REC.')
                 ->withInput();
         }
 
-        if ($this->conflictCount($allDepartmentSchedules, $faculty->fac_id) > 0) {
+        if ($scheduler->submissionConflictCount($allDepartmentSchedules, $faculty->fac_id) > 0) {
             return back()
                 ->with('error', 'Resolve this faculty member’s schedule conflicts before submitting the PBT.')
                 ->withInput();
@@ -259,8 +249,8 @@ class ScheduleSubmissionController extends Controller
             'faculty' => $facultyName,
             'subject_code' => $schedule->subject->course_code,
             'subject_name' => $schedule->subject->course_name,
-            'section' => $schedule->section->sec_name,
-            'room' => $schedule->room->room_name,
+            'section' => $schedule->section?->sec_name,
+            'room' => $schedule->room?->room_name,
             'day' => $schedule->sch_day,
             'start_time' => $schedule->sch_start_time,
             'end_time' => $schedule->sch_end_time,
@@ -318,39 +308,5 @@ class ScheduleSubmissionController extends Controller
                 'faculty',
                 fn($query) => $query->where('fac_dept_id', $departmentId)
             );
-    }
-
-    private function conflictCount($schedules, string $facultyId): int
-    {
-        $count = 0;
-        $items = $schedules->values();
-
-        for ($left = 0; $left < $items->count(); $left++) {
-            for ($right = $left + 1; $right < $items->count(); $right++) {
-                $first = $items[$left];
-                $second = $items[$right];
-
-                if (
-                    $first->sch_fac_id !== $facultyId
-                    && $second->sch_fac_id !== $facultyId
-                ) {
-                    continue;
-                }
-
-                $overlaps = $first->sch_day === $second->sch_day
-                    && $first->sch_start_time < $second->sch_end_time
-                    && $second->sch_start_time < $first->sch_end_time;
-
-                $sharesResource = $first->sch_fac_id === $second->sch_fac_id
-                    || $first->sch_room_id === $second->sch_room_id
-                    || $first->sch_sec_id === $second->sch_sec_id;
-
-                if ($overlaps && $sharesResource) {
-                    $count++;
-                }
-            }
-        }
-
-        return $count;
     }
 }

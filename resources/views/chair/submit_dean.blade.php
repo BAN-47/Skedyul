@@ -184,7 +184,7 @@
                                 </div>
 
                                 <div class="flex justify-between">
-                                    <span>Faculty, course, section, and room assigned for every class</span>
+                                    <span>Faculty and course assigned, with a section on every class except REC</span>
                                     <span
                                         class="font-semibold {{ $scheduleDetailsComplete ? 'text-emerald-600' : 'text-amber-600' }}">
                                         {{ $scheduleDetailsComplete ? 'Complete' : 'Incomplete' }}

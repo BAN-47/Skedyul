@@ -361,11 +361,11 @@
                                                     @php
                                                         $pid = $person->fac_id ?? ($person->dean_id ?? '');
                                                         $pname = trim(
-                                                            ($person->fac_first_name ??
-                                                                ($person->dean_first_name ?? '')) .
-                                                                ' ' .
-                                                                ($person->fac_last_name ??
-                                                                    ($person->dean_last_name ?? '')),
+                                                            implode(' ', array_filter([
+                                                                $person->fac_first_name ?? ($person->dean_first_name ?? ''),
+                                                                $person->fac_last_name ?? ($person->dean_last_name ?? ''),
+                                                                $person->fac_suffix ?? ($person->dean_suffix ?? '')
+                                                            ]))
                                                         );
                                                     @endphp
                                                     <button type="button"
