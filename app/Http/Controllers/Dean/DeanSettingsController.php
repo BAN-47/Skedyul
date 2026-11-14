@@ -107,16 +107,23 @@ class DeanSettingsController extends Controller
             'fac_bachelors_degree' => 'nullable|string|max:255',
             'fac_masters_degree' => 'nullable|string|max:255',
             'fac_doctorate_degree' => 'nullable|string|max:255',
+            'fac_bachelors_abbr' => [$request->filled('fac_bachelors_degree') ? 'required' : 'nullable', 'string', 'max:40'],
+            'fac_masters_abbr' => [$request->filled('fac_masters_degree') ? 'required' : 'nullable', 'string', 'max:40'],
+            'fac_doctorate_abbr' => [$request->filled('fac_doctorate_degree') ? 'required' : 'nullable', 'string', 'max:60'],
         ]);
 
         $dean = $this->currentDean();
         $dean->update(collect($data)->except([
             'fac_bachelors_degree', 'fac_masters_degree', 'fac_doctorate_degree',
+            'fac_bachelors_abbr', 'fac_masters_abbr', 'fac_doctorate_abbr',
         ])->all());
         Faculty::where('fac_usr_id', Auth::id())->update([
             'fac_bachelors_degree' => $data['fac_bachelors_degree'] ?? null,
             'fac_masters_degree' => $data['fac_masters_degree'] ?? null,
             'fac_doctorate_degree' => $data['fac_doctorate_degree'] ?? null,
+            'fac_bachelors_abbr' => $data['fac_bachelors_abbr'] ?? null,
+            'fac_masters_abbr' => $data['fac_masters_abbr'] ?? null,
+            'fac_doctorate_abbr' => $data['fac_doctorate_abbr'] ?? null,
         ]);
 
         return response()->json(['success' => true]);

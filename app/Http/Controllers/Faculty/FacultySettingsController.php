@@ -116,6 +116,9 @@ class FacultySettingsController extends Controller
             'fac_bachelors_degree' => ['nullable', 'string', 'max:255'],
             'fac_masters_degree'   => ['nullable', 'string', 'max:255'],
             'fac_doctorate_degree' => ['nullable', 'string', 'max:255'],
+            'fac_bachelors_abbr' => [$request->filled('fac_bachelors_degree') ? 'required' : 'nullable', 'string', 'max:40'],
+            'fac_masters_abbr' => [$request->filled('fac_masters_degree') ? 'required' : 'nullable', 'string', 'max:40'],
+            'fac_doctorate_abbr' => [$request->filled('fac_doctorate_degree') ? 'required' : 'nullable', 'string', 'max:60'],
         ]);
 
         DB::transaction(function () use ($user, $faculty, $data) {
@@ -127,6 +130,9 @@ class FacultySettingsController extends Controller
                 'fac_bachelors_degree' => $data['fac_bachelors_degree'] ?? null,
                 'fac_masters_degree'   => $data['fac_masters_degree'] ?? null,
                 'fac_doctorate_degree' => $data['fac_doctorate_degree'] ?? null,
+                'fac_bachelors_abbr' => $data['fac_bachelors_abbr'] ?? null,
+                'fac_masters_abbr' => $data['fac_masters_abbr'] ?? null,
+                'fac_doctorate_abbr' => $data['fac_doctorate_abbr'] ?? null,
             ]);
 
             $user->update([

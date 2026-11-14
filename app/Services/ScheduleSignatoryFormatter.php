@@ -27,10 +27,16 @@ class ScheduleSignatoryFormatter
         $faculty = $person->user?->faculty;
         $postNominals = [];
         foreach ([
-            $faculty?->fac_bachelors_degree,
-            $faculty?->fac_masters_degree,
-            $faculty?->fac_doctorate_degree,
-        ] as $degree) {
+            [$faculty?->fac_bachelors_abbr, $faculty?->fac_bachelors_degree],
+            [$faculty?->fac_masters_abbr, $faculty?->fac_masters_degree],
+            [$faculty?->fac_doctorate_abbr, $faculty?->fac_doctorate_degree],
+        ] as [$abbreviation, $degree]) {
+            $abbreviation = trim((string) $abbreviation);
+            if ($abbreviation !== '') {
+                $postNominals[] = $abbreviation;
+                continue;
+            }
+
             foreach (preg_split('/\s*[\/;]\s*/', trim((string) $degree)) ?: [] as $credential) {
                 $abbreviation = $this->abbreviateDegree($credential);
                 if ($abbreviation !== '') {

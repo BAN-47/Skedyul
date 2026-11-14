@@ -93,9 +93,36 @@
                   <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Nationality</label><input id="fac-nationality" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_nationality }}"></div>
                 </div>
                 <div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Bachelor's Degree</label><input id="fac-bachelors" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_bachelors_degree }}"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Master's Degree</label><input id="fac-masters" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_masters_degree }}"></div>
-                  <div class="flex flex-col gap-1.5"><label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Doctorate Degree</label><input id="fac-doctorate" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_degree }}"></div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Bachelor's Degree</label>
+                    <div class="flex gap-2">
+                      <input id="fac-bachelors" aria-label="Bachelor's degree full name" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_bachelors_degree }}">
+                      <div class="w-20 shrink-0">
+                        <label for="fac-bachelors-abbr" class="mb-1 block text-[9px] font-semibold text-slate-500">Acronym</label>
+                        <input id="fac-bachelors-abbr" aria-label="Bachelor's degree acronym" placeholder="BSIS" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-[13px] font-semibold uppercase text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_bachelors_abbr }}">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Master's Degree</label>
+                    <div class="flex gap-2">
+                      <input id="fac-masters" aria-label="Master's degree full name" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_masters_degree }}">
+                      <div class="w-20 shrink-0">
+                        <label for="fac-masters-abbr" class="mb-1 block text-[9px] font-semibold text-slate-500">Acronym</label>
+                        <input id="fac-masters-abbr" aria-label="Master's degree acronym" placeholder="MIT" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-[13px] font-semibold uppercase text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_masters_abbr }}">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1.5">
+                    <label class="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-400">Doctorate Degree</label>
+                    <div class="flex gap-2">
+                      <input id="fac-doctorate" aria-label="Doctorate degree full name" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_degree }}">
+                      <div class="w-20 shrink-0">
+                        <label for="fac-doctorate-abbr" class="mb-1 block text-[9px] font-semibold text-slate-500">Acronym</label>
+                        <input id="fac-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PhD, DIT" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-[13px] font-semibold uppercase text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_abbr }}">
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="mt-1 flex justify-end">
                   <button type="button" class="rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-blue-700" onclick="facSavePersonalInfo()">Save Changes</button>
@@ -1620,6 +1647,9 @@ function facSavePersonalInfo() {
         fac_bachelors_degree: document.getElementById('fac-bachelors').value.trim(),
         fac_masters_degree: document.getElementById('fac-masters').value.trim(),
         fac_doctorate_degree: document.getElementById('fac-doctorate').value.trim(),
+        fac_bachelors_abbr: document.getElementById('fac-bachelors-abbr').value.trim(),
+        fac_masters_abbr: document.getElementById('fac-masters-abbr').value.trim(),
+        fac_doctorate_abbr: document.getElementById('fac-doctorate-abbr').value.trim(),
       }, 'Personal information saved.');
     }
 

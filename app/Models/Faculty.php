@@ -51,6 +51,9 @@ class Faculty extends Model
         'fac_bachelors_degree',
         'fac_masters_degree',
         'fac_doctorate_degree',
+        'fac_bachelors_abbr',
+        'fac_masters_abbr',
+        'fac_doctorate_abbr',
 
         // Profile
         'fac_profile_image',

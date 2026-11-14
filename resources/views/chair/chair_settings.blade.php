@@ -118,9 +118,9 @@
                   <div><label class="field-label">Nationality</label><input class="field-input" id="pi-nat" value="{{ $chair->dc_nationality }}"></div>
                 </div>
                 <div class="grid grid-cols-3 gap-3 mb-3">
-                  <div><label class="field-label">Bachelor's Degree</label><input class="field-input" id="pi-bachelors" value="{{ $faculty?->fac_bachelors_degree }}"></div>
-                  <div><label class="field-label">Master's Degree</label><input class="field-input" id="pi-masters" value="{{ $faculty?->fac_masters_degree }}"></div>
-                  <div><label class="field-label">Doctorate Degree</label><input class="field-input" id="pi-doctorate" value="{{ $faculty?->fac_doctorate_degree }}"></div>
+                  <div><label class="field-label">Bachelor's Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-bachelors" value="{{ $faculty?->fac_bachelors_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-bachelors-abbr">Acronym</label><input class="field-input uppercase" id="pi-bachelors-abbr" aria-label="Bachelor's degree acronym" placeholder="BSIS" value="{{ $faculty?->fac_bachelors_abbr }}"></div></div></div>
+                  <div><label class="field-label">Master's Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-masters" value="{{ $faculty?->fac_masters_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-masters-abbr">Acronym</label><input class="field-input uppercase" id="pi-masters-abbr" aria-label="Master's degree acronym" placeholder="MIT" value="{{ $faculty?->fac_masters_abbr }}"></div></div></div>
+                  <div><label class="field-label">Doctorate Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-doctorate" value="{{ $faculty?->fac_doctorate_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-doctorate-abbr">Acronym</label><input class="field-input uppercase" id="pi-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PhD, DIT" value="{{ $faculty?->fac_doctorate_abbr }}"></div></div></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-1">
                   <div><label class="field-label">Date of Birth</label><input class="field-input" type="date" id="pi-dob" value="{{ $chair->dc_dob?->format('Y-m-d') }}"></div>
@@ -546,6 +546,9 @@
         fac_bachelors_degree: document.getElementById('pi-bachelors').value,
         fac_masters_degree: document.getElementById('pi-masters').value,
         fac_doctorate_degree: document.getElementById('pi-doctorate').value,
+        fac_bachelors_abbr: document.getElementById('pi-bachelors-abbr').value,
+        fac_masters_abbr: document.getElementById('pi-masters-abbr').value,
+        fac_doctorate_abbr: document.getElementById('pi-doctorate-abbr').value,
       };
 
       fetch("{{ route('chair.profile.personal-info.update') }}", {
