@@ -319,7 +319,7 @@
                                             class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing
                                             schedule for</span>
                                         <span
-                                            class="block truncate text-[13px] font-semibold text-slate-800">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : 'Choose a teacher' }}</span>
+                                            class="block truncate text-[13px] font-semibold text-slate-800">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : 'Choose a teacher' }}</span>
                                     </span>
                                     <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20"
                                         fill="currentColor" aria-hidden="true">
@@ -359,13 +359,7 @@
                                                 @forelse($groupList as $person)
                                                     @php
                                                         $pid = $person->fac_id ?? ($person->dean_id ?? '');
-                                                        $pname = trim(
-                                                            implode(' ', array_filter([
-                                                                $person->fac_first_name ?? ($person->dean_first_name ?? ''),
-                                                                $person->fac_last_name ?? ($person->dean_last_name ?? ''),
-                                                                $person->fac_suffix ?? ($person->dean_suffix ?? '')
-                                                            ]))
-                                                        );
+                                                        $pname = \App\Services\FacultyNameFormatter::format($person);
                                                     @endphp
                                                     <button type="button"
                                                         class="teacher-option flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none {{ ($selectedFaculty->fac_id ?? null) === $pid ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-100' : '' }}"
@@ -652,7 +646,7 @@
                 <div
                     class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
                     Teacher: <span
-                        class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
+                        class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
                 </div>
 
                 <div class="mb-3">
@@ -815,7 +809,7 @@
                 <div
                     class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
                     Teacher: <span
-                        class="font-bold text-slate-900">{{ $selectedFaculty ? $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name : '—' }}</span>
+                        class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
                 </div>
 
                 <div class="mb-3">
@@ -990,7 +984,7 @@
                         class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
                         Faculty:
                         <span class="font-bold text-slate-900">
-                            {{ $selectedFaculty->fac_first_name . ' ' . $selectedFaculty->fac_last_name }}
+                            {{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}
                         </span>
                     </div>
 

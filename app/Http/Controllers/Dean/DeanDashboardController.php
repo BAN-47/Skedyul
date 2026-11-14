@@ -14,6 +14,7 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\User;
+use App\Services\FacultyNameFormatter;
 use Illuminate\Support\Facades\Auth;
 
 class DeanDashboardController extends Controller
@@ -161,7 +162,7 @@ class DeanDashboardController extends Controller
         $pendingApprovals = $pendingApprovals->map(function ($submission) use ($submittersById) {
             $submitter = $submittersById->get($submission->schsub_submitted_by);
             $submitterName = $submitter->usr_name ?? 'Unknown Chair';
-            $facultyName = $submission->faculty->user->usr_name ?? 'Unknown Faculty';
+            $facultyName = FacultyNameFormatter::format($submission->faculty) ?: 'Unknown Faculty';
             $departmentCode = $submission->department->dept_code ?? 'Department';
 
             $initials = collect(preg_split('/\s+/', trim($facultyName)))

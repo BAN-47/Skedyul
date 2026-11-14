@@ -12,6 +12,7 @@ use App\Models\Section;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
+use App\Services\FacultyNameFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -108,9 +109,7 @@ class DeanScheduleViewerController extends Controller
         $row = 6;
 
         foreach ($schedules as $schedule) {
-            $facultyName = $schedule->faculty?->user?->usr_name
-                ?? $schedule->faculty?->full_name
-                ?? 'Unassigned';
+            $facultyName = FacultyNameFormatter::format($schedule->faculty) ?: 'Unassigned';
 
             $sheet->fromArray([
                 $schedule->subject?->course_code ?? '—',

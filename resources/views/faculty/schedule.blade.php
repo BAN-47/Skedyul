@@ -249,7 +249,7 @@
                                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing
                                     my schedule</span>
                                 <span
-                                    class="block truncate text-[13px] font-semibold text-slate-800">{{ $faculty->full_name }}</span>
+                                    class="block truncate text-[13px] font-semibold text-slate-800">{{ \App\Services\FacultyNameFormatter::format($faculty) }}</span>
                             </span>
                         </div>
 

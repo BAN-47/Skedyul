@@ -84,7 +84,7 @@
                                     <tr data-approval-row>
                                         <td><b>{{ $sub->department->dept_code ?? '—' }}</b></td>
                                         <td>
-                                            <b>{{ $sub->faculty->user->usr_name ?? 'Unknown Faculty' }}</b>
+                                            <b>{{ \App\Services\FacultyNameFormatter::format($sub->faculty) ?: 'Unknown Faculty' }}</b>
                                             <div class="text-xs text-slate-400">Program by Teacher</div>
                                         </td>
                                         <td>
@@ -121,7 +121,7 @@
                                                 <button class="topbar-btn btn-secondary px-2.5 py-1 text-[11px]"
                                                     onclick="openReview(
                                                         '{{ $sub->schsub_id }}',
-                                                        '{{ addslashes($sub->faculty->user->usr_name ?? 'Faculty PBT') }}',
+                                                        '{{ addslashes(\App\Services\FacultyNameFormatter::format($sub->faculty) ?: 'Faculty PBT') }}',
                                                         {{ $sub->conflict_count }},
                                                         '{{ route('dean.pending_approvals.review', $sub->schsub_id) }}'
                                                     )">

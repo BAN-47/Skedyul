@@ -8,6 +8,7 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Schedule_Submission;
+use App\Services\FacultyNameFormatter;
 use App\Models\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -190,8 +191,7 @@ class PendingApprovalsController extends Controller
                         ->where('sch_id', '!=', $schedule->sch_id)
                         ->exists();
 
-                    $schedule->faculty_name = optional($schedule->faculty?->user)->usr_name
-                        ?? 'Unknown';
+                    $schedule->faculty_name = FacultyNameFormatter::format($schedule->faculty) ?: 'Unknown';
                     $schedule->subject_code = $schedule->subject?->course_code;
                     $schedule->section_name = $schedule->section?->sec_name;
                     $schedule->room_name = $schedule->room?->room_name;

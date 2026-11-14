@@ -4,7 +4,7 @@
     <div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]">
         <div class="modal-header px-6 pt-5">
             <div class="modal-title" id="review-modal-title">
-                PBT Review — {{ $submission->faculty->user->usr_name ?? 'Faculty' }}
+                PBT Review — {{ \App\Services\FacultyNameFormatter::format($submission->faculty) ?: 'Faculty' }}
             </div>
             <button class="modal-close" type="button" onclick="closeModal('modal-review')">✕</button>
         </div>
@@ -43,7 +43,7 @@
                         style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:2px;">
                         Faculty</div>
                     <div style="font-weight:600;font-size:13px;">
-                        {{ $submission->faculty->user->usr_name ?? 'Unknown Faculty' }}
+                        {{ \App\Services\FacultyNameFormatter::format($submission->faculty) ?: 'Unknown Faculty' }}
                     </div>
                 </div>
                 <div style="background:var(--grey);border-radius:10px;padding:12px;">

@@ -116,19 +116,7 @@
                                             <option value="">Choose a faculty member</option>
                                             @foreach ($facultyMembers as $faculty)
                                                 @php
-                                                    $facultyName =
-                                                        $faculty->user?->usr_name ??
-                                                        trim(
-                                                            implode(
-                                                                ' ',
-                                                                array_filter([
-                                                                    $faculty->fac_first_name,
-                                                                    $faculty->fac_middle_name,
-                                                                    $faculty->fac_last_name,
-                                                                    $faculty->fac_suffix,
-                                                                ]),
-                                                            ),
-                                                        );
+                                                    $facultyName = \App\Services\FacultyNameFormatter::format($faculty);
                                                 @endphp
                                                 <option value="{{ $faculty->fac_id }}" @selected(old('faculty_id') === $faculty->fac_id)>
                                                     {{ $facultyName ?: 'Unnamed Faculty' }}

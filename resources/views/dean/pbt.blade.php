@@ -76,7 +76,7 @@
                                 <option value="">Choose a faculty member</option>
                                 @foreach ($facultyMembers as $faculty)
                                     @php
-                                        $name = $faculty->user?->usr_name ?? $faculty->full_name;
+                                        $name = \App\Services\FacultyNameFormatter::format($faculty);
                                         $departmentCode = $faculty->program?->dept_code ?? 'Department';
                                     @endphp
                                     <option value="{{ $faculty->fac_id }}" @selected(($selectedFaculty?->fac_id ?? request('faculty_id')) === $faculty->fac_id)>
@@ -121,7 +121,7 @@
                                 <div>
                                     <div class="flex items-center gap-2">
                                         <h2 class="text-base font-extrabold">
-                                            {{ $selectedFaculty->user?->usr_name ?? $selectedFaculty->full_name }}</h2>
+                                            {{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}</h2>
                                         <span
                                             class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">{{ $selectedFaculty->program?->dept_code ?? 'Department' }}</span>
                                     </div>

@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
+use App\Services\FacultyNameFormatter;
 use App\Services\CampusDirectorSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -230,13 +231,7 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $facultyName = $faculty->user->usr_name
-            ?? trim(implode(' ', array_filter([
-                $faculty->fac_first_name,
-                $faculty->fac_middle_name,
-                $faculty->fac_last_name,
-                $faculty->fac_suffix,
-            ])));
+        $facultyName = FacultyNameFormatter::format($faculty);
 
         $chair = Dept_Chair::with('user')
             ->where('dc_dept_id', $faculty->fac_dept_id)

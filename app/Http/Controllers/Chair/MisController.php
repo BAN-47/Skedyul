@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Departments;
 use App\Models\SystemSetting;
+use App\Services\FacultyNameFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +21,6 @@ use ZipArchive;
 
 class MisController extends Controller
 {
-    private const DEFAULT_MIS_INSTRUCTOR_TITLE = 'Prof.';
-    private const DOCTORATE_MIS_INSTRUCTOR_TITLE = 'Dr.';
 
     private function chairRecord(): ?Dept_Chair
     {
@@ -119,8 +118,6 @@ class MisController extends Controller
                 'activeSemester' => $activeSem,
                 'chairDepartment' => null,
                 'filters' => ['section' => null, 'shift' => $shift],
-                'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
-                'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
                 'signatories' => [
                     'chair_name' => $chairName,
                     'chair_title' => 'Dept. Chair',
@@ -191,8 +188,6 @@ class MisController extends Controller
                 'section' => $sectionId,
                 'shift' => $shift,
             ],
-            'instructorTitle' => self::DEFAULT_MIS_INSTRUCTOR_TITLE,
-            'doctorateInstructorTitle' => self::DOCTORATE_MIS_INSTRUCTOR_TITLE,
             'signatories' => [
                 'chair_name' => $chairName,
                 'chair_title' => 'Chair, ' . ($chairDepartment->dept_code ?? 'Department'),
@@ -458,24 +453,9 @@ class MisController extends Controller
             $body->removeChild($child);
         }
     }
-    /**
-     * Format an MIS export instructor using the surname and degree information.
-     * A saved doctorate degree uses Dr.; otherwise the default Prof. title is used.
-     */
     private function misInstructorName(?object $faculty): string
     {
-        $lastName = trim((string) ($faculty?->fac_last_name ?? ''));
-
-        if ($lastName === '') {
-            return '—';
-        }
-
-        $doctorateDegree = trim((string) ($faculty?->fac_doctorate_degree ?? ''));
-        $title = $doctorateDegree !== ''
-            ? self::DOCTORATE_MIS_INSTRUCTOR_TITLE
-            : self::DEFAULT_MIS_INSTRUCTOR_TITLE;
-
-        return $title . ' ' . $lastName;
+        return FacultyNameFormatter::format($faculty) ?: '—';
     }
     private function replaceScheduleRows(
         DOMXPath $xpath,

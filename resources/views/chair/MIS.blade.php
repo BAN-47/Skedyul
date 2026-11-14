@@ -153,16 +153,7 @@
                                             }
                                             $day = $s->sch_day ?? '—';
                                             $room = optional($s->room)->room_name ?? '—';
-                                            $faculty = $s->faculty;
-                                            $lastName = trim((string) (optional($faculty)->fac_last_name ?? ''));
-                                            $doctorateDegree = trim(
-                                                (string) (optional($faculty)->fac_doctorate_degree ?? ''),
-                                            );
-                                            $teacherTitle =
-                                                $doctorateDegree !== ''
-                                                    ? trim((string) ($doctorateInstructorTitle ?? 'Dr.'))
-                                                    : trim((string) ($instructorTitle ?? 'Prof.'));
-                                            $inst = $lastName !== '' ? $teacherTitle . ' ' . $lastName : '—';
+                                            $inst = \App\Services\FacultyNameFormatter::format($s->faculty) ?: '—';
                                         @endphp
                                         <tr class="border-b border-slate-100 hover:bg-slate-50/80">
                                             <td class="px-2 py-1.5 align-top">
