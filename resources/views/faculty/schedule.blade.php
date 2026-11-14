@@ -302,7 +302,7 @@
                                     @endphp
                                     <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"
                                         style="grid-column:1;grid-row:{{ $slot + 1 }} / span 2;">
-                                        {{ $hour->format('g') }}–{{ $hourEnd->format('g A') }}
+                                        {{ $hour->format('g A') }}–{{ $hourEnd->format('g A') }}
                                     </div>
                                 @endfor
 

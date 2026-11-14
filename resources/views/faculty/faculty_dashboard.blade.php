@@ -190,7 +190,7 @@
                 <tbody>
                   @forelse ($todaySchedule as $sch)
                     <tr class="sched-row border-b border-gray-100" data-start="{{ $sch->sch_start_time }}" data-end="{{ $sch->sch_end_time }}">
-                      <td class="px-3 py-2.5 font-mono text-xs text-gray-400 whitespace-nowrap">{{ $sch->sch_start_time }}–{{ $sch->sch_end_time }}</td>
+                      <td class="px-3 py-2.5 font-mono text-xs text-gray-400 whitespace-nowrap">{{ \Carbon\Carbon::parse($sch->sch_start_time)->format('g:i A') }}–{{ \Carbon\Carbon::parse($sch->sch_end_time)->format('g:i A') }}</td>
                       <td class="px-3 py-2.5"><b class="text-gray-900">{{ $sch->subject->subj_code ?? '' }} — {{ $sch->subject->subj_name ?? 'N/A' }}</b></td>
                       <td class="px-3 py-2.5 text-gray-700">{{ $sch->room->room_name ?? 'N/A' }}</td>
                       <td class="px-3 py-2.5 text-gray-700">{{ $sch->section->sec_name ?? 'N/A' }}</td>
