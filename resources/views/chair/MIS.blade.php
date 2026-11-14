@@ -34,8 +34,8 @@
             <div class="page-content" id="page-mis">
 
 
-                <div class="flex items-center justify-between gap-3 mb-4 no-print">
-                    <div class="flex items-center gap-2">
+                <div class="flex items-center justify-end gap-3 mb-4 no-print">
+                    <div class="ml-auto flex items-center justify-end gap-2">
                         <a href="{{ route('chair.mis.word', request()->query()) }}" class="btn btn-primary">
                             Download DOCX
                         </a>

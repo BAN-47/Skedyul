@@ -98,7 +98,8 @@
 
                 {{-- HEADING + ACTIONS --}}
                 <div class="flex items-center justify-between gap-3 mb-4">
-                    <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-500">Schedules save as drafts when confirmed</span>
+                    <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                         @if ($selectedFaculty)
                             @if ($activeSemester)
                                 <button type="button" onclick="openModal('modal-submit-dean')" class="btn btn-primary">
@@ -108,7 +109,6 @@
                             <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
                                 class="btn btn-secondary">Download XLSX</a>
                         @endif
-                        <span class="text-xs text-slate-500">Schedules save as drafts when confirmed</span>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
                     </div>
                 </div>

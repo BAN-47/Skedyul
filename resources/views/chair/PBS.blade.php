@@ -92,8 +92,8 @@
             <div class="page-content" id="page-pbs">
 
                 {{-- HEADING + ACTIONS --}}
-                <div class="flex items-center justify-between gap-3 mb-4">
-                    <div class="flex items-center gap-2">
+                <div class="flex items-center justify-end gap-3 mb-4">
+                    <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                         <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section
                             Count</button>
                         <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Download PBS
