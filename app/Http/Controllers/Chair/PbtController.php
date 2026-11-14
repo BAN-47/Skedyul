@@ -173,7 +173,7 @@ class PbtController extends Controller
             return str_contains($t, 'part');
         })->values();
 
-        return view('chair.pbt', [
+        return response()->view('chair.pbt', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
                 ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
@@ -253,7 +253,8 @@ class PbtController extends Controller
             'selectedShift'    => $shiftKey,
             'activeSemester'   => $activeSem ?? null,
             'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 
     private function getSectionsForDepartment(Request $request, ?string $defaultDeptId)

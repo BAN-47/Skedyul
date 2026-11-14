@@ -618,10 +618,9 @@
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
-                            <input id="campus-director-name" type="text" maxlength="120"
-                                placeholder="Enter campus director name"
-                                class="w-full border-0 border-b border-slate-700 bg-transparent px-1 pb-1 text-center text-sm font-bold uppercase outline-none focus:ring-0"
-                                value="{{ $signoff['campus_director'] ?? '' }}" readonly>
+                            <div class="w-full border-b border-slate-700 px-1 pb-1 text-center text-sm font-bold uppercase">
+                                {{ $signoff['campus_director'] ?? '' }}
+                            </div>
                             <div class="text-xs text-slate-600">Campus Director</div>
                         </div>
                     </div>

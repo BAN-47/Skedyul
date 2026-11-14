@@ -82,7 +82,7 @@ class PbsController extends Controller
         $selectedDeptId = $request->query('department', $progId);
 
         if (!$progId) {
-            return view('chair.pbs', [
+            return response()->view('chair.pbs', [
                 'schedules'        => collect(),
                 'subjects'         => collect(),
                 'faculty'          => collect(),
@@ -100,7 +100,8 @@ class PbsController extends Controller
                 'selectedSection'  => null,
                 'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
                 'error'            => 'Your account is not linked to a department. Contact the system administrator.',
-            ]);
+            ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+                ->header('Pragma', 'no-cache');
         }
 
         $filters = $request->only(['section']);
@@ -215,7 +216,7 @@ class PbsController extends Controller
             ->orderBy('fac_first_name')
             ->get();
 
-        return view('chair.pbs', [
+        return response()->view('chair.pbs', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
             'allSubjects'      => Course::where('course_is_active', true)->orderBy('course_code')->get(),
@@ -263,7 +264,8 @@ class PbsController extends Controller
             'summaryShift'     => $summaryShift,
             'summarySchedules' => $summarySchedules,
             'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
     }
 
     private function validated(Request $request, bool $multipleDays = false): array
