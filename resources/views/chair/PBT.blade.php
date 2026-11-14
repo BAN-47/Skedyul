@@ -98,7 +98,6 @@
 
                 {{-- HEADING + ACTIONS --}}
                 <div class="flex items-center justify-between gap-3 mb-4">
-                    <div class="text-[19px] font-extrabold text-slate-900">PBT Schedule Plotter</div>
                     <div class="flex items-center gap-2">
                         @if ($selectedFaculty)
                             @if ($activeSemester)

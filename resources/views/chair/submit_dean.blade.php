@@ -20,8 +20,7 @@
             ])
 
             <div class="flex-1 overflow-y-auto p-7">
-                <div class="mb-5">
-                    <h1 class="text-xl font-extrabold">Submit Faculty PBT to Dean</h1>
+                <div class="mb-5 font-bold">
                     <p class="mt-1 text-sm text-slate-500">
                         Choose a faculty member to review and submit their Program by Teacher schedule.
                     </p>

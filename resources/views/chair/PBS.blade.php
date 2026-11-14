@@ -91,7 +91,6 @@
 
       {{-- HEADING + ACTIONS --}}
       <div class="flex items-center justify-between gap-3 mb-4">
-        <div class="text-[19px] font-extrabold text-slate-900">PBS Schedule Plotter</div>
         <div class="flex items-center gap-2">
           <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section Count</button>
           <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>

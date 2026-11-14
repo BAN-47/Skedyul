@@ -49,8 +49,7 @@
 
                 <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <div class="text-[22px] font-extrabold">Faculty Load Management</div>
-                        <div class="text-[13px] text-slate-400 mt-0.5">
+                        <div class="text-[13px] text-slate-400 mt-0.5 font-bold">
                             {{ $department->dept_name ?? 'Department' }}
                             @if ($program)
                                 &middot; {{ $program->dept_code ?? $program->prog_code }}

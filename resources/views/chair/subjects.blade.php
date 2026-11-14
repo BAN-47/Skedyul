@@ -28,8 +28,7 @@
             ])
 
             <div id="page-subjects" class="page-content min-h-0 flex-1 overflow-y-auto">
-                <div class="mb-5">
-                    <div class="text-[20px] font-extrabold text-slate-900">Course Management</div>
+                <div class="mb-5 font-bold">
                     <div class="mt-1 text-[13px] text-slate-500">
                         {{ $programName ?? 'BSIS' }} Department — filter by year &amp; semester
                     </div>

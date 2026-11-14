@@ -35,7 +35,6 @@
 
 
                 <div class="flex items-center justify-between gap-3 mb-4 no-print">
-                    <div class="text-[19px] font-extrabold text-slate-900">Class Program for MIS</div>
                     <div class="flex items-center gap-2">
                         <a href="{{ route('chair.mis.word', request()->query()) }}" class="btn btn-primary">
                             Download DOCX
