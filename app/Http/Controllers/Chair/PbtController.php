@@ -122,21 +122,19 @@ class PbtController extends Controller
                 )
                 ->where('sch_is_active', true)
                 ->whereHas('studyLoad', fn ($q) => $q->where('sl_fac_id', $selectedFaculty->fac_id))
+                ->where(function ($query) use ($shiftKey) {
+                    if ($shiftKey === 'evening') {
+                        $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'evening'))
+                            ->orWhereHas('section', fn ($section) => $section->where('sec_is_evening', true));
+                    } else {
+                        $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'day'))
+                            ->whereDoesntHave('section', fn ($section) => $section->where('sec_is_evening', true));
+                    }
+                })
                 ->with(['subject', 'section', 'room', 'studyLoad'])
                 ->orderBy('sch_day')
                 ->orderBy('sch_start_time')
-                ->get()
-                ->filter(function ($schedule) use ($shiftKey) {
-                    $load = $schedule->studyLoad;
-                    if (ScheduleAssignmentService::isOjt($schedule->subject)) {
-                        return ($load?->sl_ojt_is_evening ? 'evening' : 'day') === $shiftKey;
-                    }
-                    $loadShift = $schedule->section?->sec_is_evening
-                        ? 'evening'
-                        : ($load?->sl_shift ?? 'day');
-                    return $loadShift === $shiftKey;
-                })
-                ->values();
+                ->get();
         }
 
         // Every active department chair with a Faculty row can be selected.
@@ -290,26 +288,14 @@ class PbtController extends Controller
             ->with('subject', 'section', 'schedules')
             ->get();
 
-        $shiftForLoad = function ($load) {
-            if (ScheduleAssignmentService::isOjt($load->subject)) {
-                return $load->sl_ojt_is_evening ? 'evening' : 'day';
-            }
-            return $load->section?->sec_is_evening ? 'evening' : ($load->sl_shift ?? 'day');
-        };
+        $shiftForLoad = fn ($load) => $load->section?->sec_is_evening
+            ? 'evening'
+            : ($load->sl_shift ?? 'day');
         $loads = $allLoads->filter(fn ($load) => $shiftForLoad($load) === $shift)->values();
 
         // Academic credit units and scheduled weekly contact hours are
         // different totals. Units come from each distinct Study Load course.
-        $countedOjt = [];
-        $units = $loads->sum(function ($load) use (&$countedOjt) {
-            $course = $load->subject;
-            if (ScheduleAssignmentService::isOjt($course)) {
-                $courseId = (string) $course->course_id;
-                if (isset($countedOjt[$courseId])) return 0;
-                $countedOjt[$courseId] = true;
-            }
-            return ScheduleAssignmentService::courseUnits($course);
-        });
+        $units = $loads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0)); 
 
         $hoursForLoads = function ($loads) {
             return $loads->sum(function ($load) {
@@ -353,9 +339,6 @@ class PbtController extends Controller
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
             'sem_id'     => 'required|uuid|exists:semester,sem_id',
             'sec_id'     => 'nullable|uuid|exists:section,sec_id',
-            'sec_ids'    => 'sometimes|array|min:1',
-            'sec_ids.*'  => 'required|uuid|exists:section,sec_id',
-            'ojt_is_evening' => 'sometimes|boolean',
             'room_id'    => 'nullable|uuid|exists:room,room_id',
             'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'shift'      => 'required|string|in:day,evening',
@@ -366,23 +349,6 @@ class PbtController extends Controller
         ]);
 
         $course = Course::findOrFail($data['subj_id']);
-        if (ScheduleAssignmentService::isOjt($course) && $multipleDays) {
-            $sectionIds = array_values(array_unique($data['sec_ids'] ?? []));
-            if (!$sectionIds) {
-                throw ValidationException::withMessages(['sec_ids' => 'Select at least one Year 4 section for OJT.']);
-            }
-            $sections = Section::whereIn('sec_id', $sectionIds)->get();
-            if ($sections->count() !== count($sectionIds) || $sections->contains(fn ($section) =>
-                (int) $section->sec_year_level !== 4 || (string) $section->sec_dept_id !== (string) $course->course_dept_id
-            )) {
-                throw ValidationException::withMessages(['sec_ids' => 'OJT can only be assigned to Year 4 sections in the course program.']);
-            }
-            $data['sec_ids'] = $sectionIds;
-            $data['sec_id'] = $sectionIds[0];
-            $data['ojt_is_evening'] = $request->boolean('ojt_is_evening');
-            return $data;
-        }
-
         $data['sec_id'] = $data['sec_id'] ?? null;
         if (empty($data['sec_id'])) {
             if ($course->course_code !== 'REC') {
@@ -395,11 +361,6 @@ class PbtController extends Controller
         }
 
         $section = Section::findOrFail($data['sec_id']);
-        if (ScheduleAssignmentService::isOjt($course) && (int) $section->sec_year_level !== 4) {
-            throw ValidationException::withMessages([
-                'sec_id' => 'OJT can only be assigned to a Year 4 section.',
-            ]);
-        }
         if ((string) $course->course_dept_id !== (string) $section->sec_dept_id) {
             throw ValidationException::withMessages([
                 'subj_id' => 'The selected course must belong to the selected section department.',
@@ -422,10 +383,6 @@ class PbtController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request, true);
-        if (ScheduleAssignmentService::isOjt(Course::find($data['subj_id']))) {
-            $result = $this->scheduler->assignMultipleSections($data);
-            return response()->json($result, $result['success'] ? 200 : 422);
-        }
         $result = $this->scheduler->assignMultiple($data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }

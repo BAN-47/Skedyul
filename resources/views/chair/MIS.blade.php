@@ -72,16 +72,23 @@
                             {{ optional($activeSemester)->label ?? 'No active semester' }}
                         </span>
 
-                        <div class="flex rounded-md overflow-hidden border border-slate-300">
-                            <button type="button" onclick="setMisShift('day')"
-                                class="px-2.5 py-1.5 text-[11px] font-bold uppercase {{ $shift === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">
-                                Day
-                            </button>
-                            <button type="button" onclick="setMisShift('night')"
-                                class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300 {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">
-                                Evening
-                            </button>
-                        </div>
+                        @if (empty($filters['section']))
+                            <div class="flex rounded-md overflow-hidden border border-slate-300">
+                                <button type="button" onclick="setMisShift('day')"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold uppercase {{ $shift === 'day' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">
+                                    Day
+                                </button>
+                                <button type="button" onclick="setMisShift('night')"
+                                    class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300 {{ $shift === 'night' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600' }}">
+                                    Evening
+                                </button>
+                            </div>
+                        @else
+                            <span
+                                class="inline-flex items-center px-3 py-1.5 rounded-md bg-blue-50 border border-blue-200 text-[11px] font-bold text-blue-700 uppercase">
+                                Day & Evening
+                            </span>
+                        @endif
                     </div>
                 </div>
 
@@ -200,7 +207,7 @@
                         @elseif(empty($filters['section']))
                             No schedules plotted yet for this department. Plot classes in PBS / PBT first.
                         @else
-                            No schedules for this section in the active semester ({{ $shift }} shift).
+                            No schedules found for this section in the active semester.
                         @endif
                     </div>
                 @endforelse

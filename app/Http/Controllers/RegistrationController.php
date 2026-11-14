@@ -41,7 +41,7 @@ class RegistrationController extends Controller
 
         $data = $request->validate([
             'usr_first_name' => ['required', 'string', 'max:150'],
-            'usr_middle_name' => ['required', 'string', 'max:150'],
+            'usr_middle_name' => ['nullable', 'string', 'max:150'],
             'usr_last_name' => ['required', 'string', 'max:150'],
             'usr_suffix' => ['nullable', 'string', 'max:20'],
             'usr_employee_id' => ['required', 'string', 'max:255'],
