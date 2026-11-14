@@ -102,6 +102,7 @@ class PbsExportController extends Controller
         }
         $spreadsheet->setActiveSheetIndex(0);
         $sheet->setTitle(mb_substr(trim((string) $section->sec_name) ?: 'PBS', 0, 31));
+
         // The source workbook styles the entire D column with a right border,
         // which Excel renders as a long line below the actual course table.
         // Clear only the column-level style; the table's individual cell borders remain.
@@ -223,8 +224,17 @@ class PbsExportController extends Controller
     private function clearCourseSummary($sheet): void
     {
         foreach (range(16, 23) as $row) {
+            $descriptionRange = 'B' . $row . ':C' . $row;
+            // The template merges B:C only for the taller PATHFit row.
+            if ($row !== 22 && isset($sheet->getMergeCells()[$descriptionRange])) {
+                $sheet->unmergeCells($descriptionRange);
+            }
+
             $sheet->setCellValue('A' . $row, null);
             $sheet->setCellValue('B' . $row, null);
+            if ($row !== 22) {
+                $sheet->setCellValue('C' . $row, null);
+            }
             $sheet->setCellValue('D' . $row, null);
         }
         $sheet->setCellValue('D15', null);
@@ -232,15 +242,57 @@ class PbsExportController extends Controller
 
     private function writeCourseSummary($sheet, $schedules, int $students): void
     {
+        // Follow the curriculum order used by the supplied PBS workbook.
+        // PATHFit1 belongs on row 22, which is the template's taller row for
+        // its long course title.
+        $courseOrder = [
+            'GECRPH' => 0,
+            'GECMMW' => 1,
+            'GEETEM' => 2,
+            'CC111' => 3,
+            'CC112' => 4,
+            'CC112L' => 5,
+            'PATHFIT1' => 6,
+            'NSTP1' => 7,
+        ];
+
         $courses = $schedules
             ->filter(fn($schedule) => $schedule->subject)
             ->unique(fn($schedule) => $schedule->subject->course_id)
+            ->sortBy(function ($schedule) use ($courseOrder) {
+                $code = $schedule->subject->course_code ?? $schedule->subject->subj_code ?? '';
+                $normalizedCode = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $code));
+
+                return sprintf('%03d-%s', $courseOrder[$normalizedCode] ?? 999, $normalizedCode);
+            })
             ->values();
 
         $sheet->setCellValue('D15', $students);
         foreach ($courses->take(8) as $index => $schedule) {
             $row = 16 + $index;
             $course = $schedule->subject;
+
+            $descriptionRange = 'B' . $row . ':C' . $row;
+            if ($row === 22) {
+                if (!isset($sheet->getMergeCells()[$descriptionRange])) {
+                    $sheet->mergeCells($descriptionRange);
+                }
+                $sheet->getStyle($descriptionRange)->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setWrapText(true)
+                    ->setShrinkToFit(false);
+            } else {
+                if (isset($sheet->getMergeCells()[$descriptionRange])) {
+                    $sheet->unmergeCells($descriptionRange);
+                }
+                $sheet->getStyle('B' . $row)->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setWrapText(false)
+                    ->setShrinkToFit(false);
+            }
+
             $sheet->setCellValue('A' . $row, $course->course_code ?? $course->subj_code ?? '');
             $sheet->setCellValue('B' . $row, $course->course_name ?? $course->subj_name ?? '');
         }
@@ -255,8 +307,18 @@ class PbsExportController extends Controller
         $sheet->setCellValue('G49', 'Dean' . ($collegeLabel ? ', ' . $collegeLabel : ''));
 
         $directorCell = $isEvening ? 'J48' : 'K48';
-        CampusDirectorSignature::write($sheet, $directorName, $directorCell);
+        $directorRange = $isEvening ? 'J48:M48' : 'K48:M48';
+        // Write to the anchor of the merged signature range. The shared helper
+        // follows the K49 label, which is not the anchor in the evening template.
+        $sheet->setCellValue($directorCell, mb_strtoupper(trim($directorName)));
+        $sheet->getStyle($directorRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setIndent(1);
         $sheet->setCellValue('K49', 'Campus Director');
+        $sheet->getStyle('K49:M49')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
 
         $sheet->setCellValue('G53', $casDeanName !== '' ? mb_strtoupper($casDeanName) : '');
         $sheet->setCellValue('G54', $casDeanName !== '' ? 'Dean, CAS' : '');
@@ -415,17 +477,23 @@ class PbsExportController extends Controller
     private function eveningRows(string $day, int $start, int $end): ?array
     {
         $weekend = in_array($day, ['SAT', 'SUN'], true);
-        $gridStart = 7 * 60;
+        $gridStart = $weekend ? 7 * 60 : 16 * 60;
         $gridEnd = 22 * 60;
+        $minutesPerRow = $weekend ? 30 : 12;
 
-        // Weekdays use the lower evening rows (4:00 PM-10:00 PM).
-        // Saturday and Sunday use the full 7:00 AM-10:00 PM grid.
-        if ($start < $gridStart || $end > $gridEnd || (!$weekend && $start < 16 * 60)) {
+        // The evening template has two independent time scales:
+        // weekdays use 4:00 PM-10:00 PM across 30 worksheet rows (12 minutes per row),
+        // while Saturday and Sunday use 7:00 AM-10:00 PM across 30 rows (30 minutes per row).
+        if ($start < $gridStart || $end > $gridEnd || $end <= $start) {
             return null;
         }
 
-        $first = 13 + (int) floor(($start - $gridStart) / 30);
-        $last = 13 + (int) ceil(($end - $gridStart) / 30) - 1;
+        // Round a non-aligned start forward. Otherwise a class starting at
+        // 6:30 PM shares a worksheet row with the preceding class ending at
+        // 6:30 PM, causing overlapping merged cells in the Excel export.
+        $first = 13 + (int) ceil(($start - $gridStart) / $minutesPerRow);
+        $last = 13 + (int) ceil(($end - $gridStart) / $minutesPerRow) - 1;
+
         return [$first, min(42, max($first, $last))];
     }
 
