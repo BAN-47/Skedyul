@@ -388,7 +388,7 @@
                                 </td>
                                 <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">
                                     <div class="border-b border-slate-800 pb-1 font-bold uppercase">
-                                        {{ \App\Models\SystemSetting::get('campus_director_name', $signatories['campus_director'] ?? '') }}</div>
+                                        {{ $signatories['campus_director'] ?? '' }}</div>
                                     <div class="pt-1 text-slate-600">Campus Director</div>
                                 </td>
                             </tr>

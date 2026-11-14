@@ -235,6 +235,33 @@
                             </div>
                         @endif
                     </section>
+                    <section class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm print-card">
+                        <table class="w-full min-w-[720px] border-collapse text-center text-[12px]">
+                            <thead>
+                                <tr class="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                                    <th class="w-1/3 border-b border-slate-300 px-4 py-2">Prepared by:</th>
+                                    <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Reviewed, Certified True and Correct:</th>
+                                    <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Approved by:</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-4 pb-3 pt-8 align-bottom">
+                                        <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['chair_name'] ?: '—' }}</div>
+                                        <div class="pt-1 text-slate-600">{{ $signatories['chair_title'] }}</div>
+                                    </td>
+                                    <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">
+                                        <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['dean_name'] ?: '—' }}</div>
+                                        <div class="pt-1 text-slate-600">{{ $signatories['dean_title'] }}</div>
+                                    </td>
+                                    <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">
+                                        <div class="border-b border-slate-800 pb-1 font-bold uppercase">{{ $signatories['campus_director'] ?: '—' }}</div>
+                                        <div class="pt-1 text-slate-600">Campus Director</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </section>
                 </div>
             </div>
         </main>

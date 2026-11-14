@@ -251,7 +251,7 @@
                                 <td class="px-3 py-3 align-top">
                                     <input type="text"
                                         class="w-full border-0 border-b border-slate-300 px-2 py-1 text-[12px] font-bold text-slate-800 bg-transparent"
-                                        value="{{ \App\Models\SystemSetting::get('campus_director_name', '') }}" readonly>
+                                        value="{{ $signatories['campus_director'] ?? '' }}" readonly>
                                     <div class="text-slate-500 text-[10px] mt-1">Campus Director</div>
                                 </td>
                             </tr>

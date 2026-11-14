@@ -4,11 +4,14 @@ namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dean;
+use App\Models\Dept_Chair;
 use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Semester;
+use App\Models\SystemSetting;
+use App\Services\ScheduleSignatoryFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -47,12 +50,19 @@ class DeanScheduleViewerController extends Controller
             }
         }
 
+        $signatories = $this->scheduleSignatories(
+            $dean,
+            $selectedSection?->sec_dept_id,
+            $selectedSection?->program?->dept_code
+        );
+
         return view('dean.pbs', compact(
             'semester',
             'departments',
             'sections',
             'selectedSection',
-            'schedules'
+            'schedules',
+            'signatories'
         ));
     }
 
@@ -115,6 +125,43 @@ class DeanScheduleViewerController extends Controller
             $row++;
         }
 
+        $chair = Dept_Chair::where('dc_dept_id', $section->sec_dept_id)->first();
+        $formatter = app(ScheduleSignatoryFormatter::class);
+        $chairName = $formatter->formatRoleName($chair, 'dc_');
+        $deanName = $formatter->formatRoleName($dean, 'dean_');
+        $campusDirector = trim((string) SystemSetting::get('campus_director_name', ''));
+        $labelRow = $row + 2;
+        $nameRow = $labelRow + 1;
+        $titleRow = $nameRow + 1;
+
+        foreach ([['A', 'C'], ['D', 'F'], ['G', 'H']] as [$start, $end]) {
+            foreach ([$labelRow, $nameRow, $titleRow] as $signatureRow) {
+                $sheet->mergeCells($start . $signatureRow . ':' . $end . $signatureRow);
+            }
+        }
+
+        $sheet->setCellValue('A' . $labelRow, 'Prepared by:');
+        $sheet->setCellValue('D' . $labelRow, 'Reviewed, Certified True and Correct:');
+        $sheet->setCellValue('G' . $labelRow, 'Approved by:');
+        $sheet->setCellValue('A' . $nameRow, mb_strtoupper($chairName));
+        $sheet->setCellValue('D' . $nameRow, mb_strtoupper($deanName));
+        $sheet->setCellValue('G' . $nameRow, mb_strtoupper($campusDirector));
+        $sheet->setCellValue('A' . $titleRow, 'Program Coordinator / Chair');
+        $sheet->setCellValue('D' . $titleRow, 'Dean, ' . ($dean->department?->college_code ?? ''));
+        $sheet->setCellValue('G' . $titleRow, 'Campus Director');
+        $sheet->getStyle('A' . $labelRow . ':H' . $labelRow)->getFont()->setBold(true)->setSize(9);
+        $sheet->getStyle('A' . $nameRow . ':H' . $nameRow)->getFont()->setBold(true)->setSize(10);
+        $sheet->getStyle('A' . $labelRow . ':H' . $titleRow)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(true);
+        $sheet->getStyle('A' . $nameRow . ':H' . $nameRow)->getBorders()->getBottom()
+            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+        $sheet->getStyle('A' . $titleRow . ':H' . $titleRow)->getFont()->setSize(9)->getColor()->setRGB('64748B');
+        $sheet->getRowDimension($labelRow)->setRowHeight(28);
+        $sheet->getRowDimension($nameRow)->setRowHeight(24);
+        $sheet->getRowDimension($titleRow)->setRowHeight(22);
+
         $sheet->getStyle('A1:H1')->getFont()->setBold(true)->setSize(16);
         $sheet->getStyle('A1:H3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle('A5:H5')->getFont()->setBold(true);
@@ -169,12 +216,36 @@ class DeanScheduleViewerController extends Controller
             }
         }
 
+        $signatories = $this->scheduleSignatories(
+            $dean,
+            $selectedFaculty?->fac_dept_id,
+            $selectedFaculty?->program?->dept_code
+        );
+
         return view('dean.pbt', compact(
             'semester',
             'facultyMembers',
             'selectedFaculty',
-            'schedules'
+            'schedules',
+            'signatories'
         ));
+    }
+
+    private function scheduleSignatories(Dean $dean, ?string $departmentId, ?string $departmentCode): array
+    {
+        $chair = $departmentId
+            ? Dept_Chair::where('dc_dept_id', $departmentId)->first()
+            : null;
+        $formatter = app(ScheduleSignatoryFormatter::class);
+        $collegeCode = $dean->department?->college_code;
+
+        return [
+            'chair_name' => $formatter->formatRoleName($chair, 'dc_'),
+            'chair_title' => 'Chair' . ($departmentCode ? ', ' . $departmentCode : ''),
+            'dean_name' => $formatter->formatRoleName($dean, 'dean_'),
+            'dean_title' => 'Dean' . ($collegeCode ? ', ' . $collegeCode : ''),
+            'campus_director' => trim((string) SystemSetting::get('campus_director_name', '')),
+        ];
     }
 
     private function dean(): Dean

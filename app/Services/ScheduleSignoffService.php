@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\College;
 use App\Models\Dean;
 use App\Models\Dept_Chair;
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\Auth;
 
 class ScheduleSignoffService
@@ -41,6 +42,7 @@ class ScheduleSignoffService
         return [
             'prepared_by' => implode(' ', $preparedParts) ?: 'Chair name unavailable',
             'reviewed_by' => implode(' ', $deanParts) ?: 'CCICT Dean not assigned',
+            'campus_director' => trim((string) SystemSetting::get('campus_director_name', '')),
         ];
     }
 }
