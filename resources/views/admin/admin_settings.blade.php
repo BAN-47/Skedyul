@@ -120,6 +120,10 @@
                   <input class="field-input" id="inst-phone" value="{{ optional($institution)->inst_phone ?? '(032) 401-7777' }}">
                 </div>
               </div>
+              <div class="mb-1">
+                <label class="field-label">Campus Director</label>
+                <input class="field-input" id="inst-director" value="{{ \App\Models\SystemSetting::get('campus_director_name', '') }}">
+              </div>
               <div class="flex justify-end mt-1">
                 <button type="button" class="btn btn-primary" onclick="saveInstitution()">Save Changes</button>
               </div>
@@ -406,6 +410,7 @@ function saveInstitution() {
     inst_abbreviation: document.getElementById('inst-abbr').value.trim(),
     inst_contact_email: document.getElementById('inst-email').value.trim(),
     inst_phone: document.getElementById('inst-phone').value.trim(),
+    campus_director: document.getElementById('inst-director').value.trim(),
   };
   fetch('{{ route("admin.institution.update") }}', {
     method: 'PUT',

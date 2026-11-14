@@ -249,21 +249,10 @@
                                     </div>
                                 </td>
                                 <td class="px-3 py-3 align-top">
-                                    <div class="no-print">
-                                        <input type="text" id="campus-director-input"
-                                            class="w-full rounded border border-slate-300 px-2 py-1 text-[12px] font-bold text-slate-800"
-                                            placeholder="Type Campus Director name"
-                                            value="{{ $signatories['campus_director'] ?? '' }}"
-                                            onchange="saveCampusDirector(this)" onblur="saveCampusDirector(this)">
-                                        <div class="text-slate-500 text-[10px] mt-1">Campus Director (click to edit)
-                                        </div>
-                                    </div>
-                                    <div class="hidden">
-                                        <div class="font-bold text-[12px]">
-                                            {{ $signatories['campus_director'] ?: '—' }}
-                                        </div>
-                                        <div class="text-slate-500 text-[10px] mt-1">Campus Director</div>
-                                    </div>
+                                    <input type="text"
+                                        class="w-full border-0 border-b border-slate-300 px-2 py-1 text-[12px] font-bold text-slate-800 bg-transparent"
+                                        value="{{ \App\Models\SystemSetting::get('campus_director_name', '') }}" readonly>
+                                    <div class="text-slate-500 text-[10px] mt-1">Campus Director</div>
                                 </td>
                             </tr>
                         </tbody>
