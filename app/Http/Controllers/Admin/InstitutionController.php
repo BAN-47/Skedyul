@@ -11,6 +11,8 @@ class InstitutionController extends Controller
 {
     public function update(Request $request)
     {
+        abort_unless($request->user()?->usr_role === 'system_admin', 403);
+
         $validated = $request->validate([
             'inst_name' => 'required|string|max:255',
             'inst_branch_campus' => 'required|string|max:255',
@@ -21,7 +23,7 @@ class InstitutionController extends Controller
             'campus_director' => 'nullable|string|max:255',
         ]);
 
-        $campusDirector = $validated['campus_director'] ?? null;
+        $campusDirector = trim((string) ($validated['campus_director'] ?? ''));
         unset($validated['campus_director']);
 
         // since there's only ever one institution row, update it if it exists, create it if not
@@ -34,9 +36,7 @@ class InstitutionController extends Controller
             $institution = Institution::create($validated);
         }
 
-        if ($campusDirector !== null) {
-            \App\Models\SystemSetting::set('campus_director_name', $campusDirector, auth()->id());
-        }
+        \App\Models\SystemSetting::set('campus_director_name', $campusDirector, auth()->id());
 
         return response()->json(['success' => true]);
     }

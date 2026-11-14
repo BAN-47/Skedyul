@@ -7,6 +7,8 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Semester;
+use App\Models\SystemSetting;
+use App\Services\ScheduleSignatoryFormatter;
 use App\Models\Study_Load;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -150,16 +152,9 @@ class PbtExportController extends Controller
                 $faculty->fac_suffix,
             ])));
 
-        $chairName = $chair->full_name
+        $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
             ?: ($chair->user?->usr_name ?? 'Department Chair');
-
-        $normalizedChairName = mb_strtoupper(
-            preg_replace('/[^A-Z]/i', '', $chairName)
-        );
-
-        $chairSignature = $normalizedChairName === 'NOREENBFUENTES'
-            ? 'NOREEN B. FUENTES, Ph.D., DIT'
-            : mb_strtoupper($chairName);
+        $campusDirector = trim((string) SystemSetting::get('campus_director_name', ''));
 
         $academicYear = $semester->academicYear?->ay_academic_year
             ?? $semester->academicYear?->ay_year_label
@@ -175,6 +170,7 @@ class PbtExportController extends Controller
             $faculty,
             $facultyName,
             $chairSignature,
+            $campusDirector,
             $semesterLabel,
             $schedules
         );
@@ -184,6 +180,7 @@ class PbtExportController extends Controller
             $faculty,
             $facultyName,
             $chairSignature,
+            $campusDirector,
             $semesterLabel,
             $schedules
         );
@@ -221,6 +218,7 @@ class PbtExportController extends Controller
         Faculty $faculty,
         string $facultyName,
         string $chairSignature,
+        string $campusDirector,
         string $semesterLabel,
         $schedules
     ): void {
@@ -236,6 +234,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('K12', '');
         $sheet->setCellValue('K13', '');
         $sheet->setCellValue('A51', $chairSignature);
+        $sheet->setCellValue('N51', $campusDirector);
 
         $daySchedules = $schedules
             ->filter(fn($schedule) => $this->isDaySchedule($schedule))
@@ -280,6 +279,7 @@ class PbtExportController extends Controller
         Faculty $faculty,
         string $facultyName,
         string $chairSignature,
+        string $campusDirector,
         string $semesterLabel,
         $schedules
     ): void {
@@ -295,6 +295,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('K14', '');
         $sheet->setCellValue('K15', '');
         $sheet->setCellValue('A52', $chairSignature);
+        $sheet->setCellValue('N52', $campusDirector);
 
         $eveningSchedules = $schedules
             ->filter(fn($schedule) => $this->isEveningSchedule($schedule))

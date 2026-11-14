@@ -8,6 +8,8 @@ use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Semester;
+use App\Models\SystemSetting;
+use App\Services\ScheduleSignatoryFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -239,16 +241,9 @@ class PbtExportController extends Controller
             ->where('dc_dept_id', $faculty->fac_dept_id)
             ->first();
 
-        $chairName = $chair?->full_name
+        $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
             ?: ($chair?->user?->usr_name ?? 'Department Chair');
-
-        $normalizedChairName = mb_strtoupper(
-            preg_replace('/[^A-Z]/i', '', $chairName)
-        );
-
-        $chairSignature = $normalizedChairName === 'NOREENBFUENTES'
-            ? 'NOREEN B. FUENTES, Ph.D., DIT'
-            : mb_strtoupper($chairName);
+        $campusDirector = trim((string) SystemSetting::get('campus_director_name', ''));
 
         $academicYear = $semester->academicYear?->ay_academic_year
             ?? $semester->academicYear?->ay_year_label
@@ -266,6 +261,7 @@ class PbtExportController extends Controller
             $schedules->filter(fn($schedule) => $this->isDay($schedule))->values(),
             $facultyName,
             $chairSignature,
+            $campusDirector,
             $semesterLabel,
             false
         );
@@ -275,6 +271,7 @@ class PbtExportController extends Controller
             $schedules->filter(fn($schedule) => $this->isEvening($schedule))->values(),
             $facultyName,
             $chairSignature,
+            $campusDirector,
             $semesterLabel,
             true
         );
@@ -289,6 +286,7 @@ class PbtExportController extends Controller
         $schedules,
         string $facultyName,
         string $chairSignature,
+        string $campusDirector,
         string $semesterLabel,
         bool $evening
     ): void {
@@ -307,6 +305,7 @@ class PbtExportController extends Controller
             $sheet->setCellValue('C14', '');
             $sheet->setCellValue('A15', 'Doctorate Degree:');
             $sheet->setCellValue('A52', $chairSignature);
+            $sheet->setCellValue('N52', $campusDirector);
         } else {
             $sheet->setCellValue('A7', 'Day Program');
             $sheet->setCellValue('A8', $semesterLabel);
@@ -315,6 +314,7 @@ class PbtExportController extends Controller
             $sheet->setCellValue('C12', '');
             $sheet->setCellValue('A13', 'Doctorate Degree:');
             $sheet->setCellValue('A51', $chairSignature);
+            $sheet->setCellValue('N51', $campusDirector);
         }
 
         if ($evening) {

@@ -1099,7 +1099,6 @@
             const section = document.getElementById('filter-section')?.value || '';
             const semester = document.getElementById('filter-semester')?.value || '';
             const studentCountInput = document.getElementById('section-student-count');
-            const campusDirectorInput = document.getElementById('campus-director-name');
             const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
             if (!section || !semester) {
@@ -1128,46 +1127,22 @@
             };
 
             try {
-                const [countResponse, directorResponse] = await Promise.all([
-                    fetch(@json(route('chair.pbs.section.students')), {
-                        method: 'PUT',
-                        headers,
-                        credentials: 'same-origin',
-                        body: JSON.stringify({
-                            sec_id: section,
-                            sec_no_of_student: count
-                        }),
+                const countResponse = await fetch(@json(route('chair.pbs.section.students')), {
+                    method: 'PUT',
+                    headers,
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        sec_id: section,
+                        sec_no_of_student: count
                     }),
-                    fetch(@json(route('chair.mis.campus-director')), {
-                        method: 'PUT',
-                        headers,
-                        credentials: 'same-origin',
-                        body: JSON.stringify({
-                            campus_director: campusDirectorInput?.value?.trim() || ''
-                        }),
-                    }),
-                ]);
-
-                const [countData, directorData] = await Promise.all([
-                    countResponse.json().catch(() => ({})),
-                    directorResponse.json().catch(() => ({})),
-                ]);
+                });
+                const countData = await countResponse.json().catch(() => ({}));
 
                 if (!countResponse.ok || !countData.success) {
                     throw new Error(countData.message || 'Could not save the student count.');
                 }
-                if (!directorResponse.ok || !directorData.success) {
-                    throw new Error(directorData.message || 'Could not save the campus director name.');
-                }
-
                 if (studentCountInput && countData.sec_no_of_student != null) {
                     studentCountInput.value = countData.sec_no_of_student;
-                }
-
-                try {
-                    localStorage.setItem('skedyul.campusDirectorName', directorData.campus_director || '');
-                } catch (error) {
-                    // Export still uses the server-saved value if browser storage is unavailable.
                 }
 
                 const url = new URL(@json(route('chair.pbs.export')), window.location.origin);

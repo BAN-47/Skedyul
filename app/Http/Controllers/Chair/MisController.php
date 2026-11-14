@@ -342,6 +342,7 @@ class MisController extends Controller
         );
 
         $zip->addFromString('word/document.xml', $dom->saveXML());
+        $this->updateCampusDirectorFooter($zip);
         $zip->close();
 
         $sectionId = $filters['section'] ?? null;
@@ -362,6 +363,60 @@ class MisController extends Controller
         return response()
             ->download($tempPath, $filename)
             ->deleteFileAfterSend(true);
+    }
+
+    private function updateCampusDirectorFooter(ZipArchive $zip): void
+    {
+        $footerXml = $zip->getFromName('word/footer1.xml');
+        if ($footerXml === false) {
+            return;
+        }
+
+        $footer = new DOMDocument('1.0', 'UTF-8');
+        $footer->preserveWhiteSpace = true;
+        if (!$footer->loadXML($footerXml, LIBXML_NONET)) {
+            return;
+        }
+
+        $xpath = new DOMXPath($footer);
+        $xpath->registerNamespace(
+            'w',
+            'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+        );
+
+        foreach ($xpath->query('//w:p') as $labelParagraph) {
+            if (stripos($this->nodeText($xpath, $labelParagraph), 'Campus Director, CTU-Main Campus') === false) {
+                continue;
+            }
+
+            $cell = $xpath->query('ancestor::w:tc[1]', $labelParagraph)?->item(0);
+            if (!$cell) {
+                break;
+            }
+
+            $paragraphs = $xpath->query('./w:p', $cell);
+            $labelIndex = -1;
+            for ($index = 0; $index < $paragraphs->length; $index++) {
+                if ($paragraphs->item($index)->isSameNode($labelParagraph)) {
+                    $labelIndex = $index;
+                    break;
+                }
+            }
+
+            for ($index = $labelIndex - 1; $index >= 0; $index--) {
+                $paragraph = $paragraphs->item($index);
+                if ($this->nodeText($xpath, $paragraph) !== '') {
+                    $this->setNodeText(
+                        $xpath,
+                        $paragraph,
+                        trim((string) SystemSetting::get('campus_director_name', ''))
+                    );
+                    break 2;
+                }
+            }
+        }
+
+        $zip->addFromString('word/footer1.xml', $footer->saveXML());
     }
 
     /**
@@ -687,25 +742,4 @@ class MisController extends Controller
         ]);
     }
 
-    /** Save campus director name (manual). Stored in system_setting. */
-    public function updateCampusDirector(Request $request)
-    {
-        $data = $request->validate([
-            'campus_director' => 'nullable|string|max:150',
-        ]);
-
-        $name = trim($data['campus_director'] ?? '');
-
-        SystemSetting::set(
-            'campus_director_name',
-            $name,
-            Auth::user()?->usr_id
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Campus Director saved.',
-            'campus_director' => $name,
-        ]);
-    }
 }

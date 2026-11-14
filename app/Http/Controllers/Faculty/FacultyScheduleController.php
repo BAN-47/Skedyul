@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\SystemSetting;
+use App\Services\ScheduleSignatoryFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -165,27 +166,12 @@ class FacultyScheduleController extends Controller
             ? Dean::where('dean_college_id', $faculty->fac_college_id)->first()
             : null;
 
-        $personName = static function ($person, string $prefix): string {
-            if (!$person) return '';
-
-            $first = trim((string) ($person->{$prefix . 'first_name'} ?? ''));
-            $middle = trim((string) ($person->{$prefix . 'middle_name'} ?? ''));
-            $last = trim((string) ($person->{$prefix . 'last_name'} ?? ''));
-            $suffix = trim((string) ($person->{$prefix . 'suffix'} ?? ''));
-            $parts = array_filter([
-                $first,
-                $middle !== '' ? mb_strtoupper(mb_substr($middle, 0, 1)) . '.' : '',
-                $last,
-            ]);
-            $name = implode(' ', $parts);
-
-            return $suffix !== '' ? $name . ', ' . $suffix : $name;
-        };
+        $signatoryFormatter = app(ScheduleSignatoryFormatter::class);
 
         $signatories = [
-            'chair_name' => $personName($chair, 'dc_'),
+            'chair_name' => $signatoryFormatter->formatRoleName($chair, 'dc_'),
             'chair_title' => 'Chair' . ($department?->dept_code ? ', ' . $department->dept_code : ''),
-            'dean_name' => $personName($dean, 'dean_'),
+            'dean_name' => $signatoryFormatter->formatRoleName($dean, 'dean_'),
             'dean_title' => 'Dean' . ($faculty->college?->college_code ? ', ' . $faculty->college->college_code : ''),
             'campus_director' => SystemSetting::get('campus_director_name', ''),
         ];
