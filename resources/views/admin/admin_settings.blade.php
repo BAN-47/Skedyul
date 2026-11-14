@@ -428,6 +428,9 @@ function saveInstitution() {
         showToast(r.data.message || 'Failed to save institution');
         return;
       }
+      if (typeof r.data.campus_director === 'string') {
+        document.getElementById('inst-director').value = r.data.campus_director;
+      }
       showToast('Institution details saved!');
     })
     .catch(function () { showToast('Network error saving institution'); });

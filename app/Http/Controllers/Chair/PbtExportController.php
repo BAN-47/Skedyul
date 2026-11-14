@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
+use App\Services\CampusDirectorSignature;
 use App\Models\Study_Load;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -234,7 +235,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('K12', '');
         $sheet->setCellValue('K13', '');
         $sheet->setCellValue('A51', $chairSignature);
-        $sheet->setCellValue('N51', $campusDirector);
+        CampusDirectorSignature::write($sheet, $campusDirector, 'N51');
 
         $daySchedules = $schedules
             ->filter(fn($schedule) => $this->isDaySchedule($schedule))
@@ -295,7 +296,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('K14', '');
         $sheet->setCellValue('K15', '');
         $sheet->setCellValue('A52', $chairSignature);
-        $sheet->setCellValue('N52', $campusDirector);
+        CampusDirectorSignature::write($sheet, $campusDirector, 'N52');
 
         $eveningSchedules = $schedules
             ->filter(fn($schedule) => $this->isEveningSchedule($schedule))

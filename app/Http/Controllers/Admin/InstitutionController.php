@@ -11,7 +11,7 @@ class InstitutionController extends Controller
 {
     public function update(Request $request)
     {
-        abort_unless($request->user()?->usr_role === 'system_admin', 403);
+        abort_unless(in_array($request->user()?->usr_role, ['system_admin', 'admin'], true), 403);
 
         $validated = $request->validate([
             'inst_name' => 'required|string|max:255',
@@ -38,6 +38,9 @@ class InstitutionController extends Controller
 
         \App\Models\SystemSetting::set('campus_director_name', $campusDirector, auth()->id());
 
-        return response()->json(['success' => true]);
+        return response()->json([
+            'success' => true,
+            'campus_director' => $campusDirector,
+        ]);
     }
 }

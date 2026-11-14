@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Semester;
 use App\Models\SystemSetting;
+use App\Services\CampusDirectorSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -254,7 +255,7 @@ class PbsExportController extends Controller
         $sheet->setCellValue('G49', 'Dean' . ($collegeLabel ? ', ' . $collegeLabel : ''));
 
         $directorCell = $isEvening ? 'J48' : 'K48';
-        $sheet->setCellValue($directorCell, $directorName !== '' ? mb_strtoupper($directorName) : '');
+        CampusDirectorSignature::write($sheet, $directorName, $directorCell);
         $sheet->setCellValue('K49', 'Campus Director');
 
         $sheet->setCellValue('G53', $casDeanName !== '' ? mb_strtoupper($casDeanName) : '');

@@ -10,6 +10,7 @@ use App\Models\Schedule;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
+use App\Services\CampusDirectorSignature;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -305,7 +306,7 @@ class PbtExportController extends Controller
             $sheet->setCellValue('C14', '');
             $sheet->setCellValue('A15', 'Doctorate Degree:');
             $sheet->setCellValue('A52', $chairSignature);
-            $sheet->setCellValue('N52', $campusDirector);
+            CampusDirectorSignature::write($sheet, $campusDirector, 'N52');
         } else {
             $sheet->setCellValue('A7', 'Day Program');
             $sheet->setCellValue('A8', $semesterLabel);
@@ -314,7 +315,7 @@ class PbtExportController extends Controller
             $sheet->setCellValue('C12', '');
             $sheet->setCellValue('A13', 'Doctorate Degree:');
             $sheet->setCellValue('A51', $chairSignature);
-            $sheet->setCellValue('N51', $campusDirector);
+            CampusDirectorSignature::write($sheet, $campusDirector, 'N51');
         }
 
         if ($evening) {
