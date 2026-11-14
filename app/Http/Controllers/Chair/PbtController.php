@@ -361,23 +361,6 @@ class PbtController extends Controller
             return $data;
         }
 
-        $section = Section::findOrFail($data['sec_id']);
-        if ((string) $course->course_dept_id !== (string) $section->sec_dept_id) {
-            throw ValidationException::withMessages([
-                'subj_id' => 'The selected course must belong to the selected section department.',
-            ]);
-        }
-
-        if (
-            $course->course_code !== 'REC'
-            && !empty($course->course_year_level)
-            && (string) $course->course_year_level !== (string) $section->sec_year_level
-        ) {
-            throw ValidationException::withMessages([
-                'subj_id' => 'The selected course year level must match the selected section.',
-            ]);
-        }
-
         return $data;
     }
 

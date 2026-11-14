@@ -66,6 +66,14 @@ class RegistrationController extends Controller
             'password.confirmed' => 'The password confirmation does not match.',
         ]);
 
+        // Store people names in readable title case even when a user types in
+        // all caps or all lowercase. Keep suffixes and initials legible too.
+        foreach (['usr_first_name', 'usr_middle_name', 'usr_last_name', 'usr_suffix'] as $nameField) {
+            if (isset($data[$nameField])) {
+                $data[$nameField] = mb_convert_case(mb_strtolower(trim($data[$nameField])), MB_CASE_TITLE, 'UTF-8');
+            }
+        }
+
         $email = mb_strtolower(trim($data['usr_email']));
         if (User::whereRaw('LOWER(usr_email) = ?', [$email])->exists()) {
             throw ValidationException::withMessages([

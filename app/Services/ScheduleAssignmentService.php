@@ -181,6 +181,10 @@ class ScheduleAssignmentService
         $course = Course::findOrFail($data['subj_id']);
         $isRec = $course->course_code === 'REC';
 
+        if ($message = $this->sectionRequirementMessage($course, $data['sec_id'] ?? null)) {
+            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
+        }
+
         if ($conflict = $this->findConflict($data, $isRec)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
@@ -342,6 +346,9 @@ class ScheduleAssignmentService
 
         $course = Course::findOrFail($data['subj_id']);
         $isRec = $course->course_code === 'REC';
+        if ($message = $this->sectionRequirementMessage($course, $data['sec_id'] ?? null)) {
+            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
+        }
         if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
@@ -649,6 +656,16 @@ class ScheduleAssignmentService
             ->whereKey($facultyId)
             ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->exists();
+    }
+
+    /** REC is the only course that may be scheduled without a section. */
+    private function sectionRequirementMessage(Course $course, ?string $sectionId): ?string
+    {
+        if (!$sectionId) {
+            return $course->course_code === 'REC' ? null : 'A section is required for this course.';
+        }
+
+        return null;
     }
 
     private function assertCourseHoursAvailable(

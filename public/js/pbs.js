@@ -4,37 +4,38 @@ const SELECTED_DATE = window.PBS_SELECTED_DATE;
 function filterSubjectsByCategory() {
     const catSel = document.getElementById('add-category');
     const subSel = document.getElementById('add-subject');
-    const secSel = document.getElementById('add-section');
-    const deptSel = document.getElementById('add-department');
     if (!catSel || !subSel) return;
+    populateSubjectOptions(subSel, catSel.value, 'add-section', 'add-department', false);
+}
 
-    const selectedCat = catSel.value;
-    let subjectsToLoad = [];
-    if (selectedCat) {
-        const globalList = window.ALL_SUBJECTS_LIST || [];
-        subjectsToLoad = globalList.filter(sub => String(sub.cat) === String(selectedCat));
-    } else {
-        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-        const deptId = selectedOpt?.getAttribute('data-dept-id') || (deptSel ? deptSel.value : '');
-        // Standard mode: fetch department subjects matching department & year
-        const deptList = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
-        subjectsToLoad = deptList;
-    }
+function populateSubjectOptions(select, category, sectionId, departmentId, includeCourseName) {
+    const section = document.getElementById(sectionId);
+    const selectedSection = section?.options[section.selectedIndex];
+    const deptId = selectedSection?.dataset.deptId || document.getElementById(departmentId)?.value || document.getElementById('edit-department-id')?.value || '';
+    const year = selectedSection?.dataset.yearLevel || '';
+    const semester = String(window.ACTIVE_COURSE_SEMESTER || '');
+    const subjects = (window.ALL_SUBJECTS_LIST || []).filter(subject => {
+        if (category) return String(subject.cat) === String(category);
+        const deptMatch = !deptId || !subject.dept || String(subject.dept) === String(deptId);
+        const yearMatch = !year || !subject.year || String(subject.year) === String(year);
+        const semMatch = subject.code === 'REC' || !semester || !subject.sem || String(subject.sem) === semester;
+        return deptMatch && yearMatch && semMatch;
+    });
 
-    subSel.innerHTML = '<option value="">-- Select Subject --</option>';
-    subjectsToLoad.forEach(sub => {
-        const opt = document.createElement('option');
-        opt.value = sub.id;
-        opt.textContent = sub.code + ' — ' + sub.name;
-        opt.dataset.departmentId = sub.dept || '';
-        opt.dataset.yearLevel = sub.year || '';
-        opt.dataset.semester = sub.sem || '';
-        opt.dataset.category = sub.cat || '';
-        opt.dataset.courseCode = sub.code || '';
-        opt.dataset.lectureHours = sub.lecHours || 0;
-        opt.dataset.labHours = sub.labHours || 0;
-        
-        subSel.appendChild(opt);
+    select.innerHTML = '<option value="">-- Select Subject --</option>';
+    subjects.forEach(subject => {
+        const option = document.createElement('option');
+        option.value = subject.id;
+        option.textContent = subject.code + ' — ' + subject.name;
+        option.dataset.departmentId = subject.dept || '';
+        option.dataset.yearLevel = subject.year || '';
+        option.dataset.semester = subject.sem || '';
+        option.dataset.category = subject.cat || '';
+        option.dataset.courseCode = subject.code || '';
+        option.dataset.lectureHours = subject.lecHours || 0;
+        option.dataset.labHours = subject.labHours || 0;
+        if (includeCourseName) option.dataset.courseName = subject.name || '';
+        select.appendChild(option);
     });
 }
 
@@ -42,51 +43,9 @@ function filterSubjectsByCategory() {
 function filterEditSubjectsByCategory() {
     const catSel = document.getElementById('edit-category');
     const subSel = document.getElementById('edit-subject');
-    const secSel = document.getElementById('edit-section');
-    const deptSel = document.getElementById('edit-department');
     if (!catSel || !subSel) return;
 
-    const selectedCat = catSel.value;
-    if (!selectedCat) {
-        const selectedOpt = secSel ? secSel.options[secSel.selectedIndex] : null;
-        const deptId = selectedOpt?.getAttribute('data-dept-id') || (deptSel ? deptSel.value : '');
-        const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
-        const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
-        // reset to department mode: filter by section year level and semester
-        Array.from(subSel.options).forEach(opt => {
-            if (!opt.value) return;
-            const subYear = opt.getAttribute('data-year-level') || '';
-            const subSem = opt.getAttribute('data-semester') || '';
-            const isRec = opt.getAttribute('data-course-code') === 'REC';
-            const subDept = opt.getAttribute('data-dept-id') || opt.dataset.departmentId || '';
-            const deptMatch = !deptId || !subDept || String(subDept) === String(deptId);
-            const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
-            const semMatch = isRec || !activeSemester || !subSem || String(subSem) === String(activeSemester);
-            const show = deptMatch && yearMatch && semMatch;
-            opt.hidden = !show;
-            opt.style.display = show ? '' : 'none';
-        });
-        if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
-        return;
-    }
-
-    // Category mode intentionally searches all departments, year levels, and semesters.
-    const filtered = window.ALL_SUBJECTS_LIST || [];
-    subSel.innerHTML = '<option value="">-- Select Subject --</option>';
-    filtered.filter(sub => String(sub.cat) === String(selectedCat)).forEach(sub => {
-        const opt = document.createElement('option');
-        opt.value = sub.id;
-        opt.textContent = sub.code + ' — ' + sub.name;
-        opt.dataset.departmentId = sub.dept || '';
-        opt.dataset.yearLevel = sub.year || '';
-        opt.dataset.semester = sub.sem || '';
-        opt.dataset.category = sub.cat || '';
-        opt.dataset.courseCode = sub.code || '';
-        opt.dataset.lectureHours = sub.lecHours || 0;
-        opt.dataset.labHours = sub.labHours || 0;
-        subSel.appendChild(opt);
-    });
-    if (subSel.options[subSel.selectedIndex]?.hidden) subSel.value = '';
+    populateSubjectOptions(subSel, catSel.value, 'edit-section', 'edit-department', false);
 }
 
 /* ── modal helpers ── */
@@ -345,56 +304,8 @@ function addMinutesToTime(hhmm, minutesToAdd) {
  * Also respects active semester filter.
  */
 function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
-    const secSel = document.getElementById(sectionSelectId);
-    const subSel = document.getElementById(subjectSelectId);
-    if (!secSel || !subSel) return;
-
-    const categoryId = sectionSelectId.startsWith('edit') ? 'edit-category' : 'add-category';
-    if (document.getElementById(categoryId)?.value) {
-        if (sectionSelectId.startsWith('edit')) {
-            filterEditSubjectsByCategory();
-        } else {
-            filterSubjectsByCategory();
-        }
-        return;
-    }
-
-    const selectedOpt = secSel.options[secSel.selectedIndex];
-    const yearLevel = selectedOpt ? (selectedOpt.getAttribute('data-year-level') || '') : '';
-    const deptId = selectedOpt?.getAttribute('data-dept-id') ||
-        document.getElementById(sectionSelectId.replace('section', 'department'))?.value ||
-        '';
-    const selectedCategory = document.getElementById(
-        sectionSelectId.startsWith('edit') ? 'edit-category' : 'add-category'
-    )?.value || '';
-    const activeSemester = String(window.ACTIVE_COURSE_SEMESTER || '');
-
-    Array.from(subSel.options).forEach(opt => {
-        if (!opt.value) {
-            opt.hidden = false;
-            opt.style.display = '';
-            return;
-        }
-        const subYear = opt.getAttribute('data-year-level') || '';
-        const subSem = opt.getAttribute('data-semester') || '';
-        const subDept = opt.getAttribute('data-dept-id') || opt.dataset.departmentId || '';
-        const subCategory = opt.getAttribute('data-category') || '';
-        const courseCode = opt.getAttribute('data-course-code') || '';
-        const isRec = courseCode === 'REC';
-        const deptMatch = !deptId || !subDept || String(subDept) === String(deptId);
-        const categoryMatch = !selectedCategory || subCategory === selectedCategory;
-        const yearMatch = isRec || !yearLevel || !subYear || String(subYear) === String(yearLevel);
-        const semMatch = isRec || !activeSemester || !subSem || String(subSem) === activeSemester;
-        const match = deptMatch && categoryMatch && yearMatch && semMatch;
-        opt.hidden = !match;
-        opt.style.display = match ? '' : 'none';
-    });
-
-    // Reset subject if current selection is no longer visible
-    const current = subSel.options[subSel.selectedIndex];
-    if (current && current.hidden) {
-        subSel.value = '';
-    }
+    if (sectionSelectId.startsWith('edit')) filterEditSubjectsByCategory();
+    else filterSubjectsByCategory();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -423,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const subjectSelect = document.getElementById('add-subject');
             const categorySelect = document.getElementById('add-category');
             const sections = (window.COLLEGE_SECTIONS && window.COLLEGE_SECTIONS[deptId]) || [];
-            const subjects = (window.COLLEGE_SUBJECTS && window.COLLEGE_SUBJECTS[deptId]) || [];
+            const subjects = window.ALL_SUBJECTS_LIST || [];
             const allCategories = window.ALL_CATEGORIES || [];
             
             sectionSelect.innerHTML = '<option value="">-- Select Section --</option>';

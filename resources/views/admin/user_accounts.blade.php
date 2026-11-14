@@ -534,6 +534,7 @@
               <option value="faculty">Faculty</option>
               <option value="department_chair">Dept. Chair</option>
               <option value="dean">Dean</option>
+              <option value="system_admin">Technical Administrator</option>
             </select>
           </div>
         </div>
@@ -880,10 +881,10 @@
     <span id="toast-msg"></span>
   </div>
 
-  @if(session('error') || session('success'))
+  @if(session('error') || session('success') || $errors->any())
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      showToast(@json(session('error') ?? session('success')));
+      showToast(@json(session('error') ?? session('success') ?? $errors->first()));
     });
   </script>
   @endif

@@ -651,6 +651,33 @@ class UserController extends Controller
                     $request,
                     $data
                 );
+
+                // Names are canonical on USER and are mirrored to any linked
+                // role rows so schedules and role-specific screens stay current.
+                $profileNames = [
+                    'first_name' => $data['usr_first_name'],
+                    'middle_name' => $data['usr_middle_name'] ?? null,
+                    'last_name' => $data['usr_last_name'],
+                    'suffix' => $data['usr_suffix'] ?? null,
+                ];
+                Faculty::where('fac_usr_id', $user->usr_id)->update([
+                    'fac_first_name' => $profileNames['first_name'],
+                    'fac_middle_name' => $profileNames['middle_name'],
+                    'fac_last_name' => $profileNames['last_name'],
+                    'fac_suffix' => $profileNames['suffix'],
+                ]);
+                Dean::where('dean_usr_id', $user->usr_id)->update([
+                    'dean_first_name' => $profileNames['first_name'],
+                    'dean_middle_name' => $profileNames['middle_name'],
+                    'dean_last_name' => $profileNames['last_name'],
+                    'dean_suffix' => $profileNames['suffix'],
+                ]);
+                Dept_Chair::where('dc_usr_id', $user->usr_id)->update([
+                    'dc_first_name' => $profileNames['first_name'],
+                    'dc_middle_name' => $profileNames['middle_name'],
+                    'dc_last_name' => $profileNames['last_name'],
+                    'dc_suffix' => $profileNames['suffix'],
+                ]);
             });
         } catch (QueryException $e) {
             $sqlState = $e->errorInfo[0] ?? $e->getCode();

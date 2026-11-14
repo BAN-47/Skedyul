@@ -47,7 +47,7 @@
                             <label class="sr-only" for="{{ $abbrField }}">{{ $label }} acronym</label>
                             <input id="{{ $abbrField }}" name="{{ $abbrField }}" value="{{ old($abbrField, $faculty->{$abbrField}) }}" placeholder="{{ $abbrPlaceholder }}" aria-label="{{ $label }} acronym" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-2 py-3.5 text-sm font-bold uppercase outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100" @if($abbrRequired) required @endif>
                         </div>
-                        <p class="mt-1 text-xs text-slate-500">Enter the full degree and the short form shown after your name.</p>
+                        <p class="mt-1 text-xs text-slate-500">Enter the full degree name (at least three words), then its acronym in the small box. An acronym alone is not accepted here.</p>
                     </div>
                 @endforeach
                 <button class="w-full rounded-xl bg-blue-600 px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700">Save and Continue</button>

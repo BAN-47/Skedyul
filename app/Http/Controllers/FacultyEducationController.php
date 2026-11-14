@@ -23,21 +23,27 @@ class FacultyEducationController extends Controller
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->firstOrFail();
         $isFullTime = $faculty->fac_employment_type === 'full_time';
+        $requireFullDegreeName = static function ($attribute, $value, $fail): void {
+            if (!is_string($value) || count(preg_split('/\s+/u', trim($value), -1, PREG_SPLIT_NO_EMPTY)) < 3) {
+                $fail('Enter the full degree name, not only its abbreviation (for example, “Bachelor of Science in Information Systems”).');
+            }
+        };
 
         $data = $request->validate([
-            'fac_bachelors_degree' => ['required', 'string', 'max:255'],
+            'fac_bachelors_degree' => ['required', 'string', 'max:255', $requireFullDegreeName],
             'fac_bachelors_abbr' => ['required', 'string', 'max:40'],
             'fac_masters_degree' => [
                 $isFullTime ? 'required' : 'nullable',
                 'string',
                 'max:255',
+                $requireFullDegreeName,
             ],
             'fac_masters_abbr' => [
                 $isFullTime || $request->filled('fac_masters_degree') ? 'required' : 'nullable',
                 'string',
                 'max:40',
             ],
-            'fac_doctorate_degree' => ['nullable', 'string', 'max:255'],
+            'fac_doctorate_degree' => ['nullable', 'string', 'max:255', $requireFullDegreeName],
             'fac_doctorate_abbr' => [
                 $request->filled('fac_doctorate_degree') ? 'required' : 'nullable',
                 'string',
