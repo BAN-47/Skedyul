@@ -232,7 +232,7 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $chair = Dept_Chair::with('user')
+        $chair = Dept_Chair::with('user.faculty')
             ->where('dc_dept_id', $faculty->fac_dept_id)
             ->first();
         $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')

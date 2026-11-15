@@ -124,7 +124,7 @@
                     <label class="field-label">Room Type</label>
                     <select name="room_type" required class="field-input">
                         <option value="">Select type</option>
-                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room'] as $type)
+                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room','Court','Gym','Ground'] as $type)
                             <option value="{{ $type }}" @selected(old('room_type') === $type)>{{ $type }}</option>
                         @endforeach
                     </select>
@@ -178,7 +178,7 @@
                 <div>
                     <label class="field-label">Room Type</label>
                     <select id="chair-room-edit-type" name="room_type" required class="field-input">
-                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room'] as $type)<option value="{{ $type }}">{{ $type }}</option>@endforeach
+                        @foreach(['Lecture','Laboratory','AVR / Function Hall','Conference Room','Court','Gym','Ground'] as $type)<option value="{{ $type }}">{{ $type }}</option>@endforeach
                     </select>
                 </div>
             </div>

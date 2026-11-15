@@ -59,7 +59,7 @@
                   </div>
                   <div>
                     <div class="text-[15px] font-bold text-slate-900">{{ $dean->dean_first_name }} {{ $dean->dean_middle_name }} {{ $dean->dean_last_name }}</div>
-                    <div class="text-xs text-slate-400 mt-0.5">Dean · CCICT</div>
+                    <div class="text-xs text-slate-400 mt-0.5">Dean · {{ $college?->college_code ?? $college?->college_name ?? 'College not assigned' }}</div>
                     <div class="flex gap-2 mt-3">
                       <button class="btn btn-primary text-xs px-3.5 py-1.5" onclick="document.getElementById('avatar-input').click()">Upload Photo</button>
                       <button class="btn btn-secondary text-xs px-3.5 py-1.5" onclick="removeAvatar()">Remove</button>
@@ -141,7 +141,7 @@
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
                   <div><label class="field-label">Office Location</label><input class="field-input" id="pi-address" value="{{ $dean->dean_address }}"></div>
-                  <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="CCICT" readonly></div>
+                  <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $college?->college_code ?? $college?->college_name ?? 'Not assigned' }}" readonly></div>
                 </div>
                 <div class="mb-4">
                   <label class="field-label">Bio / About</label>
@@ -163,8 +163,8 @@
                 <div><label class="field-label">Campus</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_branch_campus ?? 'Main Campus' }}" readonly></div>
               </div>
               <div class="grid grid-cols-2 gap-3 mb-3">
-                <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_college ?? 'College of Computing, Information and Communications Technology' }}" readonly></div>
-                <div><label class="field-label">Abbreviation</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $institution->inst_abbreviation ?? 'CCICT' }}" readonly></div>
+                <div><label class="field-label">College / Unit</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $college?->college_name ?? $institution->inst_college ?? 'College not assigned' }}" readonly></div>
+                <div><label class="field-label">Abbreviation</label><input class="field-input bg-slate-100 cursor-not-allowed" value="{{ $college?->college_code ?? $institution->inst_abbreviation ?? '—' }}" readonly></div>
               </div>
               <div class="grid grid-cols-2 gap-3 mb-1">
                 <div><label class="field-label">Contact Email</label><input class="field-input bg-slate-100 cursor-not-allowed" type="email" value="{{ $institution->inst_contact_email ?? 'ccict@ctu.edu.ph' }}" readonly></div>

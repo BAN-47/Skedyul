@@ -19,6 +19,7 @@ class DeanSettingsController extends Controller
 {
     public function settings()
     {
+        $dean = $this->currentDean();
         $academicYear = \App\Models\AcademicYear::where('ay_is_active', true)
             ->with(['semesters' => fn ($q) => $q->where('sem_is_active', true)])
             ->first();
@@ -26,7 +27,8 @@ class DeanSettingsController extends Controller
         $activeSemester = $academicYear?->semesters->first();
 
         return view('dean.dean_settings', [
-            'dean' => $this->currentDean(),
+            'dean' => $dean,
+            'college' => $dean->department,
             'faculty' => Faculty::where('fac_usr_id', Auth::id())->first(),
             'academicYear' => $academicYear,
             'activeSemester' => $activeSemester,

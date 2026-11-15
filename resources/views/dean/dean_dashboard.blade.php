@@ -56,7 +56,7 @@
                             Hello, Dean {{ $greetingName ?? 'Dean' }}
                         </div>
                         <div class="text-[13px] text-slate-400 mt-0.5">
-                            AY {{ $ayLabel ?? '—' }} · {{ $semLabel ?? '—' }} · CCICT Overview
+                            AY {{ $ayLabel ?? '—' }} · {{ $semLabel ?? '—' }} · {{ $college?->college_code ?? $college?->college_name ?? 'College' }} Overview
                         </div>
                     </div>
                     <span class="badge badge-teal">Scheduling Active</span>

@@ -448,8 +448,13 @@
                                                     {{ $s->course->course_code ?? ($s->subject->course_code ?? ($s->subject->subj_code ?? '—')) }}
                                                 </div>
                                                 @if ($s->faculty)
-                                                    <div class="text-[11.5px] font-semibold mt-1">Prof.
-                                                        {{ $s->faculty->fac_last_name }}</div>
+                                                    <a href="{{ route('chair.pbt', ['faculty' => $s->sch_fac_id, 'semester' => $s->sch_sem_id, 'shift' => $shift === 'night' ? 'night' : 'day']) }}"
+                                                        onclick="event.stopPropagation()"
+                                                        title="Open this teacher's matching PBT schedule"
+                                                        class="text-[11.5px] font-semibold mt-1 hover:underline">
+                                                        Prof.
+                                                        {{ $s->faculty->fac_last_name }}
+                                                    </a>
                                                 @endif
                                                 @if ($s->room)
                                                     <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
@@ -493,8 +498,8 @@
                             <div class="text-left text-xs font-bold text-slate-700">Reviewed, Certified True and
                                 Correct:</div>
                             <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
-                                {{ $signoff['reviewed_by'] ?? 'CCICT Dean not assigned' }}</div>
-                            <div class="text-xs text-slate-600">Director / Dean, CCICT</div>
+                                {{ $signoff['reviewed_by'] ?? 'Dean not assigned' }}</div>
+                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}</div>
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>

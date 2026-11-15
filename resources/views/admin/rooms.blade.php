@@ -119,7 +119,7 @@
       <div>
         <label class="field-label">Room Type</label>
         <select id="add-room-type" class="field-input">
-          <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option>
+          <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option><option>Court</option><option>Gym</option><option>Ground</option>
         </select>
       </div>
     </div>
@@ -207,7 +207,7 @@
       <div>
         <label class="field-label">Room Type</label>
         <select id="edit-room-type" class="field-input">
-          <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option>
+          <option>Lecture</option><option>Laboratory</option><option>AVR / Function Hall</option><option>Conference Room</option><option>Court</option><option>Gym</option><option>Ground</option>
         </select>
       </div>
     </div>

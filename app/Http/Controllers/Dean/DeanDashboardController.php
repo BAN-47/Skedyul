@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Dean;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Audit_Log;
-use App\Models\College;
 use App\Models\Course;
 use App\Models\Departments;
 use App\Models\Faculty;
@@ -23,6 +22,9 @@ class DeanDashboardController extends Controller
     {
         $user = Auth::user();
         $dean = $user?->dean;
+        abort_unless($user?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+        $college = $dean->department;
+        $collegeId = $dean->dean_college_id;
         $greetingName = collect([
             $dean?->dean_first_name,
             $dean?->dean_middle_name,
@@ -34,10 +36,13 @@ class DeanDashboardController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::with('user', 'department')->get();
+        $faculty = Faculty::with('user', 'department')
+            ->where('fac_college_id', $collegeId)
+            ->get();
         $totalFaculty = $faculty->count();
 
         $studyLoadsByFaculty = Study_Load::with('subject')
+            ->whereIn('sl_fac_id', $faculty->pluck('fac_id'))
             ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id))
             ->get()
             ->groupBy('sl_fac_id');
@@ -84,16 +89,9 @@ class DeanDashboardController extends Controller
             ->take(10)
             ->values();
 
-        // CCICT programs only: BSIS, BSIT, BIT-CT.
-        $ccict = College::where('college_code', 'CCICT')->first();
-        $programOrder = ['BSIS' => 1, 'BSIT' => 2, 'BIT-CT' => 3];
-
-        $programs = $ccict
-            ? Departments::where('dept_college_id', $ccict->college_id)
-            ->get()
-            ->sortBy(fn($program) => $programOrder[$program->dept_code] ?? 99)
-            ->values()
-            : collect();
+        $programs = Departments::where('dept_college_id', $collegeId)
+            ->orderBy('dept_code')
+            ->get();
 
         $deptSummary = $programs->map(function ($program) use ($facultyLoads) {
             $programFacultyLoads = $facultyLoads->filter(
@@ -125,12 +123,16 @@ class DeanDashboardController extends Controller
             ];
         })->values();
 
-        $subjectsTotal = Course::count();
-        $subjectsPlotted = Course::whereHas('studyLoads')->count();
+        $departmentIds = $programs->pluck('dept_id');
+        $subjectsTotal = Course::whereIn('course_dept_id', $departmentIds)->count();
+        $subjectsPlotted = Course::whereIn('course_dept_id', $departmentIds)
+            ->whereHas('studyLoads')
+            ->count();
 
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $scheduleCountsByShift = Schedule::query()
             ->where('sch_is_active', true)
+            ->whereHas('section.program', fn($query) => $query->where('dept_college_id', $collegeId))
             ->when($semester, fn($query) => $query->where('sch_sem_id', $semester->sem_id))
             ->select('sch_day', 'sch_shift', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
             ->groupBy('sch_day', 'sch_shift')
@@ -147,6 +149,7 @@ class DeanDashboardController extends Controller
             'faculty.user',
             'section',
         ])
+            ->whereHas('department', fn($query) => $query->where('dept_college_id', $collegeId))
             ->when($semester, fn($query) => $query->where('schsub_sem_id', $semester->sem_id))
             ->where('schsub_status', 'pending')
             ->orderByDesc('schsub_submitted_at');
@@ -187,6 +190,7 @@ class DeanDashboardController extends Controller
         });
 
         $scheduledApprovedCount = Schedule_Submission::query()
+            ->whereHas('department', fn($query) => $query->where('dept_college_id', $collegeId))
             ->when($semester, fn($query) => $query->where('schsub_sem_id', $semester->sem_id))
             ->where('schsub_status', 'approved')
             ->count();
@@ -199,6 +203,7 @@ class DeanDashboardController extends Controller
         return view('dean.dean_dashboard', compact(
             'academicYear',
             'semester',
+            'college',
             'totalFaculty',
             'avgFacultyLoad',
             'overloadCount',

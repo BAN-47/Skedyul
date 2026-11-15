@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\College;
 use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\SystemSetting;
@@ -14,34 +13,31 @@ class ScheduleSignoffService
     {
         $user = Auth::user();
         $chair = $user
-            ? Dept_Chair::where('dc_usr_id', $user->usr_id)->first()
+            ? Dept_Chair::with(['user.faculty', 'program'])->where('dc_usr_id', $user->usr_id)->first()
             : null;
 
-        $preparedParts = array_filter([
-            $chair?->dc_first_name ?? $user?->usr_first_name,
-            $chair?->dc_middle_name ?? $user?->usr_middle_name,
-            $chair?->dc_last_name ?? $user?->usr_last_name,
-            $chair?->dc_suffix ?? $user?->usr_suffix,
-        ]);
+        $formatter = app(ScheduleSignatoryFormatter::class);
+        $preparedBy = $formatter->formatRoleName($chair, 'dc_');
+        if ($preparedBy === '' && $user) {
+            $preparedBy = trim(implode(' ', array_filter([
+                $user->usr_first_name,
+                $user->usr_middle_name,
+                $user->usr_last_name,
+                $user->usr_suffix,
+            ])));
+        }
 
-        $ccictCollegeId = College::query()
-            ->whereRaw('UPPER(TRIM(college_code)) = ?', ['CCICT'])
-            ->value('college_id');
+        $collegeId = $chair?->dc_college_id ?? $chair?->program?->dept_college_id;
 
-        $dean = $ccictCollegeId
-            ? Dean::where('dean_college_id', $ccictCollegeId)->first()
+        $dean = $collegeId
+            ? Dean::with('user.faculty')->where('dean_college_id', $collegeId)->first()
             : null;
-
-        $deanParts = array_filter([
-            $dean?->dean_first_name,
-            $dean?->dean_middle_name,
-            $dean?->dean_last_name,
-            $dean?->dean_suffix,
-        ]);
+        $collegeCode = $dean?->department?->college_code ?? $chair?->program?->department?->college_code;
 
         return [
-            'prepared_by' => implode(' ', $preparedParts) ?: 'Chair name unavailable',
-            'reviewed_by' => implode(' ', $deanParts) ?: 'CCICT Dean not assigned',
+            'prepared_by' => $preparedBy ?: 'Chair name unavailable',
+            'reviewed_by' => $formatter->formatRoleName($dean, 'dean_') ?: 'Dean not assigned',
+            'reviewed_title' => 'Director / Dean' . ($collegeCode ? ', ' . $collegeCode : ''),
             'campus_director' => trim((string) SystemSetting::get('campus_director_name', '')),
         ];
     }

@@ -6,6 +6,7 @@
         ? $submission->section?->sec_name ?? 'Program by Section'
         : (\App\Services\FacultyNameFormatter::format($submission->faculty) ?:
         'Faculty');
+    $college = $submission->department?->department;
 @endphp
 
 <div class="modal-overlay p-5" id="modal-review">
@@ -36,7 +37,7 @@
                     <div
                         style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:2px;">
                         College</div>
-                    <div style="font-weight:700;font-size:14px;">CCICT</div>
+                    <div style="font-weight:700;font-size:14px;">{{ $college?->college_code ?? $college?->college_name ?? '—' }}</div>
                 </div>
                 <div style="background:var(--grey);border-radius:10px;padding:12px;">
                     <div

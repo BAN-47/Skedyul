@@ -136,7 +136,7 @@
                                             <div class="text-[13px] font-semibold text-slate-900">
                                                 {{ $chair->full_name }}</div>
                                             <div class="text-[11px] text-slate-400">Chair ·
-                                                {{ $chair->department->dept_code ?? 'N/A' }}</div>
+                                                {{ $chair->program->dept_code ?? 'N/A' }}</div>
                                         </div>
                                     </div>
                                 </label>

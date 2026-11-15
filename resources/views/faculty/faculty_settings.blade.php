@@ -454,6 +454,9 @@
             <option>Laboratory</option>
             <option>AVR / Function Hall</option>
             <option>Conference Room</option>
+            <option>Court</option>
+            <option>Gym</option>
+            <option>Ground</option>
           </select>
         </div>
       </div>
@@ -532,6 +535,9 @@
             <option>Laboratory</option>
             <option>AVR / Function Hall</option>
             <option>Conference Room</option>
+            <option>Court</option>
+            <option>Gym</option>
+            <option>Ground</option>
           </select>
         </div>
       </div>

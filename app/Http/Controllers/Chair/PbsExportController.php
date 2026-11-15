@@ -11,6 +11,7 @@ use App\Models\Section;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\CampusDirectorSignature;
+use App\Services\ScheduleSignatoryFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -34,7 +35,7 @@ class PbsExportController extends Controller
             'semester' => ['required', 'uuid', 'exists:semester,sem_id'],
         ]);
 
-        $chair = Dept_Chair::where('dc_usr_id', Auth::user()->usr_id)->first();
+        $chair = Dept_Chair::with('user.faculty')->where('dc_usr_id', Auth::user()->usr_id)->first();
         abort_unless($chair, 403, 'Your account is not assigned to a department.');
 
         // PBS allows the Chair to choose departments within their own college.
@@ -67,20 +68,16 @@ class PbsExportController extends Controller
 
         $college = $section->program?->department;
         $collegeDean = $college
-            ? Dean::where('dean_college_id', $college->college_id)->with('user')->first()
+            ? Dean::where('dean_college_id', $college->college_id)->with('user.faculty')->first()
             : null;
         $casCollege = College::whereRaw('UPPER(TRIM(college_code)) = ?', ['CAS'])->first();
         $casDean = $casCollege
-            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user')->first()
+            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user.faculty')->first()
             : null;
-        $chairName = trim(implode(' ', array_filter([
-            $chair->dc_first_name,
-            $chair->dc_middle_name,
-            $chair->dc_last_name,
-            $chair->dc_suffix,
-        ])));
-        $collegeDeanName = $this->personName($collegeDean, 'dean');
-        $casDeanName = $this->personName($casDean, 'dean');
+        $signatoryFormatter = app(ScheduleSignatoryFormatter::class);
+        $chairName = $signatoryFormatter->formatRoleName($chair, 'dc_');
+        $collegeDeanName = $signatoryFormatter->formatRoleName($collegeDean, 'dean_');
+        $casDeanName = $signatoryFormatter->formatRoleName($casDean, 'dean_');
         $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
 
         $isEvening = (bool) $section->sec_is_evening;
@@ -165,7 +162,7 @@ class PbsExportController extends Controller
             'section_id' => ['required', 'uuid', 'exists:section,sec_id'],
         ]);
 
-        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        $dean = Dean::with('user.faculty')->where('dean_usr_id', Auth::id())->first();
         abort_unless($dean && $dean->dean_college_id, 403, 'Your account is not assigned to a college.');
 
         $section = Section::with('program.department')
@@ -195,25 +192,19 @@ class PbsExportController extends Controller
             ->orderBy('sch_start_time')
             ->get();
 
-        $chair = Dept_Chair::where('dc_dept_id', $section->sec_dept_id)->first();
+        $chair = Dept_Chair::with('user.faculty')->where('dc_dept_id', $section->sec_dept_id)->first();
         $college = $section->program?->department;
         $collegeDean = $college
-            ? Dean::where('dean_college_id', $college->college_id)->with('user')->first()
+            ? Dean::where('dean_college_id', $college->college_id)->with('user.faculty')->first()
             : null;
         $casCollege = College::whereRaw('UPPER(TRIM(college_code)) = ?', ['CAS'])->first();
         $casDean = $casCollege
-            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user')->first()
+            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user.faculty')->first()
             : null;
-        $chairName = $chair
-            ? trim(implode(' ', array_filter([
-                $chair->dc_first_name,
-                $chair->dc_middle_name,
-                $chair->dc_last_name,
-                $chair->dc_suffix,
-            ])))
-            : '';
-        $collegeDeanName = $this->personName($collegeDean, 'dean');
-        $casDeanName = $this->personName($casDean, 'dean');
+        $signatoryFormatter = app(ScheduleSignatoryFormatter::class);
+        $chairName = $signatoryFormatter->formatRoleName($chair, 'dc_');
+        $collegeDeanName = $signatoryFormatter->formatRoleName($collegeDean, 'dean_');
+        $casDeanName = $signatoryFormatter->formatRoleName($casDean, 'dean_');
         $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
 
         $isEvening = (bool) $section->sec_is_evening;
@@ -637,21 +628,6 @@ class PbsExportController extends Controller
 
         $hasDoctorate = trim((string) ($faculty->fac_doctorate_degree ?? '')) !== '';
         return ($hasDoctorate ? 'Dr. ' : 'Prof. ') . $lastName;
-    }
-
-    private function personName($person, string $prefix): string
-    {
-        if (!$person) {
-            return '';
-        }
-
-        $fields = [
-            $person->{$prefix . '_first_name'} ?? null,
-            $person->{$prefix . '_middle_name'} ?? null,
-            $person->{$prefix . '_last_name'} ?? null,
-            $person->{$prefix . '_suffix'} ?? null,
-        ];
-        return trim(implode(' ', array_filter($fields, fn($value) => trim((string) $value) !== '')));
     }
 
     private function dayKey(string $day): string

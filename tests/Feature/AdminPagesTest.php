@@ -6,19 +6,15 @@ use Tests\TestCase;
 
 class AdminPagesTest extends TestCase
 {
-    public function test_admin_users_page_renders(): void
+    public function test_admin_users_page_requires_authentication(): void
     {
-        $response = $this->get('/admin/users');
-
-        $response->assertStatus(200);
-        $response->assertSee('All User Accounts');
+        $this->get(route('admin.users'))
+            ->assertRedirect(route('login'));
     }
 
-    public function test_admin_subjects_page_renders(): void
+    public function test_admin_subjects_page_requires_authentication(): void
     {
-        $response = $this->get('/admin/subjects');
-
-        $response->assertStatus(200);
-        $response->assertSee('Subject Management');
+        $this->get(route('subject.index'))
+            ->assertRedirect(route('login'));
     }
 }

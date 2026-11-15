@@ -15,6 +15,9 @@ function populateSubjectOptions(select, category, sectionId, departmentId, inclu
     const year = selectedSection?.dataset.yearLevel || '';
     const semester = String(window.ACTIVE_COURSE_SEMESTER || '');
     const subjects = (window.ALL_SUBJECTS_LIST || []).filter(subject => {
+        // Category browsing is global: show every course in that category.
+        // The normal subject list is scoped to the selected department,
+        // section year level, and semester below.
         if (category) return String(subject.cat) === String(category);
         const deptMatch = !deptId || !subject.dept || String(subject.dept) === String(deptId);
         const yearMatch = !year || !subject.year || String(subject.year) === String(year);

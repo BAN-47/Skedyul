@@ -27,6 +27,6 @@ class ScheduleSignatoryFormatter
         $formatted = implode(', ', array_filter([$name, $suffix]));
         $postNominal = FacultyNameFormatter::highestPostNominal($person->user?->faculty);
 
-        return $formatted . ($postNominal !== '' ? ' (' . $postNominal . ')' : '');
+        return $formatted . ($postNominal !== '' ? ', ' . $postNominal : '');
     }
 }

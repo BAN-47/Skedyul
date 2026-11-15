@@ -187,10 +187,10 @@ class PbsController extends Controller
             ->orderBy('course_code');
 
         if (!empty($selectedCategory)) {
-            $subjectsQuery->where('course_dept_id', $progId)
-                ->where('course_category', $selectedCategory);
+            // Category mode intentionally browses courses across all
+            // departments, year levels, and semesters.
+            $subjectsQuery->where('course_category', $selectedCategory);
         } else {
-            // No category: filter by selected department + year level + semester
             $subjectsQuery->where('course_dept_id', $subjectDeptId);
 
             if (!empty($selectedSection?->sec_year_level)) {

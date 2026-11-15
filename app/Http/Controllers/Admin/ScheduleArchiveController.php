@@ -57,7 +57,7 @@ class ScheduleArchiveController extends Controller
                 ->select('sem_id', 'semester_name')
                 ->whereNotNull('sem_id')
                 ->distinct()
-                ->orderByRaw("CASE WHEN semester_name ILIKE '1st%' THEN 1 WHEN semester_name ILIKE '2nd%' THEN 2 ELSE 3 END")
+                ->orderByRaw("CASE WHEN LOWER(semester_name) LIKE '1st%' THEN 1 WHEN LOWER(semester_name) LIKE '2nd%' THEN 2 ELSE 3 END")
                 ->get()
             : collect();
 

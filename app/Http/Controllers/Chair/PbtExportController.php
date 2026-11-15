@@ -196,7 +196,7 @@ class PbtExportController extends Controller
 
     private function chair(): Dept_Chair
     {
-        $chair = Dept_Chair::with('user')
+        $chair = Dept_Chair::with('user.faculty')
             ->where('dc_usr_id', Auth::id())
             ->first();
 

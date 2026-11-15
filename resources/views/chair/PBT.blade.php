@@ -566,8 +566,12 @@
                                                     class="{{ $isRec ? 'text-[10px] leading-tight break-words' : 'text-[13px] tracking-wide' }} font-extrabold">
                                                     {{ $isRec ? ($courseName ?? 'Research, Extension and Consultation Time') : ($courseCode ?? '—') }}
                                                 </div>
-                                                <div class="text-[11.5px] font-semibold mt-1">
-                                                    {{ $sharedSectionNames }}</div>
+                                                <a href="{{ route('chair.pbs', ['section' => $s->sch_sec_id, 'department' => $s->section?->sec_dept_id, 'semester' => $s->sch_sem_id, 'shift' => $shift === 'night' ? 'night' : 'day']) }}"
+                                                    onclick="event.stopPropagation()"
+                                                    title="Open this section's matching PBS schedule"
+                                                    class="text-[11.5px] font-semibold mt-1 hover:underline">
+                                                    {{ $sharedSectionNames }}
+                                                </a>
                                                 @if ($s->room)
                                                     <div class="text-[11.5px] font-medium mt-0.5 opacity-95">
                                                         {{ $s->room->room_name }}</div>
@@ -607,8 +611,8 @@
                             <div class="text-left text-xs font-bold text-slate-700">Reviewed, Certified True and
                                 Correct:</div>
                             <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
-                                {{ $signoff['reviewed_by'] ?? 'CCICT Dean not assigned' }}</div>
-                            <div class="text-xs text-slate-600">Director / Dean, CCICT</div>
+                                {{ $signoff['reviewed_by'] ?? 'Dean not assigned' }}</div>
+                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}</div>
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>

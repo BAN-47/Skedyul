@@ -160,10 +160,10 @@ class FacultyScheduleController extends Controller
 
         $department = $faculty->program;
         $chair = $department
-            ? Dept_Chair::where('dc_dept_id', $department->dept_id)->first()
+            ? Dept_Chair::with('user.faculty')->where('dc_dept_id', $department->dept_id)->first()
             : null;
         $dean = $faculty->fac_college_id
-            ? Dean::where('dean_college_id', $faculty->fac_college_id)->first()
+            ? Dean::with('user.faculty')->where('dean_college_id', $faculty->fac_college_id)->first()
             : null;
 
         $signatoryFormatter = app(ScheduleSignatoryFormatter::class);

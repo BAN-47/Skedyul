@@ -4,26 +4,26 @@ namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
 use App\Models\Faculty;
-use App\Models\College;
 use App\Models\Semester;
 use App\Models\Dept_Chair;
+use App\Models\Dean;
+use App\Models\Departments;
 use App\Models\Notification;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class FacultyDeploymentController extends Controller
 {
     public function index()
     {
+        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        abort_unless(Auth::user()?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+
         $activeSemester = Semester::where('sem_is_active', true)->first();
+        $collegeId = $dean->dean_college_id;
 
-        // Only faculty under CCICT college
-        $ccict = College::where('college_code', 'CCICT')->first();
-
-        $facultyQuery = Faculty::with(['department', 'program', 'studyLoads.subject']);
-
-        if ($ccict) {
-            $facultyQuery->where('fac_college_id', $ccict->college_id);
-        }
+        $facultyQuery = Faculty::with(['department', 'program', 'studyLoads.subject'])
+            ->where('fac_college_id', $collegeId);
 
         $programOrder = ['BSIS' => 1, 'BSIT' => 2, 'BIT-CT' => 3];
 
@@ -64,13 +64,19 @@ class FacultyDeploymentController extends Controller
                 return $row;
             });
 
-        $chairs = Dept_Chair::with('department')->get();
+        $departmentIds = Departments::where('dept_college_id', $collegeId)->pluck('dept_id');
+        $chairs = Dept_Chair::with('program')
+            ->whereIn('dc_dept_id', $departmentIds)
+            ->get();
 
         return view('dean.faculty_deployment', compact('faculty', 'chairs'));
     }
 
     public function sendNotification(Request $request)
     {
+        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        abort_unless(Auth::user()?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+
         $request->validate([
             'title'         => 'required|string|max:255',
             'message'       => 'required|string',
@@ -78,6 +84,15 @@ class FacultyDeploymentController extends Controller
             'recipients'    => 'required|array|min:1',
             'recipients.*'  => 'exists:USER,usr_id',
         ]);
+
+        $departmentIds = Departments::where('dept_college_id', $dean->dean_college_id)->pluck('dept_id');
+        $allowedRecipients = Faculty::where('fac_college_id', $dean->dean_college_id)
+            ->pluck('fac_usr_id')
+            ->merge(Dept_Chair::whereIn('dc_dept_id', $departmentIds)->pluck('dc_usr_id'))
+            ->filter()
+            ->unique();
+
+        abort_unless(collect($request->recipients)->diff($allowedRecipients)->isEmpty(), 403, 'You can only notify faculty and chairs in your college.');
 
         foreach ($request->recipients as $usrId) {
             Notification::create([

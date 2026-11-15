@@ -67,10 +67,12 @@ class AdminScheduleArchivesTest extends TestCase
             $table->uuid('course_id')->primary();
             $table->string('course_code')->nullable();
             $table->string('course_name')->nullable();
+            $table->decimal('course_units')->nullable();
         });
         Schema::create('section', function (Blueprint $table) {
             $table->uuid('sec_id')->primary();
             $table->string('sec_name')->nullable();
+            $table->integer('sec_no_of_student')->nullable();
         });
         Schema::create('room', function (Blueprint $table) {
             $table->uuid('room_id')->primary();
@@ -157,17 +159,21 @@ class AdminScheduleArchivesTest extends TestCase
         $this->schedule((string) Str::uuid(), $this->currentSemesterId, 'Wednesday');
 
         $response = $this->actingAs($this->admin())
-            ->get(route('admin.schedule-archives'));
+            ->get(route('admin.schedule-archives', [
+                'year' => $this->pastYearId,
+                'semester' => $this->pastSemesterId,
+                'faculty' => $this->facultyId,
+            ]));
 
         $response->assertOk()
             ->assertSee('Schedule Archives')
             ->assertSee('2024-2025')
             ->assertSee('CS101')
             ->assertSee('Ada Lovelace')
-            ->assertSee('Archived snapshot')
-            ->assertSee('Preserved schedule')
-            ->assertSee('of 2 schedules')
-            ->assertDontSee('Wednesday');
+            ->assertSee('Monday')
+            ->assertSee('Tuesday');
+
+        $this->assertSame(2, substr_count($response->getContent(), '<article class="z-20'));
 
         $this->assertSame(1, preg_match_all('/class="sidebar-logo"/', $response->getContent()));
         $this->assertDatabaseHas('schedule', [
@@ -185,14 +191,17 @@ class AdminScheduleArchivesTest extends TestCase
         $this->schedule((string) Str::uuid(), $this->pastSemesterId, 'Monday');
         $this->schedule((string) Str::uuid(), $this->currentSemesterId, 'Tuesday');
 
-        $this->actingAs($this->admin())
+        $response = $this->actingAs($this->admin())
             ->get(route('admin.schedule-archives', [
                 'year' => $this->pastYearId,
                 'semester' => $this->pastSemesterId,
-            ]))
-            ->assertOk()
+                'faculty' => $this->facultyId,
+            ]));
+
+        $response->assertOk()
             ->assertSee('Monday')
-            ->assertDontSee('Tuesday');
+            ->assertSee('Tuesday'); // The timetable always displays every weekday column.
+        $this->assertSame(1, substr_count($response->getContent(), '<article class="z-20'));
     }
 
     public function test_non_admin_cannot_view_schedule_archives(): void

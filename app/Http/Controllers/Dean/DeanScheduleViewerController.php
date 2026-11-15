@@ -124,7 +124,7 @@ class DeanScheduleViewerController extends Controller
             $row++;
         }
 
-        $chair = Dept_Chair::where('dc_dept_id', $section->sec_dept_id)->first();
+        $chair = Dept_Chair::with('user.faculty')->where('dc_dept_id', $section->sec_dept_id)->first();
         $formatter = app(ScheduleSignatoryFormatter::class);
         $chairName = $formatter->formatRoleName($chair, 'dc_');
         $deanName = $formatter->formatRoleName($dean, 'dean_');
@@ -233,7 +233,7 @@ class DeanScheduleViewerController extends Controller
     private function scheduleSignatories(Dean $dean, ?string $departmentId, ?string $departmentCode): array
     {
         $chair = $departmentId
-            ? Dept_Chair::where('dc_dept_id', $departmentId)->first()
+            ? Dept_Chair::with('user.faculty')->where('dc_dept_id', $departmentId)->first()
             : null;
         $formatter = app(ScheduleSignatoryFormatter::class);
         $collegeCode = $dean->department?->college_code;
@@ -249,7 +249,7 @@ class DeanScheduleViewerController extends Controller
 
     private function dean(): Dean
     {
-        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        $dean = Dean::with('user.faculty')->where('dean_usr_id', Auth::id())->first();
         abort_if(!$dean || !$dean->dean_college_id, 403, 'Your account is not assigned to a college.');
 
         return $dean;

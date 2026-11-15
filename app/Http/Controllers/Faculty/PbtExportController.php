@@ -88,7 +88,7 @@ class PbtExportController extends Controller
 
         $facultyName = FacultyNameFormatter::format($faculty);
 
-        $chair = Dept_Chair::with('user')
+        $chair = Dept_Chair::with('user.faculty')
             ->where('dc_dept_id', $faculty->fac_dept_id)
             ->first();
 

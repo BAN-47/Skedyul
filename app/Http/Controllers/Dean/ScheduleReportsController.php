@@ -8,7 +8,6 @@ use App\Models\Section;
 use App\Models\Faculty;
 use App\Models\Study_Load;
 use App\Models\Semester;
-use App\Models\College;
 use App\Models\Departments;
 use App\Models\Dept_Chair;
 use App\Models\Notification;
@@ -22,9 +21,9 @@ class ScheduleReportsController extends Controller
         $activeSemester = Semester::where('sem_is_active', true)->first();
 
         $dean = Auth::user()?->dean;
-        $college = $dean?->department
-            ?? College::where('college_code', 'CCICT')->first();
-        $collegeId = $college?->college_id;
+        abort_unless(Auth::user()?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+        $college = $dean->department;
+        $collegeId = $dean->dean_college_id;
 
         // Keep department ordering consistent in all three report tabs.
         $departmentOrder = [
