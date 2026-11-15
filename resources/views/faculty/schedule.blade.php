@@ -107,12 +107,10 @@
                 'announcements' => $announcements ?? null,
             ])
 
-            <main class="page-content" id="page-faculty-schedule">
+            <main class="page-content faculty-page-enter" id="page-faculty-schedule">
                 <div class="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 class="text-xl font-extrabold text-slate-900">My Teaching Schedule</h1>
-                        <p class="mt-1 text-sm text-slate-500">View-only schedule and course summary for
-                            {{ $activeSemester->label ?? 'the active semester' }}.</p>
                     </div>
 
                     <div class="flex flex-wrap gap-2">

@@ -21,7 +21,7 @@
       @include('partials.faculty_header', ['title' => 'Settings'])
 
       <!-- FACULTY SETTINGS PAGE -->
-      <div id="page-faculty-settings" class="page active">
+      <div id="page-faculty-settings" class="page active faculty-page-enter">
         <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <div class="rounded-[14px] border border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-900">
             <div class="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[1px] text-slate-400">Settings</div>
@@ -1734,7 +1734,14 @@ function facSavePersonalInfo() {
     function showFacSettingsSection(section, el) {
       ['profile', 'security', 'notifications'].forEach(s => {
         const elem = document.getElementById('fac-settings-' + s);
-        if (elem) elem.classList.toggle('hidden', s !== section);
+        if (elem) {
+          elem.classList.toggle('hidden', s !== section);
+          if (s === section) {
+            elem.classList.remove('faculty-page-enter');
+            void elem.offsetWidth;
+            elem.classList.add('faculty-page-enter');
+          }
+        }
       });
       const activeClasses = ['bg-blue-50', 'text-blue-600', 'font-semibold', 'border-blue-600', 'dark:bg-blue-950/40', 'dark:text-blue-400', 'dark:border-blue-500'];
       const inactiveClasses = ['border-transparent', 'font-medium', 'text-slate-600', 'dark:text-slate-400'];
