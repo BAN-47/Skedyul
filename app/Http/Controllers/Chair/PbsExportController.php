@@ -154,6 +154,133 @@ class PbsExportController extends Controller
         );
     }
 
+    /**
+     * Dean-side PBS export. This uses the same day/evening workbook templates
+     * and rendering helpers as the Chair export, while enforcing the Dean's
+     * college scope instead of requiring a Chair account.
+     */
+    public function downloadForDean(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'section_id' => ['required', 'uuid', 'exists:section,sec_id'],
+        ]);
+
+        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        abort_unless($dean && $dean->dean_college_id, 403, 'Your account is not assigned to a college.');
+
+        $section = Section::with('program.department')
+            ->where('sec_id', $validated['section_id'])
+            ->whereHas('program', fn($query) => $query->where('dept_college_id', $dean->dean_college_id))
+            ->firstOrFail();
+
+        $semester = Semester::with('academicYear')
+            ->where('sem_is_active', true)
+            ->first();
+        abort_unless($semester, 422, 'There is no active semester to export.');
+
+        $schedules = Schedule::query()
+            ->where('sch_sec_id', $section->sec_id)
+            ->where('sch_sem_id', $semester->sem_id)
+            ->where('sch_is_active', true)
+            ->with(['subject', 'faculty', 'room'])
+            ->orderByRaw("CASE UPPER(sch_day)
+                WHEN 'MONDAY' THEN 1 WHEN 'MON' THEN 1
+                WHEN 'TUESDAY' THEN 2 WHEN 'TUE' THEN 2
+                WHEN 'WEDNESDAY' THEN 3 WHEN 'WED' THEN 3
+                WHEN 'THURSDAY' THEN 4 WHEN 'THU' THEN 4
+                WHEN 'FRIDAY' THEN 5 WHEN 'FRI' THEN 5
+                WHEN 'SATURDAY' THEN 6 WHEN 'SAT' THEN 6
+                WHEN 'SUNDAY' THEN 7 WHEN 'SUN' THEN 7
+                ELSE 8 END")
+            ->orderBy('sch_start_time')
+            ->get();
+
+        $chair = Dept_Chair::where('dc_dept_id', $section->sec_dept_id)->first();
+        $college = $section->program?->department;
+        $collegeDean = $college
+            ? Dean::where('dean_college_id', $college->college_id)->with('user')->first()
+            : null;
+        $casCollege = College::whereRaw('UPPER(TRIM(college_code)) = ?', ['CAS'])->first();
+        $casDean = $casCollege
+            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user')->first()
+            : null;
+        $chairName = $chair
+            ? trim(implode(' ', array_filter([
+                $chair->dc_first_name,
+                $chair->dc_middle_name,
+                $chair->dc_last_name,
+                $chair->dc_suffix,
+            ])))
+            : '';
+        $collegeDeanName = $this->personName($collegeDean, 'dean');
+        $casDeanName = $this->personName($casDean, 'dean');
+        $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
+
+        $isEvening = (bool) $section->sec_is_evening;
+        $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
+        $templatePath = storage_path('app/templates/' . $templateName);
+        abort_unless(is_file($templatePath), 500, 'The PBS export template is missing: ' . $templateName);
+
+        $spreadsheet = IOFactory::load($templatePath);
+        $sourceSheetName = $isEvening ? 'BSIS 1-1' : 'BSIS 1-A';
+        $sheet = $spreadsheet->getSheetByName($sourceSheetName);
+        abort_unless($sheet, 500, 'The PBS template is missing the expected sheet: ' . $sourceSheetName);
+
+        for ($index = $spreadsheet->getSheetCount() - 1; $index >= 0; $index--) {
+            if ($spreadsheet->getSheet($index) !== $sheet) {
+                $spreadsheet->removeSheetByIndex($index);
+            }
+        }
+        $spreadsheet->setActiveSheetIndex(0);
+        $sheet->setTitle(mb_substr(trim((string) $section->sec_name) ?: 'PBS', 0, 31));
+
+        $sheet->getColumnDimension('D')->setXfIndex(0);
+        $this->clearSampleSchedule($sheet, $isEvening);
+        $this->addFormMetadata($sheet);
+
+        $semesterName = trim((string) $semester->sem_name);
+        $academicYear = $semester->academicYear?->ay_academic_year
+            ?? $semester->academicYear?->ay_year_label
+            ?? '';
+        $academicYear = str_replace('-', ' - ', $academicYear);
+        $semesterLabel = trim($semesterName . ($academicYear !== '' ? ', AY ' . $academicYear : ''));
+
+        $sheet->setCellValue('A5', 'PROGRAM BY SECTION');
+        $sheet->setCellValue('A6', $isEvening ? 'Evening Program' : 'Day Program');
+        $sheet->setCellValue('A7', $semesterLabel);
+        $sheet->setCellValue('A9', 'Degree Year & Section: ' . $section->sec_name);
+        $sheet->setCellValue('A10', 'Adviser: _____________________________________');
+        $sheet->setCellValue('D15', (int) ($section->sec_no_of_student ?? 0));
+
+        $this->clearCourseSummary($sheet);
+        $this->writeCourseSummary($sheet, $schedules, (int) ($section->sec_no_of_student ?? 0));
+        $this->writeSignatures(
+            $sheet,
+            $chairName,
+            $collegeDeanName,
+            $college?->college_code ?: $college?->college_name,
+            $campusDirectorName,
+            $this->shouldIncludeCasDean($section, $semester) ? $casDeanName : '',
+            $isEvening
+        );
+        $this->drawSchedule($sheet, $schedules, $isEvening);
+
+        $sheet->setSelectedCell('A1');
+        $spreadsheet->setActiveSheetIndex(0);
+
+        $safeSection = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $section->sec_name);
+        $safeSemester = preg_replace('/[^A-Za-z0-9_-]+/', '-', $semesterName);
+        $filename = sprintf('PBS-%s-%s.xlsx', $safeSection ?: 'Section', $safeSemester ?: 'Semester');
+
+        return response()->streamDownload(
+            static function () use ($spreadsheet): void {
+                (new Xlsx($spreadsheet))->save('php://output');
+            },
+            $filename,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
+    }
+
     private function clearSampleSchedule($sheet, bool $isEvening): void
     {
         $scheduleColumns = $isEvening

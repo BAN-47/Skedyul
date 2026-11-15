@@ -8,6 +8,7 @@ use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
 use App\Http\Controllers\Chair\ChairSettingsController;
 use App\Http\Controllers\Chair\PbsController;
+use App\Http\Controllers\Chair\PbsSubmissionController;
 use App\Http\Controllers\Chair\PbtController;
 use App\Http\Controllers\Chair\PbtExportController;
 use App\Http\Controllers\Chair\MisController;
@@ -35,6 +36,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     Route::post('/pbs/clear', [PbsController::class, 'clear'])->name('chair.pbs.clear');
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
     Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
+    Route::post('/pbs/submit-dean', [PbsSubmissionController::class, 'store'])->name('chair.pbs.submit-dean');
 
 
     // PBT — Program by Teacher

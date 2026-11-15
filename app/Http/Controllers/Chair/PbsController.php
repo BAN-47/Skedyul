@@ -7,6 +7,7 @@ use App\Models\AcademicYear;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
+use App\Models\Schedule_Submission;
 use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Course;
@@ -19,9 +20,7 @@ use Illuminate\Support\Facades\DB;
 
 class PbsController extends Controller
 {
-    public function __construct(private ScheduleAssignmentService $scheduler)
-    {
-    }
+    public function __construct(private ScheduleAssignmentService $scheduler) {}
 
     /**
      * Resolve the logged-in department chair's assigned program.
@@ -98,6 +97,8 @@ class PbsController extends Controller
                 'chairDepartment'  => null,
                 'activeSemester'   => $this->activeSemester(),
                 'selectedSection'  => null,
+                'pbsSubmission'    => null,
+                'canSubmitPbs'     => false,
                 'signoff'          => app(\App\Services\ScheduleSignoffService::class)->names(),
                 'error'            => 'Your account is not linked to a department. Contact the system administrator.',
             ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -125,14 +126,14 @@ class PbsController extends Controller
                     ->where('sch_sec_id', $filters['section'])
                     ->when(
                         !empty($filters['semester']),
-                        fn ($q) => $q->where('sch_sem_id', $filters['semester']),
-                        fn ($q) => $q->whereRaw('1 = 0')
+                        fn($q) => $q->where('sch_sem_id', $filters['semester']),
+                        fn($q) => $q->whereRaw('1 = 0')
                     )
                     ->where('sch_is_active', true)
                     ->when(
                         $shiftKey === 'evening',
-                        fn ($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
-                        fn ($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+                        fn($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                        fn($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
                     )
                     ->with(['subject', 'faculty', 'section', 'room', 'semester'])
                     ->orderBy('sch_day')
@@ -148,6 +149,17 @@ class PbsController extends Controller
             $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
         }
 
+        $canSubmitPbs = $selectedSection
+            && (string) $selectedSection->sec_dept_id === (string) $progId;
+        $pbsSubmission = $canSubmitPbs && $activeSem
+            ? Schedule_Submission::query()
+            ->where('schsub_type', 'pbs')
+            ->where('schsub_dept_id', $progId)
+            ->where('schsub_sem_id', $activeSem->sem_id)
+            ->where('schsub_sec_id', $selectedSection->sec_id)
+            ->first()
+            : null;
+
         $summaryShift = $selectedSection?->sec_is_evening ? 'evening' : $shiftKey;
         $summarySchedules = $schedules;
         if ($selectedSection?->sec_is_evening) {
@@ -155,8 +167,8 @@ class PbsController extends Controller
                 ->where('sch_sec_id', $selectedSection->sec_id)
                 ->when(
                     !empty($filters['semester']),
-                    fn ($query) => $query->where('sch_sem_id', $filters['semester']),
-                    fn ($query) => $query->whereRaw('1 = 0')
+                    fn($query) => $query->where('sch_sem_id', $filters['semester']),
+                    fn($query) => $query->whereRaw('1 = 0')
                 )
                 ->where('sch_is_active', true)
                 ->with(['subject', 'faculty', 'section', 'room', 'semester'])
@@ -211,7 +223,7 @@ class PbsController extends Controller
         // All teachers who can be assigned (faculty table only — needed for FK).
         // Includes full-time, part-time, dept chairs, and deans who have a faculty row.
         $faculty = Faculty::query()
-            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
@@ -260,6 +272,8 @@ class PbsController extends Controller
             'chairDepartment'  => $allDepartments->first(),
             'activeSemester'   => $activeSem,
             'selectedSection'  => $selectedSection,
+            'pbsSubmission'    => $pbsSubmission,
+            'canSubmitPbs'     => (bool) $canSubmitPbs,
             'selectedShift'    => $shiftKey,
             'summaryShift'     => $summaryShift,
             'summarySchedules' => $summarySchedules,
@@ -310,7 +324,7 @@ class PbsController extends Controller
     {
         $progId = $this->chairProgramId();
         if ($progId && !Schedule::whereKey($id)
-            ->whereHas('section', fn ($query) => $query->where('sec_dept_id', $progId))
+            ->whereHas('section', fn($query) => $query->where('sec_dept_id', $progId))
             ->exists()) {
             return response()->json([
                 'success' => false,
@@ -387,8 +401,8 @@ class PbsController extends Controller
 
         Schedule::whereIn('sch_id', $schedules->pluck('sch_id'))->delete();
         \App\Models\Study_Load::whereIn('sl_id', $ids)->delete();
-        $schedules->unique(fn ($schedule) => $schedule->sch_fac_id.'|'.$schedule->sch_sem_id)
-            ->each(fn ($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
+        $schedules->unique(fn($schedule) => $schedule->sch_fac_id . '|' . $schedule->sch_sem_id)
+            ->each(fn($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
     }
@@ -457,7 +471,7 @@ class PbsController extends Controller
         }
 
         // Verify chair has access to this department's college
-        $chair = \App\Models\Dept_Chair::where('dc_usr_id', auth()->id())->first();
+        $chair = \App\Models\Dept_Chair::where('dc_usr_id', Auth::id())->first();
         if ($chair && $chair->dc_college_id !== $dept->dept_college_id) {
             return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
         }
@@ -473,14 +487,14 @@ class PbsController extends Controller
             ->where('sch_sec_id', $data['section'])
             ->when(
                 $activeSem,
-                fn ($q) => $q->where('sch_sem_id', $activeSem->sem_id),
-                fn ($q) => $q->whereRaw('1 = 0')
+                fn($q) => $q->where('sch_sem_id', $activeSem->sem_id),
+                fn($q) => $q->whereRaw('1 = 0')
             )
             ->where('sch_is_active', true)
             ->when(
                 $shiftKey === 'evening',
-                fn ($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
-                fn ($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+                fn($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                fn($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
             )
             ->with(['subject', 'faculty', 'section', 'room', 'semester'])
             ->orderBy('sch_day')

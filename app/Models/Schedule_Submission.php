@@ -28,6 +28,8 @@ class Schedule_Submission extends Model
         'schsub_id',
         'schsub_dept_id',
         'schsub_fac_id',
+        'schsub_type',
+        'schsub_sec_id',
         'schsub_sem_id',
         'schsub_submitted_by',
         'schsub_submitted_at',
@@ -54,6 +56,11 @@ class Schedule_Submission extends Model
         return $this->belongsTo(Faculty::class, 'schsub_fac_id', 'fac_id');
     }
 
+    public function section()
+    {
+        return $this->belongsTo(Section::class, 'schsub_sec_id', 'sec_id');
+    }
+
     public function semester()
     {
         return $this->belongsTo(Semester::class, 'schsub_sem_id', 'sem_id');
@@ -71,6 +78,14 @@ class Schedule_Submission extends Model
 
     public function schedules()
     {
+        if (($this->schsub_type ?? 'pbt') === 'pbs' && $this->schsub_sec_id) {
+            return Schedule::query()
+                ->where('sch_sem_id', $this->schsub_sem_id)
+                ->where('sch_sec_id', $this->schsub_sec_id)
+                ->where('sch_is_active', true)
+                ->get();
+        }
+
         return Schedule::query()
             ->where('sch_sem_id', $this->schsub_sem_id)
             ->where('sch_is_active', true)

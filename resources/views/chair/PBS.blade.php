@@ -96,6 +96,31 @@
                     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                         <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section
                             Count</button>
+                        @php
+                            $pbsStatus = $pbsSubmission?->schsub_status;
+                            $canSubmitSelectedPbs =
+                                !empty($selectedSection) &&
+                                !empty($activeSemester) &&
+                                !empty($canSubmitPbs) &&
+                                !in_array($pbsStatus, ['pending', 'approved'], true);
+                            $pbsSubmitLabel = match ($pbsStatus) {
+                                'pending' => 'PBS Submitted to Dean',
+                                'approved' => 'PBS Approved',
+                                'returned' => 'Resubmit PBS to Dean',
+                                default => 'Submit PBS to Dean',
+                            };
+                        @endphp
+                        <form method="POST" action="{{ route('chair.pbs.submit-dean') }}" class="inline-flex">
+                            @csrf
+                            <input type="hidden" name="section" value="{{ $selectedSection?->sec_id }}">
+                            <input type="hidden" name="semester" value="{{ $activeSemester->sem_id ?? '' }}">
+                            <input type="hidden" name="shift" value="{{ $shift }}">
+                            <button type="submit" class="btn btn-secondary"
+                                {{ $canSubmitSelectedPbs ? '' : 'disabled' }}
+                                title="{{ empty($selectedSection) ? 'Select a section first' : 'Submit the selected section PBS to the dean' }}">
+                                {{ $pbsSubmitLabel }}
+                            </button>
+                        </form>
                         <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Download PBS
                             Excel</button>
                         <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
@@ -473,7 +498,8 @@
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
-                            <div class="w-full border-b border-slate-700 px-1 pb-1 text-center text-sm font-bold uppercase">
+                            <div
+                                class="w-full border-b border-slate-700 px-1 pb-1 text-center text-sm font-bold uppercase">
                                 {{ $signoff['campus_director'] ?? '' }}
                             </div>
                             <div class="text-xs text-slate-600">Campus Director</div>

@@ -252,6 +252,11 @@ class PbtExportController extends Controller
             $schedules,
             'day'
         );
+        $this->styleCourseSummaryGrid(
+            $sheet,
+            self::DAY_TEMPLATE_COURSE_FIRST_ROW,
+            self::DAY_TEMPLATE_COURSE_LAST_ROW
+        );
 
         $this->fillLoadTotals(
             $sheet,
@@ -265,9 +270,11 @@ class PbtExportController extends Controller
             'day'
         );
 
-        foreach ($daySchedules as $schedule) {
-            $this->writeDaySchedule($sheet, $schedule, $schedules);
-        }
+        $sheet->getStyle('A36:F44')->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_THIN)
+            ->getColor()->setRGB('000000');
+
+        $this->writeGroupedSchedules($sheet, $daySchedules, $schedules, false);
     }
 
     private function fillEveningSheet(
@@ -292,10 +299,25 @@ class PbtExportController extends Controller
         $sheet->setCellValue('K15', '');
         $sheet->setCellValue('A52', $chairSignature);
         CampusDirectorSignature::write($sheet, $campusDirector, 'N52');
+        $this->centerEveningCampusDirectorSignature($sheet);
 
         $eveningSchedules = $schedules
             ->filter(fn($schedule) => $this->isEveningSchedule($schedule))
             ->values();
+        $eveningColumnWidths = [
+            'A' => 8.543,
+            'B' => 10.363,
+            'C' => 14.906,
+            'D' => 12.453,
+            'E' => 10.363,
+            'F' => 1.363,
+            'G' => 10.453,
+            'H' => 10.453,
+            'I' => 5.543,
+        ];
+        foreach ($eveningColumnWidths as $column => $width) {
+            $sheet->getColumnDimension($column)->setWidth($width);
+        }
 
         $this->clearCourseRows(
             $sheet,
@@ -313,6 +335,11 @@ class PbtExportController extends Controller
             $schedules,
             'evening'
         );
+        $this->styleCourseSummaryGrid(
+            $sheet,
+            self::EVENING_TEMPLATE_COURSE_FIRST_ROW,
+            self::EVENING_TEMPLATE_COURSE_LAST_ROW
+        );
 
         $this->fillLoadTotals(
             $sheet,
@@ -326,11 +353,67 @@ class PbtExportController extends Controller
             'evening'
         );
 
-        foreach ($eveningSchedules as $schedule) {
-            $this->writeEveningSchedule($sheet, $schedule, $schedules);
-        }
+        $this->writeGroupedSchedules($sheet, $eveningSchedules, $schedules, true);
     }
 
+    private function centerEveningCampusDirectorSignature($sheet): void
+    {
+        $nameRange = 'N52:R52';
+        if (!in_array($nameRange, $sheet->getMergeCells(), true)) {
+            $sheet->mergeCells($nameRange);
+        }
+
+        $sheet->getStyle($nameRange)->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(false);
+        $sheet->getStyle($nameRange)->getFont()->setBold(true);
+        $sheet->getStyle($nameRange)->getBorders()->getBottom()
+            ->setBorderStyle(Border::BORDER_THIN)
+            ->getColor()->setRGB('000000');
+        $sheet->getStyle('N53:R53')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+    }
+    private function styleCourseSummaryGrid($sheet, int $firstRow, int $lastRow): void
+    {
+        for ($row = $firstRow; $row <= $lastRow; $row++) {
+            $hasCourseData = false;
+            foreach (['A', 'B', 'D', 'E'] as $column) {
+                $value = $sheet->getCell($column . $row)->getValue();
+                if ($value !== null && trim((string) $value) !== '') {
+                    $hasCourseData = true;
+                    break;
+                }
+            }
+
+            if (!$hasCourseData) {
+                continue;
+            }
+
+            foreach (["B{$row}:C{$row}", "E{$row}:F{$row}"] as $mergeRange) {
+                if (!in_array($mergeRange, $sheet->getMergeCells(), true)) {
+                    $sheet->mergeCells($mergeRange);
+                }
+            }
+
+            foreach (["A{$row}", "B{$row}:C{$row}", "D{$row}", "E{$row}:F{$row}"] as $range) {
+                $style = $sheet->getStyle($range);
+                $style->getBorders()->getOutline()
+                    ->setBorderStyle(Border::BORDER_THIN)
+                    ->getColor()->setRGB('000000');
+                $style->getFont()->setName('Arial Narrow')->setSize(9)->setBold(false);
+                $style->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+            }
+
+            $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("B{$row}:C{$row}")->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                ->setWrapText(false);
+            $sheet->getStyle("D{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("E{$row}:F{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        }
+    }
     private function clearCourseRows($sheet, int $firstRow, int $lastRow): void
     {
         for ($row = $firstRow; $row <= $lastRow; $row++) {
@@ -372,7 +455,14 @@ class PbtExportController extends Controller
             $studentCount = $courseSections->sum(fn($section) => (int) ($section->sec_no_of_student ?? 0));
 
             $sheet->setCellValue('A' . $row, $course->course_code ?? '');
-            $sheet->setCellValue('B' . $row, $course->course_name ?? '');
+            $courseTitle = trim((string) ($course->course_name ?? ''));
+            $sheet->setCellValue('B' . $row, $courseTitle);
+            if ($summaryShift === 'evening') {
+                $sheet->getStyle('B' . $row . ':C' . $row)->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                    ->setVertical(Alignment::VERTICAL_CENTER)
+                    ->setWrapText(false);
+            }
             $sheet->setCellValue('D' . $row, $sectionNames);
             $sheet->setCellValue('E' . $row, $studentCount);
         }
@@ -580,6 +670,106 @@ class PbtExportController extends Controller
         return ((int) date('G', $timestamp) * 60) + (int) date('i', $timestamp);
     }
 
+    private function writeGroupedSchedules($sheet, $schedules, $allSchedules, bool $evening): void
+    {
+        $dayColumns = $evening
+            ? [
+                'monday' => 11,
+                'tuesday' => 12,
+                'wednesday' => 13,
+                'thursday' => 14,
+                'friday' => 15,
+                'saturday' => 17,
+                'sunday' => 18,
+            ]
+            : [
+                'monday' => 11,
+                'tuesday' => 12,
+                'wednesday' => 13,
+                'thursday' => 14,
+                'friday' => 15,
+                'saturday' => 16,
+            ];
+        $groups = [];
+
+        foreach ($schedules as $schedule) {
+            $day = strtolower(trim((string) $schedule->sch_day));
+            if (!isset($dayColumns[$day])) {
+                continue;
+            }
+
+            $start = $this->minutes($schedule->sch_start_time);
+            $end = $this->minutes($schedule->sch_end_time);
+            if ($end <= $start) {
+                continue;
+            }
+
+            if (!$evening) {
+                $baseRow = $start >= 13 * 60 ? 33 : 15;
+                $baseMinutes = $start >= 13 * 60 ? 13 * 60 : 7 * 60;
+                $firstRow = $baseRow + (int) ceil(($start - $baseMinutes) / 20);
+                $lastRow = $baseRow + (int) ceil(($end - $baseMinutes) / 20) - 1;
+            } else {
+                $isWeekday = in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true);
+                $baseMinutes = $isWeekday ? 16 * 60 : 7 * 60;
+                $rowsPerHour = $isWeekday ? 5 : 2;
+                $firstRow = 17 + (int) ceil((($start - $baseMinutes) * $rowsPerHour) / 60);
+                $lastRow = 17 + (int) ceil((($end - $baseMinutes) * $rowsPerHour) / 60) - 1;
+            }
+
+            $sectionNames = $this->sectionNamesForSchedule($schedule, $allSchedules);
+            $groupKey = json_encode([
+                (string) ($schedule->sch_course_id ?? $schedule->subject?->course_id ?? ''),
+                (string) ($schedule->sch_sec_id ?? $schedule->section?->sec_id ?? ''),
+                (string) ($schedule->sch_fac_id ?? ''),
+                (string) ($schedule->sch_room_id ?? $schedule->room?->room_id ?? ''),
+                $start,
+                $end,
+                $firstRow,
+                $lastRow,
+                $sectionNames,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'schedule' => $schedule,
+                    'section_names' => $sectionNames,
+                    'first_row' => $firstRow,
+                    'last_row' => $lastRow,
+                    'columns' => [],
+                ];
+            }
+
+            $groups[$groupKey]['columns'][$dayColumns[$day]] = true;
+        }
+
+        foreach ($groups as $group) {
+            $columns = array_map('intval', array_keys($group['columns']));
+            sort($columns, SORT_NUMERIC);
+            $runs = [];
+
+            foreach ($columns as $column) {
+                $lastRun = count($runs) - 1;
+                if ($lastRun < 0 || $column !== $runs[$lastRun][1] + 1) {
+                    $runs[] = [$column, $column];
+                } else {
+                    $runs[$lastRun][1] = $column;
+                }
+            }
+
+            foreach ($runs as [$firstColumn, $lastColumn]) {
+                $this->writeScheduleBlock(
+                    $sheet,
+                    $group['schedule'],
+                    $firstColumn,
+                    $group['first_row'],
+                    $group['last_row'],
+                    $group['section_names'],
+                    $lastColumn
+                );
+            }
+        }
+    }
     private function writeDaySchedule($sheet, Schedule $schedule, $allSchedules): void
     {
         $dayColumns = [
@@ -663,14 +853,15 @@ class PbtExportController extends Controller
             ->implode(', ');
     }
 
-    private function writeScheduleBlock($sheet, Schedule $schedule, int $column, int $firstRow, int $lastRow, ?string $sectionNames = null): void
+    private function writeScheduleBlock($sheet, Schedule $schedule, int $column, int $firstRow, int $lastRow, ?string $sectionNames = null, ?int $lastColumn = null): void
     {
         $firstRow = max(15, $firstRow);
         $lastRow = max($firstRow, $lastRow);
+        $lastColumn ??= $column;
         $coordinate = Coordinate::stringFromColumnIndex($column) . $firstRow;
-        $lastCoordinate = Coordinate::stringFromColumnIndex($column) . $lastRow;
+        $lastCoordinate = Coordinate::stringFromColumnIndex($lastColumn) . $lastRow;
 
-        if ($firstRow !== $lastRow) {
+        if ($firstRow !== $lastRow || $column !== $lastColumn) {
             $sheet->mergeCells($coordinate . ':' . $lastCoordinate);
         }
 

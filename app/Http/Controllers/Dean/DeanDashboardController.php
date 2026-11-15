@@ -28,7 +28,7 @@ class DeanDashboardController extends Controller
             $dean?->dean_middle_name,
             $dean?->dean_last_name,
             $dean?->dean_suffix,
-        ])->filter(fn ($part) => filled($part))->implode(' ');
+        ])->filter(fn($part) => filled($part))->implode(' ');
         $greetingName = $greetingName ?: ($user?->usr_name ?: 'Dean');
 
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
@@ -45,9 +45,9 @@ class DeanDashboardController extends Controller
         $facultyLoads = $faculty->map(function ($member) use ($studyLoadsByFaculty) {
             $loads = $studyLoadsByFaculty->get($member->fac_id, collect());
             $dayHours = (float) $loads->where('sl_shift', 'day')
-                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+                ->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
             $eveningHours = (float) $loads->where('sl_shift', 'evening')
-                ->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+                ->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
             $dayMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'day');
             $eveningMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'evening');
             $hours = $dayHours + $eveningHours;
@@ -131,12 +131,12 @@ class DeanDashboardController extends Controller
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $scheduleCountsByShift = Schedule::query()
             ->where('sch_is_active', true)
-            ->when($semester, fn ($query) => $query->where('sch_sem_id', $semester->sem_id))
+            ->when($semester, fn($query) => $query->where('sch_sem_id', $semester->sem_id))
             ->select('sch_day', 'sch_shift', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
             ->groupBy('sch_day', 'sch_shift')
             ->get()
             ->groupBy('sch_day');
-        $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
+        $weeklyScheduleCounts = collect($weekDays)->map(fn($day) => [
             'day' => substr($day, 0, 3),
             'day_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'day')->total ?? 0),
             'evening_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'evening')->total ?? 0),
@@ -145,10 +145,10 @@ class DeanDashboardController extends Controller
         $pendingQuery = Schedule_Submission::with([
             'department',
             'faculty.user',
+            'section',
         ])
             ->when($semester, fn($query) => $query->where('schsub_sem_id', $semester->sem_id))
             ->where('schsub_status', 'pending')
-            ->whereNotNull('schsub_fac_id')
             ->orderByDesc('schsub_submitted_at');
 
         $pendingDeptCount = (clone $pendingQuery)->count();
@@ -162,10 +162,13 @@ class DeanDashboardController extends Controller
         $pendingApprovals = $pendingApprovals->map(function ($submission) use ($submittersById) {
             $submitter = $submittersById->get($submission->schsub_submitted_by);
             $submitterName = $submitter->usr_name ?? 'Unknown Chair';
-            $facultyName = FacultyNameFormatter::format($submission->faculty) ?: 'Unknown Faculty';
+            $isPbs = ($submission->schsub_type ?? 'pbt') === 'pbs';
+            $recordName = $isPbs
+                ? ($submission->section->sec_name ?? 'Program by Section')
+                : (FacultyNameFormatter::format($submission->faculty) ?: 'Unknown Faculty');
             $departmentCode = $submission->department->dept_code ?? 'Department';
 
-            $initials = collect(preg_split('/\s+/', trim($facultyName)))
+            $initials = collect(preg_split('/\s+/', trim($recordName)))
                 ->filter()
                 ->take(2)
                 ->map(fn($part) => strtoupper(substr($part, 0, 1)))
@@ -175,11 +178,11 @@ class DeanDashboardController extends Controller
 
             return [
                 'id' => $submission->schsub_id,
-                'title' => $facultyName . ' — ' . $departmentCode . ' PBT',
+                'title' => $recordName . ' — ' . $departmentCode . ($isPbs ? ' PBS' : ' PBT'),
                 'detail' => 'Submitted by ' . $submitterName
                     . ($submittedAt ? ' · ' . $submittedAt->format('M j, Y g:i A') : ''),
-                'initials' => $initials ?: 'FA',
-                'color' => '#2563eb',
+                'initials' => $initials ?: ($isPbs ? 'PB' : 'FA'),
+                'color' => $isPbs ? '#059669' : '#2563eb',
             ];
         });
 

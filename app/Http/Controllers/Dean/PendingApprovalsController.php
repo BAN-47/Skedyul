@@ -89,6 +89,7 @@ class PendingApprovalsController extends Controller
         $query = Schedule_Submission::with([
             'department',
             'faculty.user',
+            'section',
             'semester',
             'submittedBy',
             'reviewedBy',
@@ -102,7 +103,7 @@ class PendingApprovalsController extends Controller
                 fn($submissionQuery) =>
                 $submissionQuery->where('schsub_sem_id', $semester->sem_id)
             )
-            ->whereNotNull('schsub_fac_id')
+            ->whereIn('schsub_type', ['pbt', 'pbs'])
             ->orderByDesc('schsub_submitted_at')
             ->get()
             ->map(function ($submission) {
@@ -140,6 +141,7 @@ class PendingApprovalsController extends Controller
         $submission = Schedule_Submission::with([
             'department',
             'faculty.user',
+            'section',
             'semester',
             'submittedBy',
         ])->findOrFail($id);
@@ -178,6 +180,10 @@ class PendingApprovalsController extends Controller
                         $facultyQuery->where('fac_id', $submission->schsub_fac_id);
                     }
                 });
+
+            if (($submission->schsub_type ?? 'pbt') === 'pbs' && $submission->schsub_sec_id) {
+                $scheduleQuery->where('sch_sec_id', $submission->schsub_sec_id);
+            }
 
             $schedules = $scheduleQuery
                 ->orderBy('sch_day')
@@ -226,13 +232,13 @@ class PendingApprovalsController extends Controller
         );
 
         if ($submission->schsub_status !== 'pending') {
-            return back()->with('error', 'Only pending PBT submissions can be approved.');
+            return back()->with('error', 'Only pending schedule submissions can be approved.');
         }
 
         if ($this->submissionConflictCount($submission) > 0) {
             return back()->with(
                 'error',
-                'Cannot approve this PBT because it has unresolved schedule conflicts.'
+                'Cannot approve this schedule because it has unresolved conflicts.'
             );
         }
 
@@ -249,7 +255,7 @@ class PendingApprovalsController extends Controller
 
         return redirect()
             ->route('dean.pending_approvals')
-            ->with('success', 'Faculty PBT approved successfully.');
+            ->with('success', ($submission->schsub_type === 'pbs' ? 'PBS' : 'Faculty PBT') . ' approved successfully.');
     }
 
     public function returnToChair(Request $request, string $id)
@@ -285,7 +291,7 @@ class PendingApprovalsController extends Controller
 
         return redirect()
             ->route('dean.pending_approvals')
-            ->with('success', 'Faculty PBT returned to the chair with remarks.');
+            ->with('success', ($submission->schsub_type === 'pbs' ? 'PBS' : 'Faculty PBT') . ' returned to the chair with remarks.');
     }
 
     private function submissionConflictCount(Schedule_Submission $submission): int

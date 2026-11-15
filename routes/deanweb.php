@@ -11,6 +11,7 @@ use App\Http\Controllers\Dean\ScheduleReportsController;
 use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Dean\PbtExportController;
 use App\Http\Controllers\Dean\DeanScheduleViewerController;
+use App\Http\Controllers\Chair\PbsExportController;
 use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\SectionController;
 
@@ -60,7 +61,7 @@ Route::middleware(['auth', 'audit.activity'])
         Route::get('/pbs', [DeanScheduleViewerController::class, 'pbs'])
             ->name('pbs');
 
-        Route::get('/pbs/export', [DeanScheduleViewerController::class, 'exportPbs'])
+        Route::get('/pbs/export', [PbsExportController::class, 'downloadForDean'])
             ->name('pbs.export');
 
         Route::get('/pbt', [DeanScheduleViewerController::class, 'pbt'])

@@ -1,10 +1,18 @@
 {{-- Loaded via AJAX by openReview() in pending_approvals.blade.php --}}
 
+@php
+    $isPbs = ($submission->schsub_type ?? 'pbt') === 'pbs';
+    $reviewName = $isPbs
+        ? $submission->section?->sec_name ?? 'Program by Section'
+        : (\App\Services\FacultyNameFormatter::format($submission->faculty) ?:
+        'Faculty');
+@endphp
+
 <div class="modal-overlay p-5" id="modal-review">
     <div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]">
         <div class="modal-header px-6 pt-5">
             <div class="modal-title" id="review-modal-title">
-                PBT Review — {{ \App\Services\FacultyNameFormatter::format($submission->faculty) ?: 'Faculty' }}
+                {{ $isPbs ? 'PBS Review' : 'PBT Review' }} — {{ $reviewName }}
             </div>
             <button class="modal-close" type="button" onclick="closeModal('modal-review')">✕</button>
         </div>
@@ -14,12 +22,12 @@
                 <div
                     style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;">
                     <strong>{{ $conflictCount }} Conflict{{ $conflictCount > 1 ? 's' : '' }} Detected:</strong>
-                    This faculty member has overlapping schedule assignments. Resolve before approving.
+                    This submission has overlapping schedule assignments. Resolve before approving.
                 </div>
             @else
                 <div
                     style="background:var(--green-light);border:1px solid #bbf7d0;border-left:4px solid var(--green);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#14532d;">
-                    <strong>✓ No conflicts found.</strong> This PBT is ready for approval.
+                    <strong>✓ No conflicts found.</strong> This submission is ready for approval.
                 </div>
             @endif
 
@@ -41,9 +49,9 @@
                 <div style="background:var(--grey);border-radius:10px;padding:12px;">
                     <div
                         style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:2px;">
-                        Faculty</div>
+                        {{ $isPbs ? 'Section' : 'Faculty' }}</div>
                     <div style="font-weight:600;font-size:13px;">
-                        {{ \App\Services\FacultyNameFormatter::format($submission->faculty) ?: 'Unknown Faculty' }}
+                        {{ $reviewName }}
                     </div>
                 </div>
                 <div style="background:var(--grey);border-radius:10px;padding:12px;">
@@ -65,7 +73,7 @@
                 <div style="background:var(--grey);border-radius:10px;padding:12px;">
                     <div
                         style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:2px;">
-                        Classes in PBT</div>
+                        {{ $isPbs ? 'Classes in PBS' : 'Classes in PBT' }}</div>
                     <div style="font-weight:600;font-size:13px;">{{ count($schedules) }}</div>
                 </div>
             </div>
@@ -109,7 +117,7 @@
                         @empty
                             <tr>
                                 <td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">
-                                    No schedule entries found for this faculty PBT.
+                                    No schedule entries found for this submission.
                                 </td>
                             </tr>
                         @endforelse
@@ -157,7 +165,7 @@
                     Return to Chair
                 </button>
                 <button class="topbar-btn btn-primary" type="button" id="btn-approve">
-                    Approve PBT
+                    Approve {{ $isPbs ? 'PBS' : 'PBT' }}
                 </button>
             </div>
         </form>

@@ -56,6 +56,7 @@ class ScheduleSubmissionController extends Controller
                 ->countBy('sch_fac_id');
 
             $submissionsByFaculty = Schedule_Submission::where('schsub_dept_id', $departmentId)
+                ->where('schsub_type', 'pbt')
                 ->where('schsub_sem_id', $semester->sem_id)
                 ->whereNotNull('schsub_fac_id')
                 ->get()
@@ -213,6 +214,7 @@ class ScheduleSubmissionController extends Controller
         }
 
         $submission = Schedule_Submission::where('schsub_dept_id', $departmentId)
+            ->where('schsub_type', 'pbt')
             ->where('schsub_sem_id', $semester->sem_id)
             ->where('schsub_fac_id', $faculty->fac_id)
             ->first();
@@ -266,6 +268,8 @@ class ScheduleSubmissionController extends Controller
             $values = [
                 'schsub_dept_id' => $departmentId,
                 'schsub_fac_id' => $faculty->fac_id,
+                'schsub_type' => 'pbt',
+                'schsub_sec_id' => null,
                 'schsub_sem_id' => $semester->sem_id,
                 'schsub_submitted_by' => Auth::id(),
                 'schsub_submitted_at' => now(),

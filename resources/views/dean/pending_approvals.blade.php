@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -61,7 +61,7 @@
                 <div class="card">
                     <div class="card-header">
                         <div>
-                            <div class="card-title">Faculty PBT Submissions</div>
+                            <div class="card-title">PBS and PBT Submissions</div>
                             <div class="card-sub">{{ $pendingCount }} pending approval</div>
                         </div>
                     </div>
@@ -71,7 +71,7 @@
                             <thead>
                                 <tr>
                                     <th>Department</th>
-                                    <th>Faculty PBT</th>
+                                    <th>Submission</th>
                                     <th>Submitted By</th>
                                     <th>Submitted</th>
                                     <th>Conflicts</th>
@@ -81,11 +81,19 @@
                             </thead>
                             <tbody>
                                 @forelse($submissions as $sub)
+                                    @php
+                                        $isPbs = ($sub->schsub_type ?? 'pbt') === 'pbs';
+                                        $reviewName = $isPbs
+                                            ? $sub->section?->sec_name ?? 'Program by Section'
+                                            : (\App\Services\FacultyNameFormatter::format($sub->faculty) ?:
+                                            'Unknown Faculty');
+                                    @endphp
                                     <tr data-approval-row>
                                         <td><b>{{ $sub->department->dept_code ?? '—' }}</b></td>
                                         <td>
-                                            <b>{{ \App\Services\FacultyNameFormatter::format($sub->faculty) ?: 'Unknown Faculty' }}</b>
-                                            <div class="text-xs text-slate-400">Program by Teacher</div>
+                                            <b>{{ $reviewName }}</b>
+                                            <div class="text-xs text-slate-400">
+                                                {{ $isPbs ? 'Program by Section' : 'Program by Teacher' }}</div>
                                         </td>
                                         <td>
                                             {{ $sub->submittedBy->usr_name ?? 'Unknown Chair' }}
@@ -121,11 +129,12 @@
                                                 <button class="topbar-btn btn-secondary px-2.5 py-1 text-[11px]"
                                                     onclick="openReview(
                                                         '{{ $sub->schsub_id }}',
-                                                        '{{ addslashes(\App\Services\FacultyNameFormatter::format($sub->faculty) ?: 'Faculty PBT') }}',
+                                                        '{{ addslashes($reviewName) }}',
                                                         {{ $sub->conflict_count }},
-                                                        '{{ route('dean.pending_approvals.review', $sub->schsub_id) }}'
+                                                        '{{ route('dean.pending_approvals.review', $sub->schsub_id) }}',
+                                                        '{{ $isPbs ? 'pbs' : 'pbt' }}'
                                                     )">
-                                                    Review PBT
+                                                    Review {{ $isPbs ? 'PBS' : 'PBT' }}
                                                 </button>
                                             @else
                                                 <span class="text-xs text-slate-400">Approved</span>
@@ -135,7 +144,7 @@
                                 @empty
                                     <tr>
                                         <td colspan="7" class="p-10 text-center text-slate-400">
-                                            No faculty PBT submissions found for this semester.
+                                            No PBS or PBT submissions found for this semester.
                                         </td>
                                     </tr>
                                 @endforelse
@@ -145,8 +154,10 @@
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
                         <p id="approval-page-info" class="text-sm text-slate-500" role="status" aria-live="polite"></p>
                         <div id="approval-pagination" class="flex items-center gap-2">
-                            <button type="button" id="approval-previous" class="topbar-btn btn-secondary" aria-label="Previous approvals page">Previous</button>
-                            <button type="button" id="approval-next" class="topbar-btn btn-secondary" aria-label="Next approvals page">Next</button>
+                            <button type="button" id="approval-previous" class="topbar-btn btn-secondary"
+                                aria-label="Previous approvals page">Previous</button>
+                            <button type="button" id="approval-next" class="topbar-btn btn-secondary"
+                                aria-label="Next approvals page">Next</button>
                         </div>
                     </div>
                 </div>
@@ -291,9 +302,9 @@
                     row.style.display = index >= start && index < end ? '' : 'none';
                 });
 
-                pageInfo.textContent = rows.length === 0
-                    ? 'Showing 0 of 0 submissions'
-                    : `Showing ${start + 1}–${end} of ${rows.length} submissions`;
+                pageInfo.textContent = rows.length === 0 ?
+                    'Showing 0 of 0 submissions' :
+                    `Showing ${start + 1}–${end} of ${rows.length} submissions`;
                 previousButton.disabled = currentPage === 0;
                 nextButton.disabled = currentPage >= pageCount - 1;
                 pagination.style.display = rows.length > pageSize ? 'flex' : 'none';
@@ -366,13 +377,14 @@
             renderPage();
         }
 
-        function openReview(subId, facultyName, conflictCount, reviewUrl) {
+        function openReview(subId, displayName, conflictCount, reviewUrl, submissionType) {
+            const submissionLabel = submissionType === 'pbs' ? 'PBS' : 'PBT';
             const container = document.getElementById('review-modal-container');
 
             container.innerHTML = `
                 <div class="modal-overlay open p-5">
                     <div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]">
-                        <div class="modal-body p-10 text-center text-slate-400">Loading PBT…</div>
+                        <div class="modal-body p-10 text-center text-slate-400">Loading ${submissionLabel}…</div>
                     </div>
                 </div>`;
 
@@ -405,7 +417,7 @@
                             return;
                         }
 
-                        if (!confirm('Approve the PBT for ' + facultyName + '?')) {
+                        if (!confirm('Approve the ' + submissionLabel + ' for ' + displayName + '?')) {
                             return;
                         }
 
@@ -420,7 +432,7 @@
                             return;
                         }
 
-                        if (!confirm('Return this PBT to the Chair with your note?')) {
+                        if (!confirm('Return this ' + submissionLabel + ' to the Chair with your note?')) {
                             return;
                         }
 
@@ -434,7 +446,7 @@
                         <div class="modal-overlay open p-5">
                             <div class="modal !w-[900px] max-w-[calc(100vw-2.5rem)]">
                                 <div class="modal-body p-5 text-sm text-red-700">
-                                    Failed to load the PBT. Please close this window and try again.
+                                    Failed to load the ${submissionLabel}. Please close this window and try again.
                                 </div>
                             </div>
                         </div>`;
