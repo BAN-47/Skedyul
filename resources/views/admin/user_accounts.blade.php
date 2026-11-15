@@ -541,6 +541,28 @@
 
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
+            <label class="field-label" for="edit-password">New Password</label>
+            <div class="relative">
+              <input id="edit-password" name="password" type="password"
+                minlength="8" autocomplete="new-password"
+                placeholder="Leave blank to keep current password"
+                class="field-input pr-11">
+              <button type="button" aria-label="Show password"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                onclick="togglePasswordVisibility('edit-password', this)">👁</button>
+            </div>
+            <p class="mt-1 text-[11px] text-slate-500">Enter a new password only if you want to change it (minimum 8 characters).</p>
+          </div>
+          <div>
+            <label class="field-label" for="edit-password-confirmation">Confirm New Password</label>
+            <input id="edit-password-confirmation" name="password_confirmation"
+              type="password" minlength="8" autocomplete="new-password"
+              placeholder="Re-enter the new password" class="field-input">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div>
             <label class="field-label">Status</label>
             <select id="edit-status" name="usr_is_active"
               class="field-input">
@@ -1227,6 +1249,10 @@ function togglePasswordVisibility(inputId, btn) {
           ROLE_LABELS[data.usr_role] || data.usr_role || '';
 
         const form = document.getElementById('form-edit-user');
+
+        // Never populate a password from the API. Password changes are explicit.
+        form.elements.password.value = '';
+        form.elements.password_confirmation.value = '';
 
         form.action = UPDATE_URL_TEMPLATE.replace('__ID__', userId);
         form.dataset.userId = userId;

@@ -47,11 +47,43 @@ class AcademicYearManagementTest extends TestCase
             $table->date('sem_start_date');
             $table->date('sem_end_date');
             $table->boolean('sem_is_active')->default(false);
+            $table->boolean('sem_is_plotting_enabled')->default(false);
         });
         Schema::create('schedule', function (Blueprint $table) {
             $table->uuid('sch_id')->primary();
             $table->uuid('sch_sem_id');
+            $table->uuid('sch_fac_id')->nullable();
+            $table->uuid('sch_course_id')->nullable();
+            $table->uuid('sch_sec_id')->nullable();
+            $table->uuid('sch_room_id')->nullable();
+            $table->string('sch_day')->nullable();
+            $table->time('sch_start_time')->nullable();
+            $table->time('sch_end_time')->nullable();
+            $table->string('sch_shift')->nullable();
+            $table->string('sch_status')->nullable();
             $table->boolean('sch_is_active')->default(true);
+            $table->uuid('sch_created_by')->nullable();
+        });
+        Schema::create('schedule_archives', function (Blueprint $table) {
+            $table->uuid('sar_id')->primary();
+            $table->uuid('sar_sch_id')->nullable();
+            $table->uuid('sar_sem_id')->nullable();
+            $table->uuid('sar_ay_id')->nullable();
+            $table->uuid('sar_fac_id')->nullable();
+            $table->uuid('sar_course_id')->nullable();
+            $table->uuid('sar_sec_id')->nullable();
+            $table->uuid('sar_room_id')->nullable();
+            $table->string('sar_day')->nullable();
+            $table->time('sar_start_time')->nullable();
+            $table->time('sar_end_time')->nullable();
+            $table->string('sar_shift')->nullable();
+            $table->string('sar_status')->nullable();
+            $table->boolean('sar_is_active')->default(false);
+            $table->text('sar_description')->nullable();
+            $table->uuid('sar_created_by')->nullable();
+            $table->uuid('sar_updated_by')->nullable();
+            $table->timestamp('sar_archived_at')->nullable();
+            $table->timestamps();
         });
         Schema::create('system_setting', function (Blueprint $table) {
             $table->uuid('sset_id')->primary();
@@ -127,6 +159,15 @@ class AcademicYearManagementTest extends TestCase
             'sem_id' => $newSemester->sem_id,
             'sem_ay_id' => $newYear->ay_id,
             'sem_is_active' => true,
+            'sem_is_plotting_enabled' => true,
+        ]);
+        $this->assertDatabaseHas('semester', [
+            'sem_id' => $this->firstSemesterId,
+            'sem_is_plotting_enabled' => false,
+        ]);
+        $this->assertDatabaseHas('schedule_archives', [
+            'sar_sch_id' => $scheduleId,
+            'sar_ay_id' => $this->activeYearId,
         ]);
         $this->assertDatabaseHas('schedule', [
             'sch_id' => $scheduleId,
@@ -153,6 +194,11 @@ class AcademicYearManagementTest extends TestCase
             'sem_id' => $this->secondSemesterId,
             'sem_ay_id' => $this->activeYearId,
             'sem_is_active' => true,
+            'sem_is_plotting_enabled' => true,
+        ]);
+        $this->assertDatabaseHas('semester', [
+            'sem_id' => $this->firstSemesterId,
+            'sem_is_plotting_enabled' => false,
         ]);
         $this->assertSame(
             2,

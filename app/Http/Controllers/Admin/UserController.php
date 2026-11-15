@@ -550,6 +550,7 @@ class UserController extends Controller
             'usr_last_name' => 'required|string|max:150',
             'usr_suffix' => 'nullable|string|max:20',
             'usr_email' => 'required|email|max:255',
+            'password' => 'nullable|string|min:8|confirmed',
             'usr_role' => ['required', Rule::in([
                 'faculty',
                 'department_chair',
@@ -643,6 +644,11 @@ class UserController extends Controller
                     'usr_role' => $data['usr_role'],
                     'usr_is_active' => $data['usr_is_active'],
                 ]);
+
+                if (!empty($data['password'])) {
+                    $user->usr_password_hash = Hash::make($data['password']);
+                    $user->save();
+                }
 
                 $this->syncRoleProfile(
                     $user,
