@@ -54,9 +54,13 @@ Route::get('/test-db', function () {
 
         return "✅ Supabase Connected Successfully";
     } catch (\Exception $e) {
-        return "❌ Database Error: " . $e->getMessage();
+        \Illuminate\Support\Facades\Log::error('Database diagnostic failed.', [
+            'exception' => $e,
+        ]);
+
+        return response('Database connection failed.', 503);
     }
-});
+})->middleware(['auth', 'role:system_admin']);
 
 
 /*
@@ -154,7 +158,7 @@ Route::delete('/passkeys/credentials/{id}', [PasskeyRegistrationController::clas
 */
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.dashboard');
 
 
@@ -186,7 +190,7 @@ Route::middleware(['auth', 'audit.activity'])->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function () {
+Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity'])->group(function () {
 
     Route::get('/schedule-archives', [ScheduleArchiveController::class, 'index'])
         ->name('admin.schedule-archives');
@@ -325,19 +329,19 @@ Route::prefix('admin')->middleware(['auth', 'audit.activity'])->group(function (
 */
 
 Route::get('/subject', [SubjectController::class, 'index'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('subject.index');
 
 Route::post('/subject', [SubjectController::class, 'store'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('subject.store');
 
 Route::put('/subject/{id}', [SubjectController::class, 'update'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('subject.update');
 
 Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('subject.destroy');
 
 
@@ -348,23 +352,23 @@ Route::delete('/subject/{id}', [SubjectController::class, 'destroy'])
 */
 
 Route::get('/rooms', [RoomController::class, 'index'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.rooms');
 
 Route::post('/rooms', [RoomController::class, 'store'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.rooms.store');
 
 Route::get('/rooms/{room}', [RoomController::class, 'show'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.rooms.show');
 
 Route::put('/rooms/{room}', [RoomController::class, 'update'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.rooms.update');
 
 Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.rooms.destroy');
 
 
@@ -375,7 +379,7 @@ Route::delete('/rooms/{room}', [RoomController::class, 'destroy'])
 */
 
 Route::get('/programs', [ProgramController::class, 'index'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.programs');
 
 
@@ -386,7 +390,7 @@ Route::get('/programs', [ProgramController::class, 'index'])
 */
 
 Route::get('/departments', [DepartmentController::class, 'index'])
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.departments');
 
 /* Settings routes are inside admin+auth group above. */

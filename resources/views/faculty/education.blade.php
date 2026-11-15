@@ -31,7 +31,7 @@
                 @foreach([
                     'bachelors' => ["Bachelor's Degree", 'Bachelor of Science in Information Systems', 'BSIS', true],
                     'masters' => ["Master's Degree", 'Master of Information Technology', 'MIT', $faculty->fac_employment_type === 'full_time'],
-                    'doctorate' => ['Doctorate Degree', 'Doctor of Information Technology', 'DIT', false],
+                    'doctorate' => ['Doctorate Degree', 'Doctor of Information Technology', 'PH. D., DIT', false],
                 ] as $degreeType => [$label, $degreePlaceholder, $abbrPlaceholder, $isRequired])
                     @php
                         $degreeField = 'fac_' . $degreeType . '_degree';

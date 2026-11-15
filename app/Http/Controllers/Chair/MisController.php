@@ -79,6 +79,11 @@ class MisController extends Controller
             $name .= ', ' . $suffix;
         }
 
+        $postNominal = FacultyNameFormatter::highestPostNominal($row->user?->faculty);
+        if ($name !== '' && $postNominal !== '') {
+            $name .= ', ' . $postNominal;
+        }
+
         return $name;
     }
 
@@ -337,7 +342,11 @@ class MisController extends Controller
         );
 
         $zip->addFromString('word/document.xml', $dom->saveXML());
-        $this->updateCampusDirectorFooter($zip);
+        $this->updateSignatoryNames($zip, [
+            'Prepared by' => $data['signatories']['chair_name'] ?? '',
+            'Reviewed' => $data['signatories']['dean_name'] ?? '',
+            'Campus Director' => $data['signatories']['campus_director'] ?? '',
+        ]);
         $zip->close();
 
         $sectionId = $filters['section'] ?? null;
@@ -360,58 +369,59 @@ class MisController extends Controller
             ->deleteFileAfterSend(true);
     }
 
-    private function updateCampusDirectorFooter(ZipArchive $zip): void
+    private function updateSignatoryNames(ZipArchive $zip, array $names): void
     {
-        $footerXml = $zip->getFromName('word/footer1.xml');
-        if ($footerXml === false) {
-            return;
-        }
-
-        $footer = new DOMDocument('1.0', 'UTF-8');
-        $footer->preserveWhiteSpace = true;
-        if (!$footer->loadXML($footerXml, LIBXML_NONET)) {
-            return;
-        }
-
-        $xpath = new DOMXPath($footer);
-        $xpath->registerNamespace(
-            'w',
-            'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
-        );
-
-        foreach ($xpath->query('//w:p') as $labelParagraph) {
-            if (stripos($this->nodeText($xpath, $labelParagraph), 'Campus Director, CTU-Main Campus') === false) {
+        foreach ($zip->numFiles ? range(0, $zip->numFiles - 1) : [] as $index) {
+            $entry = $zip->getNameIndex($index);
+            if (!preg_match('~^word/(?:document|footer\\d+)\\.xml$~', (string) $entry)) {
                 continue;
             }
 
-            $cell = $xpath->query('ancestor::w:tc[1]', $labelParagraph)?->item(0);
-            if (!$cell) {
-                break;
+            $xml = $zip->getFromIndex($index);
+            if ($xml === false) {
+                continue;
             }
 
-            $paragraphs = $xpath->query('./w:p', $cell);
-            $labelIndex = -1;
-            for ($index = 0; $index < $paragraphs->length; $index++) {
-                if ($paragraphs->item($index)->isSameNode($labelParagraph)) {
-                    $labelIndex = $index;
+            $part = new DOMDocument('1.0', 'UTF-8');
+            $part->preserveWhiteSpace = true;
+            if (!$part->loadXML($xml, LIBXML_NONET)) {
+                continue;
+            }
+
+            $xpath = new DOMXPath($part);
+            $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
+
+            foreach ($xpath->query('//w:p') as $labelParagraph) {
+                $label = mb_strtolower($this->nodeText($xpath, $labelParagraph));
+                foreach ($names as $needle => $name) {
+                    if ($name === '' || !str_contains($label, mb_strtolower($needle))) {
+                        continue;
+                    }
+
+                    $cell = $xpath->query('ancestor::w:tc[1]', $labelParagraph)?->item(0);
+                    if (!$cell) {
+                        continue;
+                    }
+
+                    $paragraphs = $xpath->query('./w:p', $cell);
+                    for ($i = 0; $i < $paragraphs->length; $i++) {
+                        if (!$paragraphs->item($i)->isSameNode($labelParagraph)) {
+                            continue;
+                        }
+                        for ($prior = $i - 1; $prior >= 0; $prior--) {
+                            if ($this->nodeText($xpath, $paragraphs->item($prior)) !== '') {
+                                $this->setNodeText($xpath, $paragraphs->item($prior), mb_strtoupper(trim($name)));
+                                break;
+                            }
+                        }
+                        break;
+                    }
                     break;
                 }
             }
 
-            for ($index = $labelIndex - 1; $index >= 0; $index--) {
-                $paragraph = $paragraphs->item($index);
-                if ($this->nodeText($xpath, $paragraph) !== '') {
-                    $this->setNodeText(
-                        $xpath,
-                        $paragraph,
-                        trim((string) SystemSetting::get('campus_director_name', ''))
-                    );
-                    break 2;
-                }
-            }
+            $zip->addFromString($entry, $part->saveXML());
         }
-
-        $zip->addFromString('word/footer1.xml', $footer->saveXML());
     }
 
     /**

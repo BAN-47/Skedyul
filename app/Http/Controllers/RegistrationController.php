@@ -9,6 +9,7 @@ use App\Models\FacultyAccountReview;
 use App\Models\Notification;
 use App\Models\User;
 use App\Services\ScheduleAssignmentService;
+use App\Services\MiddleInitialFormatter;
 use App\Services\CaptchaChallenge;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,11 +69,12 @@ class RegistrationController extends Controller
 
         // Store people names in readable title case even when a user types in
         // all caps or all lowercase. Keep suffixes and initials legible too.
-        foreach (['usr_first_name', 'usr_middle_name', 'usr_last_name', 'usr_suffix'] as $nameField) {
+        foreach (['usr_first_name', 'usr_last_name', 'usr_suffix'] as $nameField) {
             if (isset($data[$nameField])) {
                 $data[$nameField] = mb_convert_case(mb_strtolower(trim($data[$nameField])), MB_CASE_TITLE, 'UTF-8');
             }
         }
+        $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
 
         $email = mb_strtolower(trim($data['usr_email']));
         if (User::whereRaw('LOWER(usr_email) = ?', [$email])->exists()) {

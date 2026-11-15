@@ -53,7 +53,7 @@
                     <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                             <div class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty in
-                                department</div>
+                                college</div>
                             <div class="mt-2 text-2xl font-extrabold text-slate-900">{{ $facultyMembers->count() }}
                             </div>
                             <div class="mt-1 text-xs text-slate-500">Available for individual PBT export</div>
@@ -94,7 +94,7 @@
                                 </div>
                             @elseif ($facultyMembers->isEmpty())
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                                    No faculty members are assigned to your department.
+                                    No active faculty members are linked to your college.
                                 </div>
                             @else
                                 <form method="GET" action="{{ route('chair.export_reports.pbt') }}" class="space-y-5">

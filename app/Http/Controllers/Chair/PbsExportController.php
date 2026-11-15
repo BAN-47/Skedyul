@@ -33,14 +33,18 @@ class PbsExportController extends Controller
         $validated = $request->validate([
             'section' => ['required', 'uuid', 'exists:section,sec_id'],
             'semester' => ['required', 'uuid', 'exists:semester,sem_id'],
+            'shift' => ['nullable', 'in:day,night,evening'],
         ]);
 
         $chair = Dept_Chair::with('user.faculty')->where('dc_usr_id', Auth::user()->usr_id)->first();
         abort_unless($chair, 403, 'Your account is not assigned to a department.');
 
-        // PBS allows the Chair to choose departments within their own college.
-        $allowedDepartmentIds = $chair->dc_college_id
-            ? \App\Models\Departments::where('dept_college_id', $chair->dc_college_id)->pluck('dept_id')
+        // Match the PBS page's college scope, which is derived from the chair's
+        // assigned department. Some existing chair rows have a stale or empty
+        // dc_college_id even though their assigned department has the right college.
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        $allowedDepartmentIds = $collegeId
+            ? \App\Models\Departments::where('dept_college_id', $collegeId)->pluck('dept_id')
             : collect([$chair->dc_dept_id])->filter()->values();
 
         $section = Section::with('program.department')
@@ -49,10 +53,20 @@ class PbsExportController extends Controller
             ->firstOrFail();
 
         $semester = Semester::with('academicYear')->findOrFail($validated['semester']);
+        $isEvening = isset($validated['shift'])
+            ? in_array($validated['shift'], ['night', 'evening'], true)
+            : (bool) $section->sec_is_evening;
         $schedules = Schedule::query()
             ->where('sch_sec_id', $section->sec_id)
             ->where('sch_sem_id', $semester->sem_id)
             ->where('sch_is_active', true)
+            ->when(
+                isset($validated['shift']) && $isEvening,
+                fn ($query) => $query->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                fn ($query) => isset($validated['shift'])
+                    ? $query->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+                    : $query
+            )
             ->with(['subject', 'faculty', 'room'])
             ->orderByRaw("CASE UPPER(sch_day)
                 WHEN 'MONDAY' THEN 1 WHEN 'MON' THEN 1
@@ -80,7 +94,6 @@ class PbsExportController extends Controller
         $casDeanName = $signatoryFormatter->formatRoleName($casDean, 'dean_');
         $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
 
-        $isEvening = (bool) $section->sec_is_evening;
         $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
         $templatePath = storage_path('app/templates/' . $templateName);
         abort_unless(is_file($templatePath), 500, 'The PBS export template is missing: ' . $templateName);

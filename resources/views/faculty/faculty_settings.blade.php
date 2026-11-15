@@ -119,7 +119,7 @@
                       <input id="fac-doctorate" aria-label="Doctorate degree full name" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-[13px] text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_degree }}">
                       <div class="w-20 shrink-0">
                         <label for="fac-doctorate-abbr" class="mb-1 block text-[9px] font-semibold text-slate-500">Acronym</label>
-                        <input id="fac-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PhD, DIT" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-[13px] font-semibold uppercase text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_abbr }}">
+                        <input id="fac-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PH. D., DIT" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2.5 text-[13px] font-semibold uppercase text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-blue-900" value="{{ $faculty->fac_doctorate_abbr }}">
                       </div>
                     </div>
                   </div>

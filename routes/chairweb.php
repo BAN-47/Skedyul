@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
-use App\Http\Controllers\Chair\ScheduleController;
 use App\Http\Controllers\Chair\ChairSubjectController;
 use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
@@ -78,10 +77,6 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
         return view('chair.settings');
     })->name('chair.settings');
 });
-
-Route::post('/schedule', function () {
-    return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
-})->name('schedule.store');
 
 Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
     Route::post('/profile/avatar', [ChairSettingsController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
