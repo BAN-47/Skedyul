@@ -512,13 +512,13 @@ class UserController extends Controller
 
         $profileImageUrl = match ($user->usr_role) {
             'faculty' => $profile?->fac_profile_image
-                ? asset('images/faculty_profile/' . $profile->fac_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->fac_profile_image, 'faculty_profile')
                 : null,
             'dean' => $profile?->dean_profile_image
-                ? asset('images/dean_profile/' . $profile->dean_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->dean_profile_image, 'dean_profile')
                 : null,
             'department_chair' => $profile?->dc_profile_image
-                ? asset('images/chair_profile/' . $profile->dc_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->dc_profile_image, 'chair_profile')
                 : null,
             default => null,
         };

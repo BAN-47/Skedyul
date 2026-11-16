@@ -8,7 +8,7 @@
     <div class="sidebar-user">
         <div class="sidebar-avatar">
             @if($chairSidebarProfile?->dc_profile_image)
-                <img src="{{ asset('images/chair_profile/' . $chairSidebarProfile->dc_profile_image) }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
+                <img src="{{ \App\Services\ProfileImageStorage::url($chairSidebarProfile->dc_profile_image, 'chair_profile') }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
             @else
                 {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
             @endif

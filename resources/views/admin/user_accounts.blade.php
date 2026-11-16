@@ -100,14 +100,14 @@
                 $avatarColor = $colors[$colorIndex];
                 $avatarUrl = match ($user->usr_role) {
                 'faculty' => $user->faculty?->fac_profile_image
-                ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image)
+                ? \App\Services\ProfileImageStorage::url($user->faculty->fac_profile_image, 'faculty_profile')
                 : null,
                 'dean' => $user->dean?->dean_profile_image
-                ? asset('images/dean_profile/' . $user->dean->dean_profile_image)
-                : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                ? \App\Services\ProfileImageStorage::url($user->dean->dean_profile_image, 'dean_profile')
+                : ($user->faculty?->fac_profile_image ? \App\Services\ProfileImageStorage::url($user->faculty->fac_profile_image, 'faculty_profile') : null),
                 'department_chair' => $user->deptChair?->dc_profile_image
-                ? asset('images/chair_profile/' . $user->deptChair->dc_profile_image)
-                : ($user->faculty?->fac_profile_image ? asset('images/faculty_profile/' . $user->faculty->fac_profile_image) : null),
+                ? \App\Services\ProfileImageStorage::url($user->deptChair->dc_profile_image, 'chair_profile')
+                : ($user->faculty?->fac_profile_image ? \App\Services\ProfileImageStorage::url($user->faculty->fac_profile_image, 'faculty_profile') : null),
                 default => null,
                 };
 

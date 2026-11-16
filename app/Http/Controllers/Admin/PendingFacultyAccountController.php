@@ -83,9 +83,10 @@ class PendingFacultyAccountController extends Controller
         $this->ensureSystemAdmin();
         $review = FacultyAccountReview::findOrFail($id);
 
-        abort_unless(Storage::disk('local')->exists($review->fvr_id_photo_path), 404);
+        $privateDisk = (string) config('filesystems.private_uploads_disk', 'local');
+        abort_unless(Storage::disk($privateDisk)->exists($review->fvr_id_photo_path), 404);
 
-        return Storage::disk('local')->response(
+        return Storage::disk($privateDisk)->response(
             $review->fvr_id_photo_path,
             null,
             ['Cache-Control' => 'private, no-store']
@@ -184,7 +185,7 @@ class PendingFacultyAccountController extends Controller
         });
 
         if ($photoPath) {
-            Storage::disk('local')->delete($photoPath);
+            Storage::disk((string) config('filesystems.private_uploads_disk', 'local'))->delete($photoPath);
         }
 
         return redirect()

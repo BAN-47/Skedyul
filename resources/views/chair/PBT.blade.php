@@ -307,7 +307,7 @@
                                     <span
                                         class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
                                         @if ($selectedFaculty?->fac_profile_image)
-                                            <img src="{{ asset('images/faculty_profile/' . $selectedFaculty->fac_profile_image) }}"
+                                            <img src="{{ \App\Services\ProfileImageStorage::url($selectedFaculty->fac_profile_image, 'faculty_profile') }}"
                                                 class="h-full w-full object-cover"
                                                 alt="{{ $selectedFaculty->fac_first_name }} profile photo">
                                         @else
@@ -371,7 +371,7 @@
                                                         <span
                                                             class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-bold text-slate-600">
                                                             @if ($person->fac_profile_image)
-                                                                <img src="{{ asset('images/faculty_profile/' . $person->fac_profile_image) }}"
+                                                                <img src="{{ \App\Services\ProfileImageStorage::url($person->fac_profile_image, 'faculty_profile') }}"
                                                                     class="h-full w-full object-cover"
                                                                     alt="{{ $pname }} profile photo">
                                                             @else

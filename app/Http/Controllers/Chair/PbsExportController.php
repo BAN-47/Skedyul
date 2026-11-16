@@ -95,8 +95,8 @@ class PbsExportController extends Controller
         $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
 
         $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
-        $templatePath = storage_path('app/templates/' . $templateName);
-        abort_unless(is_file($templatePath), 500, 'The PBS export template is missing: ' . $templateName);
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath($templateName);
+        abort_unless($templatePath, 500, 'The PBS export template is missing: ' . $templateName);
 
         $spreadsheet = IOFactory::load($templatePath);
         $sourceSheetName = $isEvening ? 'BSIS 1-1' : 'BSIS 1-A';
@@ -222,8 +222,8 @@ class PbsExportController extends Controller
 
         $isEvening = (bool) $section->sec_is_evening;
         $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
-        $templatePath = storage_path('app/templates/' . $templateName);
-        abort_unless(is_file($templatePath), 500, 'The PBS export template is missing: ' . $templateName);
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath($templateName);
+        abort_unless($templatePath, 500, 'The PBS export template is missing: ' . $templateName);
 
         $spreadsheet = IOFactory::load($templatePath);
         $sourceSheetName = $isEvening ? 'BSIS 1-1' : 'BSIS 1-A';
@@ -335,8 +335,8 @@ class PbsExportController extends Controller
 
     private function addFormMetadata($sheet): void
     {
-        $imagePath = storage_path('app/templates/PBS_Form_Metadata.png');
-        abort_unless(is_file($imagePath), 500, 'The PBS form metadata image is missing.');
+        $imagePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBS_Form_Metadata.png');
+        abort_unless($imagePath, 500, 'The PBS form metadata image is missing.');
 
         // The supplied workbook stores this label as a floating text box.
         // PhpSpreadsheet drops text boxes while saving, so re-add it as a
