@@ -10,6 +10,7 @@ use App\Models\Dept_Chair;
 use App\Models\College;
 use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
+use App\Services\MiddleInitialFormatter;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -325,6 +326,8 @@ class UserController extends Controller
             $request->input('usr_role', '')
         )));
 
+        $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
+
         // Case-insensitive match (Postgres treats mixed-case emails as different
         // under =, but users treat them as the same address).
         $email = strtolower(trim($data['usr_email']));
@@ -509,13 +512,13 @@ class UserController extends Controller
 
         $profileImageUrl = match ($user->usr_role) {
             'faculty' => $profile?->fac_profile_image
-                ? asset('images/faculty_profile/' . $profile->fac_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->fac_profile_image, 'faculty_profile')
                 : null,
             'dean' => $profile?->dean_profile_image
-                ? asset('images/dean_profile/' . $profile->dean_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->dean_profile_image, 'dean_profile')
                 : null,
             'department_chair' => $profile?->dc_profile_image
-                ? asset('images/chair_profile/' . $profile->dc_profile_image)
+                ? \App\Services\ProfileImageStorage::url($profile->dc_profile_image, 'chair_profile')
                 : null,
             default => null,
         };
@@ -568,6 +571,8 @@ class UserController extends Controller
         ], $this->roleSpecificRules(
             $request->input('usr_role', '')
         )));
+
+        $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
 
         $email = strtolower(trim($data['usr_email']));
         $data['usr_email'] = $email;

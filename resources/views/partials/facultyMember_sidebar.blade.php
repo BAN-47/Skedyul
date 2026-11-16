@@ -6,7 +6,7 @@
     <div class="sidebar-user">
         <div class="sidebar-avatar">
             @if (auth()->user()->faculty?->fac_profile_image)
-                <img src="{{ asset('images/faculty_profile/' . auth()->user()->faculty->fac_profile_image) }}"
+                <img src="{{ \App\Services\ProfileImageStorage::url(auth()->user()->faculty->fac_profile_image, 'faculty_profile') }}"
                     alt="Profile photo" class="h-full w-full rounded-full object-cover">
             @else
                 {{ strtoupper(substr(auth()->user()->faculty->fac_first_name ?? 'U', 0, 1) . substr(auth()->user()->faculty->fac_last_name ?? '', 0, 1)) }}

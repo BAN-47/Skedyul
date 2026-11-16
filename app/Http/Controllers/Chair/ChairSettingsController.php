@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Notification;
+use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -29,16 +30,9 @@ class ChairSettingsController extends Controller
 
         $chair = $this->currentChair();
 
-        // delete old file if one exists
-        if ($chair->dc_profile_image) {
-            $oldPath = public_path('images/chair_profile/' . $chair->dc_profile_image);
-            if (file_exists($oldPath)) {
-                unlink($oldPath);
-            }
-        }
-
         $filename = $chair->dc_id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
-        $request->file('avatar')->move(public_path('images/chair_profile'), $filename);
+        abort_unless(ProfileImageStorage::store($request->file('avatar'), 'chair_profile', $filename), 500, 'Could not save the profile photo.');
+        ProfileImageStorage::delete($chair->dc_profile_image, 'chair_profile');
 
         $chair->update([
             'dc_profile_image' => $filename,
@@ -46,7 +40,7 @@ class ChairSettingsController extends Controller
 
         return response()->json([
             'success' => true,
-            'url' => asset('images/chair_profile/' . $filename),
+            'url' => ProfileImageStorage::url($filename, 'chair_profile'),
         ]);
     }
 
@@ -54,12 +48,7 @@ class ChairSettingsController extends Controller
     {
         $chair = $this->currentChair();
 
-        if ($chair->dc_profile_image) {
-            $path = public_path('images/chair_profile/' . $chair->dc_profile_image);
-            if (file_exists($path)) {
-                unlink($path);
-            }
-        }
+        ProfileImageStorage::delete($chair->dc_profile_image, 'chair_profile');
 
         $chair->update(['dc_profile_image' => null]);
 

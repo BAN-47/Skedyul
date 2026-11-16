@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skedyul — Entity Relationship Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'base', securityLevel: 'strict', er: { entityPadding: 6, diagramPadding: 6 }, themeVariables: { fontSize: '18px', primaryColor: '#ffffff', primaryTextColor: '#111827', primaryBorderColor: '#334155', lineColor: '#475569', secondaryColor: '#ffffff', tertiaryColor: '#ffffff', mainBkg: '#ffffff', background: '#ffffff', textColor: '#111827' } });</script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 8px; background: #ffffff; color: #111827; font-family: Inter, "Segoe UI", Arial, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: clamp(24px, 2.5vw, 34px); }
+    .intro { margin: 0 0 6px; color: #475569; font-size: 15px; line-height: 1.35; }
+    .container { width: 100%; margin: auto; padding: 6px; overflow: auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; }
+    .mermaid { min-width: 1950px; text-align: center; }
+    .mermaid svg { max-width: none !important; }
+    .mermaid .entityBox, .mermaid .attributeBoxOdd, .mermaid .attributeBoxEven { fill: #ffffff !important; stroke: #334155 !important; stroke-width: 1.5px !important; }
+    .mermaid .entityLabel { font-size: 22px !important; font-weight: 700 !important; fill: #111827 !important; }
+    .mermaid .attributeText { font-size: 16px !important; fill: #1f2937 !important; }
+    .mermaid .relationshipLabel { font-size: 15px !important; fill: #111827 !important; }
+    .mermaid .relationshipLine { stroke: #475569 !important; stroke-width: 1.8px !important; }
+    .note { margin: 6px 0 0; color: #475569; font-size: 13px; line-height: 1.35; }
+    @media print { body { padding: 0; background: white; } .container { border: 0; border-radius: 0; } .mermaid { min-width: 0; } }
+  </style>
+</head>
+<body>
+  <h1>Skedyul — Entity Relationship Diagram</h1>
+  <p class="intro">Full ERD of unique tables represented by the current Skedyul Eloquent models. PK means primary key; FK means foreign key/reference. Relationship ends show one and many cardinalities.</p>
+  <main class="container"><pre class="mermaid">
+erDiagram
+    USER ||--o| FACULTY : profile
+    USER ||--o| DEAN : profile
+    USER ||--o| DEPARTMENT_CHAIR : profile
+    USER ||--o{ AUDIT_LOG : performs
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ FACULTY_ACCOUNT_REVIEWS : applicant
+    USER ||--o{ FACULTY_ACCOUNT_REVIEWS : reviewer
+    USER ||--o{ WEBAUTHN_CREDENTIALS : registers
+    USER ||--o{ BIOMETRIC_CREDENTIAL : registers
+    USER ||--o{ TOKEN_BLACKLIST : owns
+    USER ||--o{ STUDY_LOAD : assigns
+    USER ||--o{ SCHEDULE : creates
+    USER ||--o{ PBS_SCHEDULE : creates
+    USER ||--o{ SCHEDULE_SUBMISSION : submits
+    USER ||--o{ SCHEDULE_SUBMISSION : reviews
+    USER ||--o{ SYSTEM_SETTING : updates
+
+    COLLEGE ||--o{ DEPARTMENT : contains
+    COLLEGE ||--o{ FACULTY : has
+    COLLEGE ||--o{ COURSE : offers
+    COLLEGE ||--o{ DEPARTMENT_CHAIR : assigns
+    COLLEGE ||--o{ DEAN : assigns
+    COLLEGE ||--o{ ROOM : owns
+    DEPARTMENT ||--o{ FACULTY : groups
+    DEPARTMENT ||--o{ COURSE : offers
+    DEPARTMENT ||--o{ SECTION : manages
+    DEPARTMENT ||--o{ DEPARTMENT_CHAIR : assigns
+    DEPARTMENT ||--o{ DEAN : assigned_department
+    DEPARTMENT ||--o{ SCHEDULE_SUBMISSION : receives
+
+    ACADEMIC_YEAR ||--o{ SEMESTER : contains
+    ACADEMIC_YEAR ||--o{ SECTION : groups
+    ACADEMIC_YEAR ||--o{ WORKLOAD : tracks
+    SEMESTER ||--o{ SECTION : contains
+    SEMESTER ||--o{ WORKLOAD : tracks
+    SEMESTER ||--o{ STUDY_LOAD : applies_to
+    SEMESTER ||--o{ SCHEDULE : schedules
+    SEMESTER ||--o{ PBS_SCHEDULE : schedules
+    SEMESTER ||--o{ SCHEDULE_SUBMISSION : submitted_for
+
+    FACULTY ||--o{ FAC_SPECIALIZATION : has
+    FACULTY ||--o{ WORKLOAD : has
+    FACULTY ||--o{ STUDY_LOAD : assigned
+    FACULTY ||--o{ SCHEDULE : teaches
+    FACULTY ||--o{ PBS_SCHEDULE : teaches
+    FACULTY ||--o{ SCHEDULE_SUBMISSION : submits
+    COURSE ||--o{ STUDY_LOAD : assigned_to
+    COURSE ||--o{ SCHEDULE : scheduled_as
+    COURSE ||--o{ PBS_SCHEDULE : scheduled_as
+    COURSE ||--o{ SECTION_COURSE : listed_in
+    SECTION ||--o{ STUDY_LOAD : receives
+    SECTION ||--o{ SCHEDULE : scheduled_for
+    SECTION ||--o{ PBS_SCHEDULE : scheduled_for
+    SECTION ||--o{ SCHEDULE_SUBMISSION : submitted_for
+    SECTION ||--o{ SECTION_COURSE : includes
+    ROOM ||--o{ SCHEDULE : hosts
+    ROOM ||--o{ PBS_SCHEDULE : hosts
+    STUDY_LOAD ||--o{ SCHEDULE : plotted_as
+
+    USER {
+        uuid usr_id PK
+        string usr_name
+        string usr_first_name
+        string usr_middle_name
+        string usr_last_name
+        string usr_suffix
+        string usr_email
+        string usr_password_hash
+        string usr_role
+        boolean usr_is_active
+    }
+    FACULTY {
+        uuid fac_id PK
+        uuid fac_usr_id FK
+        uuid fac_college_id FK
+        uuid fac_dept_id FK
+        string fac_first_name
+        string fac_middle_name
+        string fac_last_name
+        string fac_suffix
+        string fac_employment_type
+        string fac_rank
+        string fac_special_position
+        string fac_bachelors_abbr
+        string fac_masters_abbr
+        string fac_doctorate_abbr
+    }
+    DEAN {
+        uuid dean_id PK
+        uuid dean_usr_id FK
+        uuid dean_college_id FK
+        uuid dean_dept_id FK
+        string dean_first_name
+        string dean_middle_name
+        string dean_last_name
+        string dean_suffix
+    }
+    DEPARTMENT_CHAIR {
+        uuid dc_id PK
+        uuid dc_usr_id FK
+        uuid dc_college_id FK
+        uuid dc_dept_id FK
+        string dc_first_name
+        string dc_middle_name
+        string dc_last_name
+        string dc_suffix
+    }
+    COLLEGE {
+        uuid college_id PK
+        string college_name
+        string college_code
+        string college_description
+    }
+    DEPARTMENT {
+        uuid dept_id PK
+        uuid dept_college_id FK
+        string dept_name
+        string dept_code
+    }
+    COURSE {
+        uuid course_id PK
+        uuid course_college_id FK
+        uuid course_dept_id FK
+        string course_code
+        string course_name
+        decimal course_units
+        decimal course_lecture_hours
+        decimal course_lab_hours
+        boolean course_is_active
+    }
+    SECTION {
+        uuid sec_id PK
+        uuid sec_dept_id FK
+        uuid sec_ay_id FK
+        uuid sec_sem_id FK
+        string sec_name
+        integer sec_year_level
+        integer sec_no_of_student
+        integer sec_max_capacity
+        string sec_status
+    }
+    ACADEMIC_YEAR {
+        uuid ay_id PK
+        string ay_academic_year
+        string ay_year_label
+        boolean ay_is_active
+    }
+    SEMESTER {
+        uuid sem_id PK
+        uuid sem_ay_id FK
+        string sem_name
+        date sem_start_date
+        date sem_end_date
+        boolean sem_is_active
+        boolean sem_is_plotting_enabled
+    }
+    ROOM {
+        uuid room_id PK
+        uuid room_college_id FK
+        string room_name
+        string room_building
+        string room_type
+        integer room_capacity
+        boolean room_is_available
+    }
+    STUDY_LOAD {
+        uuid sl_id PK
+        uuid sl_fac_id FK
+        uuid sl_course_id FK
+        uuid sl_sec_id FK
+        uuid sl_sem_id FK
+        uuid sl_assigned_by FK
+        string sl_shift
+        boolean sl_ojt_is_evening
+        datetime sl_assigned_at
+    }
+    SCHEDULE {
+        uuid sch_id PK
+        uuid sch_load_id FK
+        uuid sch_fac_id FK
+        uuid sch_course_id FK
+        uuid sch_sec_id FK
+        uuid sch_room_id FK
+        uuid sch_sem_id FK
+        uuid sch_created_by FK
+        string sch_day
+        string sch_shift
+        time sch_start_time
+        time sch_end_time
+        string sch_status
+        boolean sch_is_active
+    }
+    PBS_SCHEDULE {
+        uuid pbs_id PK
+        uuid pbs_subj_id FK
+        uuid pbs_fac_id FK
+        uuid pbs_sec_id FK
+        uuid pbs_room_id FK
+        uuid pbs_sem_id FK
+        uuid pbs_created_by FK
+        string pbs_day
+        time pbs_start_time
+        time pbs_end_time
+        string pbs_status
+        boolean pbs_is_active
+    }
+    WORKLOAD {
+        uuid wl_id PK
+        uuid wl_fac_id FK
+        uuid wl_sem_id FK
+        uuid wl_ay_id FK
+        string wl_type
+        decimal wl_total_hours
+    }
+    SCHEDULE_SUBMISSION {
+        uuid schsub_id PK
+        uuid schsub_dept_id FK
+        uuid schsub_fac_id FK
+        uuid schsub_sec_id FK
+        uuid schsub_sem_id FK
+        uuid schsub_submitted_by FK
+        uuid schsub_reviewed_by FK
+        string schsub_type
+        datetime schsub_submitted_at
+        datetime schsub_reviewed_at
+        string schsub_status
+        text schsub_remarks
+        json schsub_schedule_snapshot
+    }
+    SECTION_COURSE {
+        uuid ssub_id PK
+        uuid ssub_sec_id FK
+        uuid ssub_subj_id FK
+    }
+    FAC_SPECIALIZATION {
+        uuid fspec_id PK
+        uuid fspec_fac_id FK
+        string fspec_specialization
+    }
+    AUDIT_LOG {
+        uuid al_id PK
+        uuid al_usr_id FK
+        string al_action
+        string al_target_table
+        uuid al_target_id
+        text al_description
+        string al_ip_address
+        datetime al_created_at
+    }
+    NOTIFICATION {
+        uuid notif_id PK
+        uuid notif_usr_id FK
+        string notif_title
+        text notif_message
+        string notif_type
+        boolean notif_is_read
+    }
+    FACULTY_ACCOUNT_REVIEWS {
+        uuid fvr_id PK
+        uuid fvr_usr_id FK
+        uuid fvr_reviewed_by FK
+        string fvr_id_photo_path
+        string fvr_status
+        string fvr_applicant_name
+        string fvr_applicant_email
+        text fvr_decision_note
+        datetime fvr_reviewed_at
+    }
+    WEBAUTHN_CREDENTIALS {
+        uuid id PK
+        uuid usr_id FK
+        string credential_id
+        text public_key
+        integer sign_count
+        json transports
+        string device_name
+        json credential_record
+        datetime last_used_at
+    }
+    BIOMETRIC_CREDENTIAL {
+        uuid bio_id PK
+        uuid bio_usr_id FK
+        string bio_fingerprint_hash
+        datetime bio_registered_at
+        boolean bio_is_active
+    }
+    TOKEN_BLACKLIST {
+        uuid tbl_id PK
+        uuid tbl_usr_id FK
+        text tbl_token
+        datetime tbl_revoked_at
+    }
+    SYSTEM_SETTING {
+        uuid sset_id PK
+        string sset_key
+        text sset_value
+        uuid sset_updated_by FK
+        datetime sset_updated_at
+    }
+    SYSTEM_BACKUP {
+        uuid bkp_id PK
+        string bkp_file_path
+        string bkp_status
+        text bkp_error_message
+        datetime bkp_ran_at
+    }
+    INSTITUTION {
+        uuid inst_id PK
+        string inst_name
+        string inst_branch_campus
+        string inst_college
+        string inst_abbreviation
+        string inst_contact_email
+        string inst_phone
+    }
+  </pre></main>
+  <p class="note">Duplicate model aliases are consolidated (Settings/SystemSetting and classes in SupportingModels). Relationships are based on model relations and matching FK fields; verify physical constraints against the live Supabase schema before treating this as a database-generated schema diagram.</p>
+</body>
+</html>

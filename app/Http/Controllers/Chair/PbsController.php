@@ -38,6 +38,15 @@ class PbsController extends Controller
         return $chair?->dc_dept_id;
     }
 
+    private function chairCollegeId(): ?string
+    {
+        $chair = Dept_Chair::with('program')
+            ->where('dc_usr_id', Auth::id())
+            ->first();
+
+        return $chair?->program?->dept_college_id ?? $chair?->dc_college_id;
+    }
+
     /** Selected semester row, defaulting to the official active semester. */
     private function activeSemester(?string $selectedId = null): ?object
     {
@@ -81,7 +90,7 @@ class PbsController extends Controller
         $selectedDeptId = $request->query('department', $progId);
 
         if (!$progId) {
-            return response()->view('chair.pbs', [
+            return response()->view('chair.PBS', [
                 'schedules'        => collect(),
                 'subjects'         => collect(),
                 'faculty'          => collect(),
@@ -187,8 +196,7 @@ class PbsController extends Controller
             ->orderBy('course_code');
 
         if (!empty($selectedCategory)) {
-            // Category mode intentionally browses courses across all
-            // departments, year levels, and semesters.
+            $subjectsQuery->whereIn('course_dept_id', $allDepartments->pluck('dept_id'));
             $subjectsQuery->where('course_category', $selectedCategory);
         } else {
             $subjectsQuery->where('course_dept_id', $subjectDeptId);
@@ -213,6 +221,7 @@ class PbsController extends Controller
 
         // Get ALL unique categories in DB (global, no semester filter)
         $categories = Course::where('course_is_active', true)
+            ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
             ->whereNotNull('course_category')
             ->where('course_category', '!=', '')
             ->distinct()
@@ -223,15 +232,18 @@ class PbsController extends Controller
         // All teachers who can be assigned (faculty table only — needed for FK).
         // Includes full-time, part-time, dept chairs, and deans who have a faculty row.
         $faculty = Faculty::query()
+            ->where('fac_college_id', $collegeId)
             ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
 
-        return response()->view('chair.pbs', [
+        return response()->view('chair.PBS', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
-            'allSubjects'      => Course::where('course_is_active', true)->orderBy('course_code')->get(),
+            'allSubjects'      => Course::where('course_is_active', true)
+                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
+                ->orderBy('course_code')->get(),
             'faculty'          => $faculty,
             'sections'         => $sections,
             'programs'         => $allDepartments,
@@ -265,7 +277,8 @@ class PbsController extends Controller
                     $sem->label = $label !== '' ? $label : $sem->sem_name;
                     return $sem;
                 }),
-            'rooms'         => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
+            'rooms'         => DB::table('room')->where('room_is_available', true)
+                ->where('room_college_id', $collegeId)->orderBy('room_name')->get(),
             'filters'       => $filters,
             'selectedDate'  => $request->query('date'),
             'chairProgram'     => $allDepartments->first(),
@@ -298,15 +311,18 @@ class PbsController extends Controller
             'end_time'   => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after:start_time', 'before_or_equal:22:00'],
         ]);
 
-        $progId = $this->chairProgramId();
-        if ($progId) {
-            $ownsSection = Section::where('sec_id', $data['sec_id'])
-                ->where('sec_dept_id', $progId)
-                ->exists();
-
-            if (!$ownsSection) {
-                abort(403, 'You can only schedule sections under your assigned program.');
-            }
+        $collegeId = $this->chairCollegeId();
+        $section = Section::with('program')->findOrFail($data['sec_id']);
+        $course = Course::findOrFail($data['subj_id']);
+        $faculty = Faculty::findOrFail($data['fac_id']);
+        $room = DB::table('room')->where('room_id', $data['room_id'])->first();
+        if (!$collegeId || (string) $section->program?->dept_college_id !== (string) $collegeId) {
+            abort(403, 'You can only schedule sections within your college.');
+        }
+        if (!Departments::where('dept_id', $course->course_dept_id)->where('dept_college_id', $collegeId)->exists()
+            || (string) $faculty->fac_college_id !== (string) $collegeId
+            || !$room || (string) $room->room_college_id !== (string) $collegeId) {
+            abort(403, 'PBS schedules can only use courses, faculty, and rooms within your college.');
         }
 
         return $data;
@@ -322,13 +338,13 @@ class PbsController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $progId = $this->chairProgramId();
-        if ($progId && !Schedule::whereKey($id)
-            ->whereHas('section', fn($query) => $query->where('sec_dept_id', $progId))
+        $departmentId = $this->chairProgramId();
+        if (!$departmentId || !Schedule::whereKey($id)
+            ->whereHas('section', fn($query) => $query->where('sec_dept_id', $departmentId))
             ->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only update schedules under your assigned program.',
+                'message' => 'You can only update schedules within your department.',
             ], 403);
         }
 
@@ -358,15 +374,13 @@ class PbsController extends Controller
             ], 404);
         }
 
-        $progId = $this->chairProgramId();
-        if ($progId) {
-            $schedule = Schedule::with('section')->find($id);
-            if ($schedule && $schedule->section && $schedule->section->sec_dept_id !== $progId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You can only delete schedules under your assigned program.',
-                ], 403);
-            }
+        $departmentId = $this->chairProgramId();
+        $schedule = Schedule::with('section.program')->find($id);
+        if (!$departmentId || !$schedule?->section || (string) $schedule->section->sec_dept_id !== (string) $departmentId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only delete schedules within your department.',
+            ], 403);
         }
 
         return response()->json($this->scheduler->delete($id));
@@ -380,17 +394,15 @@ class PbsController extends Controller
         ]);
         $sectionId = $data['section'];
 
-        $progId = $this->chairProgramId();
-        if ($progId) {
-            $owns = Section::where('sec_id', $sectionId)
-                ->where('sec_dept_id', $progId)
-                ->exists();
-            if (!$owns) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'You can only clear schedules under your assigned program.',
-                ], 403);
-            }
+        $departmentId = $this->chairProgramId();
+        $owns = $departmentId && Section::where('sec_id', $sectionId)
+            ->where('sec_dept_id', $departmentId)
+            ->exists();
+        if (!$owns) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only clear schedules within your department.',
+            ], 403);
         }
 
         $query = Schedule::where('sch_sec_id', $sectionId)
@@ -409,7 +421,7 @@ class PbsController extends Controller
 
     /**
      * Save number of students for the selected section (sec_no_of_student).
-     * Chair may only update sections under their department.
+     * Chair may update sections within their college.
      */
     public function updateStudents(Request $request)
     {
@@ -418,17 +430,17 @@ class PbsController extends Controller
             'sec_no_of_student' => 'required|integer|min:0|max:500',
         ]);
 
-        $progId = $this->chairProgramId();
+        $collegeId = $this->chairCollegeId();
         $section = Section::where('sec_id', $data['sec_id'])->first();
 
         if (!$section) {
             return response()->json(['success' => false, 'message' => 'Section not found.'], 404);
         }
 
-        if ($progId && $section->sec_dept_id !== $progId) {
+        if (!$collegeId || !Departments::where('dept_id', $section->sec_dept_id)->where('dept_college_id', $collegeId)->exists()) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only update sections under your assigned department.',
+                'message' => 'You can only update sections within your college.',
             ], 403);
         }
 
@@ -470,9 +482,11 @@ class PbsController extends Controller
             return response()->json(['success' => false, 'message' => 'Section does not belong to selected department.'], 403);
         }
 
-        // Verify chair has access to this department's college
-        $chair = \App\Models\Dept_Chair::where('dc_usr_id', Auth::id())->first();
-        if ($chair && $chair->dc_college_id !== $dept->dept_college_id) {
+        // Use the assigned department's college as the source of truth, just
+        // like the PBS page and export. Existing chair rows may have a stale
+        // dc_college_id value.
+        $chairCollegeId = $this->chairCollegeId();
+        if (!$chairCollegeId || (string) $chairCollegeId !== (string) $dept->dept_college_id) {
             return response()->json(['success' => false, 'message' => 'Not authorized for this department.'], 403);
         }
 

@@ -536,7 +536,8 @@
 
                 <div>
                     <label class="field-label">Department</label>
-                    <select id="add-department" class="field-input">
+                    <select id="add-department" class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100" disabled
+                        title="Change department using the PBS header filters">
                         <option value="">-- Select Department --</option>
                         @foreach ($allDepartments as $dept)
                             <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
@@ -549,7 +550,8 @@
                 {{-- ── SECTION (triggers subject filter by year level) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input"
+                    <select id="add-section" class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100" disabled
+                        title="Change section using the PBS header filters"
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
@@ -1178,6 +1180,10 @@
                 const url = new URL(@json(route('chair.pbs.export')), window.location.origin);
                 url.searchParams.set('section', section);
                 url.searchParams.set('semester', semester);
+                url.searchParams.set(
+                    'shift',
+                    new URLSearchParams(window.location.search).get('shift') === 'night' ? 'night' : 'day'
+                );
                 window.location.assign(url.toString());
             } catch (error) {
                 const message = error instanceof Error ? error.message : 'Could not prepare the PBS export.';

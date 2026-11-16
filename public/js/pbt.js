@@ -481,6 +481,7 @@ document.addEventListener("DOMContentLoaded", () => {
         editDept.addEventListener("change", () => {
             const deptId = editDept.value;
             const sectionSelect = document.getElementById("edit-section");
+            const subjectSelect = document.getElementById("edit-subject");
             const sections =
                 (window.COLLEGE_SECTIONS && window.COLLEGE_SECTIONS[deptId]) ||
                 [];
@@ -496,6 +497,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 opt.dataset.isEvening = String(sec.isEvening || "0");
                 sectionSelect.appendChild(opt);
             });
+            if (subjectSelect) {
+                subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+            }
+            const categorySelect = document.getElementById("edit-category");
+            if (categorySelect) categorySelect.value = "";
             filterSubjectsBySection("edit-section", "edit-subject");
         });
     }
@@ -517,6 +523,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Trigger initial filter based on default department
     if (addDept) {
         addDept.dispatchEvent(new Event("change"));
+    }
+    if (editDept) {
+        editDept.dispatchEvent(new Event("change"));
     }
     restoreAddAnotherState();
 });
@@ -741,6 +750,11 @@ function openEditModal(block) {
     clearInlineError("edit-error");
     syncSelectedSemesterFields();
     document.getElementById("edit-id").value = block.dataset.scheduleId;
+    const departmentSelect = document.getElementById("edit-department");
+    if (departmentSelect) {
+        departmentSelect.value = block.dataset.department || "";
+        departmentSelect.dispatchEvent(new Event("change"));
+    }
     document.getElementById("edit-section").value = block.dataset.section || "";
     const categorySelect = document.getElementById("edit-category");
     if (categorySelect) categorySelect.value = "";
@@ -764,7 +778,7 @@ function submitEdit() {
         fac_id: SELECTED_TEACHER,
         sem_id: document.getElementById("filter-semester")?.value || "",
         prog_id:
-            document.getElementById("edit-department-id")?.value || "",
+            document.getElementById("edit-department")?.value || "",
         sec_id: document.getElementById("edit-section").value,
         room_id: document.getElementById("edit-room").value,
         day: document.getElementById("edit-day").value,

@@ -153,7 +153,7 @@ class FacultyMobileController extends Controller
                 'masters_abbr' => $faculty->fac_masters_abbr,
                 'doctorate_abbr' => $faculty->fac_doctorate_abbr,
                 'email' => $user->usr_email,
-                'profile_image' => $faculty->fac_profile_image ? asset('images/faculty_profile/' . basename($faculty->fac_profile_image)) : null,
+                'profile_image' => $faculty->fac_profile_image ? \App\Services\ProfileImageStorage::url($faculty->fac_profile_image, 'faculty_profile') : null,
                 'program' => $faculty->program?->dept_name,
                 'college' => $faculty->college?->college_name,
             ],

@@ -7,6 +7,7 @@ use App\Models\Faculty;
 use App\Models\SystemSetting;
 use App\Models\Schedule;
 use App\Http\Controllers\Controller;
+use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
@@ -62,30 +63,19 @@ class DeanSettingsController extends Controller
 
         $dean = $this->currentDean();
 
-        if ($dean->dean_profile_image) {
-            $oldPath = public_path('images/dean_profile/' . $dean->dean_profile_image);
-            if (file_exists($oldPath)) {
-                unlink($oldPath);
-            }
-        }
-
         $filename = $dean->dean_id . '_' . time() . '.' . $request->file('avatar')->getClientOriginalExtension();
-        $request->file('avatar')->move(public_path('images/dean_profile'), $filename);
+        abort_unless(ProfileImageStorage::store($request->file('avatar'), 'dean_profile', $filename), 500, 'Could not save the profile photo.');
+        ProfileImageStorage::delete($dean->dean_profile_image, 'dean_profile');
         $dean->update(['dean_profile_image' => $filename]);
 
-        return response()->json(['success' => true, 'url' => asset('images/dean_profile/' . $filename)]);
+        return response()->json(['success' => true, 'url' => ProfileImageStorage::url($filename, 'dean_profile')]);
     }
 
     public function removeAvatar()
     {
         $dean = $this->currentDean();
 
-        if ($dean->dean_profile_image) {
-            $oldPath = public_path('images/dean_profile/' . $dean->dean_profile_image);
-            if (file_exists($oldPath)) {
-                unlink($oldPath);
-            }
-        }
+        ProfileImageStorage::delete($dean->dean_profile_image, 'dean_profile');
 
         $dean->update([
             'dean_profile_image' => null,

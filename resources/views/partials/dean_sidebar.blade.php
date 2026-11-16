@@ -7,7 +7,7 @@
     <div class="sidebar-user">
         <div class="sidebar-avatar">
             @if (Auth::user()->dean?->dean_profile_image)
-                <img src="{{ asset('images/dean_profile/' . Auth::user()->dean->dean_profile_image) }}"
+                <img src="{{ \App\Services\ProfileImageStorage::url(Auth::user()->dean->dean_profile_image, 'dean_profile') }}"
                     alt="Profile photo" class="h-full w-full rounded-full object-cover">
             @else
                 {{ strtoupper(substr(Auth::user()->dean->dean_first_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_middle_name ?? '', 0, 1) . substr(Auth::user()->dean->dean_last_name ?? '', 0, 1)) }}

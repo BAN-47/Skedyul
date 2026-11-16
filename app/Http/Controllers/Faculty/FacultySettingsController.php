@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Faculty;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -55,25 +55,16 @@ class FacultySettingsController extends Controller
         ]);
 
         $faculty = $this->currentFaculty();
-        $directory = public_path('images/faculty_profile');
-        File::ensureDirectoryExists($directory);
-
         $filename = $faculty->fac_id . '_' . Str::uuid() . '.' . $request->file('avatar')->getClientOriginalExtension();
-        $request->file('avatar')->move($directory, $filename);
+        abort_unless(ProfileImageStorage::store($request->file('avatar'), 'faculty_profile', $filename), 500, 'Could not save the profile photo.');
 
         $oldImage = $faculty->fac_profile_image;
         $faculty->update(['fac_profile_image' => $filename]);
-
-        if ($oldImage) {
-            $oldPath = $directory . DIRECTORY_SEPARATOR . basename($oldImage);
-            if (is_file($oldPath)) {
-                unlink($oldPath);
-            }
-        }
+        ProfileImageStorage::delete($oldImage, 'faculty_profile');
 
         return response()->json([
             'success' => true,
-            'url' => asset('images/faculty_profile/' . $filename),
+            'url' => ProfileImageStorage::url($filename, 'faculty_profile'),
         ]);
     }
 
@@ -83,12 +74,7 @@ class FacultySettingsController extends Controller
         $oldImage = $faculty->fac_profile_image;
         $faculty->update(['fac_profile_image' => null]);
 
-        if ($oldImage) {
-            $oldPath = public_path('images/faculty_profile/' . basename($oldImage));
-            if (is_file($oldPath)) {
-                unlink($oldPath);
-            }
-        }
+        ProfileImageStorage::delete($oldImage, 'faculty_profile');
 
         return response()->json(['success' => true]);
     }

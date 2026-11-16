@@ -26,8 +26,8 @@ class AutoSwitchSemester extends Command
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
-            $this->error('AutoSwitchSemester failed: ' . $e->getMessage());
-            Log::error('AutoSwitchSemester failed', ['exception' => $e->getMessage()]);
+            $this->error('AutoSwitchSemester failed. Check the application logs.');
+            Log::error('AutoSwitchSemester failed', ['exception' => $e]);
             return self::FAILURE;
         }
     }

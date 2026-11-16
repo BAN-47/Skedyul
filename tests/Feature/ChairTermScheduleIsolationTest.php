@@ -20,9 +20,21 @@ class ChairTermScheduleIsolationTest extends TestCase
 
     private string $secondSemesterId;
 
+    private string $collegeId;
+
+    private string $departmentId;
+
     private array $scheduleIds = [];
 
     private array $loadIds = [];
+
+    private ?string $otherDepartmentId = null;
+
+    private ?string $otherSectionId = null;
+
+    private ?string $otherScheduleId = null;
+
+    private ?string $otherLoadId = null;
 
     protected function setUp(): void
     {
@@ -40,6 +52,8 @@ class ChairTermScheduleIsolationTest extends TestCase
         });
         Schema::create('faculty', function (Blueprint $table) {
             $table->uuid('fac_id')->primary();
+            $table->uuid('fac_college_id')->nullable();
+            $table->uuid('fac_dept_id')->nullable();
         });
         Schema::create('department_chair', function (Blueprint $table) {
             $table->uuid('dc_id')->primary();
@@ -51,6 +65,10 @@ class ChairTermScheduleIsolationTest extends TestCase
             $table->uuid('sec_id')->primary();
             $table->uuid('sec_dept_id')->nullable();
             $table->string('sec_name')->nullable();
+        });
+        Schema::create('department', function (Blueprint $table) {
+            $table->uuid('dept_id')->primary();
+            $table->uuid('dept_college_id')->nullable();
         });
         Schema::create('academic_year', function (Blueprint $table) {
             $table->uuid('ay_id')->primary();
@@ -93,13 +111,27 @@ class ChairTermScheduleIsolationTest extends TestCase
         $this->sectionId = (string) Str::uuid();
         $this->firstSemesterId = (string) Str::uuid();
         $this->secondSemesterId = (string) Str::uuid();
+        $this->collegeId = (string) Str::uuid();
+        $this->departmentId = (string) Str::uuid();
         $firstLoadId = (string) Str::uuid();
         $secondLoadId = (string) Str::uuid();
         $courseId = (string) Str::uuid();
         $academicYearId = (string) Str::uuid();
         DB::table('faculty')->insert(['fac_id' => $this->facultyId]);
+        DB::table('department')->insert([
+            'dept_id' => $this->departmentId,
+            'dept_college_id' => $this->collegeId,
+        ]);
+        DB::table('faculty')->where('fac_id', $this->facultyId)->update([
+            'fac_college_id' => $this->collegeId,
+            'fac_dept_id' => $this->departmentId,
+        ]);
         DB::table('academic_year')->insert(['ay_id' => $academicYearId]);
-        DB::table('section')->insert(['sec_id' => $this->sectionId, 'sec_name' => 'BSIT-1A']);
+        DB::table('section')->insert([
+            'sec_id' => $this->sectionId,
+            'sec_dept_id' => $this->departmentId,
+            'sec_name' => 'BSIT-1A',
+        ]);
         DB::table('course')->insert([
             'course_id' => $courseId,
             'course_lecture_hours' => 3,
@@ -183,14 +215,86 @@ class ChairTermScheduleIsolationTest extends TestCase
         $this->assertDatabaseHas('study_load', ['sl_id' => $this->loadIds[1]]);
     }
 
+    public function test_chair_cannot_update_delete_or_clear_another_department_pbs_schedule(): void
+    {
+        $chair = $this->chair();
+        $otherScheduleId = $this->otherDepartmentSchedule();
+
+        $this->actingAs($chair)
+            ->putJson(route('chair.pbs.update', $otherScheduleId), [])
+            ->assertForbidden();
+
+        $this->actingAs($chair)
+            ->deleteJson(route('chair.pbs.destroy', $otherScheduleId), [
+                'sem_id' => $this->firstSemesterId,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($chair)
+            ->postJson(route('chair.pbs.clear'), [
+                'section' => $this->otherSectionId,
+                'semester' => $this->firstSemesterId,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('schedule', ['sch_id' => $otherScheduleId]);
+        $this->assertDatabaseHas('study_load', ['sl_id' => $this->otherLoadId]);
+    }
+
+    private function otherDepartmentSchedule(): string
+    {
+        if ($this->otherScheduleId) {
+            return $this->otherScheduleId;
+        }
+
+        $this->otherDepartmentId = (string) Str::uuid();
+        $this->otherSectionId = (string) Str::uuid();
+        $this->otherLoadId = (string) Str::uuid();
+        $this->otherScheduleId = (string) Str::uuid();
+
+        DB::table('department')->insert([
+            'dept_id' => $this->otherDepartmentId,
+            'dept_college_id' => $this->collegeId,
+        ]);
+        DB::table('section')->insert([
+            'sec_id' => $this->otherSectionId,
+            'sec_dept_id' => $this->otherDepartmentId,
+            'sec_name' => 'BSIS-1A',
+        ]);
+        DB::table('study_load')->insert([
+            'sl_id' => $this->otherLoadId,
+            'sl_fac_id' => $this->facultyId,
+            'sl_sec_id' => $this->otherSectionId,
+            'sl_sem_id' => $this->firstSemesterId,
+        ]);
+        DB::table('schedule')->insert([
+            'sch_id' => $this->otherScheduleId,
+            'sch_load_id' => $this->otherLoadId,
+            'sch_fac_id' => $this->facultyId,
+            'sch_sec_id' => $this->otherSectionId,
+            'sch_sem_id' => $this->firstSemesterId,
+        ]);
+
+        return $this->otherScheduleId;
+    }
+
     private function chair(): User
     {
-        return User::create([
+        $user = User::create([
             'usr_id' => 'chair-user',
             'usr_name' => 'Chair',
             'usr_email' => 'chair@example.com',
             'usr_password_hash' => 'password-hash',
             'usr_role' => 'department_chair',
         ]);
+
+        DB::table('department_chair')->insert([
+            'dc_id' => (string) Str::uuid(),
+            'dc_usr_id' => $user->usr_id,
+            'dc_dept_id' => $this->departmentId,
+            'dc_college_id' => $this->collegeId,
+        ]);
+
+        return $user;
     }
 }

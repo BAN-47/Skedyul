@@ -311,6 +311,27 @@ function filterSubjectsBySection(sectionSelectId, subjectSelectId) {
     else filterSubjectsByCategory();
 }
 
+function syncAddScopeToHeader() {
+    const headerDepartment = document.getElementById('filter-department');
+    const headerSection = document.getElementById('filter-section');
+    const addDepartment = document.getElementById('add-department');
+    const addSection = document.getElementById('add-section');
+
+    if (!headerDepartment || !headerSection || !addDepartment || !addSection) return;
+
+    const selectedHeaderSection = headerSection.selectedOptions[0];
+    const departmentId = headerDepartment.value || selectedHeaderSection?.dataset.deptId || '';
+
+    addDepartment.value = departmentId;
+    addDepartment.dispatchEvent(new Event('change'));
+
+    const matchingSection = Array.from(addSection.options).some(option =>
+        option.value && option.value === headerSection.value
+    );
+    addSection.value = matchingSection ? headerSection.value : '';
+    filterSubjectsBySection('add-section', 'add-subject');
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const headerDept = document.getElementById('filter-department');
     const headerSection = document.getElementById('filter-section');
@@ -406,9 +427,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // Trigger initial filter based on default department
+    // Keep the add modal's locked department and section aligned with the header.
     if (addDept) {
-        addDept.dispatchEvent(new Event('change'));
+        syncAddScopeToHeader();
     }
     restoreAddAnotherState();
 });
@@ -433,15 +454,8 @@ function restoreAddAnotherState() {
     }
     sessionStorage.removeItem('pbs-add-another');
 
-    const department = document.getElementById('add-department');
-    if (department && state.department && department.value !== state.department) {
-        department.value = state.department;
-        department.dispatchEvent(new Event('change'));
-    }
-
-    const section = document.getElementById('add-section');
+    syncAddScopeToHeader();
     const category = document.getElementById('add-category');
-    if (section) section.value = state.section || '';
     if (category) category.value = state.category || '';
     if (category?.value) {
         filterSubjectsByCategory();
@@ -466,8 +480,8 @@ function restoreAddAnotherState() {
 function openAddModal(day, startTime) {
     clearInlineError('add-error');
 
-    // Reset form fields (semester + department are fixed / hidden)
-    ['add-subject', 'add-faculty', 'add-room', 'add-section', 'add-description'].forEach(id => {
+    // Reset schedule details while keeping department and section fixed by the header.
+    ['add-subject', 'add-faculty', 'add-room', 'add-description'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -482,8 +496,8 @@ function openAddModal(day, startTime) {
         option.querySelector('.pbs-teacher-check').classList.add('hidden');
     });
 
-    // Reset subject filter (show all until a section is chosen)
-    filterSubjectsBySection('add-section', 'add-subject');
+    // Use the current header department and section for the locked modal fields.
+    syncAddScopeToHeader();
 
     // Pre-fill day + times from the clicked cell
     document.querySelectorAll('.add-day-checkbox').forEach(input => {
@@ -491,33 +505,6 @@ function openAddModal(day, startTime) {
     });
     document.getElementById('add-start').value = startTime || '';
     document.getElementById('add-end').value   = startTime ? addMinutesToTime(startTime, 60) : '';
-
-    // Pre-fill department and section from current page filters when available
-    const params = new URLSearchParams(window.location.search);
-    const filterDept = params.get('department');
-    const filterSection = params.get('section');
-    
-    // Pre-fill department
-    if (filterDept) {
-        const deptEl = document.getElementById('add-department');
-        if (deptEl) {
-            deptEl.value = filterDept;
-            // Trigger department change to load sections for that department
-            deptEl.dispatchEvent(new Event('change'));
-        }
-    }
-    
-    // Pre-fill section (after department change has loaded sections)
-    if (filterSection) {
-        const sectionEl = document.getElementById('add-section');
-        if (sectionEl) {
-            // Small delay to allow department change to populate sections
-            setTimeout(() => {
-                sectionEl.value = filterSection;
-                filterSubjectsBySection('add-section', 'add-subject');
-            }, 100);
-        }
-    }
 
     setAddButtonsLoading(false);
     openModal('modal-add-schedule');
@@ -578,8 +565,6 @@ function submitAdd(keepOpen = false) {
             if (keepOpen) {
                 try {
                     sessionStorage.setItem('pbs-add-another', JSON.stringify({
-                        department: document.getElementById('add-department').value,
-                        section: document.getElementById('add-section').value,
                         subject: document.getElementById('add-subject').value,
                         room: document.getElementById('add-room').value,
                         faculty: document.getElementById('add-faculty').value,

@@ -23,11 +23,19 @@ class PbtController extends Controller
     {
     }
 
+    private function chairCollegeId(): ?string
+    {
+        $chair = \App\Models\Dept_Chair::with('program')
+            ->where('dc_usr_id', auth()->user()?->usr_id)->first();
+
+        return $chair?->program?->dept_college_id ?? $chair?->dc_college_id;
+    }
+
     public function index(Request $request)
     {
         $filters = $request->only(['program']);
 
-        // Same as PBS: chair only sees their department (BSIS chair → BSIS only)
+        // Chairs can work across departments within their assigned college.
         $deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)
             ->value('dc_dept_id');
 
@@ -74,6 +82,13 @@ class PbtController extends Controller
 
         // Build teacher groups (must be faculty rows for FK)
         $allFaculty = Faculty::query()
+            ->where(function ($facultyQuery) use ($collegeId) {
+                $facultyQuery->where('fac_college_id', $collegeId)
+                    ->orWhereHas('program', fn ($programQuery) => $programQuery->where('dept_college_id', $collegeId));
+                if (!$collegeId) {
+                    $facultyQuery->whereRaw('1 = 0');
+                }
+            })
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->select('faculty.*')
             ->addSelect([
@@ -173,7 +188,7 @@ class PbtController extends Controller
             return str_contains($t, 'part');
         })->values();
 
-        return response()->view('chair.pbt', [
+        return response()->view('chair.PBT', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
                 ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
@@ -192,6 +207,7 @@ class PbtController extends Controller
                 ->orderBy('course_code')
                 ->get(),
             'allSubjects'      => Course::where('course_is_active', true)
+                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
                 ->where(function ($query) {
                     $query->where('course_name', '!=', 'Research, Extension and Consultation Time')
                         ->where(function ($regular) {
@@ -211,6 +227,7 @@ class PbtController extends Controller
             'selectedDeptId'   => $request->query('department', $deptId),
             'sections'         => Section::whereIn('sec_dept_id', $allDepartments->pluck('dept_id'))->orderBy('sec_name')->get(),
             'categories'       => Course::where('course_is_active', true)
+                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
                 ->whereNotNull('course_category')
                 ->where('course_category', '!=', '')
                 ->distinct()
@@ -244,7 +261,8 @@ class PbtController extends Controller
                     $sem->label = $label !== '' ? $label : $sem->sem_name;
                     return $sem;
                 }),
-            'rooms'            => DB::table('room')->where('room_is_available', true)->orderBy('room_name')->get(),
+            'rooms'            => DB::table('room')->where('room_is_available', true)
+                ->where('room_college_id', $collegeId)->orderBy('room_name')->get(),
             'filters'          => $filters,
             'selectedFaculty'  => $selectedFaculty,
             'selectedDate'     => $request->query('date'),
@@ -350,6 +368,21 @@ class PbtController extends Controller
         ]);
 
         $course = Course::findOrFail($data['subj_id']);
+        $collegeId = $this->chairCollegeId();
+        $courseInCollege = $collegeId && Departments::where('dept_id', $course->course_dept_id)
+            ->where('dept_college_id', $collegeId)->exists();
+        $facultyInCollege = $collegeId && Faculty::where('fac_id', $data['fac_id'])
+            ->where(function ($query) use ($collegeId) {
+                $query->where('fac_college_id', $collegeId)
+                    ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
+            })->exists();
+        $roomInCollege = empty($data['room_id']) || ($collegeId && DB::table('room')
+            ->where('room_id', $data['room_id'])->where('room_college_id', $collegeId)->exists());
+        $sectionInCollege = empty($data['sec_id']) || ($collegeId && Section::where('sec_id', $data['sec_id'])
+            ->whereHas('program', fn ($query) => $query->where('dept_college_id', $collegeId))->exists());
+        if (!$courseInCollege || !$facultyInCollege || !$roomInCollege || !$sectionInCollege) {
+            abort(403, 'PBT schedules can only use courses, faculty, sections, and rooms within your college.');
+        }
         $data['sec_id'] = $data['sec_id'] ?? null;
         if (empty($data['sec_id'])) {
             if ($course->course_code !== 'REC') {
@@ -374,6 +407,10 @@ class PbtController extends Controller
     public function update(Request $request, string $id)
     {
         $data = $this->validated($request);
+        $collegeId = $this->chairCollegeId();
+        if (!$collegeId || !$this->scheduleIsInChairCollege($id, $collegeId)) {
+            return response()->json(['success' => false, 'message' => 'You can only update schedules within your college.'], 403);
+        }
         $schedule = Schedule::find($id);
         if (!$schedule || (string) $schedule->sch_sem_id !== (string) $data['sem_id']) {
             return response()->json([
@@ -398,6 +435,11 @@ class PbtController extends Controller
             ], 404);
         }
 
+        $collegeId = $this->chairCollegeId();
+        if (!$collegeId || !$this->scheduleIsInChairCollege($id, $collegeId)) {
+            return response()->json(['success' => false, 'message' => 'You can only delete schedules within your college.'], 403);
+        }
+
         return response()->json($this->scheduler->delete($id));
     }
 
@@ -408,9 +450,20 @@ class PbtController extends Controller
             'semester' => 'required|uuid|exists:semester,sem_id',
         ]);
         $facultyId = $data['faculty'];
+        $collegeId = $this->chairCollegeId();
+        if (!$collegeId || !Faculty::where('fac_id', $facultyId)->where(function ($query) use ($collegeId) {
+            $query->where('fac_college_id', $collegeId)
+                ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
+        })->exists()) {
+            return response()->json(['success' => false, 'message' => 'You can only clear schedules for faculty within your college.'], 403);
+        }
 
         $schedules = Schedule::where('sch_fac_id', $facultyId)
             ->where('sch_sem_id', $data['semester'])
+            ->where(function ($query) use ($collegeId) {
+                $query->whereHas('section.program', fn ($section) => $section->where('dept_college_id', $collegeId))
+                    ->orWhereDoesntHave('section');
+            })
             ->get(['sch_id', 'sch_load_id', 'sch_fac_id', 'sch_sem_id']);
 
         Schedule::whereIn('sch_id', $schedules->pluck('sch_id'))->delete();
@@ -419,5 +472,18 @@ class PbtController extends Controller
             ->each(fn ($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
+    }
+
+    private function scheduleIsInChairCollege(string $scheduleId, string $collegeId): bool
+    {
+        return Schedule::whereKey($scheduleId)->where(function ($query) use ($collegeId) {
+            $query->whereHas('section.program', fn ($section) => $section->where('dept_college_id', $collegeId))
+                ->orWhere(function ($recSchedule) use ($collegeId) {
+                    $recSchedule->whereDoesntHave('section')
+                        ->whereHas('faculty', fn ($faculty) => $faculty
+                            ->where('fac_college_id', $collegeId)
+                            ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId)));
+                });
+        })->exists();
     }
 }

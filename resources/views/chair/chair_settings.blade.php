@@ -52,7 +52,7 @@
                   <div class="relative shrink-0">
                     <div id="avatar-display"
                       class="w-24 h-24 rounded-full bg-[--navy] flex items-center justify-center text-2xl font-extrabold text-white border-4 border-white shadow-sm overflow-hidden bg-cover bg-center"
-                      @if($chair->dc_profile_image) style="background-image:url('{{ asset('images/chair_profile/' . $chair->dc_profile_image) }}')" @endif>
+                      @if($chair->dc_profile_image) style="background-image:url('{{ \App\Services\ProfileImageStorage::url($chair->dc_profile_image, 'chair_profile') }}')" @endif>
                       @unless($chair->dc_profile_image){{ strtoupper(substr($chair->dc_first_name, 0, 1)) }}@endunless
                     </div>
                     <div class="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer border-2 border-white text-sm font-bold text-white"
@@ -120,7 +120,7 @@
                 <div class="grid grid-cols-3 gap-3 mb-3">
                   <div><label class="field-label">Bachelor's Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-bachelors" value="{{ $faculty?->fac_bachelors_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-bachelors-abbr">Acronym</label><input class="field-input uppercase" id="pi-bachelors-abbr" aria-label="Bachelor's degree acronym" placeholder="BSIS" value="{{ $faculty?->fac_bachelors_abbr }}"></div></div></div>
                   <div><label class="field-label">Master's Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-masters" value="{{ $faculty?->fac_masters_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-masters-abbr">Acronym</label><input class="field-input uppercase" id="pi-masters-abbr" aria-label="Master's degree acronym" placeholder="MIT" value="{{ $faculty?->fac_masters_abbr }}"></div></div></div>
-                  <div><label class="field-label">Doctorate Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-doctorate" value="{{ $faculty?->fac_doctorate_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-doctorate-abbr">Acronym</label><input class="field-input uppercase" id="pi-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PhD, DIT" value="{{ $faculty?->fac_doctorate_abbr }}"></div></div></div>
+                  <div><label class="field-label">Doctorate Degree</label><div class="flex gap-2"><input class="field-input min-w-0 flex-1" id="pi-doctorate" value="{{ $faculty?->fac_doctorate_degree }}"><div class="w-20 shrink-0"><label class="field-label text-[9px]" for="pi-doctorate-abbr">Acronym</label><input class="field-input uppercase" id="pi-doctorate-abbr" aria-label="Doctorate degree acronym" placeholder="PH. D., DIT" value="{{ $faculty?->fac_doctorate_abbr }}"></div></div></div>
                 </div>
                 <div class="grid grid-cols-2 gap-3 mb-1">
                   <div><label class="field-label">Date of Birth</label><input class="field-input" type="date" id="pi-dob" value="{{ $chair->dc_dob?->format('Y-m-d') }}"></div>

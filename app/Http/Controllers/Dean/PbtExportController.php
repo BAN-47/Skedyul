@@ -238,8 +238,8 @@ class PbtExportController extends Controller
         $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
             ?: ($chair?->user?->usr_name ?? 'Department Chair');
 
-        $templatePath = storage_path('app/templates/PBT_Template.xlsx');
-        if (!is_file($templatePath)) {
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBT_Template.xlsx');
+        if (!$templatePath) {
             throw ValidationException::withMessages([
                 'faculty_id' => 'The PBT Excel template is missing from storage/app/templates.',
             ]);

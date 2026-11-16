@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Chair\ChairController;
-use App\Http\Controllers\Chair\ScheduleController;
 use App\Http\Controllers\Chair\ChairSubjectController;
 use App\Http\Controllers\Chair\ChairRoomController;
 use App\Http\Controllers\Chair\ChairFacultyLoadController;
@@ -15,7 +14,7 @@ use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
 
-Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
+Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
     Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
@@ -79,11 +78,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     })->name('chair.settings');
 });
 
-Route::post('/schedule', function () {
-    return back()->with('info', 'Sorry but this faculty assignment feature is not yet implemented. Thank you.');
-})->name('schedule.store');
-
-Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
+Route::prefix('chair')->middleware(['auth', 'role:department_chair', 'audit.activity'])->group(function () {
     Route::post('/profile/avatar', [ChairSettingsController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
     Route::delete('/profile/avatar', [ChairSettingsController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
     Route::put('/profile/personal-info', [ChairSettingsController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
@@ -93,4 +88,6 @@ Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function (
     Route::put('/security', [ChairSettingsController::class, 'updateSecuritySettings'])->name('chair.security.update');
 });
 
-Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');
+Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])
+    ->middleware(['auth', 'role:department_chair', 'audit.activity'])
+    ->name('chair.settings');

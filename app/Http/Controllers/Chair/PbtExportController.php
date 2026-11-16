@@ -43,6 +43,7 @@ class PbtExportController extends Controller
     public function index(Request $request)
     {
         $chair = $this->chair();
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
 
         $semester = $request->filled('semester')
             ? Semester::with('academicYear')->find($request->query('semester'))
@@ -72,8 +73,15 @@ class PbtExportController extends Controller
                 return $option;
             });
 
-        $facultyMembers = Faculty::with('user')
-            ->where('fac_dept_id', $chair->dc_dept_id)
+        $facultyMembers = Faculty::with('user', 'program')
+            ->where(function ($query) use ($collegeId) {
+                $query->where('fac_college_id', $collegeId)
+                    ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
+                if (!$collegeId) {
+                    $query->whereRaw('1 = 0');
+                }
+            })
+            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
@@ -109,6 +117,13 @@ class PbtExportController extends Controller
             ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->firstOrFail();
 
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        $facultyInCollege = $collegeId && (
+            (string) $faculty->fac_college_id === (string) $collegeId
+            || (string) $faculty->program?->dept_college_id === (string) $collegeId
+        );
+        abort_unless($facultyInCollege, 403, 'You can only export faculty schedules within your college.');
+
         $schedules = Schedule::with([
             'subject',
             'section.program',
@@ -128,9 +143,9 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $templatePath = storage_path('app/templates/PBT_Template.xlsx');
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBT_Template.xlsx');
 
-        if (!is_file($templatePath)) {
+        if (!$templatePath) {
             throw ValidationException::withMessages([
                 'faculty_id' => 'The PBT Excel template is missing from storage/app/templates.',
             ]);
@@ -196,7 +211,7 @@ class PbtExportController extends Controller
 
     private function chair(): Dept_Chair
     {
-        $chair = Dept_Chair::with('user.faculty')
+        $chair = Dept_Chair::with('user.faculty', 'program')
             ->where('dc_usr_id', Auth::id())
             ->first();
 
@@ -624,13 +639,9 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
-
-        // Evening sections NEVER belong on the Day sheet
-        if ($isEveningSection) {
-            return false;
-        }
-
+        // Match the schedule plotter: the scheduled time determines the shift.
+        // A section's sec_is_evening flag can be stale or differ from the
+        // particular schedule being exported.
         return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
             && $start >= 7 * 60
             && $end <= 17 * 60
@@ -642,12 +653,6 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
-
-        if (!$isEveningSection) {
-            return false;
-        }
-
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
             return $start >= (16 * 60) && $end <= 22 * 60;
         }

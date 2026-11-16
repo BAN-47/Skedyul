@@ -367,24 +367,6 @@
         </div>
     </div>
 
-    <!-- MODAL: REVIEW (populated dynamically via openReview()) -->
-    <div class="modal-overlay p-5" id="modal-review">
-        <div class="modal w-[560px]">
-            <div class="modal-header">
-                <div class="modal-title" id="review-title">Schedule Review</div><button class="modal-close"
-                    onclick="closeModal('modal-review')">✕</button>
-            </div>
-            <div class="modal-body" id="review-body">
-                <!-- filled by openReview() -->
-            </div>
-            <div class="modal-footer">
-                <button class="topbar-btn btn-secondary" onclick="closeModal('modal-review')">Close</button>
-                <button class="topbar-btn" style="background:var(--red-light);color:var(--red);"
-                    onclick="closeModal('modal-review');showToast('Schedule returned.')">Return to Chair</button>
-            </div>
-        </div>
-    </div>
-
     <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
     <script>
@@ -575,76 +557,6 @@
             setupReportPagination(`section-report-${index}`, '[data-section-report-row]', group);
         });
 
-        // Replaces hardcoded deptData + openDept()
-        async function openDept(deptId, deptCode, deptName) {
-            const res = await fetch(`/dean/reports/department/${deptId}`);
-            const d = await res.json();
-
-            const facultyRows = d.faculty.map(f => `
-    <tr>
-      <td><b>${f.name}</b></td>
-      <td>${f.rank}</td>
-      <td>${f.employment}</td>
-      <td><span style="font-family:var(--mono);font-weight:700;">${f.load}</span></td>
-      <td><span class="badge">${f.status}</span></td>
-    </tr>`).join('');
-
-            document.getElementById('dept-detail-content').innerHTML = `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:22px;font-weight:800;">${deptCode}</div>
-      <div style="font-size:14px;color:var(--text3);margin-top:2px;">${deptName}</div>
-    </div>
-    <div class="card">
-      <table>
-        <thead><tr><th>Name</th><th>Rank</th><th>Employment</th><th>Load</th><th>Status</th></tr></thead>
-        <tbody>${facultyRows}</tbody>
-      </table>
-    </div>`;
-
-            document.getElementById('dept-list-view').style.display = 'none';
-            document.getElementById('dept-detail-view').style.display = 'block';
-        }
-
-        function closeDept() {
-            document.getElementById('dept-list-view').style.display = 'block';
-            document.getElementById('dept-detail-view').style.display = 'none';
-        }
-
-        // Replaces hardcoded conflict modal
-        async function openReview(sectionId, sectionLabel) {
-            const res = await fetch(`/dean/reports/conflicts/${sectionId}`);
-            const conflicts = await res.json();
-
-            document.getElementById('review-title').textContent = `Schedule Review — ${sectionLabel}`;
-
-            let html = '';
-            if (conflicts.length > 0) {
-                html += `<div style="background:var(--red-light);border:1px solid #fecaca;border-left:4px solid var(--red);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#991b1b;">
-      <strong>${conflicts.length} Conflict(s) Detected</strong></div>`;
-            }
-
-            html +=
-                `<table><thead><tr><th>Faculty</th><th>Subjects</th><th>Day & Time</th><th>Issue</th></tr></thead><tbody>`;
-            conflicts.forEach(c => {
-                html += `<tr>
-      <td><b>${c.faculty}</b></td>
-      <td>${c.subject_a} / ${c.subject_b}</td>
-      <td>${c.day} ${c.time}</td>
-      <td><span class="badge badge-red">Conflict</span></td>
-    </tr>`;
-            });
-            if (conflicts.length === 0) {
-                html += `<tr><td colspan="4" class="text-center">No conflicts found.</td></tr>`;
-            }
-            html += `</tbody></table>
-    <div class="field-group" style="margin-top:16px;">
-      <label class="field-label">Return Note</label>
-      <textarea class="field-input" rows="3" placeholder="Notes for the chair..."></textarea>
-    </div>`;
-
-            document.getElementById('review-body').innerHTML = html;
-            openModal('modal-review');
-        }
     </script>
 </body>
 

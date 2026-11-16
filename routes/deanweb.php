@@ -21,7 +21,7 @@ use App\Http\Controllers\Admin\SectionController;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'audit.activity'])
+Route::middleware(['auth', 'role:dean', 'audit.activity'])
     ->prefix('dean')
     ->name('dean.')
     ->group(function () {
@@ -126,12 +126,12 @@ Route::put(
     '/dean/profile/notification-preferences',
     [DeanSettingsController::class, 'updateNotificationPreferences']
 )
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:dean', 'audit.activity'])
     ->name('dean.profile.notification-preferences.update');
 
 Route::get(
     '/notifications/pending-count',
     [DeanSettingsController::class, 'pendingCount']
 )
-    ->middleware(['auth', 'audit.activity'])
+    ->middleware(['auth', 'role:dean', 'audit.activity'])
     ->name('dean.notifications.pending-count');
