@@ -62,8 +62,8 @@ class PbsExportController extends Controller
             ->where('sch_is_active', true)
             ->when(
                 isset($validated['shift']) && $isEvening,
-                fn ($query) => $query->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
-                fn ($query) => isset($validated['shift'])
+                fn($query) => $query->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                fn($query) => isset($validated['shift'])
                     ? $query->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
                     : $query
             )
@@ -437,15 +437,14 @@ class PbsExportController extends Controller
         $sheet->setCellValue('G48', $collegeDeanName !== '' ? mb_strtoupper($collegeDeanName) : '');
         $sheet->setCellValue('G49', 'Dean' . ($collegeLabel ? ', ' . $collegeLabel : ''));
 
-        $directorCell = $isEvening ? 'J48' : 'K48';
-        $directorRange = $isEvening ? 'J48:M48' : 'K48:M48';
-        // Write to the anchor of the merged signature range. The shared helper
-        // follows the K49 label, which is not the anchor in the evening template.
-        $sheet->setCellValue($directorCell, mb_strtoupper(trim($directorName)));
-        $sheet->getStyle($directorRange)->getAlignment()
+        // Both PBS templates merge the Campus Director name across K48:M48.
+        // Always write to that merged range's anchor and center it without an
+        // indent so the name lines up with the other signatories.
+        $sheet->setCellValue('K48', mb_strtoupper(trim($directorName)));
+        $sheet->getStyle('K48:M48')->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER)
-            ->setIndent(1);
+            ->setIndent(0);
         $sheet->setCellValue('K49', 'Campus Director');
         $sheet->getStyle('K49:M49')->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
