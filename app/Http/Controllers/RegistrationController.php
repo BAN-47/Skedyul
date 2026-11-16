@@ -99,7 +99,8 @@ class RegistrationController extends Controller
             ]);
         }
 
-        $photoPath = $request->file('faculty_id_photo')->store('faculty-id-verification', 'local');
+        $privateDisk = (string) config('filesystems.private_uploads_disk', 'local');
+        $photoPath = $request->file('faculty_id_photo')->store('faculty-id-verification', $privateDisk);
         $fullName = trim(implode(' ', array_filter([
             $data['usr_first_name'],
             $data['usr_middle_name'] ?? null,
@@ -175,7 +176,7 @@ class RegistrationController extends Controller
                 }
             });
         } catch (Throwable $exception) {
-            Storage::disk('local')->delete($photoPath);
+            Storage::disk($privateDisk)->delete($photoPath);
             throw $exception;
         }
 

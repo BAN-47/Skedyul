@@ -307,7 +307,7 @@
                                     <span
                                         class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">
                                         @if ($selectedFaculty?->fac_profile_image)
-                                            <img src="{{ asset('images/faculty_profile/' . $selectedFaculty->fac_profile_image) }}"
+                                            <img src="{{ \App\Services\ProfileImageStorage::url($selectedFaculty->fac_profile_image, 'faculty_profile') }}"
                                                 class="h-full w-full object-cover"
                                                 alt="{{ $selectedFaculty->fac_first_name }} profile photo">
                                         @else
@@ -371,7 +371,7 @@
                                                         <span
                                                             class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-xs font-bold text-slate-600">
                                                             @if ($person->fac_profile_image)
-                                                                <img src="{{ asset('images/faculty_profile/' . $person->fac_profile_image) }}"
+                                                                <img src="{{ \App\Services\ProfileImageStorage::url($person->fac_profile_image, 'faculty_profile') }}"
                                                                     class="h-full w-full object-cover"
                                                                     alt="{{ $pname }} profile photo">
                                                             @else
@@ -545,6 +545,7 @@
                                             style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
                                             data-schedule-id="{{ $s->sch_id }}"
                                             data-subject="{{ $s->sch_subj_id }}" data-section="{{ $s->sch_sec_id }}"
+                                            data-department="{{ $s->section?->sec_dept_id ?? $course?->course_dept_id ?? '' }}"
                                             data-room="{{ $s->sch_room_id }}" data-semester="{{ $s->sch_sem_id }}"
                                             data-day="{{ $s->sch_day }}"
                                             data-start="{{ substr($s->sch_start_time, 0, 5) }}"
@@ -818,17 +819,14 @@
 
                 <div class="mb-3">
                     <label class="field-label">Department</label>
-                    @if (!empty($chairDepartment))
-                        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                            {{ $chairDepartment->dept_code ?? $chairDepartment->prog_code }} —
-                            {{ $chairDepartment->dept_name ?? $chairDepartment->prog_name }}
-                        </div>
-                        <input type="hidden" id="edit-department-id"
-                            value="{{ $chairDepartment->dept_id ?? $chairDepartment->prog_id }}">
-                    @else
-                        <div class="field-input bg-slate-100 font-semibold text-slate-500">No department assigned</div>
-                        <input type="hidden" id="edit-department-id" value="">
-                    @endif
+                    <select id="edit-department" class="field-input w-full">
+                        <option value="">-- Select Department --</option>
+                        @foreach ($allDepartments as $dept)
+                            <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
+                                {{ $dept->dept_code }} — {{ $dept->dept_name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <input type="hidden" id="edit-id">

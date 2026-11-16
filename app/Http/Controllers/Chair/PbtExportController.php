@@ -143,9 +143,9 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $templatePath = storage_path('app/templates/PBT_Template.xlsx');
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBT_Template.xlsx');
 
-        if (!is_file($templatePath)) {
+        if (!$templatePath) {
             throw ValidationException::withMessages([
                 'faculty_id' => 'The PBT Excel template is missing from storage/app/templates.',
             ]);

@@ -188,7 +188,7 @@ class PbtController extends Controller
             return str_contains($t, 'part');
         })->values();
 
-        return response()->view('chair.pbt', [
+        return response()->view('chair.PBT', [
             'schedules'        => $schedules,
             'subjects'         => Course::where('course_is_active', true)
                 ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))

@@ -308,9 +308,10 @@ class ChairFacultyLoadController extends Controller
                 return $load;
             });
         } catch (\Throwable $e) {
+            report($e);
             return response()->json([
                 'success' => false,
-                'message' => 'Could not save assignment: ' . $e->getMessage(),
+                'message' => 'Could not save the assignment. Please try again or contact an administrator.',
             ], 500);
         }
 

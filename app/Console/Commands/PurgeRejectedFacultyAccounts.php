@@ -24,7 +24,7 @@ class PurgeRejectedFacultyAccounts extends Command
             ->chunkById(100, function ($reviews) use (&$deleted) {
                 foreach ($reviews as $review) {
                     if ($review->fvr_id_photo_path) {
-                        Storage::disk('local')->delete($review->fvr_id_photo_path);
+                        Storage::disk((string) config('filesystems.private_uploads_disk', 'local'))->delete($review->fvr_id_photo_path);
                     }
                     $review->delete();
                     $deleted++;

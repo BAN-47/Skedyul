@@ -147,7 +147,7 @@ class AcademicYearController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Could not save: '.$e->getMessage(),
+                'message' => 'Could not save the academic period. Please try again or contact an administrator.',
             ], 500);
         }
 
@@ -331,7 +331,7 @@ class AcademicYearController extends Controller
         } catch (\Throwable $e) {
             report($e);
 
-            return 'Auto-switch failed: '.$e->getMessage();
+            return 'The automatic semester switch failed. Please check the application logs.';
         }
     }
 

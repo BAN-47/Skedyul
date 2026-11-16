@@ -52,7 +52,7 @@
                   <div class="relative shrink-0">
                     <div id="avatar-display"
                       class="w-24 h-24 rounded-full bg-[--navy] flex items-center justify-center text-2xl font-extrabold text-white border-4 border-white shadow-sm overflow-hidden bg-cover bg-center"
-                      @if($chair->dc_profile_image) style="background-image:url('{{ asset('images/chair_profile/' . $chair->dc_profile_image) }}')" @endif>
+                      @if($chair->dc_profile_image) style="background-image:url('{{ \App\Services\ProfileImageStorage::url($chair->dc_profile_image, 'chair_profile') }}')" @endif>
                       @unless($chair->dc_profile_image){{ strtoupper(substr($chair->dc_first_name, 0, 1)) }}@endunless
                     </div>
                     <div class="absolute bottom-0 right-0 w-7 h-7 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer border-2 border-white text-sm font-bold text-white"

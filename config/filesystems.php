@@ -15,6 +15,16 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    // Export templates can live on the local deployment filesystem or in the
+    // configured S3-compatible object store (for example Laravel Cloud storage).
+    'export_templates_disk' => env('EXPORT_TEMPLATES_DISK', 'templates'),
+    'export_templates_prefix' => env('EXPORT_TEMPLATES_PREFIX', ''),
+
+    // Uploads use separate public and private disks so private ID documents
+    // are never exposed through a public URL.
+    'profile_images_disk' => env('PROFILE_IMAGES_DISK', 'public'),
+    'private_uploads_disk' => env('PRIVATE_UPLOADS_DISK', 'local'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
@@ -47,14 +57,20 @@ return [
             'report' => false,
         ],
 
+        'templates' => [
+            'driver' => 'local',
+            'root' => storage_path('app/templates'),
+            'throw' => true,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
-            'region' => env('AWS_DEFAULT_REGION'),
+            'region' => env('AWS_REGION', env('AWS_DEFAULT_REGION')),
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
-            'endpoint' => env('AWS_ENDPOINT'),
+            'endpoint' => env('AWS_ENDPOINT_URL', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,

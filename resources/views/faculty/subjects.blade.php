@@ -126,20 +126,13 @@
     ])
 
     <!-- FACULTY SUBJECTS PAGE -->
-    <div id="page-faculty-subjects" class="page active">
+    <div id="page-faculty-subjects" class="page active faculty-page-enter">
 
       <!-- CARD WRAPPER (Tailwind) -->
       <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
         <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <div>
             <div class="text-base font-bold text-gray-900">My Subjects</div>
-            <div class="text-xs text-gray-500 mt-0.5">
-              @if ($activeSemester)
-                Assigned subjects for {{ $activeSemester->sem_name }}
-              @else
-                No active semester set
-              @endif
-            </div>
           </div>
 
           <!-- DAY / EVENING TOGGLE -->
@@ -178,7 +171,7 @@
                 data-lab="{{ $subj->subj_lab_hours ?? 0 }}"
                 data-room="{{ $entry['room'] }}"
                 data-section="{{ $entry['sections'] }}"
-                data-schedule="{{ $entry['schedules']->map(fn($s) => $s['day'] . ' ' . $s['start'] . '–' . $s['end'])->implode(', ') }}">
+                data-schedule="{{ $entry['schedules']->map(fn($s) => $s['day'] . ' ' . \Illuminate\Support\Carbon::parse($s['start'])->format('g:i A') . '–' . \Illuminate\Support\Carbon::parse($s['end'])->format('g:i A'))->implode(', ') }}">
                 <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><span class="font-mono font-bold text-blue-600">{{ $subj->subj_code ?? 'N/A' }}</span></td>
                 <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><b>{{ $subj->subj_name ?? 'N/A' }}</b></td>
                 <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_units ?? '—' }}</td>
@@ -189,7 +182,7 @@
                 <td class="subj-schedule border-b border-slate-100 px-3.5 py-3 text-xs text-slate-400 dark:border-slate-800">
                   @foreach ($entry['schedules'] as $sched)
                     <div class="sched-row" data-day="{{ $sched['day'] }}" data-start="{{ $sched['start'] }}" data-end="{{ $sched['end'] }}">
-                      {{ $sched['day'] }} {{ $sched['start'] }}–{{ $sched['end'] }}
+                      {{ $sched['day'] }} {{ \Illuminate\Support\Carbon::parse($sched['start'])->format('g:i A') }}–{{ \Illuminate\Support\Carbon::parse($sched['end'])->format('g:i A') }}
                       <span class="sched-status-inline"></span>
                     </div>
                   @endforeach

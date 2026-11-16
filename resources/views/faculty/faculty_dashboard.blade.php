@@ -41,7 +41,7 @@
     ])
 
     <!-- FACULTY DASHBOARD PAGE -->
-    <div id="page-faculty-dashboard" class="page active">
+    <div id="page-faculty-dashboard" class="page active faculty-page-enter">
 
       <!-- Faculty bio slideshow -->
       <div class="relative overflow-hidden rounded-2xl mb-6 px-7 py-6 bg-gradient-to-br from-slate-900 via-blue-900 to-[#1a2d5a]">
@@ -50,7 +50,7 @@
           <div class="flex-1">
             <div class="text-[11px] font-bold text-white/50 uppercase tracking-[1.5px] mb-1.5">Faculty Bio</div>
             @forelse ($facultyBios as $index => $bioFaculty)
-              <article data-faculty-bio-slide data-rank="{{ $bioFaculty->fac_rank ?? '' }}" data-department="{{ $bioFaculty->department->dept_code ?? 'N/A' }}" class="{{ $index === 0 ? '' : 'hidden' }}">
+              <article data-faculty-bio-slide data-rank="{{ $bioFaculty->fac_rank ?? '' }}" data-department="{{ $bioFaculty->program->dept_code ?? 'N/A' }}" class="{{ $index === 0 ? '' : 'hidden' }}">
                 <div class="text-xl leading-snug font-bold text-white mb-2">{{ $bioFaculty->full_name }}</div>
                 <div class="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-white/80">{{ $bioFaculty->fac_bio }}</div>
               </article>
@@ -70,7 +70,7 @@
               @if ($facultyBios->first()->fac_rank)
                 <div class="text-sm font-semibold text-white/80">{{ $facultyBios->first()->fac_rank }}</div>
               @endif
-              <div>Faculty · {{ $facultyBios->first()->department->dept_code ?? 'N/A' }} Dept</div>
+              <div>Faculty · {{ $facultyBios->first()->program->dept_code ?? 'N/A' }} Dept</div>
             @endif
           </div>
         </div>

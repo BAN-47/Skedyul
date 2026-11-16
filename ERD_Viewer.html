@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Skedyul Database ERD</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad: true });</script>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f8fafc; }
+        .container { background: white; padding: 30px; border-radius: 12px; shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 90%; max-width: 1200px; }
+        h1 { color: #1e293b; }
+    </style>
+</head>
+<body>
+    <h1>Skedyul - Entity Relationship Diagram</h1>
+    <div class="container">
+        <pre class="mermaid">
+erDiagram
+    %% ═══════════════════════════════════════════════
+    %% IDENTITY & AUTH
+    %% ═══════════════════════════════════════════════
+    USER {
+        uuid usr_id PK
+        string usr_name
+        string usr_first_name
+        string usr_middle_name
+        string usr_last_name
+        string usr_suffix
+        string usr_email
+        string usr_password_hash
+        string usr_role
+        boolean usr_is_active
+        int usr_failed_login_attempts
+        datetime usr_locked_until
+    }
+
+    WEBAUTHN_CREDENTIALS {
+        uuid id PK
+        uuid usr_id FK
+        string credential_id
+        text public_key
+        int sign_count
+        json transports
+        string device_name
+        json credential_record
+        datetime created_at
+        datetime last_used_at
+    }
+
+    BIOMETRIC_CREDENTIAL {
+        uuid bio_id PK
+        uuid bio_usr_id FK
+        string bio_fingerprint_hash
+        datetime bio_registered_at
+        boolean bio_is_active
+    }
+
+    TOKEN_BLACKLIST {
+        uuid tbl_id PK
+        uuid tbl_usr_id FK
+        string tbl_token
+        datetime tbl_revoked_at
+    }
+
+    AUDIT_LOG {
+        uuid al_id PK
+        uuid al_usr_id FK
+        string al_action
+        string al_target_table
+        string al_target_id
+        text al_description
+        string al_ip_address
+        datetime al_created_at
+    }
+
+    NOTIFICATION {
+        uuid notif_id PK
+        uuid notif_usr_id FK
+        string notif_title
+        text notif_message
+        string notif_type
+        boolean notif_is_read
+        datetime notif_created_at
+        datetime notif_updated_at
+    }
+
+    FACULTY_ACCOUNT_REVIEWS {
+        uuid fvr_id PK
+        uuid fvr_usr_id FK
+        string fvr_id_photo_path
+        string fvr_status
+        string fvr_applicant_name
+        string fvr_applicant_email
+        text fvr_decision_note
+        uuid fvr_reviewed_by FK
+        datetime fvr_reviewed_at
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% ROLE PROFILES
+    %% ═══════════════════════════════════════════════
+    FACULTY {
+        uuid fac_id PK
+        uuid fac_usr_id FK
+        uuid fac_college_id FK
+        uuid fac_dept_id FK
+        string fac_first_name
+        string fac_middle_name
+        string fac_last_name
+        string fac_suffix
+        string fac_employee_id
+        string fac_gender
+        string fac_civil_status
+        date fac_dob
+        string fac_nationality
+        string fac_phone_number
+        text fac_address
+        string fac_employment_type
+        string fac_rank
+        string fac_special_position
+        int fac_special_position_max_hours
+        string fac_bachelors_degree
+        string fac_masters_degree
+        string fac_doctorate_degree
+        string fac_bachelors_abbr
+        string fac_masters_abbr
+        string fac_doctorate_abbr
+        string fac_profile_image
+        text fac_bio
+        datetime fac_created_at
+        datetime fac_updated_at
+    }
+
+    DEAN {
+        uuid dean_id PK
+        uuid dean_usr_id FK
+        uuid dean_college_id FK
+        uuid dean_dept_id FK
+        string dean_first_name
+        string dean_middle_name
+        string dean_last_name
+        string dean_suffix
+        string dean_employee_id
+        string dean_gender
+        string dean_civil_status
+        date dean_dob
+        string dean_nationality
+        string dean_phone_number
+        text dean_address
+        string dean_profile_image
+        text dean_bio
+        datetime dean_assigned_at
+    }
+
+    DEPARTMENT_CHAIR {
+        uuid dc_id PK
+        uuid dc_usr_id FK
+        uuid dc_college_id FK
+        uuid dc_dept_id FK
+        string dc_first_name
+        string dc_middle_name
+        string dc_last_name
+        string dc_suffix
+        string dc_employee_id
+        string dc_gender
+        string dc_civil_status
+        date dc_dob
+        string dc_nationality
+        string dc_phone_number
+        text dc_address
+        string dc_profile_image
+        text dc_bio
+    }
+
+    FAC_SPECIALIZATION {
+        uuid fspec_id PK
+        uuid fspec_fac_id FK
+        string fspec_specialization
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% ORGANIZATION
+    %% ═══════════════════════════════════════════════
+    INSTITUTION {
+        uuid inst_id PK
+        string inst_name
+        string inst_branch_campus
+        string inst_college
+        string inst_abbreviation
+        string inst_contact_email
+        string inst_phone
+        datetime inst_created_at
+        datetime inst_updated_at
+    }
+
+    COLLEGE {
+        uuid college_id PK
+        string college_name
+        string college_code
+        datetime college_created_at
+    }
+
+    DEPARTMENT {
+        uuid dept_id PK
+        uuid dept_college_id FK
+        string dept_name
+        string dept_code
+        datetime dept_created_at
+    }
+
+    COURSE {
+        uuid course_id PK
+        uuid course_college_id FK
+        uuid course_dept_id FK
+        string course_code
+        string course_name
+        decimal course_units
+        decimal course_lecture_hours
+        decimal course_lab_hours
+        int course_year_level
+        string course_semester
+        boolean course_is_active
+        string course_category
+        datetime course_created_at
+        datetime course_updated_at
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% ACADEMIC CALENDAR
+    %% ═══════════════════════════════════════════════
+    ACADEMIC_YEAR {
+        uuid ay_id PK
+        string ay_academic_year
+        string ay_year_label
+        boolean ay_is_active
+        datetime ay_created_at
+    }
+
+    SEMESTER {
+        uuid sem_id PK
+        uuid sem_ay_id FK
+        string sem_name
+        date sem_start_date
+        date sem_end_date
+        boolean sem_is_active
+        boolean sem_is_plotting_enabled
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% SECTIONS & LOADS
+    %% ═══════════════════════════════════════════════
+    SECTION {
+        uuid sec_id PK
+        uuid sec_dept_id FK
+        uuid sec_ay_id FK
+        uuid sec_sem_id FK
+        string sec_name
+        int sec_year_level
+        boolean sec_is_evening
+        int sec_no_of_student
+        int sec_max_capacity
+        string sec_status
+        datetime sec_created_at
+        datetime sec_updated_at
+    }
+
+    SECTION_COURSE {
+        uuid ssub_id PK
+        uuid ssub_sec_id FK
+        uuid ssub_subj_id FK
+    }
+
+    STUDY_LOAD {
+        uuid sl_id PK
+        uuid sl_fac_id FK
+        uuid sl_course_id FK
+        uuid sl_sec_id FK
+        uuid sl_sem_id FK
+        string sl_shift
+        boolean sl_ojt_is_evening
+        uuid sl_assigned_by FK
+        datetime sl_assigned_at
+    }
+
+    WORKLOAD {
+        uuid wl_id PK
+        uuid wl_fac_id FK
+        uuid wl_sem_id FK
+        uuid wl_ay_id FK
+        string wl_type
+        decimal wl_total_hours
+        datetime wl_created_at
+        datetime wl_updated_at
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% SCHEDULING
+    %% ═══════════════════════════════════════════════
+    ROOM {
+        uuid room_id PK
+        uuid room_college_id FK
+        string room_name
+        string room_building
+        string room_type
+        int room_capacity
+        boolean room_is_available
+        datetime room_created_at
+        datetime room_updated_at
+    }
+
+    SCHEDULE {
+        uuid sch_id PK
+        uuid sch_load_id FK
+        uuid sch_fac_id FK
+        uuid sch_course_id FK
+        uuid sch_sec_id FK
+        uuid sch_room_id FK
+        uuid sch_sem_id FK
+        string sch_day
+        string sch_shift
+        time sch_start_time
+        time sch_end_time
+        string sch_time_range
+        string sch_status
+        boolean sch_is_active
+        uuid sch_created_by FK
+        string sch_mis_code
+        datetime sch_created_at
+        datetime sch_updated_at
+    }
+
+    PBS_SCHEDULE {
+        uuid pbs_id PK
+        uuid pbs_subj_id FK
+        uuid pbs_fac_id FK
+        uuid pbs_sec_id FK
+        uuid pbs_room_id FK
+        uuid pbs_sem_id FK
+        uuid pbs_created_by FK
+        string pbs_day
+        time pbs_start_time
+        time pbs_end_time
+        text pbs_description
+        string pbs_status
+        boolean pbs_is_active
+        datetime pbs_created_at
+        datetime pbs_updated_at
+    }
+
+    SCHEDULE_SUBMISSION {
+        uuid schsub_id PK
+        uuid schsub_dept_id FK
+        uuid schsub_fac_id FK
+        string schsub_type
+        uuid schsub_sec_id FK
+        uuid schsub_sem_id FK
+        uuid schsub_submitted_by FK
+        datetime schsub_submitted_at
+        uuid schsub_reviewed_by FK
+        datetime schsub_reviewed_at
+        string schsub_status
+        text schsub_remarks
+        json schsub_schedule_snapshot
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% SYSTEM
+    %% ═══════════════════════════════════════════════
+    SYSTEM_SETTING {
+        uuid sset_id PK
+        string sset_key
+        text sset_value
+        uuid sset_updated_by FK
+        datetime sset_updated_at
+    }
+
+    SYSTEM_BACKUP {
+        uuid bkp_id PK
+        string bkp_file_path
+        string bkp_status
+        text bkp_error_message
+        datetime bkp_ran_at
+    }
+
+    %% ═══════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════
+
+    %% User ↔ Auth / Security
+    USER ||--o{ WEBAUTHN_CREDENTIALS : "has"
+    USER ||--o{ BIOMETRIC_CREDENTIAL : "has"
+    USER ||--o{ TOKEN_BLACKLIST : "has"
+    USER ||--o{ AUDIT_LOG : "performs"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o| FACULTY_ACCOUNT_REVIEWS : "applies"
+    USER ||--o{ FACULTY_ACCOUNT_REVIEWS : "reviews"
+
+    %% User ↔ Role Profiles (1:1)
+    USER ||--o| FACULTY : "is"
+    USER ||--o| DEAN : "is"
+    USER ||--o| DEPARTMENT_CHAIR : "is"
+
+    %% Organizational hierarchy
+    COLLEGE ||--o{ DEPARTMENT : "contains"
+    COLLEGE ||--o{ FACULTY : "employs"
+    COLLEGE ||--o{ COURSE : "owns"
+    COLLEGE ||--o{ DEPARTMENT_CHAIR : "has"
+    COLLEGE ||--o{ ROOM : "has"
+    COLLEGE ||--o{ DEAN : "led_by"
+
+    DEPARTMENT ||--o{ FACULTY : "has"
+    DEPARTMENT ||--o{ COURSE : "offers"
+    DEPARTMENT ||--o{ SECTION : "has"
+    DEPARTMENT ||--o{ SCHEDULE_SUBMISSION : "submits"
+    DEPARTMENT ||--o{ DEPARTMENT_CHAIR : "chaired_by"
+
+    %% Academic calendar
+    ACADEMIC_YEAR ||--o{ SEMESTER : "contains"
+    ACADEMIC_YEAR ||--o{ SECTION : "has"
+    ACADEMIC_YEAR ||--o{ WORKLOAD : "for"
+
+    SEMESTER ||--o{ SECTION : "has"
+    SEMESTER ||--o{ STUDY_LOAD : "in"
+    SEMESTER ||--o{ WORKLOAD : "for"
+    SEMESTER ||--o{ SCHEDULE : "in"
+    SEMESTER ||--o{ PBS_SCHEDULE : "in"
+    SEMESTER ||--o{ SCHEDULE_SUBMISSION : "for"
+
+    %% Faculty related
+    FACULTY ||--o{ FAC_SPECIALIZATION : "has"
+    FACULTY ||--o{ STUDY_LOAD : "assigned"
+    FACULTY ||--o{ WORKLOAD : "has"
+    FACULTY ||--o{ SCHEDULE : "teaches"
+    FACULTY ||--o{ PBS_SCHEDULE : "teaches"
+    FACULTY ||--o{ SCHEDULE_SUBMISSION : "for"
+
+    %% Courses & Sections
+    COURSE ||--o{ STUDY_LOAD : "in"
+    COURSE ||--o{ SCHEDULE : "scheduled"
+    COURSE ||--o{ PBS_SCHEDULE : "scheduled"
+    COURSE ||--o{ SECTION_COURSE : "linked"
+
+    SECTION ||--o{ SECTION_COURSE : "has"
+    SECTION ||--o{ STUDY_LOAD : "has"
+    SECTION ||--o{ SCHEDULE : "has"
+    SECTION ||--o{ PBS_SCHEDULE : "has"
+    SECTION ||--o{ SCHEDULE_SUBMISSION : "for"
+
+    %% Loads → Schedules
+    STUDY_LOAD ||--o{ SCHEDULE : "generates"
+
+    %% Rooms
+    ROOM ||--o{ SCHEDULE : "used_in"
+    ROOM ||--o{ PBS_SCHEDULE : "used_in"
+
+    %% Created / Assigned by
+    USER ||--o{ STUDY_LOAD : "assigns"
+    USER ||--o{ SCHEDULE : "creates"
+    USER ||--o{ PBS_SCHEDULE : "creates"
+    USER ||--o{ SCHEDULE_SUBMISSION : "submits"
+    USER ||--o{ SCHEDULE_SUBMISSION : "reviews"
+    USER ||--o{ SYSTEM_SETTING : "updates"
+        </pre>
+    </div>
+</body>
+</html>

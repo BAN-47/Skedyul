@@ -7,7 +7,7 @@ use App\Http\Controllers\Faculty\FacultyScheduleController;
 use App\Http\Controllers\Faculty\FacultySettingsController;
 use App\Http\Controllers\Faculty\PbtExportController;
 
-Route::middleware('auth')
+Route::middleware(['auth', 'role:faculty'])
     ->prefix('faculty')
     ->name('faculty.')
     ->group(function () {

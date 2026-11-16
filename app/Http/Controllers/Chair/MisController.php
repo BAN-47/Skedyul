@@ -211,10 +211,10 @@ class MisController extends Controller
      */
     public function exportWord(Request $request)
     {
-        $templatePath = storage_path('app/templates/MIS_Template.docx');
+        $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('MIS_Template.docx');
 
         abort_unless(
-            is_file($templatePath),
+            $templatePath,
             500,
             'MIS Word template was not found at storage/app/templates/MIS_Template.docx.'
         );

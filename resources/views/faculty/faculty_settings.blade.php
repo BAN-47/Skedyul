@@ -21,7 +21,7 @@
       @include('partials.faculty_header', ['title' => 'Settings'])
 
       <!-- FACULTY SETTINGS PAGE -->
-      <div id="page-faculty-settings" class="page active">
+      <div id="page-faculty-settings" class="page active faculty-page-enter">
         <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <div class="rounded-[14px] border border-slate-200 bg-white py-3 dark:border-slate-800 dark:bg-slate-900">
             <div class="px-5 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[1px] text-slate-400">Settings</div>
@@ -42,7 +42,7 @@
                 </div>
                 <div class="flex items-center gap-6 py-2">
                   <div class="relative shrink-0">
-                    <div id="fac-pic-preview" data-initials="{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}" data-avatar-url="{{ $faculty->fac_profile_image ? asset('images/faculty_profile/' . $faculty->fac_profile_image) : '' }}" class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-slate-200 bg-slate-100 text-[28px] font-extrabold text-green-600 dark:border-slate-700 dark:bg-slate-800">@if ($faculty->fac_profile_image)<img src="{{ asset('images/faculty_profile/' . $faculty->fac_profile_image) }}" class="h-full w-full object-cover" alt="Profile photo">@else{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}@endif</div>
+                    <div id="fac-pic-preview" data-initials="{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}" data-avatar-url="{{ $faculty->fac_profile_image ? \App\Services\ProfileImageStorage::url($faculty->fac_profile_image, 'faculty_profile') : '' }}" class="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-[3px] border-slate-200 bg-slate-100 text-[28px] font-extrabold text-green-600 dark:border-slate-700 dark:bg-slate-800">@if ($faculty->fac_profile_image)<img src="{{ \App\Services\ProfileImageStorage::url($faculty->fac_profile_image, 'faculty_profile') }}" class="h-full w-full object-cover" alt="Profile photo">@else{{ strtoupper(substr($faculty->fac_first_name ?? '', 0, 1) . substr($faculty->fac_last_name ?? '', 0, 1)) }}@endif</div>
                     <button type="button" aria-label="Choose profile photo" onclick="document.getElementById('fac-pic-upload').click()" class="absolute bottom-0 right-0 flex h-[30px] w-[30px] cursor-pointer items-center justify-center rounded-full border-2 border-white bg-blue-600 text-[13px] text-white dark:border-slate-900">+</button>
                     <input type="file" id="fac-pic-upload" accept="image/*" class="hidden" onchange="facPreviewPic(this)">
                   </div>
@@ -1734,7 +1734,14 @@ function facSavePersonalInfo() {
     function showFacSettingsSection(section, el) {
       ['profile', 'security', 'notifications'].forEach(s => {
         const elem = document.getElementById('fac-settings-' + s);
-        if (elem) elem.classList.toggle('hidden', s !== section);
+        if (elem) {
+          elem.classList.toggle('hidden', s !== section);
+          if (s === section) {
+            elem.classList.remove('faculty-page-enter');
+            void elem.offsetWidth;
+            elem.classList.add('faculty-page-enter');
+          }
+        }
       });
       const activeClasses = ['bg-blue-50', 'text-blue-600', 'font-semibold', 'border-blue-600', 'dark:bg-blue-950/40', 'dark:text-blue-400', 'dark:border-blue-500'];
       const inactiveClasses = ['border-transparent', 'font-medium', 'text-slate-600', 'dark:text-slate-400'];
