@@ -24,10 +24,15 @@
                 <h1 class="mt-12 text-l font-extrabold sm:text-2xl text-start">Complete your profile</h1>
                 <p class="mt-2 text-sm leading-relaxed text-blue-100 text-start">Your account is approved. Save your education information before entering your dashboard.</p>
             </div>
-            <form class="space-y-5 p-6 sm:p-9" method="POST" action="{{ request()->fullUrl() }}">
+            <form class="space-y-5 p-6 sm:p-9" method="POST" enctype="multipart/form-data" action="{{ request()->fullUrl() }}">
                 @csrf
                 @if(session('warning'))<div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{{ session('warning') }}</div>@endif
                 @if($errors->any())<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
+                <div>
+                    <label for="profile_photo" class="mb-2 block text-sm font-bold text-slate-700">Profile Photo <span class="font-medium text-slate-400">(optional)</span></label>
+                    <input id="profile_photo" name="profile_photo" type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-100 file:px-3 file:py-2 file:text-sm file:font-bold file:text-blue-700">
+                    <p class="mt-1 text-xs text-slate-500">JPG, PNG, or WEBP; maximum 2 MB. The photo will appear on your profile.</p>
+                </div>
                 @foreach([
                     'bachelors' => ["Bachelor's Degree", 'Bachelor of Science in Information Systems', 'BSIS', true],
                     'masters' => ["Master's Degree", 'Master of Information Technology', 'MIT', $faculty->fac_employment_type === 'full_time'],

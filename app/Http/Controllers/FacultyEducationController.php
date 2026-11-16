@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Faculty;
+use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class FacultyEducationController extends Controller
 {
@@ -49,7 +51,21 @@ class FacultyEducationController extends Controller
                 'string',
                 'max:60',
             ],
+            'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
+
+        $profilePhoto = $data['profile_photo'] ?? null;
+        unset($data['profile_photo']);
+
+        if ($profilePhoto) {
+            $filename = $faculty->fac_id.'_'.Str::uuid().'.'.$profilePhoto->getClientOriginalExtension();
+            abort_unless(
+                ProfileImageStorage::store($profilePhoto, 'faculty_profile', $filename),
+                500,
+                'Could not save the profile photo.'
+            );
+            $data['fac_profile_image'] = $filename;
+        }
 
         $faculty->update($data);
         Auth::login($faculty->user);
