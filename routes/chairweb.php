@@ -14,7 +14,7 @@ use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
 
-Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function () {
+Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
     Route::get('/dashboard', [ChairController::class, 'index'])->name('chair.dashboard');
     Route::get('/notifications', [ChairSettingsController::class, 'notificationsList'])->name('chair.notifications.index');
@@ -78,7 +78,7 @@ Route::middleware(['auth', 'audit.activity'])->prefix('chair')->group(function (
     })->name('chair.settings');
 });
 
-Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function () {
+Route::prefix('chair')->middleware(['auth', 'role:department_chair', 'audit.activity'])->group(function () {
     Route::post('/profile/avatar', [ChairSettingsController::class, 'updateAvatar'])->name('chair.profile.avatar.update');
     Route::delete('/profile/avatar', [ChairSettingsController::class, 'removeAvatar'])->name('chair.profile.avatar.remove');
     Route::put('/profile/personal-info', [ChairSettingsController::class, 'updatePersonalInfo'])->name('chair.profile.personal-info.update');
@@ -88,4 +88,6 @@ Route::prefix('chair')->middleware(['auth', 'audit.activity'])->group(function (
     Route::put('/security', [ChairSettingsController::class, 'updateSecuritySettings'])->name('chair.security.update');
 });
 
-Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])->name('chair.settings');
+Route::get('/chair/settings', [ChairSettingsController::class, 'settings'])
+    ->middleware(['auth', 'role:department_chair', 'audit.activity'])
+    ->name('chair.settings');
