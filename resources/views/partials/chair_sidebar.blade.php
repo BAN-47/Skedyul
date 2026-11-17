@@ -39,7 +39,7 @@
         </a>
 
 
-        <a href="{{ route('chair.mis') }}" class="nav-item {{ request()->routeIs('chair.mis_code') ? 'active' : '' }}">
+        <a href="{{ route('chair.mis') }}" class="nav-item {{ request()->routeIs('chair.mis') ? 'active' : '' }}">
             <span class="nav-icon"></span> MIS Code
         </a>
 

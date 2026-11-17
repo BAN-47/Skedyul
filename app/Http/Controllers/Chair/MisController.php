@@ -117,7 +117,7 @@ class MisController extends Controller
         $campusDirector = SystemSetting::get('campus_director_name', '');
 
         if (!$deptId) {
-            return view('chair.mis', [
+            return view('chair.MIS', [
                 'sections' => collect(),
                 'groupedRows' => collect(),
                 'activeSemester' => $activeSem,
@@ -184,7 +184,7 @@ class MisController extends Controller
                 ?? 'Unassigned'
         );
 
-        return view('chair.mis', [
+        return view('chair.MIS', [
             'sections' => $sections,
             'groupedRows' => $groupedRows,
             'activeSemester' => $activeSem,

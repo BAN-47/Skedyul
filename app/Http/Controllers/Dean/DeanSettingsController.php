@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Dean;
 use App\Models\Dean;
 use App\Models\Faculty;
 use App\Models\SystemSetting;
-use App\Models\Schedule;
+use App\Models\Schedule_Submission;
+use App\Models\Semester;
 use App\Http\Controllers\Controller;
 use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
@@ -226,8 +227,29 @@ class DeanSettingsController extends Controller
 
     public function pendingCount()
     {
+        $dean = $this->currentDean();
+        $activeSemester = Semester::where('sem_is_active', true)->first();
+
+        $query = Schedule_Submission::query()
+            ->where('schsub_status', 'pending')
+            ->whereIn('schsub_type', ['pbt', 'pbs'])
+            ->whereHas(
+                'department',
+                fn ($departmentQuery) => $departmentQuery->where(
+                    'dept_college_id',
+                    $dean->dean_college_id
+                )
+            )
+            ->when(
+                $activeSemester,
+                fn ($submissionQuery) => $submissionQuery->where(
+                    'schsub_sem_id',
+                    $activeSemester->sem_id
+                )
+            );
+
         return response()->json([
-            'count' => Schedule::where('status', 'pending')->count(),
+            'count' => $query->count(),
         ]);
     }
 }
