@@ -37,6 +37,10 @@ class ChairController extends Controller
         // ---------- ACADEMIC CONTEXT ----------
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
+        $timetableTerm = trim(collect([
+            $semester?->sem_name,
+            $academicYear?->ay_academic_year ? 'AY ' . $academicYear->ay_academic_year : null,
+        ])->filter()->implode(' · '));
 
         // ---------- FACULTY IN THIS DEPARTMENT ----------
         // Scoped down to the chair's specific program (fac_prog_id) when they
@@ -74,6 +78,7 @@ class ChairController extends Controller
             ->get()
             ->groupBy('sl_fac_id');
 
+        // ---------- LEADERS & LOAD ANALYTICS ----------
         $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
             $allLoads = $studyLoadsByFaculty->get($f->fac_id, collect());
 
@@ -89,6 +94,7 @@ class ChairController extends Controller
                 $hoursAgainstLimit = $combinedHours ?? $shiftHours;
                 $remaining = max(0, $maxHours - $hoursAgainstLimit);
                 $percent = min(100, (int) round(($hoursAgainstLimit / max(1, $maxHours)) * 100));
+
                 $status = match (true) {
                     $hoursAgainstLimit > $maxHours => 'Overload',
                     $hoursAgainstLimit >= $maxHours => 'Full',
@@ -110,53 +116,155 @@ class ChairController extends Controller
             return [
                 'fac_id' => $f->fac_id,
                 'name' => trim($f->fac_first_name . ' ' . $f->fac_last_name),
+                'rank' => $f->fac_rank,
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
                 'day' => $shifts['day'],
                 'evening' => $shifts['evening'],
+                'classes' => $allLoads->unique(fn ($load) => (string) $load->sl_course_id . '|' . (string) $load->sl_sec_id)->count(),
+                'total_plotted' => $shifts['day']['hours'] + $shifts['evening']['hours'],
             ];
         })->values();
+
+        // Reindex after sorting: collection sorting preserves original keys,
+        // but the dashboard uses these keys as the three medal ranks.
+        $topFaculty = $facultyLoad->sortByDesc('total_plotted')->take(3)->values();
+
+        $topFacultyIds = $topFaculty->pluck('fac_id');
+        $topFacultySchedules = Schedule::query()
+            ->where('sch_is_active', true)
+            ->where(function ($query) use ($topFacultyIds) {
+                $query->whereIn('sch_fac_id', $topFacultyIds)
+                    ->orWhereHas('studyLoad', fn ($load) => $load->whereIn('sl_fac_id', $topFacultyIds));
+            })
+            ->when($semester, function ($query) use ($semester) {
+                $query->where(function ($semesterQuery) use ($semester) {
+                    $semesterQuery->where('sch_sem_id', $semester->sem_id)
+                        ->orWhereHas('studyLoad', fn ($load) => $load->where('sl_sem_id', $semester->sem_id));
+                });
+            }, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['course', 'subject', 'section', 'room', 'studyLoad.subject', 'studyLoad.section'])
+            ->orderBy('sch_start_time')
+            ->get()
+            ->map(function (Schedule $schedule) {
+                $load = $schedule->studyLoad;
+                $course = $schedule->course ?? $schedule->subject ?? $load?->subject;
+                $section = $schedule->section ?? $load?->section;
+                // Rooms belong to schedules; Study_Load has no room relation.
+                $room = $schedule->room;
+                $shiftValue = strtolower((string) ($schedule->sch_shift ?? ''));
+                $isEvening = str_contains($shiftValue, 'even')
+                    || $shiftValue === 'night'
+                    || ($shiftValue === '' && (bool) $section?->sec_is_evening);
+
+                return [
+                    'faculty_id' => (string) ($schedule->sch_fac_id ?? $load?->sl_fac_id ?? ''),
+                    'day' => (string) ($schedule->sch_day ?? ''),
+                    'start' => $schedule->sch_start_time ? \Illuminate\Support\Carbon::parse($schedule->sch_start_time)->format('g:i A') : '',
+                    'end' => $schedule->sch_end_time ? \Illuminate\Support\Carbon::parse($schedule->sch_end_time)->format('g:i A') : '',
+                    'shift' => $isEvening ? 'evening' : 'day',
+                    'course_code' => (string) ($course?->course_code ?? 'Course'),
+                    'course_name' => (string) ($course?->course_name ?? ''),
+                    'section' => (string) ($section?->sec_name ?? 'Section not set'),
+                    'section_id' => (string) ($schedule->sch_sec_id ?? $load?->sl_sec_id ?? ''),
+                    'department_id' => (string) ($section?->sec_dept_id ?? ''),
+                    'room' => (string) ($room?->room_name ?? 'Room not set'),
+                    'room_id' => (string) ($schedule->sch_room_id ?? ''),
+                ];
+            })
+            ->groupBy('faculty_id')
+            ->map(fn ($schedules) => $schedules->values());
 
         // ---------- SECTIONS IN THIS DEPARTMENT'S PROGRAMS ----------
         // Also narrowed to the chair's specific program when they have one,
         // same reasoning as $faculty above.
         $section = Section::with('program')
-            ->whereHas('program', fn($q) => $q->where('dept_college_id', $deptId))
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('sec_dept_id', $deptChair->dc_prog_id))
-            ->when($academicYear, fn($q) => $q->where('sec_ay_id', $academicYear->ay_id))
-            ->when($semester, fn($q) => $q->where('sec_sem_id', $semester->sem_id))
+            ->when($programId, fn ($query) => $query->where('sec_dept_id', $programId), fn ($query) => $query->whereRaw('1 = 0'))
             ->get();
 
         $totalSections = $section->count();
 
-        // ---------- SUBJECTS FOR THIS DEPARTMENT ----------
-        // Same fix again: subj_prog_id narrows this to the chair's program.
-        $subject = Course::where('course_college_id', $deptId)
-            ->when($deptChair->dc_prog_id, fn($q) => $q->where('course_dept_id', $deptChair->dc_prog_id))
-            ->get();
-        $totalSubjects = $subject->count();
-
-        $plottedSubjIds = $semester
-            ? Study_Load::where('sl_sem_id', $semester->sem_id)
-            ->whereIn('sl_course_id', $subject->pluck('course_id'))
-            ->distinct()
-            ->pluck('sl_course_id')
-            : collect();
-
-        $subjectsPlotted = $plottedSubjIds->count();
+        // Count department sections that have an active scheduled class this term.
+        $sectionsPlotted = $semester && $programId
+            ? Schedule::query()
+                ->where('sch_is_active', true)
+                ->where(function ($query) use ($semester) {
+                    $query->where('sch_sem_id', $semester->sem_id)
+                        ->orWhereHas('studyLoad', fn ($load) => $load->where('sl_sem_id', $semester->sem_id));
+                })
+                ->where(function ($query) use ($programId) {
+                    $query->whereHas('section', fn ($section) => $section->where('sec_dept_id', $programId))
+                        ->orWhereHas('studyLoad.section', fn ($section) => $section->where('sec_dept_id', $programId));
+                })
+                ->with(['section', 'studyLoad.section'])
+                ->get()
+                ->map(fn ($schedule) => $schedule->sch_sec_id ?? $schedule->studyLoad?->sl_sec_id)
+                ->filter()
+                ->unique()
+                ->count()
+            : 0;
 
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        $scheduleCountsByDay = Schedule::query()
-            ->whereIn('sch_fac_id', $faculty->pluck('fac_id'))
+        $weeklySchedules = Schedule::query()
+            ->where(function ($query) use ($faculty) {
+                $query->whereIn('sch_fac_id', $faculty->pluck('fac_id'))
+                    ->orWhereHas('studyLoad', fn ($load) => $load->whereIn('sl_fac_id', $faculty->pluck('fac_id')));
+            })
             ->where('sch_is_active', true)
-            ->when($semester, fn ($query) => $query->where('sch_sem_id', $semester->sem_id))
-            ->select('sch_day', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
-            ->groupBy('sch_day')
-            ->pluck('total', 'sch_day');
-        $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
-            'day' => substr($day, 0, 3),
-            'count' => (int) ($scheduleCountsByDay[$day] ?? 0),
-        ]);
+            ->when($semester, function ($query) use ($semester) {
+                $query->where(function ($semesterQuery) use ($semester) {
+                    $semesterQuery->where('sch_sem_id', $semester->sem_id)
+                        ->orWhereHas('studyLoad', fn ($load) => $load->where('sl_sem_id', $semester->sem_id));
+                });
+            }, fn ($query) => $query->whereRaw('1 = 0'))
+            ->with(['room', 'section', 'studyLoad.section'])
+            ->get();
+        $weeklyScheduleCounts = collect($weekDays)->map(function ($day) use ($weeklySchedules) {
+            $daySchedules = $weeklySchedules->filter(fn ($schedule) => strtolower((string) $schedule->sch_day) === strtolower($day));
+            $hours = $daySchedules->sum(function ($schedule) {
+                if (!$schedule->sch_start_time || !$schedule->sch_end_time) return 0;
+                $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                if ($end->lessThanOrEqualTo($start)) $end->addDay();
+                return max(0, $start->diffInMinutes($end) / 60);
+            });
+            $classCount = $daySchedules->count();
+            $roomSchedules = $daySchedules->whereNotNull('sch_room_id')->groupBy('sch_room_id');
+            $roomBreakdown = $roomSchedules->map(function ($schedules, $roomId) {
+                $room = $schedules->first()?->room;
+                $sectionIds = $schedules->map(fn ($schedule) => $schedule->sch_sec_id ?? $schedule->studyLoad?->sl_sec_id)->filter()->unique();
+                return [
+                    'room' => (string) ($room?->room_name ?? 'Room'),
+                    'sections' => $sectionIds->count(),
+                ];
+            })->sortByDesc('sections')->values();
+            $occupiedSectionCount = $roomSchedules->flatten(1)
+                ->map(fn ($schedule) => $schedule->sch_sec_id ?? $schedule->studyLoad?->sl_sec_id)
+                ->filter()->unique()->count();
+
+            return [
+                'day' => substr($day, 0, 3),
+                'name' => $day,
+                'count' => $classCount,
+                'hours' => round($hours, 1),
+                'rooms' => $roomSchedules->count(),
+                'occupied_sections' => $occupiedSectionCount,
+                'room_breakdown' => $roomBreakdown,
+                'room_percent' => $classCount ? (int) round($occupiedSectionCount / $classCount * 100) : 0,
+            ];
+        });
+        $weeklyRoomGroups = $weeklySchedules->whereNotNull('sch_room_id')->groupBy('sch_room_id');
+        $topOccupiedRoom = $weeklyRoomGroups->map(function ($schedules) {
+            $first = $schedules->first();
+            $sectionIds = $schedules->map(fn ($schedule) => $schedule->sch_sec_id ?? $schedule->studyLoad?->sl_sec_id)->filter()->unique();
+            return ['name' => $first?->room?->room_name ?? 'Room', 'sections' => $sectionIds->count()];
+        })->sortByDesc('sections')->first();
+        $roomUtilSummary = [
+            'occupied_sections' => $weeklySchedules->filter(fn ($schedule) => $schedule->sch_room_id)
+                ->map(fn ($schedule) => $schedule->sch_sec_id ?? $schedule->studyLoad?->sl_sec_id)->filter()->unique()->count(),
+            'top_room_name' => $topOccupiedRoom['name'] ?? 'No room assigned',
+            'top_room_sections' => $topOccupiedRoom['sections'] ?? 0,
+        ];
 
         // ---------- NOTIFICATIONS (drives the bell panel + Conflicts stat) ----------
         $notifications = Notification::where('notif_usr_id', $user->usr_id)
@@ -184,15 +292,17 @@ class ChairController extends Controller
             'deptChair',
             'academicYear',
             'semester',
+            'timetableTerm',
             'faculty',
             'totalFaculty',
             'facultyLoad',
             'weeklyScheduleCounts',
+            'roomUtilSummary',
             'section',
             'totalSections',
-            'subject',
-            'totalSubjects',
-            'subjectsPlotted',
+            'sectionsPlotted',
+            'topFaculty',
+            'topFacultySchedules',
             'notifications',
             'unreadCount',
             'facultyAtMaxLoadCount',

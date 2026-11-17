@@ -633,6 +633,30 @@
                hover:bg-red-600/15 hover:border-red-500/40 hover:text-red-300;
     }
 
+    /* Chair navigation keeps the shared navy palette with brighter, clearer states. */
+    .chair-sidebar .nav-item {
+        @apply rounded-r-xl mr-2.5 transition-all duration-200;
+    }
+
+    .chair-sidebar .nav-item:hover {
+        @apply translate-x-0.5 bg-white/[.08] text-white;
+    }
+
+    .chair-sidebar .nav-item.active {
+        background: linear-gradient(90deg, rgba(59, 130, 246, .34), rgba(59, 130, 246, .09));
+        box-shadow: inset 3px 0 #60a5fa;
+        border-left-color: transparent;
+    }
+
+    .chair-sidebar .nav-icon {
+        @apply text-blue-200/80;
+    }
+
+    .chair-sidebar .nav-item.active .nav-icon,
+    .chair-sidebar .nav-item:hover .nav-icon {
+        @apply text-blue-200;
+    }
+
     /* ── QUOTE BANNER ────────────────────────────────────────────────────── */
     /* Dark gradient banner used on dashboard pages */
     .quote-banner {
