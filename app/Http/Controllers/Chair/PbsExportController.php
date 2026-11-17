@@ -354,18 +354,15 @@ class PbsExportController extends Controller
 
     private function clearCourseSummary($sheet): void
     {
-        foreach (range(16, 23) as $row) {
+        foreach (range(16, 30) as $row) {
             $descriptionRange = 'B' . $row . ':C' . $row;
-            // The template merges B:C only for the taller PATHFit row.
-            if ($row !== 22 && isset($sheet->getMergeCells()[$descriptionRange])) {
+            if (isset($sheet->getMergeCells()[$descriptionRange])) {
                 $sheet->unmergeCells($descriptionRange);
             }
 
             $sheet->setCellValue('A' . $row, null);
             $sheet->setCellValue('B' . $row, null);
-            if ($row !== 22) {
-                $sheet->setCellValue('C' . $row, null);
-            }
+            $sheet->setCellValue('C' . $row, null);
             $sheet->setCellValue('D' . $row, null);
         }
         $sheet->setCellValue('D15', null);
@@ -373,56 +370,30 @@ class PbsExportController extends Controller
 
     private function writeCourseSummary($sheet, $schedules, int $students): void
     {
-        // Follow the curriculum order used by the supplied PBS workbook.
-        // PATHFit1 belongs on row 22, which is the template's taller row for
-        // its long course title.
-        $courseOrder = [
-            'GECRPH' => 0,
-            'GECMMW' => 1,
-            'GEETEM' => 2,
-            'CC111' => 3,
-            'CC112' => 4,
-            'CC112L' => 5,
-            'PATHFIT1' => 6,
-            'NSTP1' => 7,
-        ];
-
         $courses = $schedules
             ->filter(fn($schedule) => $schedule->subject)
             ->unique(fn($schedule) => $schedule->subject->course_id)
-            ->sortBy(function ($schedule) use ($courseOrder) {
-                $code = $schedule->subject->course_code ?? $schedule->subject->subj_code ?? '';
-                $normalizedCode = preg_replace('/[^A-Z0-9]/', '', mb_strtoupper((string) $code));
-
-                return sprintf('%03d-%s', $courseOrder[$normalizedCode] ?? 999, $normalizedCode);
+            ->sortBy(function ($schedule) {
+                return $schedule->subject->course_code ?? $schedule->subject->subj_code ?? '';
             })
             ->values();
 
         $sheet->setCellValue('D15', $students);
-        foreach ($courses->take(8) as $index => $schedule) {
+        
+        // Loop through all assigned courses (limit to template capacity: rows 16-30)
+        foreach ($courses->take(15) as $index => $schedule) {
             $row = 16 + $index;
             $course = $schedule->subject;
 
+            // Clear merging logic: just use standard cells
             $descriptionRange = 'B' . $row . ':C' . $row;
-            if ($row === 22) {
-                if (!isset($sheet->getMergeCells()[$descriptionRange])) {
-                    $sheet->mergeCells($descriptionRange);
-                }
-                $sheet->getStyle($descriptionRange)->getAlignment()
-                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
-                    ->setVertical(Alignment::VERTICAL_CENTER)
-                    ->setWrapText(true)
-                    ->setShrinkToFit(false);
-            } else {
-                if (isset($sheet->getMergeCells()[$descriptionRange])) {
-                    $sheet->unmergeCells($descriptionRange);
-                }
-                $sheet->getStyle('B' . $row)->getAlignment()
-                    ->setHorizontal(Alignment::HORIZONTAL_LEFT)
-                    ->setVertical(Alignment::VERTICAL_CENTER)
-                    ->setWrapText(false)
-                    ->setShrinkToFit(false);
+            if (isset($sheet->getMergeCells()[$descriptionRange])) {
+                $sheet->unmergeCells($descriptionRange);
             }
+            
+            $sheet->getStyle('B' . $row)->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                ->setVertical(Alignment::VERTICAL_CENTER);
 
             $sheet->setCellValue('A' . $row, $course->course_code ?? $course->subj_code ?? '');
             $sheet->setCellValue('B' . $row, $course->course_name ?? $course->subj_name ?? '');
