@@ -128,7 +128,7 @@ class PbtExportController extends Controller
             'subject',
             'section.program',
             'room',
-            'studyLoad',
+            'studyLoad.section',
         ])
             ->where('sch_fac_id', $faculty->fac_id)
             ->where('sch_sem_id', $semester->sem_id)
@@ -657,10 +657,13 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        if ($this->isEveningSection($schedule)) {
+            return false;
+        }
+
         return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
             && $start >= 7 * 60
             && $end <= 17 * 60
-            && !(bool) $schedule->section?->sec_is_evening
             && !($start < 13 * 60 && $end > 12 * 60);
     }
 
@@ -669,6 +672,16 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
+        if ($this->isEveningSection($schedule)) {
+            if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
+                return $start >= 16 * 60 && $end <= 22 * 60;
+            }
+
+            return in_array($day, ['saturday', 'sunday'], true)
+                && $start >= 7 * 60
+                && $end <= 22 * 60;
+        }
+
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
             return $start >= (16 * 60) && $end <= 22 * 60;
         }
@@ -678,6 +691,19 @@ class PbtExportController extends Controller
         }
 
         return false;
+    }
+
+    private function isEveningSection(Schedule $schedule): bool
+    {
+        return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
+            || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
+    }
+
+    private function isTruthyDatabaseBoolean(mixed $value): bool
+    {
+        return is_bool($value)
+            ? $value
+            : in_array(strtolower(trim((string) $value)), ['1', 'true', 't', 'yes', 'on'], true);
     }
 
     private function minutes($time): int
