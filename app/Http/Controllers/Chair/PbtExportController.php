@@ -162,6 +162,14 @@ class PbtExportController extends Controller
         }
 
         $facultyName = FacultyNameFormatter::format($faculty);
+        $doctorateAbbreviation = trim((string) $faculty->fac_doctorate_abbr);
+        if ($doctorateAbbreviation !== '') {
+            $facultyName = str_replace(
+                '(' . FacultyNameFormatter::highestPostNominal($faculty) . ')',
+                '(' . mb_strtoupper($doctorateAbbreviation) . ')',
+                $facultyName
+            );
+        }
 
         $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
             ?: ($chair->user?->usr_name ?? 'Department Chair');
@@ -238,7 +246,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('B10', $facultyName);
         $sheet->setCellValue('C11', '');
         $sheet->setCellValue('C12', '');
-        $sheet->setCellValue('A13', 'Doctorate Degree:');
+        $sheet->setCellValue('A13', $this->doctorateDegreeLabel($faculty));
         $sheet->setCellValue('K11', '___ Permanent');
         $sheet->setCellValue('L11', '___ Temporary');
         $sheet->setCellValue('M11', '___ Contract of Service');
@@ -306,7 +314,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('B12', $facultyName);
         $sheet->setCellValue('C13', '');
         $sheet->setCellValue('C14', '');
-        $sheet->setCellValue('A15', 'Doctorate Degree:');
+        $sheet->setCellValue('A15', $this->doctorateDegreeLabel($faculty));
         $sheet->setCellValue('K13', '___ Permanent');
         $sheet->setCellValue('L13', '___ Temporary');
         $sheet->setCellValue('M13', '___ Contract of Service');
@@ -389,6 +397,16 @@ class PbtExportController extends Controller
         $sheet->getStyle('N53:R53')->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
+    }
+
+    private function doctorateDegreeLabel(Faculty $faculty): string
+    {
+        $abbreviation = trim((string) $faculty->fac_doctorate_abbr);
+        $degree = $abbreviation !== ''
+            ? mb_strtoupper($abbreviation)
+            : trim((string) $faculty->fac_doctorate_degree);
+
+        return 'Doctorate Degree:' . ($degree !== '' ? ' ' . $degree : '');
     }
     private function styleCourseSummaryGrid($sheet, int $firstRow, int $lastRow): void
     {
@@ -639,12 +657,10 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        // Match the schedule plotter: the scheduled time determines the shift.
-        // A section's sec_is_evening flag can be stale or differ from the
-        // particular schedule being exported.
         return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
             && $start >= 7 * 60
             && $end <= 17 * 60
+            && !(bool) $schedule->section?->sec_is_evening
             && !($start < 13 * 60 && $end > 12 * 60);
     }
 
