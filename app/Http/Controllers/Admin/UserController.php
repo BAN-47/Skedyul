@@ -101,7 +101,7 @@ class UserController extends Controller
         return null;
     }
 
-    private function roleSpecificRules(string $role): array
+    private function roleSpecificRules(string $role, bool $requireDeanCollege = false): array
     {
         $rules = [];
 
@@ -115,7 +115,9 @@ class UserController extends Controller
         if (in_array($role, ['faculty', 'department_chair'])) {
             $rules['college_id'] = 'required|uuid|exists:college,college_id';
         } elseif ($role === 'dean') {
-            $rules['college_id'] = 'nullable|uuid|exists:college,college_id';
+            $rules['college_id'] = $requireDeanCollege
+                ? 'required|uuid|exists:college,college_id'
+                : 'nullable|uuid|exists:college,college_id';
         }
 
         if (in_array($role, ['faculty', 'dean', 'department_chair'])) {
@@ -569,10 +571,21 @@ class UserController extends Controller
             'usr_dob' => 'nullable|date',
             'usr_nationality' => 'nullable|string|max:255',
         ], $this->roleSpecificRules(
-            $request->input('usr_role', '')
+            $request->input('usr_role', ''),
+            true
         )));
 
         $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
+
+        if (isset($data['college_id'], $data['dept_id']) && !Departments::query()
+            ->where('dept_id', $data['dept_id'])
+            ->where('dept_college_id', $data['college_id'])
+            ->exists()) {
+            return redirect()->route('admin.users')->with(
+                'error',
+                'Select a department that belongs to the selected college.'
+            );
+        }
 
         $email = strtolower(trim($data['usr_email']));
         $data['usr_email'] = $email;
