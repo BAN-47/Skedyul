@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
+use App\Models\Section;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
@@ -24,6 +25,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PbtExportController extends Controller
 {
+    private array $sectionEveningFlags = [];
+
     private const DAY_TEMPLATE_COURSE_FIRST_ROW = 18;
     private const DAY_TEMPLATE_COURSE_LAST_ROW = 35;
     private const EVENING_TEMPLATE_COURSE_FIRST_ROW = 20;
@@ -42,8 +45,7 @@ class PbtExportController extends Controller
 
     public function index(Request $request)
     {
-        $chair = $this->chair();
-        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        $this->chair();
 
         $semester = $request->filled('semester')
             ? Semester::with('academicYear')->find($request->query('semester'))
@@ -74,13 +76,6 @@ class PbtExportController extends Controller
             });
 
         $facultyMembers = Faculty::with('user', 'program')
-            ->where(function ($query) use ($collegeId) {
-                $query->where('fac_college_id', $collegeId)
-                    ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
-                if (!$collegeId) {
-                    $query->whereRaw('1 = 0');
-                }
-            })
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
@@ -117,13 +112,6 @@ class PbtExportController extends Controller
             ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->firstOrFail();
 
-        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
-        $facultyInCollege = $collegeId && (
-            (string) $faculty->fac_college_id === (string) $collegeId
-            || (string) $faculty->program?->dept_college_id === (string) $collegeId
-        );
-        abort_unless($facultyInCollege, 403, 'You can only export faculty schedules within your college.');
-
         $schedules = Schedule::with([
             'subject',
             'section.program',
@@ -142,6 +130,17 @@ class PbtExportController extends Controller
                 'faculty_id' => 'This faculty member has no active scheduled classes for the current semester.',
             ]);
         }
+
+        $sectionIds = $schedules
+            ->flatMap(fn (Schedule $schedule) => [$schedule->sch_sec_id, $schedule->studyLoad?->sl_sec_id])
+            ->filter()
+            ->unique()
+            ->values();
+        $this->sectionEveningFlags = Section::query()
+            ->whereIn('sec_id', $sectionIds)
+            ->pluck('sec_is_evening', 'sec_id')
+            ->map(fn ($value) => $this->isTruthyDatabaseBoolean($value))
+            ->all();
 
         $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBT_Template.xlsx');
 
@@ -257,6 +256,7 @@ class PbtExportController extends Controller
 
         $daySchedules = $schedules
             ->filter(fn($schedule) => $this->isDaySchedule($schedule))
+            ->reject(fn($schedule) => $this->hasEveningSectionTwin($schedule, $schedules))
             ->values();
 
         $this->clearCourseRows(
@@ -672,11 +672,7 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        if ($this->hasSection($schedule)) {
-            if (!$this->isEveningSection($schedule)) {
-                return false;
-            }
-
+        if ($this->isEveningSection($schedule)) {
             if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
                 return $start >= 16 * 60 && $end <= 22 * 60;
             }
@@ -686,26 +682,50 @@ class PbtExportController extends Controller
                 && $end <= 22 * 60;
         }
 
-        if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
-            return $start >= (16 * 60) && $end <= 22 * 60;
-        }
-
-        if (in_array($day, ['saturday', 'sunday'], true)) {
-            return $start >= 7 * 60 && $end <= 22 * 60;
-        }
-
         return false;
+    }
+
+    /** Avoid exporting a duplicate day section row when the same class is also linked to its evening section. */
+    private function hasEveningSectionTwin(Schedule $schedule, $allSchedules): bool
+    {
+        if ($this->isEveningSection($schedule) || !$schedule->section) {
+            return false;
+        }
+
+        $sectionName = mb_strtolower(trim((string) $schedule->section->sec_name));
+        $departmentId = (string) $schedule->section->sec_dept_id;
+
+        return $allSchedules->contains(function (Schedule $other) use ($schedule, $sectionName, $departmentId): bool {
+            if (!$this->isEveningSection($other) || !$other->section) {
+                return false;
+            }
+
+            return (string) $other->sch_course_id === (string) $schedule->sch_course_id
+                && strtolower(trim((string) $other->sch_day)) === strtolower(trim((string) $schedule->sch_day))
+                && (string) $other->section->sec_dept_id === $departmentId
+                && mb_strtolower(trim((string) $other->section->sec_name)) === $sectionName;
+        });
     }
 
     private function isEveningSection(Schedule $schedule): bool
     {
+        $knownSectionFlag = false;
+        foreach ([$schedule->sch_sec_id, $schedule->studyLoad?->sl_sec_id] as $sectionId) {
+            $sectionId = (string) $sectionId;
+            if ($sectionId !== '' && array_key_exists($sectionId, $this->sectionEveningFlags)) {
+                $knownSectionFlag = true;
+                if ($this->sectionEveningFlags[$sectionId]) {
+                    return true;
+                }
+            }
+        }
+
+        if ($knownSectionFlag) {
+            return false;
+        }
+
         return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
             || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
-    }
-
-    private function hasSection(Schedule $schedule): bool
-    {
-        return (bool) ($schedule->sch_sec_id || $schedule->section?->sec_id || $schedule->studyLoad?->sl_sec_id);
     }
 
     private function isTruthyDatabaseBoolean(mixed $value): bool
@@ -749,6 +769,16 @@ class PbtExportController extends Controller
         $groups = [];
 
         foreach ($schedules as $schedule) {
+            $hasSection = $schedule->sch_sec_id
+                || $schedule->studyLoad?->sl_sec_id
+                || $schedule->section?->sec_id;
+            if ($hasSection && (
+                (!$evening && $this->isEveningSection($schedule))
+                || ($evening && !$this->isEveningSection($schedule))
+            )) {
+                continue;
+            }
+
             $day = strtolower(trim((string) $schedule->sch_day));
             if (!isset($dayColumns[$day])) {
                 continue;
