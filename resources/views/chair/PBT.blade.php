@@ -109,7 +109,6 @@
                             <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
                                 class="btn btn-secondary">Download XLSX</a>
                         @endif
-                        <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
                     </div>
                 </div>
 

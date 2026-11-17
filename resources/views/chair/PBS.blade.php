@@ -123,7 +123,6 @@
                         </form>
                         <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Download PBS
                             Excel</button>
-                        <button type="button" onclick="clearAll()" class="btn btn-secondary">Clear All</button>
                     </div>
                 </div>
 
