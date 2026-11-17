@@ -22,6 +22,11 @@
             {{ session('success') }}
           </div>
         @endif
+        @if(session('error'))
+          <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+            {{ session('error') }}
+          </div>
+        @endif
         @if($errors->any())
           <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
             {{ $errors->first() }}
@@ -177,7 +182,7 @@
         <label for="reject-reason" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-600">Rejection note <span class="text-red-600">*</span></label>
         <textarea id="reject-reason" name="decision_note" required minlength="5" maxlength="2000" rows="3" class="reject-note-input w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm" placeholder="For example: The uploaded faculty ID is unreadable."></textarea>
 
-        <p class="mt-2 text-center text-xs text-slate-400">The faculty and user records will be deleted. The reason and decision details will remain in the rejection history.</p>
+        <p class="mt-2 text-center text-xs text-slate-400">The application will be rejected and access blocked. If database links prevent safe deletion, the account will be deactivated and retained; the reason stays in rejection history.</p>
 
         <div class="mt-5 flex justify-end gap-2">
           <button type="button" onclick="closeRejectDialog()" class="rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200">Cancel</button>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\WebauthnCredential;
+use App\Services\CaptchaChallenge;
 use App\Services\AuditActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,13 @@ class PasskeyAuthenticationController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
         ]);
+
+        if (! CaptchaChallenge::verify($request)) {
+            return response()->json([
+                'message' => 'Please complete the reCAPTCHA verification before signing in with a passkey.',
+            ], 422);
+        }
+
         $rpId = (string) config('webauthn.rp_id');
         abort_if($rpId === '', 500, 'Passkey site settings are incomplete.');
 

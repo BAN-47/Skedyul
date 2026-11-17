@@ -43,7 +43,7 @@
     <!-- FACULTY DASHBOARD PAGE -->
     <div id="page-faculty-dashboard" class="page active faculty-page-enter">
 
-      <!-- Faculty bio slideshow -->
+      <!-- Faculty bio -->
       <div class="relative overflow-hidden rounded-2xl mb-6 px-7 py-6 bg-gradient-to-br from-slate-900 via-blue-900 to-[#1a2d5a]">
         <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:28px_28px]"></div>
         <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
@@ -65,13 +65,11 @@
               </div>
             @endif
           </div>
-          <div id="faculty-bio-department" class="shrink-0 text-left text-[11px] text-white/50 sm:text-right" aria-live="polite">
-            @if ($facultyBios->isNotEmpty())
-              @if ($facultyBios->first()->fac_rank)
-                <div class="text-sm font-semibold text-white/80">{{ $facultyBios->first()->fac_rank }}</div>
-              @endif
-              <div>Faculty · {{ $facultyBios->first()->program->dept_code ?? 'N/A' }} Dept</div>
+          <div class="shrink-0 text-left text-[11px] text-white/50 sm:text-right">
+            @if ($faculty->fac_rank)
+              <div class="text-sm font-semibold text-white/80">{{ $faculty->fac_rank }}</div>
             @endif
+            <div>Faculty · {{ $faculty->program->dept_code ?? 'N/A' }} Dept</div>
           </div>
         </div>
       </div>
@@ -644,54 +642,6 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
-
-// ── FACULTY BIO SLIDESHOW ────────────────────────────────────────────────
-let facultyBioIndex = 0;
-function showFacultyBio(index) {
-  const slides = Array.from(document.querySelectorAll('[data-faculty-bio-slide]'));
-  if (!slides.length) return;
-  facultyBioIndex = (index + slides.length) % slides.length;
-  slides.forEach((slide, slideIndex) => {
-    slide.classList.toggle('hidden', slideIndex !== facultyBioIndex);
-    slide.setAttribute('aria-hidden', slideIndex !== facultyBioIndex ? 'true' : 'false');
-  });
-
-  const dots = document.getElementById('faculty-bio-dots');
-  if (dots) {
-    dots.innerHTML = '';
-    slides.forEach((_, dotIndex) => {
-      const dot = document.createElement('button');
-      dot.type = 'button';
-      dot.setAttribute('role', 'tab');
-      dot.setAttribute('aria-label', `Show faculty bio ${dotIndex + 1}`);
-      dot.setAttribute('aria-selected', dotIndex === facultyBioIndex ? 'true' : 'false');
-      dot.className = `h-1.5 w-1.5 rounded-full transition-colors ${dotIndex === facultyBioIndex ? 'bg-white/90' : 'bg-white/30'}`;
-      dot.onclick = () => showFacultyBio(dotIndex);
-      dots.appendChild(dot);
-    });
-  }
-
-  const info = document.getElementById('faculty-bio-department');
-  if (info) {
-    const slide = slides[facultyBioIndex];
-    info.replaceChildren();
-    if (slide.dataset.rank) {
-      const rank = document.createElement('div');
-      rank.className = 'text-sm font-semibold text-white/80';
-      rank.textContent = slide.dataset.rank;
-      info.appendChild(rank);
-    }
-    const department = document.createElement('div');
-    department.textContent = `Faculty · ${slide.dataset.department || 'N/A'} Dept`;
-    info.appendChild(department);
-  }
-}
-function changeFacultyBio(direction) { showFacultyBio(facultyBioIndex + direction); }
-document.addEventListener('DOMContentLoaded', () => {
-  showFacultyBio(0);
-  const slides = document.querySelectorAll('[data-faculty-bio-slide]');
-  if (slides.length > 1) setInterval(() => showFacultyBio(facultyBioIndex + 1), 7000);
-});
 
 // ── TABS ──────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab-bar').forEach(bar => {

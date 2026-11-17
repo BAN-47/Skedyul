@@ -296,6 +296,12 @@ async function signInWithPasskey(button) {
     return;
   }
 
+  const captchaToken = window.grecaptcha?.getResponse(0) || '';
+  if (!captchaToken) {
+    showLoginPasskeyError('Complete the reCAPTCHA verification before signing in with a passkey.');
+    return;
+  }
+
   const originalText = button.textContent.trim();
   button.disabled = true;
   button.textContent = 'Waiting for your device…';
@@ -303,7 +309,10 @@ async function signInWithPasskey(button) {
   showLoginPasskeyError('');
 
   try {
-    const options = await postJson(button.dataset.optionsUrl, { email });
+    const options = await postJson(button.dataset.optionsUrl, {
+      email,
+      'g-recaptcha-response': captchaToken,
+    });
     const credential = await navigator.credentials.get({ publicKey: prepareRequestOptions(options) });
     if (!credential) throw new Error('Passkey sign-in was cancelled.');
 
@@ -326,6 +335,7 @@ async function signInWithPasskey(button) {
       dialog.querySelector('[data-passkey-dialog-detail]').textContent = message;
     }
   } finally {
+    window.grecaptcha?.reset(0);
     button.disabled = false;
     button.textContent = originalText;
   }

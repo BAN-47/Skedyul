@@ -61,7 +61,7 @@ class FacultyDashboardController extends Controller
         ]);
 
         return view('faculty.faculty_dashboard', compact(
-            'faculty', 'facultyBios', 'totalHours', 'maxHours', 'dayHours', 'dayMaxHours',
+            'faculty', 'totalHours', 'maxHours', 'dayHours', 'dayMaxHours',
             'eveningHours', 'eveningMaxHours', 'weeklyScheduleCounts',
             'mySubjects', 'mySections', 'todaySchedule', 'today'
         ));
