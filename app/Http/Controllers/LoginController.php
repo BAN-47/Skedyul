@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\SystemSetting;
 use App\Services\AuditActivityLogger;
+use App\Services\CaptchaChallenge;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
@@ -17,6 +19,12 @@ class LoginController extends Controller
         // An already authenticated user should not see the login form again.
         if (Auth::check()) {
             return $this->redirectForRole(Auth::user()->usr_role);
+        }
+
+        if (! CaptchaChallenge::verify($request)) {
+            throw ValidationException::withMessages([
+                'g-recaptcha-response' => 'Please complete the reCAPTCHA verification before signing in.',
+            ]);
         }
 
         $request->validate([
