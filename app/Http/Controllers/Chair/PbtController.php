@@ -80,9 +80,10 @@ class PbtController extends Controller
         $collegeId = $chairDepartment?->dept_college_id;
         $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
 
-        // Build teacher groups from all active faculty (must be faculty rows for FK).
+        // Build teacher groups from all faculty linked to user accounts, regardless
+        // of college. Assignment validation still enforces the active-account rule.
         $allFaculty = Faculty::query()
-            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->whereHas('user')
             ->select('faculty.*')
             ->addSelect([
                 'is_department_chair' => \App\Models\Dept_Chair::query()

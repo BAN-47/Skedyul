@@ -76,7 +76,7 @@ class PbtExportController extends Controller
             });
 
         $facultyMembers = Faculty::with('user', 'program')
-            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->whereHas('user')
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
@@ -109,7 +109,7 @@ class PbtExportController extends Controller
 
         $faculty = Faculty::with(['user', 'program'])
             ->where('fac_id', $validated['faculty_id'])
-            ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
+            ->whereHas('user')
             ->firstOrFail();
 
         $schedules = Schedule::with([

@@ -229,9 +229,10 @@ class PbsController extends Controller
             ->pluck('course_category');
 
         $prog = $programs->first();
-        // All active teachers who can be assigned (faculty table only — needed for FK).
+        // Include faculty linked to user accounts across every college. Assignment
+        // validation below still enforces the active-account scheduling rule.
         $faculty = Faculty::query()
-            ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
+            ->whereHas('user')
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
