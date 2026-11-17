@@ -1,6 +1,7 @@
-<div class="sidebar" id="faculty-sidebar">
-    <div class="sidebar-logo">
+<div class="sidebar faculty-sidebar" id="faculty-sidebar">
+    <div class="sidebar-logo faculty-sidebar-logo">
         <div class="sidebar-logo-text">SKED<span>YUL</span></div>
+        <span class="faculty-portal-badge">PORTAL</span>
     </div>
 
     <div class="sidebar-user">
@@ -24,22 +25,22 @@
         <a href="{{ route('faculty.dashboard') }}"
             class="nav-item {{ request()->routeIs('faculty.dashboard') ? 'active' : '' }}"
             style="text-decoration:none !important;">
-            <span class="nav-icon"></span> My Dashboard
+            <span class="nav-icon"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span> My Dashboard
         </a>
         <a href="{{ route('faculty.subjects') }}"
             class="nav-item {{ request()->routeIs('faculty.subjects') ? 'active' : '' }}"
             style="text-decoration:none !important;">
-            <span class="nav-icon"></span> My Subjects
+            <span class="nav-icon"><i class="ti ti-book-2" aria-hidden="true"></i></span> My Subjects
         </a>
         <a href="{{ route('faculty.schedule') }}"
             class="nav-item {{ request()->routeIs('faculty.schedule') ? 'active' : '' }}"
             style="text-decoration:none !important;">
-            <span class="nav-icon"></span> My Schedule
+            <span class="nav-icon"><i class="ti ti-calendar-week" aria-hidden="true"></i></span> My Schedule
         </a>
         <a href="{{ route('faculty.faculty_settings') }}"
             class="nav-item {{ request()->routeIs('faculty.faculty_settings') ? 'active' : '' }}"
             style="text-decoration:none !important;">
-            <span class="nav-icon"></span> Settings
+            <span class="nav-icon"><i class="ti ti-settings" aria-hidden="true"></i></span> Settings
         </a>
     </div>
 

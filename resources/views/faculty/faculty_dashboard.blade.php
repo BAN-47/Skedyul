@@ -36,6 +36,7 @@
 
     @include('partials.faculty_header', [
         'title' => 'My Dashboard',
+        'semesterLabel' => $semesterLabel,
         'scheduleFeed' => $scheduleForJs,
         'announcements' => $announcements ?? null,
     ])
@@ -44,12 +45,15 @@
     <div id="page-faculty-dashboard" class="page active faculty-page-enter">
 
       <!-- Faculty bio -->
-      <div class="relative overflow-hidden rounded-2xl mb-6 px-7 py-6 bg-gradient-to-br from-slate-900 via-blue-900 to-[#1a2d5a]">
+      <div class="relative overflow-hidden rounded-2xl mb-6 px-6 py-6 sm:px-7 sm:py-7 bg-gradient-to-br from-slate-950 via-blue-900 to-[#1a2d5a] shadow-lg shadow-blue-950/10">
         <div class="absolute inset-0 pointer-events-none bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:28px_28px]"></div>
         <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
           <div class="flex-1">
-            <div class="text-[11px] font-bold text-white/50 uppercase tracking-[1.5px] mb-1.5">Faculty Bio</div>
-            <div class="text-xl leading-snug font-bold text-white mb-2">{{ $faculty->full_name }}</div>
+            <div class="mb-2 flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-[1.5px] text-blue-100/70">
+              <span>Faculty Bio</span><span class="text-white/30">•</span><span>{{ $faculty->program->dept_name ?? 'Faculty Department' }}</span>
+            </div>
+            <div class="text-xl leading-snug font-extrabold tracking-tight text-white sm:text-2xl mb-1.5">{{ $greeting }}, {{ $faculty->full_name }}</div>
+            <div class="mb-3 text-xs font-medium text-blue-100/90">Faculty · {{ $faculty->program->dept_code ?? 'N/A' }} Department</div>
             @if (filled($faculty->fac_bio))
               <div class="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-white/80">{{ $faculty->fac_bio }}</div>
             @else
@@ -60,7 +64,7 @@
             @if ($faculty->fac_rank)
               <div class="text-sm font-semibold text-white/80">{{ $faculty->fac_rank }}</div>
             @endif
-            <div>Faculty · {{ $faculty->program->dept_code ?? 'N/A' }} Dept</div>
+            <div class="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-100"><span class="h-1.5 w-1.5 rounded-full bg-emerald-300"></span>Account active</div>
           </div>
         </div>
       </div>
@@ -112,8 +116,8 @@
       </section>
 
       <!-- STAT CARDS (Tailwind) -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+      <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div class="faculty-metric-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div class="absolute top-0 left-0 right-0 h-1 bg-blue-600"></div>
           <div class="text-xs text-gray-500 font-semibold mb-2">Teaching Load{{ auth()->user()->faculty->fac_employment_type === 'part_time' ? ' (Part-time)' : ' by Shift' }}</div>
           @if (auth()->user()->faculty->fac_employment_type === 'part_time')
@@ -125,13 +129,13 @@
             </div>
           @endif
         </div>
-        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+        <div class="faculty-metric-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div class="absolute top-0 left-0 right-0 h-1 bg-green-600"></div>
           <div class="text-xs text-gray-500 font-semibold mb-1">My Subjects</div>
           <div class="text-2xl font-extrabold text-gray-900">{{ $mySubjects->count() }}</div>
           <div class="text-[11px] text-gray-400 mt-0.5">This semester</div>
         </div>
-        <div class="relative bg-white rounded-2xl border border-gray-200 shadow-sm p-4 overflow-hidden">
+        <div class="faculty-metric-card relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
           <div class="absolute top-0 left-0 right-0 h-1 bg-amber-600"></div>
           <div class="text-xs text-gray-500 font-semibold mb-1">My Sections</div>
           <div class="text-2xl font-extrabold text-gray-900">{{ $mySections->count() }}</div>
@@ -139,28 +143,31 @@
         </div>
       </div>
 
-      <section class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="faculty-week-chart-title">
+      <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="faculty-week-chart-title">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <div><h2 id="faculty-week-chart-title" class="text-base font-bold text-gray-900">My Teaching Week</h2><p class="mt-0.5 text-xs text-gray-500">Scheduled classes by day for the current semester</p></div>
-          <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{{ $weeklyScheduleCounts->sum('count') }} classes / week</span>
+          <div><h2 id="faculty-week-chart-title" class="text-base font-bold text-slate-900">Weekly Class Pattern</h2><p class="mt-0.5 text-xs text-slate-500">Your scheduled classes across the week</p></div>
+          <span class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">{{ $weeklyScheduleCounts->sum('count') }} Total Classes</span>
         </div>
         @php $facultyWeekMax = max(1, $weeklyScheduleCounts->max('count')); @endphp
-        <div class="grid grid-cols-7 gap-2" role="img" aria-label="My weekly classes by day">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7" aria-label="My weekly classes by day">
           @foreach($weeklyScheduleCounts as $item)
-            <div class="flex h-28 flex-col items-center justify-end gap-1.5 rounded-xl bg-slate-50 px-1.5 py-2">
-              <span class="text-xs font-bold text-slate-600">{{ $item['count'] }}</span>
-              <div class="flex h-14 w-full items-end justify-center"><div class="w-2/5 rounded-t-md bg-blue-600" style="height:{{ $item['count'] ? max(8, round($item['count'] / $facultyWeekMax * 100)) : 0 }}%"></div></div>
-              <span class="text-[10px] font-semibold text-slate-500">{{ $item['day'] }}</span>
+            @php $isToday = strtolower($item['day']) === strtolower(substr($today, 0, 3)); @endphp
+            <div class="flex min-h-28 flex-col items-center justify-end gap-1.5 rounded-xl border px-2 py-2 {{ $isToday ? 'border-blue-300 bg-blue-50/80 ring-1 ring-blue-100' : 'border-slate-100 bg-slate-50' }}">
+              @if($isToday)<span class="rounded-full bg-blue-600 px-1.5 py-0.5 text-[8px] font-extrabold uppercase tracking-wide text-white">Today</span>@endif
+              <span class="text-lg font-extrabold {{ $isToday ? 'text-blue-700' : 'text-slate-800' }}">{{ $item['count'] }}</span>
+              <span class="text-[9px] text-slate-400">{{ $item['count'] === 1 ? 'Class' : 'Classes' }}</span>
+              <div class="flex h-8 w-full items-end justify-center"><div class="w-2/5 rounded-t-md {{ $isToday ? 'bg-blue-700' : 'bg-blue-500' }}" style="height:{{ $item['count'] ? max(12, round($item['count'] / $facultyWeekMax * 100)) : 0 }}%"></div></div>
+              <span class="text-[10px] font-bold text-slate-600">{{ $item['day'] }}</span>
             </div>
           @endforeach
         </div>
       </section>
 
-      <div class="flex gap-5 items-start flex-wrap">
+      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.8fr)]">
 
         <!-- TODAY'S SCHEDULE -->
-        <div class="flex-1 min-w-[420px]">
-          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div class="min-w-0">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div class="mb-4">
               <div class="text-base font-bold text-gray-900">Today's Schedule — {{ $today }}</div>
               <div class="text-xs text-gray-500 mt-0.5">Current Semester</div>
@@ -197,8 +204,8 @@
         </div>
 
         <!-- MY SUBJECTS -->
-        <div class="w-full sm:w-[280px] shrink-0">
-          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+        <div class="min-w-0">
+          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div class="text-base font-bold text-gray-900 mb-4">My Subjects</div>
             @forelse ($mySubjects as $i => $subj)
               @php
@@ -231,6 +238,11 @@
         </div>
 
       </div>
+
+      <footer class="mt-7 flex flex-col gap-2 border-t border-slate-200 pt-4 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+        <span><strong class="font-extrabold tracking-wide text-slate-600">SKEDYUL</strong> Faculty Information System · Academic Timetabling &amp; Workload</span>
+        <span>{{ $faculty->program->dept_name ?? 'Faculty Department' }} · {{ $semesterLabel }}</span>
+      </footer>
     </div>
 
   </div><!-- end .main -->

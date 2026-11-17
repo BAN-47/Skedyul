@@ -212,7 +212,6 @@ class PbtExportController extends Controller
             $row = $firstCourseRow + $index;
 
             $sheet->setCellValue('A' . $row, $schedule->subject->course_code ?? '');
-            $sheet->setCellValue('B' . $row, $schedule->subject->course_name ?? '');
             $sheet->setCellValue('D' . $row, $schedule->section->sec_name ?? '');
             $sheet->setCellValue('E' . $row, (int) ($schedule->section->sec_no_of_student ?? 0));
         }

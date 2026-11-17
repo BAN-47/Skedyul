@@ -711,7 +711,17 @@ function restoreAddAnotherState() {
         input.checked = (state.sections || []).includes(input.value);
     });
     document.getElementById("add-room").value = state.room || "";
+    document.querySelectorAll(".add-day-checkbox").forEach((input) => {
+        input.checked = (state.days || []).includes(input.value);
+    });
+    document.getElementById("add-start").value = state.startTime || "";
+    document.getElementById("add-end").value = state.endTime || "";
     openModal("modal-add-schedule");
+    if (state.startTime && state.endTime) {
+        showToast(`Next schedule time: ${state.startTime}–${state.endTime}`);
+    } else if (state.startTime) {
+        showToast(`Next schedule starts at ${state.startTime}; choose an end time.`);
+    }
 }
 
 function openAddModal(day, startTime) {
@@ -842,6 +852,16 @@ function submitAdd(keepOpen = false) {
             if (data.success) {
                 showToast(data.message || "Schedule added.");
                 if (keepOpen) {
+                    const timeToMinutes = (time) => {
+                        const [hours, minutes] = time.split(":").map(Number);
+                        return hours * 60 + minutes;
+                    };
+                    const durationMinutes = timeToMinutes(payload.end_time) - timeToMinutes(payload.start_time);
+                    const nextStartMinutes = timeToMinutes(payload.end_time);
+                    const nextStart = nextStartMinutes < 22 * 60 ? payload.end_time : "";
+                    const nextEnd = nextStart && nextStartMinutes + durationMinutes <= 22 * 60
+                        ? addMinutesToTime(nextStart, durationMinutes)
+                        : "";
                     try {
                         sessionStorage.setItem(
                             "pbt-add-another",
@@ -853,18 +873,14 @@ function submitAdd(keepOpen = false) {
                             subject: document.getElementById("add-subject").value,
                             room: document.getElementById("add-room").value,
                             category: document.getElementById("add-category").value,
+                            days: payload.days,
+                            startTime: nextStart,
+                            endTime: nextEnd,
                             }),
                         );
                     } catch {
                         showToast("Schedule saved, but the add-another form could not be preserved.");
                     }
-                    document
-                        .querySelectorAll(".add-day-checkbox")
-                        .forEach((input) => {
-                            input.checked = false;
-                        });
-                    document.getElementById("add-start").value = "";
-                    document.getElementById("add-end").value = "";
                     document.getElementById("add-description").value = "";
                     setAddButtonsLoading(false);
                 } else {
