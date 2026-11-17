@@ -80,15 +80,8 @@ class PbtController extends Controller
         $collegeId = $chairDepartment?->dept_college_id;
         $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
 
-        // Build teacher groups (must be faculty rows for FK)
+        // Build teacher groups from all active faculty (must be faculty rows for FK).
         $allFaculty = Faculty::query()
-            ->where(function ($facultyQuery) use ($collegeId) {
-                $facultyQuery->where('fac_college_id', $collegeId)
-                    ->orWhereHas('program', fn ($programQuery) => $programQuery->where('dept_college_id', $collegeId));
-                if (!$collegeId) {
-                    $facultyQuery->whereRaw('1 = 0');
-                }
-            })
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->select('faculty.*')
             ->addSelect([
@@ -371,17 +364,15 @@ class PbtController extends Controller
         $collegeId = $this->chairCollegeId();
         $courseInCollege = $collegeId && Departments::where('dept_id', $course->course_dept_id)
             ->where('dept_college_id', $collegeId)->exists();
-        $facultyInCollege = $collegeId && Faculty::where('fac_id', $data['fac_id'])
-            ->where(function ($query) use ($collegeId) {
-                $query->where('fac_college_id', $collegeId)
-                    ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
-            })->exists();
+        $facultyIsActive = Faculty::where('fac_id', $data['fac_id'])
+            ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
+            ->exists();
         $roomInCollege = empty($data['room_id']) || ($collegeId && DB::table('room')
             ->where('room_id', $data['room_id'])->where('room_college_id', $collegeId)->exists());
         $sectionInCollege = empty($data['sec_id']) || ($collegeId && Section::where('sec_id', $data['sec_id'])
             ->whereHas('program', fn ($query) => $query->where('dept_college_id', $collegeId))->exists());
-        if (!$courseInCollege || !$facultyInCollege || !$roomInCollege || !$sectionInCollege) {
-            abort(403, 'PBT schedules can only use courses, faculty, sections, and rooms within your college.');
+        if (!$courseInCollege || !$facultyIsActive || !$roomInCollege || !$sectionInCollege) {
+            abort(403, 'PBT schedules require courses, sections, and rooms in your college and an active faculty account.');
         }
         $data['sec_id'] = $data['sec_id'] ?? null;
         if (empty($data['sec_id'])) {

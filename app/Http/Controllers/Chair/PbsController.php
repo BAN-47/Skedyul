@@ -229,10 +229,8 @@ class PbsController extends Controller
             ->pluck('course_category');
 
         $prog = $programs->first();
-        // All teachers who can be assigned (faculty table only — needed for FK).
-        // Includes full-time, part-time, dept chairs, and deans who have a faculty row.
+        // All active teachers who can be assigned (faculty table only — needed for FK).
         $faculty = Faculty::query()
-            ->where('fac_college_id', $collegeId)
             ->whereHas('user', fn($query) => $query->where('usr_is_active', true))
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
@@ -320,9 +318,9 @@ class PbsController extends Controller
             abort(403, 'You can only schedule sections within your college.');
         }
         if (!Departments::where('dept_id', $course->course_dept_id)->where('dept_college_id', $collegeId)->exists()
-            || (string) $faculty->fac_college_id !== (string) $collegeId
+            || !$faculty->user?->usr_is_active
             || !$room || (string) $room->room_college_id !== (string) $collegeId) {
-            abort(403, 'PBS schedules can only use courses, faculty, and rooms within your college.');
+            abort(403, 'PBS schedules require courses and rooms in your college and an active faculty account.');
         }
 
         return $data;
