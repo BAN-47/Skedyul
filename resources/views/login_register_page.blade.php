@@ -413,7 +413,7 @@
             </div>
 
             <div>
-              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Address <span class="text-red-500" aria-hidden="true">*</span></label>
+              <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Office Address <span class="text-red-500" aria-hidden="true">*</span></label>
               <input name="role_address" value="{{ old('role_address') }}" placeholder="Cebu City" required class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
             </div>
 
