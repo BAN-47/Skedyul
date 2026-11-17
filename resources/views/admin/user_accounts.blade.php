@@ -738,7 +738,7 @@
             <div>
               <label class="field-label">College</label>
               <select id="edit-college"
-                name="college_id" class="field-input">
+                name="college_id" class="field-input" required>
                 <option value="">— Select college —</option>
                 @foreach(($colleges ?? []) as $college)
                 <option value="{{ $college->college_id }}">
@@ -752,7 +752,7 @@
           <div>
             <label class="field-label">Department</label>
             <select id="edit-department" data-department-select
-              name="dept_id" class="field-input">
+              name="dept_id" class="field-input" required>
               <option value="">— Select department —</option>
               @foreach(($departments ?? []) as $dept)
               <option value="{{ $dept->dept_id }}" data-college="{{ $dept->dept_college_id }}">

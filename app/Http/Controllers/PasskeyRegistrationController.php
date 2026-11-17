@@ -65,7 +65,7 @@ class PasskeyRegistrationController extends Controller
                 PublicKeyCredentialParameters::createPk(-257), // RS256
             ],
             AuthenticatorSelectionCriteria::create(
-                null,
+                AuthenticatorSelectionCriteria::AUTHENTICATOR_ATTACHMENT_PLATFORM,
                 AuthenticatorSelectionCriteria::USER_VERIFICATION_REQUIREMENT_REQUIRED,
                 AuthenticatorSelectionCriteria::RESIDENT_KEY_REQUIREMENT_REQUIRED
             ),

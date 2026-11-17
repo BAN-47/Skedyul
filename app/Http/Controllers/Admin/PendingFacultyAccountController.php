@@ -154,16 +154,34 @@ class PendingFacultyAccountController extends Controller
 
         $photoPath = null;
 
-        DB::transaction(function () use ($id, $data, &$photoPath) {
+        $result = DB::transaction(function () use ($id, $data, &$photoPath) {
             $review = FacultyAccountReview::where('fvr_id', $id)
                 ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless($review->fvr_status === 'pending', 404);
+                ->first();
+
+            if (! $review) {
+                return ['ok' => false, 'reason' => 'review_not_found'];
+            }
+
+            if ($review->fvr_status !== 'pending') {
+                return [
+                    'ok' => false,
+                    'reason' => 'review_not_pending',
+                    'status' => $review->fvr_status,
+                ];
+            }
 
             $user = User::where('usr_id', $review->fvr_usr_id)
                 ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless($user->usr_role === 'faculty', 404);
+                ->first();
+
+            if (! $user) {
+                return ['ok' => false, 'reason' => 'linked_user_not_found'];
+            }
+
+            if ($user->usr_role !== 'faculty') {
+                return ['ok' => false, 'reason' => 'linked_user_not_faculty'];
+            }
 
             $faculty = Faculty::where('fac_usr_id', $user->usr_id)->first();
             $review->fvr_applicant_name = trim(implode(' ', array_filter([
@@ -182,7 +200,29 @@ class PendingFacultyAccountController extends Controller
             $photoPath = $review->fvr_id_photo_path;
             $faculty?->delete();
             $user->delete();
+
+            return ['ok' => true];
         });
+
+        if (! $result['ok']) {
+            Log::warning('Faculty account rejection did not proceed.', [
+                'review_id' => $id,
+                'reason' => $result['reason'],
+                'review_status' => $result['status'] ?? null,
+            ]);
+
+            $message = match ($result['reason']) {
+                'review_not_found' => 'This application could not be found. Refresh Pending Accounts and check whether it has already been handled.',
+                'review_not_pending' => 'This application is no longer pending. Refresh Pending Accounts to see its current status.',
+                'linked_user_not_found' => 'The applicant account linked to this application could not be found. The rejection was not completed; check the application record or contact support.',
+                'linked_user_not_faculty' => 'The linked account is not a faculty account, so this application was not rejected. Check the application record or contact support.',
+                default => 'The application could not be rejected. Refresh Pending Accounts and try again.',
+            };
+
+            return redirect()
+                ->route('admin.pending-accounts')
+                ->with('error', $message);
+        }
 
         if ($photoPath) {
             Storage::disk((string) config('filesystems.private_uploads_disk', 'local'))->delete($photoPath);

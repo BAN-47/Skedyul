@@ -54,9 +54,15 @@ class PbtExportController extends Controller
             ]);
         }
 
-        $schedules = Schedule::with(['subject', 'section.program', 'room'])
-            ->where('sch_fac_id', $faculty->fac_id)
-            ->where('sch_sem_id', $semester->sem_id)
+        $schedules = Schedule::with(['subject', 'section.program', 'room', 'studyLoad'])
+            ->where(function ($query) use ($faculty) {
+                $query->where('sch_fac_id', $faculty->fac_id)
+                    ->orWhereHas('studyLoad', fn ($loadQuery) => $loadQuery->where('sl_fac_id', $faculty->fac_id));
+            })
+            ->where(function ($query) use ($semester) {
+                $query->where('sch_sem_id', $semester->sem_id)
+                    ->orWhereHas('studyLoad', fn ($loadQuery) => $loadQuery->where('sl_sem_id', $semester->sem_id));
+            })
             ->where('sch_is_active', true)
             ->orderBy('sch_day')
             ->orderBy('sch_start_time')
@@ -85,6 +91,8 @@ class PbtExportController extends Controller
                 'faculty_id' => 'The PBT template must contain sheets named Day and Evening.',
             ]);
         }
+
+        $this->ensureDaySheetIncludesSunday($daySheet);
 
         $facultyName = FacultyNameFormatter::format($faculty);
 
@@ -257,7 +265,7 @@ class PbtExportController extends Controller
     private function clearDayCalendar($sheet): void
     {
         $protectedMerges = [
-            'K30:P32',
+            'K30:Q32',
             'O15:O29',
             'O33:O42',
         ];
@@ -271,7 +279,7 @@ class PbtExportController extends Controller
 
             if (
                 $startColumn >= 11
-                && $endColumn <= 16
+                && $endColumn <= 17
                 && $startRow >= 15
                 && $endRow <= 45
                 && !in_array($merge, $protectedMerges, true)
@@ -281,7 +289,7 @@ class PbtExportController extends Controller
         }
 
         for ($row = 15; $row <= 45; $row++) {
-            for ($column = 11; $column <= 16; $column++) {
+            for ($column = 11; $column <= 17; $column++) {
                 $coordinate = Coordinate::stringFromColumnIndex($column) . $row;
 
                 if ($this->isProtectedDayCell($coordinate)) {
@@ -294,6 +302,44 @@ class PbtExportController extends Controller
                     ->getStartColor()->setRGB('FFFFFF');
             }
         }
+    }
+
+    private function ensureDaySheetIncludesSunday($sheet): void
+    {
+        if (strtoupper(trim((string) $sheet->getCell('Q14')->getValue())) === 'SUNDAY') {
+            return;
+        }
+
+        for ($row = 1; $row <= 55; $row++) {
+            $sheet->duplicateStyle($sheet->getStyle("P{$row}"), "Q{$row}");
+        }
+        $sheet->getColumnDimension('Q')->setWidth($sheet->getColumnDimension('P')->getWidth());
+        $sheet->setCellValue('Q14', 'SUNDAY');
+
+        foreach (['A1:P1', 'A2:P2', 'A3:P3', 'A6:P6', 'A7:P7', 'A8:P8'] as $merge) {
+            if (in_array($merge, $sheet->getMergeCells(), true)) {
+                [$start] = explode(':', $merge);
+                $row = preg_replace('/\D+/', '', $start);
+                $sheet->unmergeCells($merge);
+                $sheet->mergeCells("A{$row}:Q{$row}");
+            }
+        }
+
+        if (in_array('K30:P32', $sheet->getMergeCells(), true)) {
+            $sheet->unmergeCells('K30:P32');
+            $sheet->mergeCells('K30:Q32');
+        }
+
+        if (in_array('N51:P51', $sheet->getMergeCells(), true)) {
+            $sheet->unmergeCells('N51:P51');
+            $sheet->mergeCells('N51:Q51');
+        }
+
+        $sheet->getPageSetup()
+            ->setPrintArea('A1:Q55')
+            ->setFitToWidth(1)
+            ->setFitToHeight(0)
+            ->setFitToPage(true);
     }
 
     private function isProtectedDayCell(string $coordinate): bool
@@ -344,6 +390,11 @@ class PbtExportController extends Controller
     }
     private function isDay(Schedule $schedule): bool
     {
+        $shift = strtolower(trim((string) $schedule->sch_shift));
+        if ($shift !== '') {
+            return in_array($shift, ['day', 'morning'], true);
+        }
+
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
@@ -361,6 +412,11 @@ class PbtExportController extends Controller
 
     private function isEvening(Schedule $schedule): bool
     {
+        $shift = strtolower(trim((string) $schedule->sch_shift));
+        if ($shift !== '') {
+            return in_array($shift, ['evening', 'night'], true);
+        }
+
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
@@ -395,6 +451,7 @@ class PbtExportController extends Controller
                 'thursday' => 14,
                 'friday' => 15,
                 'saturday' => 16,
+                'sunday' => 17,
             ];
 
             if (!isset($columns[$day])) {
