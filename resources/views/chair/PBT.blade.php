@@ -414,6 +414,18 @@
 
                             <input type="hidden" id="filter-department" value="{{ $selectedDeptId }}">
 
+                            <label for="filter-section" class="sr-only">Section for plotting</label>
+                            <select id="filter-section" onchange="applyFilters()"
+                                class="min-w-[150px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+                                <option value="">Select section to plot</option>
+                                @foreach ($sections as $sectionOption)
+                                    <option value="{{ $sectionOption->sec_id }}" data-is-evening="{{ $sectionOption->sec_is_evening ? '1' : '0' }}"
+                                        @selected(request()->query('section') === $sectionOption->sec_id)>
+                                        {{ $sectionOption->sec_name }}{{ $sectionOption->sec_is_evening ? ' · Evening' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+
                             <div class="flex rounded-md overflow-hidden border border-slate-300">
                                 <button type="button" id="shift-day" onclick="setShift('day')"
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>

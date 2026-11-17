@@ -15,15 +15,8 @@ class FacultyDashboardController extends Controller
     {
         $faculty = Faculty::where('fac_usr_id', auth()->id())->firstOrFail();
 
-        $facultyBios = $faculty->fac_dept_id
-            ? Faculty::with('program')
-                ->where('fac_id', '!=', $faculty->fac_id)
-                ->where('fac_dept_id', $faculty->fac_dept_id)
-                ->whereNotNull('fac_bio')
-                ->whereRaw("TRIM(fac_bio) <> ''")
-                ->orderBy('fac_last_name')
-                ->orderBy('fac_first_name')
-                ->get()
+        $facultyBios = filled($faculty->fac_bio)
+            ? collect([$faculty->loadMissing('program')])
             : collect();
 
         $activeSemester = Semester::where('sem_is_active', true)->first();

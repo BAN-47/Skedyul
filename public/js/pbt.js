@@ -229,6 +229,8 @@ function applyFilters() {
 
     const semester = document.getElementById("filter-semester")?.value || "";
     semester ? params.set("semester", semester) : params.delete("semester");
+    const section = document.getElementById("filter-section")?.value || "";
+    section ? params.set("section", section) : params.delete("section");
     window.location.search = params.toString();
 }
 
@@ -307,6 +309,33 @@ function validateTimeInRange(startTime, endTime) {
         return `Schedules must be between ${fmt(range.start)} and ${fmt(range.end)}. A class may cross between the day and evening grids.`;
     }
     return null;
+}
+
+function validateEveningSectionSchedule(sectionIds, days, startTime, endTime, selectId = 'add-section') {
+    const ids = Array.isArray(sectionIds) ? sectionIds : [sectionIds];
+    const eveningSelected = ids.some(id => {
+        const select = document.getElementById(selectId);
+        const option = select ? Array.from(select.options).find(item => item.value === id) : null;
+        return option?.dataset.isEvening === '1';
+    });
+    if (!eveningSelected) return null;
+    const weekdays = days.filter(day => day !== 'Saturday' && day !== 'Sunday');
+    if (!weekdays.length) return null;
+    if (getShiftValue() !== 'evening' || (startTime < '16:00' && endTime > '07:00')) {
+        return 'Evening sections must be scheduled on the Evening page Monday through Friday. 7:00 AM–4:00 PM placements are allowed only on Saturday and Sunday.';
+    }
+    return null;
+}
+
+function blockDaytimeEveningSectionPlot(day, startTime) {
+    const option = document.getElementById('filter-section')?.selectedOptions?.[0];
+    if (option?.dataset.isEvening !== '1' || ['Saturday', 'Sunday'].includes(day)) return false;
+    const endTime = addMinutesToTime(startTime, 60);
+    if (startTime < '16:00' && endTime > '07:00') {
+        showToast('This is an evening section. Weekday schedules from 7:00 AM to 4:00 PM are blocked; use the Evening page or plot daytime on Saturday/Sunday.');
+        return true;
+    }
+    return false;
 }
 
 function paintShift() {
@@ -582,6 +611,7 @@ function openAddModal(day, startTime) {
         showToast("Select a teacher first.");
         return;
     }
+    if (blockDaytimeEveningSectionPlot(day, startTime)) return;
     clearInlineError("add-error");
     syncSelectedSemesterFields();
     ["add-subject", "add-section", "add-room", "add-description"].forEach(
@@ -590,6 +620,9 @@ function openAddModal(day, startTime) {
             if (el) el.value = "";
         },
     );
+
+    const plotSection = document.getElementById("filter-section")?.value || "";
+    if (plotSection) document.getElementById("add-section").value = plotSection;
 
     // Reset subject filter (show all until a section is chosen)
     filterSubjectsBySection("add-section", "add-subject");
@@ -680,6 +713,13 @@ function submitAdd(keepOpen = false) {
     if (rangeError) {
         showToast(rangeError);
         showInlineError("add-error", rangeError);
+        return;
+    }
+    const sectionIds = isOjt ? selectedSectionIds : [payload.sec_id];
+    const sectionTimeError = validateEveningSectionSchedule(sectionIds, payload.days, payload.start_time, payload.end_time);
+    if (sectionTimeError) {
+        showToast(sectionTimeError);
+        showInlineError('add-error', sectionTimeError);
         return;
     }
 
@@ -801,6 +841,12 @@ function submitEdit() {
     );
     if (editRangeError) {
         showToast(editRangeError);
+        return;
+    }
+    const sectionTimeError = validateEveningSectionSchedule([payload.sec_id], [payload.day], payload.start_time, payload.end_time, 'edit-section');
+    if (sectionTimeError) {
+        showToast(sectionTimeError);
+        showInlineError('edit-error', sectionTimeError);
         return;
     }
 

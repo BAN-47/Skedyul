@@ -55,7 +55,7 @@
                 <div class="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-white/80">{{ $bioFaculty->fac_bio }}</div>
               </article>
             @empty
-              <div class="text-sm leading-relaxed text-white/80">No other faculty bios have been added yet.</div>
+              <div class="text-sm leading-relaxed text-white/80">Add your bio in Settings to display it here.</div>
             @endforelse
             @if ($facultyBios->count() > 1)
               <div class="mt-3.5 flex items-center gap-2" aria-label="Faculty bio slideshow controls">
