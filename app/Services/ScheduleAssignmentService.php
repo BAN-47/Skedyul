@@ -43,7 +43,7 @@ class ScheduleAssignmentService
         'Dean of Instruction' => 9,
         'College Dean' => 9,
         'Associate College Dean' => 12,
-        'Department SUC Function Chairperson' => 16,
+        'Department Chairperson' => 16,
         'PERG Chair' => 16,
         'Campus Secretary' => 16,
         'College Secretary' => 16,

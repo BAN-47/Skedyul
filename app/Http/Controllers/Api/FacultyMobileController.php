@@ -98,10 +98,10 @@ class FacultyMobileController extends Controller
             ->when($semester, fn ($query) =>
                 $query->where('sl_sem_id', $semester->sem_id)
             )
-            ->with('subject')
+            ->with(['subject', 'section', 'schedules' => fn ($query) => $query->where('sch_is_active', true)])
             ->get();
 
-        $schedules = Schedule::with(['subject', 'section', 'room'])
+        $schedules = Schedule::with(['subject', 'section', 'room', 'studyLoad.section'])
             ->where('sch_fac_id', $faculty->fac_id)
             ->where('sch_is_active', true)
             ->when($semester, fn ($query) =>
@@ -124,6 +124,29 @@ class FacultyMobileController extends Controller
             $end = Carbon::parse($schedule->sch_end_time);
             return $start->diffInMinutes($end) / 60;
         });
+        $loadShift = fn ($load) => $load->section?->sec_is_evening
+            ? 'evening'
+            : ($load->sl_shift ?? 'day');
+        $shiftBreakdown = [];
+        foreach (['day', 'evening'] as $shift) {
+            $shiftLoads = $loads->filter(fn ($load) => $loadShift($load) === $shift);
+            $shiftBreakdown[$shift] = [
+                'preparations' => $shiftLoads
+                    ->filter(fn ($load) => ($load->subject->course_code ?? '') !== 'REC')
+                    ->pluck('sl_course_id')->unique()->count(),
+                'units' => $shiftLoads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0)),
+                'hours_per_week' => $shiftLoads->sum(fn ($load) => $load->schedules->sum(function ($schedule) {
+                    $start = Carbon::parse($schedule->sch_start_time);
+                    $end = Carbon::parse($schedule->sch_end_time);
+                    return $start->diffInMinutes($end) / 60;
+                })),
+                'max_hours' => ScheduleAssignmentService::facultyMaxHours($faculty, $shift),
+            ];
+        }
+        $totalPreparations = $loads
+            ->filter(fn ($load) => ($load->subject->course_code ?? '') !== 'REC')
+            ->pluck('sl_course_id')->unique()->count();
+
         $userId = (string) $user->usr_id;
         $notificationValue = fn (string $key, string $default) => (bool) SystemSetting::get(
             'faculty_notif_user_' . $userId . '_' . $key,
@@ -164,13 +187,18 @@ class FacultyMobileController extends Controller
             'load' => [
                 'hours' => $totalHours,
                 'max_hours' => ScheduleAssignmentService::facultyMaxHours($faculty),
-                'preparations' => $loads->pluck('sl_course_id')->unique()->count(),
+                'preparations' => $totalPreparations,
                 'units' => $loads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0)),
                 'hours_per_week' => $hoursPerWeek,
                 'designation' => $faculty->fac_special_position ?: $faculty->fac_rank,
                 'production' => null,
                 'extension' => null,
                 'research' => null,
+                'shift_breakdown' => [
+                    'total_preparations' => $totalPreparations,
+                    'day' => $shiftBreakdown['day'],
+                    'evening' => $shiftBreakdown['evening'],
+                ],
             ],
             'today' => Carbon::now()->format('l'),
             'subject_count' => $schedules->unique('sch_course_id')->count(),
@@ -195,8 +223,12 @@ class FacultyMobileController extends Controller
                 'course_code' => $schedule->subject?->course_code,
                 'course_name' => $schedule->subject?->course_name,
                 'section' => $schedule->section?->sec_name,
+                'section_id' => $schedule->sch_sec_id,
                 'room' => $schedule->room?->room_name,
                 'day' => $schedule->sch_day,
+                'shift' => $schedule->studyLoad?->section?->sec_is_evening
+                    ? 'evening'
+                    : ($schedule->studyLoad?->sl_shift ?? $schedule->sch_shift ?? 'day'),
                 'start_time' => $schedule->sch_start_time,
                 'end_time' => $schedule->sch_end_time,
                 'units' => $schedule->subject?->course_units,
