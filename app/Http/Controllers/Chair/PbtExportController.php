@@ -709,22 +709,16 @@ class PbtExportController extends Controller
 
     private function isEveningSection(Schedule $schedule): bool
     {
-        $knownSectionFlag = false;
+        $isEvening = false;
         foreach ([$schedule->sch_sec_id, $schedule->studyLoad?->sl_sec_id] as $sectionId) {
             $sectionId = (string) $sectionId;
             if ($sectionId !== '' && array_key_exists($sectionId, $this->sectionEveningFlags)) {
-                $knownSectionFlag = true;
-                if ($this->sectionEveningFlags[$sectionId]) {
-                    return true;
-                }
+                $isEvening = $isEvening || $this->sectionEveningFlags[$sectionId];
             }
         }
 
-        if ($knownSectionFlag) {
-            return false;
-        }
-
-        return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
+        return $isEvening
+            || $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
             || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
     }
 
