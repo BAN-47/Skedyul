@@ -154,55 +154,108 @@ class PendingFacultyAccountController extends Controller
 
         $photoPath = null;
 
-        $result = DB::transaction(function () use ($id, $data, &$photoPath) {
-            $review = FacultyAccountReview::where('fvr_id', $id)
-                ->lockForUpdate()
-                ->first();
+        try {
+            $result = DB::transaction(function () use ($id, $data, &$photoPath) {
+                $review = FacultyAccountReview::where('fvr_id', $id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (! $review) {
-                return ['ok' => false, 'reason' => 'review_not_found'];
-            }
+                if (! $review) {
+                    return ['ok' => false, 'reason' => 'review_not_found'];
+                }
 
-            if ($review->fvr_status !== 'pending') {
-                return [
-                    'ok' => false,
-                    'reason' => 'review_not_pending',
-                    'status' => $review->fvr_status,
-                ];
-            }
+                if ($review->fvr_status !== 'pending') {
+                    return [
+                        'ok' => false,
+                        'reason' => 'review_not_pending',
+                        'status' => $review->fvr_status,
+                    ];
+                }
 
-            $user = User::where('usr_id', $review->fvr_usr_id)
-                ->lockForUpdate()
-                ->first();
+                $user = User::where('usr_id', $review->fvr_usr_id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (! $user) {
-                return ['ok' => false, 'reason' => 'linked_user_not_found'];
-            }
+                if (! $user) {
+                    return ['ok' => false, 'reason' => 'linked_user_not_found'];
+                }
 
-            if ($user->usr_role !== 'faculty') {
-                return ['ok' => false, 'reason' => 'linked_user_not_faculty'];
-            }
+                if ($user->usr_role !== 'faculty') {
+                    return ['ok' => false, 'reason' => 'linked_user_not_faculty'];
+                }
 
-            $faculty = Faculty::where('fac_usr_id', $user->usr_id)->first();
-            $review->fvr_applicant_name = trim(implode(' ', array_filter([
-                $faculty?->fac_first_name ?? $user->usr_first_name,
-                $faculty?->fac_middle_name ?? $user->usr_middle_name,
-                $faculty?->fac_last_name ?? $user->usr_last_name,
-                $faculty?->fac_suffix ?? $user->usr_suffix,
-            ]))) ?: ($user->usr_name ?? 'Unknown applicant');
-            $review->fvr_applicant_email = $user->usr_email;
-            $review->fvr_decision_note = trim($data['decision_note']);
-            $review->fvr_status = 'rejected';
-            $review->fvr_reviewed_by = auth()->id();
-            $review->fvr_reviewed_at = now();
-            $review->save();
+                $faculty = Faculty::where('fac_usr_id', $user->usr_id)->first();
+                $review->fvr_applicant_name = trim(implode(' ', array_filter([
+                    $faculty?->fac_first_name ?? $user->usr_first_name,
+                    $faculty?->fac_middle_name ?? $user->usr_middle_name,
+                    $faculty?->fac_last_name ?? $user->usr_last_name,
+                    $faculty?->fac_suffix ?? $user->usr_suffix,
+                ]))) ?: ($user->usr_name ?? 'Unknown applicant');
+                $review->fvr_applicant_email = $user->usr_email;
+                $review->fvr_decision_note = trim($data['decision_note']);
+                $review->fvr_status = 'rejected';
+                $review->fvr_reviewed_by = auth()->id();
+                $review->fvr_reviewed_at = now();
+                $review->save();
 
-            $photoPath = $review->fvr_id_photo_path;
-            $faculty?->delete();
-            $user->delete();
+                $photoPath = $review->fvr_id_photo_path;
+                $faculty?->delete();
+                $user->delete();
 
-            return ['ok' => true];
-        });
+                return ['ok' => true, 'deleted' => true];
+            });
+        } catch (\Illuminate\Database\QueryException $exception) {
+            Log::warning('Faculty registration hard deletion failed; account deactivated instead.', [
+                'review_id' => $id,
+                'sql_state' => $exception->errorInfo[0] ?? null,
+            ]);
+
+            // Keep the rejection decision and prevent login if another table
+            // still references the applicant and blocks a physical deletion.
+            $result = DB::transaction(function () use ($id, $data, &$photoPath) {
+                $review = FacultyAccountReview::where('fvr_id', $id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $review) {
+                    return ['ok' => false, 'reason' => 'review_not_found'];
+                }
+
+                if ($review->fvr_status !== 'pending') {
+                    return [
+                        'ok' => false,
+                        'reason' => 'review_not_pending',
+                        'status' => $review->fvr_status,
+                    ];
+                }
+
+                $user = User::where('usr_id', $review->fvr_usr_id)
+                    ->lockForUpdate()
+                    ->first();
+                $faculty = $user ? Faculty::where('fac_usr_id', $user->usr_id)->first() : null;
+
+                if ($user) {
+                    $review->fvr_applicant_name = trim(implode(' ', array_filter([
+                        $faculty?->fac_first_name ?? $user->usr_first_name,
+                        $faculty?->fac_middle_name ?? $user->usr_middle_name,
+                        $faculty?->fac_last_name ?? $user->usr_last_name,
+                        $faculty?->fac_suffix ?? $user->usr_suffix,
+                    ]))) ?: ($user->usr_name ?? 'Unknown applicant');
+                    $review->fvr_applicant_email = $user->usr_email;
+                    $user->usr_is_active = false;
+                    $user->save();
+                }
+
+                $review->fvr_decision_note = trim($data['decision_note']);
+                $review->fvr_status = 'rejected';
+                $review->fvr_reviewed_by = auth()->id();
+                $review->fvr_reviewed_at = now();
+                $review->save();
+                $photoPath = $review->fvr_id_photo_path;
+
+                return ['ok' => true, 'deleted' => false];
+            });
+        }
 
         if (! $result['ok']) {
             Log::warning('Faculty account rejection did not proceed.', [
@@ -225,12 +278,21 @@ class PendingFacultyAccountController extends Controller
         }
 
         if ($photoPath) {
-            Storage::disk((string) config('filesystems.private_uploads_disk', 'local'))->delete($photoPath);
+            try {
+                Storage::disk((string) config('filesystems.private_uploads_disk', 'local'))->delete($photoPath);
+            } catch (\Throwable $exception) {
+                Log::warning('Rejected faculty ID photo cleanup failed.', [
+                    'review_id' => $id,
+                    'exception' => $exception::class,
+                ]);
+            }
         }
 
         return redirect()
             ->route('admin.pending-accounts')
-            ->with('success', 'Registration rejected. The user and faculty records were deleted, and the decision reason was saved in the rejection history.');
+            ->with('success', $result['deleted']
+                ? 'Registration rejected. The user and faculty records were deleted, and the decision reason was saved in the rejection history.'
+                : 'Registration rejected and the account was deactivated. Related records prevented safe deletion, so the account data was retained. Check Laravel Cloud logs for the database constraint.');
     }
 
     private function ensureSystemAdmin(): void
