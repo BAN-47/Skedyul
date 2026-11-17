@@ -390,8 +390,18 @@ class PbtExportController extends Controller
     }
     private function isDay(Schedule $schedule): bool
     {
-        if ($this->isEveningSection($schedule)) {
-            return false;
+        if ($this->hasSection($schedule)) {
+            if ($this->isEveningSection($schedule)) {
+                return false;
+            }
+
+            $day = strtolower((string) $schedule->sch_day);
+            $start = $this->minutes($schedule->sch_start_time);
+            $end = $this->minutes($schedule->sch_end_time);
+            return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
+                && $start >= 7 * 60
+                && $end <= 17 * 60
+                && !($start < 13 * 60 && $end > 12 * 60);
         }
 
         $shift = strtolower(trim((string) $schedule->sch_shift));
@@ -410,7 +420,11 @@ class PbtExportController extends Controller
 
     private function isEvening(Schedule $schedule): bool
     {
-        if ($this->isEveningSection($schedule)) {
+        if ($this->hasSection($schedule)) {
+            if (!$this->isEveningSection($schedule)) {
+                return false;
+            }
+
             $day = strtolower((string) $schedule->sch_day);
             $start = $this->minutes($schedule->sch_start_time);
             $end = $this->minutes($schedule->sch_end_time);
@@ -454,6 +468,11 @@ class PbtExportController extends Controller
             : in_array(strtolower(trim((string) $loadSectionValue)), ['1', 'true', 't', 'yes', 'on'], true);
 
         return $scheduleSectionIsEvening || $loadSectionIsEvening;
+    }
+
+    private function hasSection(Schedule $schedule): bool
+    {
+        return (bool) ($schedule->sch_sec_id || $schedule->section?->sec_id || $schedule->studyLoad?->sl_sec_id);
     }
 
     private function writeSchedule($sheet, Schedule $schedule, bool $evening): void

@@ -672,7 +672,11 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        if ($this->isEveningSection($schedule)) {
+        if ($this->hasSection($schedule)) {
+            if (!$this->isEveningSection($schedule)) {
+                return false;
+            }
+
             if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
                 return $start >= 16 * 60 && $end <= 22 * 60;
             }
@@ -697,6 +701,11 @@ class PbtExportController extends Controller
     {
         return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
             || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
+    }
+
+    private function hasSection(Schedule $schedule): bool
+    {
+        return (bool) ($schedule->sch_sec_id || $schedule->section?->sec_id || $schedule->studyLoad?->sl_sec_id);
     }
 
     private function isTruthyDatabaseBoolean(mixed $value): bool

@@ -216,7 +216,7 @@ class PbtExportController extends Controller
             'subject',
             'section.program',
             'room',
-            'studyLoad',
+            'studyLoad.section',
         ])
             ->where('sch_fac_id', $faculty->fac_id)
             ->where('sch_sem_id', $semester->sem_id)
@@ -697,10 +697,8 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
-
         // Evening sections NEVER belong on the Day sheet
-        if ($isEveningSection) {
+        if ($this->isEveningSection($schedule)) {
             return false;
         }
 
@@ -715,9 +713,7 @@ class PbtExportController extends Controller
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
-
-        if (!$isEveningSection) {
+        if (!$this->isEveningSection($schedule)) {
             return false;
         }
 
@@ -730,6 +726,19 @@ class PbtExportController extends Controller
         }
 
         return false;
+    }
+
+    private function isEveningSection(Schedule $schedule): bool
+    {
+        return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
+            || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
+    }
+
+    private function isTruthyDatabaseBoolean(mixed $value): bool
+    {
+        return is_bool($value)
+            ? $value
+            : in_array(strtolower(trim((string) $value)), ['1', 'true', 't', 'yes', 'on'], true);
     }
 
     private function minutes($time): int
