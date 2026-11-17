@@ -319,9 +319,9 @@ class PbsController extends Controller
             abort(403, 'You can only schedule sections within your college.');
         }
         if (!Departments::where('dept_id', $course->course_dept_id)->where('dept_college_id', $collegeId)->exists()
-            || !$faculty->user?->usr_is_active
+            || (string) $faculty->fac_college_id !== (string) $collegeId
             || !$room || (string) $room->room_college_id !== (string) $collegeId) {
-            abort(403, 'PBS schedules require courses and rooms in your college and an active faculty account.');
+            abort(403, 'PBS schedules can only use courses, faculty, and rooms within your college.');
         }
 
         return $data;

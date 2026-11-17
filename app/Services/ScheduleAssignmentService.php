@@ -185,10 +185,6 @@ class ScheduleAssignmentService
             return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
         }
 
-        if ($message = $this->eveningSectionScheduleMessage($data)) {
-            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
-        }
-
         if ($conflict = $this->findConflict($data, $isRec)) {
             return ['success' => false, 'conflict' => true, 'message' => $conflict];
         }
@@ -351,9 +347,6 @@ class ScheduleAssignmentService
         $course = Course::findOrFail($data['subj_id']);
         $isRec = $course->course_code === 'REC';
         if ($message = $this->sectionRequirementMessage($course, $data['sec_id'] ?? null)) {
-            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
-        }
-        if ($message = $this->eveningSectionScheduleMessage($data)) {
             return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
         }
         if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {
@@ -670,30 +663,6 @@ class ScheduleAssignmentService
     {
         if (!$sectionId) {
             return $course->course_code === 'REC' ? null : 'A section is required for this course.';
-        }
-
-        return null;
-    }
-
-    /** Evening sections use the evening page on weekdays; daytime is allowed on weekends. */
-    private function eveningSectionScheduleMessage(array $data): ?string
-    {
-        $sectionId = $data['sec_id'] ?? null;
-        if (!$sectionId || !(bool) Section::whereKey($sectionId)->value('sec_is_evening')) {
-            return null;
-        }
-
-        $day = $data['day'] ?? null;
-        $days = $data['days'] ?? ($day ? [$day] : []);
-        $hasWeekday = collect($days)->contains(fn ($selectedDay) => !in_array($selectedDay, ['Saturday', 'Sunday'], true));
-        if (!$hasWeekday) {
-            return null;
-        }
-
-        $start = substr((string) ($data['start_time'] ?? ''), 0, 5);
-        $end = substr((string) ($data['end_time'] ?? ''), 0, 5);
-        if (($start < '16:00' && $end > '07:00') || ($data['shift'] ?? 'day') !== 'evening') {
-            return 'Evening sections must be scheduled on the Evening page Monday through Friday. 7:00 AM–4:00 PM placements are allowed only on Saturday and Sunday.';
         }
 
         return null;

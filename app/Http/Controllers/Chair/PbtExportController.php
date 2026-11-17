@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
-use App\Models\Section;
 use App\Models\Semester;
 use App\Models\SystemSetting;
 use App\Services\ScheduleSignatoryFormatter;
@@ -25,8 +24,6 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PbtExportController extends Controller
 {
-    private array $sectionEveningFlags = [];
-
     private const DAY_TEMPLATE_COURSE_FIRST_ROW = 18;
     private const DAY_TEMPLATE_COURSE_LAST_ROW = 35;
     private const EVENING_TEMPLATE_COURSE_FIRST_ROW = 20;
@@ -45,7 +42,8 @@ class PbtExportController extends Controller
 
     public function index(Request $request)
     {
-        $this->chair();
+        $chair = $this->chair();
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
 
         $semester = $request->filled('semester')
             ? Semester::with('academicYear')->find($request->query('semester'))
@@ -112,11 +110,18 @@ class PbtExportController extends Controller
             ->whereHas('user')
             ->firstOrFail();
 
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        $facultyInCollege = $collegeId && (
+            (string) $faculty->fac_college_id === (string) $collegeId
+            || (string) $faculty->program?->dept_college_id === (string) $collegeId
+        );
+        abort_unless($facultyInCollege, 403, 'You can only export faculty schedules within your college.');
+
         $schedules = Schedule::with([
             'subject',
             'section.program',
             'room',
-            'studyLoad.section',
+            'studyLoad',
         ])
             ->where('sch_fac_id', $faculty->fac_id)
             ->where('sch_sem_id', $semester->sem_id)
@@ -130,17 +135,6 @@ class PbtExportController extends Controller
                 'faculty_id' => 'This faculty member has no active scheduled classes for the current semester.',
             ]);
         }
-
-        $sectionIds = $schedules
-            ->flatMap(fn (Schedule $schedule) => [$schedule->sch_sec_id, $schedule->studyLoad?->sl_sec_id])
-            ->filter()
-            ->unique()
-            ->values();
-        $this->sectionEveningFlags = Section::query()
-            ->whereIn('sec_id', $sectionIds)
-            ->pluck('sec_is_evening', 'sec_id')
-            ->map(fn ($value) => $this->isTruthyDatabaseBoolean($value))
-            ->all();
 
         $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBT_Template.xlsx');
 
@@ -161,14 +155,6 @@ class PbtExportController extends Controller
         }
 
         $facultyName = FacultyNameFormatter::format($faculty);
-        $doctorateAbbreviation = trim((string) $faculty->fac_doctorate_abbr);
-        if ($doctorateAbbreviation !== '') {
-            $facultyName = str_replace(
-                '(' . FacultyNameFormatter::highestPostNominal($faculty) . ')',
-                '(' . mb_strtoupper($doctorateAbbreviation) . ')',
-                $facultyName
-            );
-        }
 
         $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
             ?: ($chair->user?->usr_name ?? 'Department Chair');
@@ -245,7 +231,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('B10', $facultyName);
         $sheet->setCellValue('C11', '');
         $sheet->setCellValue('C12', '');
-        $sheet->setCellValue('A13', $this->doctorateDegreeLabel($faculty));
+        $sheet->setCellValue('A13', 'Doctorate Degree:');
         $sheet->setCellValue('K11', '___ Permanent');
         $sheet->setCellValue('L11', '___ Temporary');
         $sheet->setCellValue('M11', '___ Contract of Service');
@@ -256,7 +242,6 @@ class PbtExportController extends Controller
 
         $daySchedules = $schedules
             ->filter(fn($schedule) => $this->isDaySchedule($schedule))
-            ->reject(fn($schedule) => $this->hasEveningSectionTwin($schedule, $schedules))
             ->values();
 
         $this->clearCourseRows(
@@ -314,7 +299,7 @@ class PbtExportController extends Controller
         $sheet->setCellValue('B12', $facultyName);
         $sheet->setCellValue('C13', '');
         $sheet->setCellValue('C14', '');
-        $sheet->setCellValue('A15', $this->doctorateDegreeLabel($faculty));
+        $sheet->setCellValue('A15', 'Doctorate Degree:');
         $sheet->setCellValue('K13', '___ Permanent');
         $sheet->setCellValue('L13', '___ Temporary');
         $sheet->setCellValue('M13', '___ Contract of Service');
@@ -397,16 +382,6 @@ class PbtExportController extends Controller
         $sheet->getStyle('N53:R53')->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
-    }
-
-    private function doctorateDegreeLabel(Faculty $faculty): string
-    {
-        $abbreviation = trim((string) $faculty->fac_doctorate_abbr);
-        $degree = $abbreviation !== ''
-            ? mb_strtoupper($abbreviation)
-            : trim((string) $faculty->fac_doctorate_degree);
-
-        return 'Doctorate Degree:' . ($degree !== '' ? ' ' . $degree : '');
     }
     private function styleCourseSummaryGrid($sheet, int $firstRow, int $lastRow): void
     {
@@ -654,13 +629,14 @@ class PbtExportController extends Controller
 
     private function isDaySchedule(Schedule $schedule): bool
     {
-        $day = strtolower((string) $schedule->sch_day);
-        $start = $this->minutes($schedule->sch_start_time);
-        $end = $this->minutes($schedule->sch_end_time);
-        if ($this->isEveningSection($schedule)) {
+        // If section is explicitly marked evening, it should not be on day sheet
+        if (($schedule->section?->sec_is_evening ?? false) === true) {
             return false;
         }
 
+        $day = strtolower((string) $schedule->sch_day);
+        $start = $this->minutes($schedule->sch_start_time);
+        $end = $this->minutes($schedule->sch_end_time);
         return in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], true)
             && $start >= 7 * 60
             && $end <= 17 * 60
@@ -669,70 +645,23 @@ class PbtExportController extends Controller
 
     private function isEveningSchedule(Schedule $schedule): bool
     {
+        // If section is marked evening, it should be on evening sheet
+        if (($schedule->section?->sec_is_evening ?? false) === true) {
+            return true;
+        }
+
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        if ($this->isEveningSection($schedule)) {
-            if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
-                return $start >= 16 * 60 && $end <= 22 * 60;
-            }
+        if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
+            return $start >= (16 * 60) && $end <= 22 * 60;
+        }
 
-            return in_array($day, ['saturday', 'sunday'], true)
-                && $start >= 7 * 60
-                && $end <= 22 * 60;
+        if (in_array($day, ['saturday', 'sunday'], true)) {
+            return $start >= 7 * 60 && $end <= 22 * 60;
         }
 
         return false;
-    }
-
-    /** Avoid exporting a duplicate day section row when the same class is also linked to its evening section. */
-    private function hasEveningSectionTwin(Schedule $schedule, $allSchedules): bool
-    {
-        if ($this->isEveningSection($schedule) || !$schedule->section) {
-            return false;
-        }
-
-        $sectionName = mb_strtolower(trim((string) $schedule->section->sec_name));
-        $departmentId = (string) $schedule->section->sec_dept_id;
-
-        return $allSchedules->contains(function (Schedule $other) use ($schedule, $sectionName, $departmentId): bool {
-            if (!$this->isEveningSection($other) || !$other->section) {
-                return false;
-            }
-
-            return (string) $other->sch_course_id === (string) $schedule->sch_course_id
-                && strtolower(trim((string) $other->sch_day)) === strtolower(trim((string) $schedule->sch_day))
-                && (string) $other->section->sec_dept_id === $departmentId
-                && mb_strtolower(trim((string) $other->section->sec_name)) === $sectionName;
-        });
-    }
-
-    private function isEveningSection(Schedule $schedule): bool
-    {
-        $knownSectionFlag = false;
-        foreach ([$schedule->sch_sec_id, $schedule->studyLoad?->sl_sec_id] as $sectionId) {
-            $sectionId = (string) $sectionId;
-            if ($sectionId !== '' && array_key_exists($sectionId, $this->sectionEveningFlags)) {
-                $knownSectionFlag = true;
-                if ($this->sectionEveningFlags[$sectionId]) {
-                    return true;
-                }
-            }
-        }
-
-        if ($knownSectionFlag) {
-            return false;
-        }
-
-        return $this->isTruthyDatabaseBoolean($schedule->section?->sec_is_evening)
-            || $this->isTruthyDatabaseBoolean($schedule->studyLoad?->section?->sec_is_evening);
-    }
-
-    private function isTruthyDatabaseBoolean(mixed $value): bool
-    {
-        return is_bool($value)
-            ? $value
-            : in_array(strtolower(trim((string) $value)), ['1', 'true', 't', 'yes', 'on'], true);
     }
 
     private function minutes($time): int
@@ -769,16 +698,6 @@ class PbtExportController extends Controller
         $groups = [];
 
         foreach ($schedules as $schedule) {
-            $hasSection = $schedule->sch_sec_id
-                || $schedule->studyLoad?->sl_sec_id
-                || $schedule->section?->sec_id;
-            if ($hasSection && (
-                (!$evening && $this->isEveningSection($schedule))
-                || ($evening && !$this->isEveningSection($schedule))
-            )) {
-                continue;
-            }
-
             $day = strtolower(trim((string) $schedule->sch_day));
             if (!isset($dayColumns[$day])) {
                 continue;

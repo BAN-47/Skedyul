@@ -712,14 +712,15 @@ class PbtExportController extends Controller
 
     private function isEveningSchedule(Schedule $schedule): bool
     {
+        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
+
+        if ($isEveningSection) {
+            return true;
+        }
+
         $day = strtolower((string) $schedule->sch_day);
         $start = $this->minutes($schedule->sch_start_time);
         $end = $this->minutes($schedule->sch_end_time);
-        $isEveningSection = (bool) ($schedule->section->sec_is_evening ?? false);
-
-        if (!$isEveningSection) {
-            return false;
-        }
 
         if (in_array($day, ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], true)) {
             return $start >= (16 * 60) && $end <= 22 * 60;
