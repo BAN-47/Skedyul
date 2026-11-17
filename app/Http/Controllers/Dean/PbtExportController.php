@@ -766,12 +766,6 @@ class PbtExportController extends Controller
         $groups = [];
 
         foreach ($schedules as $schedule) {
-            $hasSection = $schedule->sch_sec_id || $schedule->section?->sec_id;
-            $isEveningSection = (bool) ($schedule->section?->sec_is_evening ?? false);
-            if ($hasSection && (($evening && !$isEveningSection) || (!$evening && $isEveningSection))) {
-                continue;
-            }
-
             $day = strtolower(trim((string) $schedule->sch_day));
             if (!isset($dayColumns[$day])) {
                 continue;
