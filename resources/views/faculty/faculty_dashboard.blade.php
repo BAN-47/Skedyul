@@ -49,20 +49,11 @@
         <div class="relative z-10 flex flex-wrap items-start justify-between gap-6">
           <div class="flex-1">
             <div class="text-[11px] font-bold text-white/50 uppercase tracking-[1.5px] mb-1.5">Faculty Bio</div>
-            @forelse ($facultyBios as $index => $bioFaculty)
-              <article data-faculty-bio-slide data-rank="{{ $bioFaculty->fac_rank ?? '' }}" data-department="{{ $bioFaculty->program->dept_code ?? 'N/A' }}" class="{{ $index === 0 ? '' : 'hidden' }}">
-                <div class="text-xl leading-snug font-bold text-white mb-2">{{ $bioFaculty->full_name }}</div>
-                <div class="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-white/80">{{ $bioFaculty->fac_bio }}</div>
-              </article>
-            @empty
-              <div class="text-sm leading-relaxed text-white/80">Add your bio in Settings to display it here.</div>
-            @endforelse
-            @if ($facultyBios->count() > 1)
-              <div class="mt-3.5 flex items-center gap-2" aria-label="Faculty bio slideshow controls">
-                <button type="button" onclick="changeFacultyBio(-1)" aria-label="Previous faculty bio" class="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">&#8249;</button>
-                <div id="faculty-bio-dots" class="flex items-center gap-1.5" role="tablist" aria-label="Choose a faculty bio"></div>
-                <button type="button" onclick="changeFacultyBio(1)" aria-label="Next faculty bio" class="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20">&#8250;</button>
-              </div>
+            <div class="text-xl leading-snug font-bold text-white mb-2">{{ $faculty->full_name }}</div>
+            @if (filled($faculty->fac_bio))
+              <div class="max-w-3xl whitespace-pre-line text-sm leading-relaxed text-white/80">{{ $faculty->fac_bio }}</div>
+            @else
+              <div class="text-sm leading-relaxed text-white/80">You have not added a bio yet.</div>
             @endif
           </div>
           <div class="shrink-0 text-left text-[11px] text-white/50 sm:text-right">
