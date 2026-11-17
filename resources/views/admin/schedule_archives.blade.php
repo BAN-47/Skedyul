@@ -33,17 +33,13 @@
                     </div>
                 @else
                     <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-                        <div>
-                            <h1 class="text-xl font-extrabold text-slate-900">Archived Faculty Schedule</h1>
-                            <p class="mt-1 text-sm text-slate-500">View past schedules and their course summaries. Archived records are read-only.</p>
-                        </div>
                         <button type="button" onclick="window.print()" class="no-print btn btn-secondary">Print</button>
                     </div>
 
                     <form method="GET" action="{{ route('admin.schedule-archives') }}"
                         class="no-print card mb-4 grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-5">
                         <div>
-                            <label for="archive-year" class="field-label">Academic year</label>
+                            <label for="archive-year" class="field-label">Academic Year</label>
                             <select class="field-input" name="year" id="archive-year" onchange="this.form.submit()">
                                 @forelse ($academicYears as $academicYear)
                                     <option value="{{ $academicYear->ay_id }}" @selected($selectedYear === $academicYear->ay_id)>

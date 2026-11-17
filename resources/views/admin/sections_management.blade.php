@@ -47,12 +47,6 @@
                 @endif
 
                 <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <div class="text-[20px] font-extrabold text-slate-900">Sections</div>
-                        <div class="mt-1 text-[13px] text-slate-500">
-                            {{ $isDean ? 'Manage sections in your college.' : 'Manage sections across all programs.' }}
-                        </div>
-                    </div>
                     <button type="button" onclick="openNewSection()" class="btn btn-primary">+ Add Section</button>
                 </div>
 
