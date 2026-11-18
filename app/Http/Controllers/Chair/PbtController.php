@@ -60,10 +60,22 @@ class PbtController extends Controller
             }
             $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
             $activeSem->label = trim(($activeSem->sem_name ?? '') . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
+            $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
             if (isset($activeSem->ay_is_active) && !(bool) $activeSem->ay_is_active) {
                 $activeSem->label .= ' (Archived · View only)';
-            } elseif (!(bool) $activeSem->sem_is_active && (bool) ($activeSem->sem_is_plotting_enabled ?? false)) {
+            } elseif ((bool) $activeSem->sem_is_active) {
+                $activeSem->label .= ' (Current)';
+            } elseif ((bool) ($activeSem->ay_is_active ?? false)
+                && $activeSem->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester'
+                && (bool) ($activeSem->sem_is_plotting_enabled ?? false)) {
                 $activeSem->label .= ' (Advance plotting)';
+            } elseif ((bool) ($activeSem->ay_is_active ?? false)
+                && $activeSem->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester') {
+                $activeSem->label .= ' (Upcoming · View only)';
+            } else {
+                $activeSem->label .= ' (View only)';
             }
         }
         $canPlotSelectedSemester = $activeSem && $this->semesterIsWritable($activeSem->sem_id);
@@ -188,6 +200,8 @@ class PbtController extends Controller
             return str_contains($t, 'part');
         })->values();
 
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
         return response()->view('chair.PBT', [
             'schedules'        => $schedules,
             'subjects'         => Course::with('program')->where('course_is_active', true)
@@ -235,12 +249,6 @@ class PbtController extends Controller
             'chairDepartment'  => $chairDepartment,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-                ->where(function ($query) {
-                    $query->where('s.sem_is_active', true)
-                        ->orWhere('s.sem_is_plotting_enabled', true)
-                        ->orWhereNull('s.sem_ay_id')
-                        ->orWhere('ay.ay_is_active', false);
-                })
                 ->orderByDesc('s.sem_start_date')
                 ->select([
                     's.sem_id',
@@ -254,7 +262,7 @@ class PbtController extends Controller
                     'ay.ay_is_active',
                 ])
                 ->get()
-                ->map(function ($sem) {
+                ->map(function ($sem) use ($officialSemesterName) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
                     $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
@@ -262,8 +270,17 @@ class PbtController extends Controller
                         $label .= ' (Current)';
                     } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
                         $label .= ' (Archived · View only)';
-                    } elseif (!empty($sem->sem_is_plotting_enabled)) {
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester'
+                        && !empty($sem->sem_is_plotting_enabled)) {
                         $label .= ' (Advance plotting)';
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester') {
+                        $label .= ' (Upcoming · View only)';
+                    } else {
+                        $label .= ' (View only)';
                     }
                     $sem->label = $label !== '' ? $label : $sem->sem_name;
                     return $sem;
@@ -404,10 +421,15 @@ class PbtController extends Controller
         $semester = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
             ->where('s.sem_id', $semesterId)
-            ->first(['s.sem_is_active', 's.sem_is_plotting_enabled', 's.sem_ay_id', 'ay.ay_is_active']);
+            ->first(['s.sem_name', 's.sem_is_active', 's.sem_is_plotting_enabled', 's.sem_ay_id', 'ay.ay_is_active']);
 
-        return $semester && ((bool) $semester->sem_is_active
-            || (!empty($semester->ay_is_active) && (bool) $semester->sem_is_plotting_enabled));
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
+        return $semester && (((bool) $semester->sem_is_active && (bool) $semester->ay_is_active)
+            || (!empty($semester->ay_is_active)
+                && $semester->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester'
+                && (bool) $semester->sem_is_plotting_enabled));
     }
 
     public function store(Request $request)

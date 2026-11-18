@@ -70,10 +70,22 @@ class PbsController extends Controller
         $semName = $sem->sem_name ?? '';
         $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
         $sem->label = trim($semName . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
         if (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
             $sem->label .= ' (Archived · View only)';
-        } elseif (!(bool) $sem->sem_is_active && (bool) ($sem->sem_is_plotting_enabled ?? false)) {
+        } elseif ((bool) $sem->sem_is_active) {
+            $sem->label .= ' (Current)';
+        } elseif ((bool) ($sem->ay_is_active ?? false)
+            && $semName === '2nd Semester'
+            && $officialSemesterName === '1st Semester'
+            && (bool) ($sem->sem_is_plotting_enabled ?? false)) {
             $sem->label .= ' (Advance plotting)';
+        } elseif ((bool) ($sem->ay_is_active ?? false)
+            && $semName === '2nd Semester'
+            && $officialSemesterName === '1st Semester') {
+            $sem->label .= ' (Upcoming · View only)';
+        } else {
+            $sem->label .= ' (View only)';
         }
         $sem->ay_academic_year = $year;
         return $sem;
@@ -245,6 +257,8 @@ class PbsController extends Controller
             ->orderBy('fac_first_name')
             ->get();
 
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
         return response()->view('chair.PBS', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
@@ -264,12 +278,6 @@ class PbsController extends Controller
             // Labels like "2026-2027 1st Sem"
             'semesters'     => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-                ->where(function ($query) {
-                    $query->where('s.sem_is_active', true)
-                        ->orWhere('s.sem_is_plotting_enabled', true)
-                        ->orWhereNull('s.sem_ay_id')
-                        ->orWhere('ay.ay_is_active', false);
-                })
                 ->orderByDesc('s.sem_start_date')
                 ->select([
                     's.sem_id',
@@ -283,7 +291,7 @@ class PbsController extends Controller
                     'ay.ay_is_active',
                 ])
                 ->get()
-                ->map(function ($sem) {
+                ->map(function ($sem) use ($officialSemesterName) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
                     $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
@@ -291,8 +299,17 @@ class PbsController extends Controller
                         $label .= ' (Current)';
                     } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
                         $label .= ' (Archived · View only)';
-                    } elseif (!empty($sem->sem_is_plotting_enabled)) {
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester'
+                        && !empty($sem->sem_is_plotting_enabled)) {
                         $label .= ' (Advance plotting)';
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester') {
+                        $label .= ' (Upcoming · View only)';
+                    } else {
+                        $label .= ' (View only)';
                     }
                     $sem->label = $label !== '' ? $label : $sem->sem_name;
                     return $sem;
@@ -349,10 +366,15 @@ class PbsController extends Controller
         $semester = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
             ->where('s.sem_id', $semesterId)
-            ->first(['s.sem_is_active', 's.sem_is_plotting_enabled', 's.sem_ay_id', 'ay.ay_is_active']);
+            ->first(['s.sem_name', 's.sem_is_active', 's.sem_is_plotting_enabled', 's.sem_ay_id', 'ay.ay_is_active']);
 
-        return $semester && ((bool) $semester->sem_is_active
-            || (!empty($semester->ay_is_active) && (bool) $semester->sem_is_plotting_enabled));
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
+        return $semester && (((bool) $semester->sem_is_active && (bool) $semester->ay_is_active)
+            || (!empty($semester->ay_is_active)
+                && $semester->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester'
+                && (bool) $semester->sem_is_plotting_enabled));
     }
 
     public function store(Request $request)

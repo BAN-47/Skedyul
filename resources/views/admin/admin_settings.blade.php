@@ -15,6 +15,8 @@
   $activeSemester = $activeSemester ?? null;
   $activeYear = $activeYear ?? null;
   $academicYears = $academicYears ?? collect();
+  $reviewYear = $reviewYear ?? $activeYear;
+  $reviewSemesters = $reviewSemesters ?? collect();
   $ayStart = $ayStart ?? '2026-08-01';
   $ayEnd = $ayEnd ?? '2026-12-20';
   $periodLabel = $periodLabel ?? null;
@@ -135,8 +137,8 @@
             <div class="card mb-4">
               <div class="card-header">
                 <div>
-                  <div class="card-title">Current Academic Year</div>
-                  <div class="card-sub">Controls the fixed period on PBS, PBT, and Faculty Load for all roles</div>
+                  <div class="card-title">Academic Year & Semester</div>
+                  <div class="card-sub">Review past years here; only the active year controls PBS, PBT, and Faculty Load</div>
                 </div>
                 @if(!empty($activeSemester) && !empty($activeYear))
                   <span class="badge badge-green">{{ $periodLabel }}</span>
@@ -151,6 +153,72 @@
                 </div>
               @endif
 
+              <div class="mb-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                <div class="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div>
+                    <label class="field-label" for="review-academic-year">Review a registered academic year</label>
+                    <select class="field-input" id="review-academic-year" onchange="reviewAcademicYear(this.value)">
+                      @foreach($academicYears as $yearOption)
+                        @php $yearOptionLabel = $yearOption->ay_academic_year ?? $yearOption->ay_year_label ?? 'Academic year'; @endphp
+                        <option value="{{ $yearOption->ay_id }}" @selected((string) optional($reviewYear)->ay_id === (string) $yearOption->ay_id)>
+                          {{ $yearOptionLabel }}{{ $yearOption->ay_is_active ? ' · Current' : ' · Archived' }}
+                        </option>
+                      @endforeach
+                    </select>
+                    <p class="mt-1 text-[11px] text-slate-500">Use Switch Now to change the active semester early, or make a saved past semester current. Schedules are preserved.</p>
+                  </div>
+                  @if($academicYears->isNotEmpty())
+                    <span class="mb-1 inline-flex items-center rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600">
+                      Current: {{ $activeYear->ay_academic_year ?? $activeYear->ay_year_label ?? 'Not set' }} · {{ $activeSemester->sem_name ?? 'No active semester' }}
+                    </span>
+                  @endif
+                </div>
+
+                @if($reviewYear)
+                  <div class="mt-3 overflow-x-auto rounded-lg border border-blue-100 bg-white">
+                    <table class="data-table min-w-[520px]">
+                      <thead><tr><th>Semester</th><th>Dates</th><th>Status</th><th>Action</th></tr></thead>
+                      <tbody>
+                        @forelse($reviewSemesters as $reviewSemester)
+                          @php
+                            $reviewIsCurrent = (bool) $reviewSemester->sem_is_active;
+                            $reviewIsPlotting = (bool) $reviewSemester->sem_is_plotting_enabled
+                              && (bool) $reviewYear->ay_is_active
+                              && $reviewSemester->sem_name === '2nd Semester'
+                              && ($activeSemester->sem_name ?? null) === '1st Semester';
+                          @endphp
+                          <tr>
+                            <td class="font-semibold">{{ $reviewSemester->sem_name }}</td>
+                            <td>{{ $reviewSemester->sem_start_date?->format('M j, Y') ?? 'Dates not set' }} – {{ $reviewSemester->sem_end_date?->format('M j, Y') ?? 'Dates not set' }}</td>
+                            <td>
+                              @if($reviewIsCurrent)
+                                <span class="badge badge-green">Current</span>
+                              @elseif($reviewIsPlotting)
+                                <span class="badge badge-blue">Advance plotting</span>
+                              @elseif(!$reviewYear->ay_is_active)
+                                <span class="badge badge-grey">Archived · View only</span>
+                              @else
+                                <span class="badge badge-grey">View only</span>
+                              @endif
+                            </td>
+                            <td>
+                              @unless($reviewIsCurrent)
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                  onclick="activateAcademicSemester('{{ $reviewSemester->sem_id }}', @js(($reviewYear->ay_academic_year ?? $reviewYear->ay_year_label).' · '.$reviewSemester->sem_name), {{ $reviewYear->ay_is_active ? 'false' : 'true' }})">
+                                  {{ $reviewYear->ay_is_active ? 'Switch Now' : 'Make Current' }}
+                                </button>
+                              @endunless
+                            </td>
+                          </tr>
+                        @empty
+                          <tr><td colspan="4" class="text-center text-slate-400">No semesters are registered for this year.</td></tr>
+                        @endforelse
+                      </tbody>
+                    </table>
+                  </div>
+                @endif
+              </div>
+
               @if(empty($activeSemester) || empty($activeYear))
                 <div class="mb-3 p-3 rounded-lg text-[12px]" style="background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;">
                   No active period yet. Type a year, choose 1st or 2nd semester, set dates, then Save.
@@ -159,11 +227,11 @@
 
               <div class="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label class="field-label">Academic Year</label>
+                  <label class="field-label">Current year or new year to register</label>
                   <input class="field-input" id="ay-year" data-active-year="{{ optional($activeYear)->ay_academic_year ?? optional($activeYear)->ay_year_label ?? '' }}"
                          value="{{ optional($activeYear)->ay_academic_year ?? '' }}"
                          placeholder="2027-2028">
-                  <p class="text-[11px] text-slate-400 mt-1">Type a new year (e.g. 2027-2028) to register it.</p>
+                  <p class="text-[11px] text-slate-400 mt-1">To register the next year, enter its label (for example, 2027-2028). Past years above are only for review.</p>
                 </div>
                 <div>
                   <label class="field-label">Semester</label>
@@ -209,13 +277,13 @@
                           onchange="togglePlottingEnabled('{{ optional($inactiveSemester)->sem_id }}', this)">
                     <span class="toggle-track {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
-                  <span class="text-[12px] text-slate-600">Allow chairs to access the other semester for advance plotting</span>
+                  <span class="text-[12px] text-slate-600">Allow chairs to plot the upcoming 2nd Semester of this academic year</span>
                 </div>
               </div>
 
               <p class="text-[11px] text-slate-400 mt-1 mb-2">
-                When 1st semester end date passes, the system switches to 2nd semester.
-                When 2nd ends, you will be prompted to set the next academic year.
+                When 1st Semester ends, the system switches to 2nd Semester. Advance Plotting is only for that future 2nd Semester; it does not apply to an earlier semester or an archived year.
+                When 2nd Semester ends, register the next academic year. It starts in 1st Semester with Advance Plotting off.
               </p>
 
               <div class="flex justify-end mt-1">
@@ -449,7 +517,7 @@ async function saveAcademicYear() {
     sem_name: (document.getElementById('ay-semester').value || '').trim(),
     sem_start_date: document.getElementById('ay-start').value || '',
     sem_end_date: document.getElementById('ay-end').value || '',
-    sem_is_plotting_enabled: document.getElementById('ay-plotting-enabled').checked,
+    sem_is_plotting_enabled: document.getElementById('ay-plotting-enabled')?.checked || false,
   };
   if (!payload.ay_academic_year || !payload.sem_name || !payload.sem_start_date || !payload.sem_end_date) {
     showToast('Please fill academic year, semester, start date, and end date.');
@@ -512,6 +580,40 @@ function updateAcademicYearMode() {
   }
 }
 
+function reviewAcademicYear(yearId) {
+  if (!yearId) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('review_year', yearId);
+  url.hash = 'settings-academic';
+  window.location.assign(url.toString());
+}
+
+async function activateAcademicSemester(semesterId, label, isArchivedYear) {
+  const action = isArchivedYear ? 'Make ' + label + ' current?' : 'Switch to ' + label + ' now, before its scheduled start or the current semester end date?';
+  if (!semesterId || !window.confirm(action + ' Chairs will be able to plot in it. Existing schedules will be preserved.')) return;
+
+  try {
+    const response = await fetch('{{ url('/admin/academic-year/semester') }}/' + encodeURIComponent(semesterId) + '/activate', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': csrfToken(),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      credentials: 'same-origin',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      showToast(result.message || 'Could not switch academic year');
+      return;
+    }
+    showToast(result.message);
+    setTimeout(function () { window.location.reload(); }, 700);
+  } catch (error) {
+    showToast('Network error switching academic year');
+  }
+}
+
 document.getElementById('ay-semester')?.addEventListener('change', function () {
   if (this.disabled) return;
   const option = this.selectedOptions[0];
@@ -523,6 +625,12 @@ document.getElementById('ay-semester')?.addEventListener('change', function () {
 
 document.getElementById('ay-year')?.addEventListener('input', updateAcademicYearMode);
 updateAcademicYearMode();
+
+if (new URLSearchParams(window.location.search).has('review_year')) {
+  const academicNav = Array.from(document.querySelectorAll('.settings-nav-item'))
+    .find((item) => item.textContent.trim() === 'Academic Year');
+  showSettingsSection('academic', academicNav || null);
+}
 
 function savePassword() {
   var payload = {
