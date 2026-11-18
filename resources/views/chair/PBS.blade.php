@@ -281,7 +281,7 @@
 
                             {{-- Department selector (combines program and department) --}}
                             <select id="filter-department" onchange="applyFilters()"
-                                class="pbs-filter min-w-[150px] bg-blue-50 border-blue-300 text-blue-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
+                                class="pbs-filter order-2 min-w-[150px] bg-blue-50 border-blue-300 text-blue-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
                                 <option value="">DEPARTMENT</option>
                                 @foreach ($allDepartments as $dept)
                                     <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
@@ -303,7 +303,7 @@
                                 @endforeach
                             </select>
 
-                            <div id="pbs-section-picker" class="relative order-3">
+                            <div id="pbs-section-picker" class="relative order-4">
                                 <button type="button" id="pbs-section-picker-trigger" aria-haspopup="dialog"
                                     aria-expanded="false" aria-controls="pbs-section-picker-menu"
                                     class="flex min-w-[180px] items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
@@ -417,7 +417,7 @@
                             </div>
 
                             <label for="filter-semester" class="sr-only">Academic year and semester</label>
-                            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter min-w-[190px]">
+                            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter order-1 min-w-[190px]">
                                 <option value="">Select semester</option>
                                 @foreach ($semesters as $semester)
                                     <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
@@ -426,14 +426,14 @@
                                 @endforeach
                             </select>
 
-                            <div class="flex rounded-md overflow-hidden border border-slate-300">
+                            <div class="order-3 flex overflow-hidden rounded-md border border-slate-300">
                                 <button type="button" id="shift-day" onclick="setShift('day')"
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
                                 <button type="button" id="shift-night" onclick="setShift('night')"
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Evening</button>
                             </div>
 
-                            <div class="order-4 ml-auto text-[11px] text-slate-400 italic">
+                            <div class="order-5 ml-auto text-[11px] text-slate-400 italic">
                                 Click an empty time slot below to add a schedule
                             </div>
                         </div>
