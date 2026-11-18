@@ -184,8 +184,7 @@ class PbtController extends Controller
 
         return response()->view('chair.PBT', [
             'schedules'        => $schedules,
-            'subjects'         => Course::where('course_is_active', true)
-                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
+            'subjects'         => Course::with('program')->where('course_is_active', true)
                 ->where(function ($query) use ($semNum) {
                     $query->where(function ($rec) {
                         $rec->where('course_name', 'Research, Extension and Consultation Time');
@@ -200,8 +199,7 @@ class PbtController extends Controller
                 })
                 ->orderBy('course_code')
                 ->get(),
-            'allSubjects'      => Course::where('course_is_active', true)
-                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
+            'allSubjects'      => Course::with('program')->where('course_is_active', true)
                 ->where(function ($query) {
                     $query->where('course_name', '!=', 'Research, Extension and Consultation Time')
                         ->where(function ($regular) {
@@ -221,7 +219,6 @@ class PbtController extends Controller
             'selectedDeptId'   => $request->query('department', $deptId),
             'sections'         => Section::whereIn('sec_dept_id', $allDepartments->pluck('dept_id'))->orderBy('sec_name')->get(),
             'categories'       => Course::where('course_is_active', true)
-                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
                 ->whereNotNull('course_category')
                 ->where('course_category', '!=', '')
                 ->distinct()
@@ -256,7 +253,7 @@ class PbtController extends Controller
                     return $sem;
                 }),
             'rooms'            => DB::table('room')->where('room_is_available', true)
-                ->where('room_college_id', $collegeId)->orderBy('room_name')->get(),
+                ->orderBy('room_name')->get(),
             'filters'          => $filters,
             'selectedFaculty'  => $selectedFaculty,
             'selectedDate'     => $request->query('date'),
@@ -361,22 +358,13 @@ class PbtController extends Controller
             'end_time'   => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after:start_time', 'before_or_equal:22:00'],
         ]);
 
-        $course = Course::findOrFail($data['subj_id']);
         $collegeId = $this->chairCollegeId();
-        $courseInCollege = $collegeId && Departments::where('dept_id', $course->course_dept_id)
-            ->where('dept_college_id', $collegeId)->exists();
-        $facultyInCollege = $collegeId && Faculty::where('fac_id', $data['fac_id'])
-            ->where(function ($query) use ($collegeId) {
-                $query->where('fac_college_id', $collegeId)
-                    ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
-            })->exists();
-        $roomInCollege = empty($data['room_id']) || ($collegeId && DB::table('room')
-            ->where('room_id', $data['room_id'])->where('room_college_id', $collegeId)->exists());
         $sectionInCollege = empty($data['sec_id']) || ($collegeId && Section::where('sec_id', $data['sec_id'])
             ->whereHas('program', fn ($query) => $query->where('dept_college_id', $collegeId))->exists());
-        if (!$courseInCollege || !$facultyInCollege || !$roomInCollege || !$sectionInCollege) {
-            abort(403, 'PBT schedules can only use courses, faculty, sections, and rooms within your college.');
+        if (!$sectionInCollege) {
+            abort(403, 'PBT schedule sections must remain within your college.');
         }
+        $course = Course::findOrFail($data['subj_id']);
         $data['sec_id'] = $data['sec_id'] ?? null;
         if (empty($data['sec_id'])) {
             if ($course->course_code !== 'REC') {

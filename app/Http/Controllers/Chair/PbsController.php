@@ -196,17 +196,13 @@ class PbsController extends Controller
         // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
         $selectedCategory = $request->query('category');
 
-        $subjectDeptId = $selectedDeptId ?: $progId;
-        $subjectsQuery = Course::query()
+        $subjectsQuery = Course::with('program')
             ->where('course_is_active', true)
             ->orderBy('course_code');
 
         if (!empty($selectedCategory)) {
-            $subjectsQuery->whereIn('course_dept_id', $allDepartments->pluck('dept_id'));
             $subjectsQuery->where('course_category', $selectedCategory);
         } else {
-            $subjectsQuery->where('course_dept_id', $subjectDeptId);
-
             if (!empty($selectedSection?->sec_year_level)) {
                 $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
             }
@@ -227,7 +223,6 @@ class PbsController extends Controller
 
         // Get ALL unique categories in DB (global, no semester filter)
         $categories = Course::where('course_is_active', true)
-            ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
             ->whereNotNull('course_category')
             ->where('course_category', '!=', '')
             ->distinct()
@@ -246,8 +241,7 @@ class PbsController extends Controller
         return response()->view('chair.PBS', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
-            'allSubjects'      => Course::where('course_is_active', true)
-                ->whereIn('course_dept_id', $allDepartments->pluck('dept_id'))
+            'allSubjects'      => Course::with('program')->where('course_is_active', true)
                 ->orderBy('course_code')->get(),
             'faculty'          => $faculty,
             'sections'         => $sections,
@@ -285,7 +279,7 @@ class PbsController extends Controller
                     return $sem;
                 }),
             'rooms'         => DB::table('room')->where('room_is_available', true)
-                ->where('room_college_id', $collegeId)->orderBy('room_name')->get(),
+                ->orderBy('room_name')->get(),
             'filters'       => $filters,
             'selectedDate'  => $request->query('date'),
             'chairProgram'     => $allDepartments->first(),
@@ -320,16 +314,8 @@ class PbsController extends Controller
 
         $collegeId = $this->chairCollegeId();
         $section = Section::with('program')->findOrFail($data['sec_id']);
-        $course = Course::findOrFail($data['subj_id']);
-        $faculty = Faculty::findOrFail($data['fac_id']);
-        $room = DB::table('room')->where('room_id', $data['room_id'])->first();
         if (!$collegeId || (string) $section->program?->dept_college_id !== (string) $collegeId) {
             abort(403, 'You can only schedule sections within your college.');
-        }
-        if (!Departments::where('dept_id', $course->course_dept_id)->where('dept_college_id', $collegeId)->exists()
-            || (string) $faculty->fac_college_id !== (string) $collegeId
-            || !$room || (string) $room->room_college_id !== (string) $collegeId) {
-            abort(403, 'PBS schedules can only use courses, faculty, and rooms within your college.');
         }
 
         return $data;

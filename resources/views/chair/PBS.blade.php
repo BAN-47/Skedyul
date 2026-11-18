@@ -1177,6 +1177,7 @@
                     id: "{{ $sub->course_id ?? $sub->subj_id }}",
                     code: "{{ $sub->course_code ?? $sub->subj_code }}",
                     name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                    deptCode: "{{ $sub->program?->dept_code ?? '' }}",
                     year: "{{ $sub->course_year_level ?? '' }}",
                     sem: "{{ $sub->course_semester ?? '' }}",
                     cat: "{{ $sub->course_category ?? '' }}",
