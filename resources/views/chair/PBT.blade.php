@@ -24,8 +24,10 @@
         $sections = $sections ?? collect();
         $programs = $programs ?? collect();
         $semesters = $semesters ?? collect();
+        $academicYears = $academicYears ?? collect();
         $filters = $filters ?? [];
         $activeSemester = $activeSemester ?? null;
+        $selectedAcademicYearId = $selectedAcademicYearId ?? optional($activeSemester)->sem_ay_id;
         $departments = $departments ?? ($programs ?? collect());
         $programs = $programs ?? ($departments ?? collect());
         $chairDepartment = $chairDepartment ?? null;
@@ -439,7 +441,17 @@
                             </div>
 
 
-                            <label for="filter-semester" class="sr-only">Academic year and semester</label>
+                            <label for="filter-academic-year" class="sr-only">Academic year</label>
+                            <select id="filter-academic-year" onchange="applyAcademicYear()"
+                                class="min-w-[150px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">
+                                @foreach ($academicYears as $yearOption)
+                                    <option value="{{ $yearOption->ay_id }}" @selected((string) $selectedAcademicYearId === (string) $yearOption->ay_id)>
+                                        {{ $yearOption->ay_academic_year ?? $yearOption->ay_year_label }}{{ $yearOption->ay_is_active ? ' · Current' : ' · Archived' }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <label for="filter-semester" class="sr-only">Semester</label>
                             <select id="filter-semester" onchange="applyFilters()"
                                 class="min-w-[190px] rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">
                                 <option value="">Select semester</option>
@@ -1204,7 +1216,7 @@
                     : 1);
             window.ALL_CATEGORIES = @json($categories ?? []);
         </script>
-        <script src="{{ asset('js/pbt.js') }}" defer></script>
+        <script src="{{ asset('js/pbt.js') }}?v={{ filemtime(public_path('js/pbt.js')) }}" defer></script>
         <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
         @if (session('error') || session('success'))

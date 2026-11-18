@@ -215,6 +215,8 @@ function selectTeacher(facultyId) {
 function applyFilters() {
     syncSelectedSemesterFields();
     const params = new URLSearchParams(window.location.search);
+    const academicYear = document.getElementById("filter-academic-year")?.value || "";
+    academicYear ? params.set("academic_year", academicYear) : params.delete("academic_year");
     const departmentFilter = document.getElementById("filter-program") ||
         document.getElementById("filter-department");
     const departmentParam = departmentFilter?.id === "filter-department" ? "department" : "program";
@@ -226,6 +228,14 @@ function applyFilters() {
 
     const semester = document.getElementById("filter-semester")?.value || "";
     semester ? params.set("semester", semester) : params.delete("semester");
+    window.location.search = params.toString();
+}
+
+function applyAcademicYear() {
+    const params = new URLSearchParams(window.location.search);
+    const academicYear = document.getElementById("filter-academic-year")?.value || "";
+    academicYear ? params.set("academic_year", academicYear) : params.delete("academic_year");
+    params.delete("semester");
     window.location.search = params.toString();
 }
 

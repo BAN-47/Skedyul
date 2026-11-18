@@ -42,9 +42,19 @@ class PbtController extends Controller
         $semesterQuery = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
             ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label', 'ay.ay_is_active');
+        $requestedAcademicYearId = $request->query('academic_year');
         $activeSem = $request->filled('semester')
             ? (clone $semesterQuery)->where('s.sem_id', $request->query('semester'))->first()
             : null;
+        if ($requestedAcademicYearId
+            && (string) ($activeSem->sem_ay_id ?? '') !== (string) $requestedAcademicYearId) {
+            $activeSem = (clone $semesterQuery)
+                ->where('s.sem_ay_id', $requestedAcademicYearId)
+                ->orderByRaw("CASE WHEN s.sem_name = '1st Semester' THEN 0 ELSE 1 END")
+                ->orderBy('s.sem_start_date')
+                ->first();
+        }
+        $selectedAcademicYearId = $activeSem->sem_ay_id ?? $requestedAcademicYearId;
         $activeSem ??= (clone $semesterQuery)
             ->where('s.sem_is_active', true)
             ->orderByDesc('s.sem_start_date')
@@ -52,6 +62,7 @@ class PbtController extends Controller
         $activeSem ??= (clone $semesterQuery)
             ->orderByDesc('s.sem_start_date')
             ->first();
+        $selectedAcademicYearId = $activeSem->sem_ay_id ?? null;
         if ($activeSem) {
             $year = $activeSem->ay_academic_year ?? $activeSem->ay_year_label ?? null;
             if (!$year) {
@@ -201,6 +212,7 @@ class PbtController extends Controller
         })->values();
 
         $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+        $academicYears = DB::table('academic_year')->orderByDesc('ay_academic_year')->get();
 
         return response()->view('chair.PBT', [
             'schedules'        => $schedules,
@@ -247,8 +259,11 @@ class PbtController extends Controller
             'programs'         => $allDepartments,
             'departments'      => $allDepartments,
             'chairDepartment'  => $chairDepartment,
+            'academicYears'    => $academicYears,
+            'selectedAcademicYearId' => $selectedAcademicYearId ?? $activeSem?->sem_ay_id,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+                ->when($selectedAcademicYearId ?? $activeSem?->sem_ay_id, fn ($query, $yearId) => $query->where('s.sem_ay_id', $yearId))
                 ->where(function ($query) {
                     $query->where('s.sem_is_active', true)
                         ->orWhereNull('s.sem_ay_id')

@@ -135,7 +135,19 @@ class PbsController extends Controller
         $filters = $request->only(['section']);
         $filters['department'] = $selectedDeptId;
 
+        $requestedAcademicYearId = $request->query('academic_year');
         $activeSem = $this->activeSemester($request->query('semester'));
+        if ($requestedAcademicYearId
+            && (string) ($activeSem->sem_ay_id ?? '') !== (string) $requestedAcademicYearId) {
+            $yearSemesterId = DB::table('semester')
+                ->where('sem_ay_id', $requestedAcademicYearId)
+                ->orderByRaw("CASE WHEN sem_name = '1st Semester' THEN 0 ELSE 1 END")
+                ->orderBy('sem_start_date')
+                ->value('sem_id');
+            $activeSem = $yearSemesterId ? $this->activeSemester((string) $yearSemesterId) : null;
+        }
+        $activeSem ??= $this->activeSemester();
+        $selectedAcademicYearId = $activeSem->sem_ay_id ?? $requestedAcademicYearId;
         $canPlotSelectedSemester = $activeSem && $this->semesterIsWritable($activeSem->sem_id);
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
@@ -275,9 +287,11 @@ class PbsController extends Controller
             'categories'       => $categories,
             'selectedCategory' => $selectedCategory,
             'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),
+            'selectedAcademicYearId' => $selectedAcademicYearId,
             // Labels like "2026-2027 1st Sem"
             'semesters'     => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+                ->when($selectedAcademicYearId, fn ($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))
                 ->where(function ($query) {
                     $query->where('s.sem_is_active', true)
                         ->orWhereNull('s.sem_ay_id')

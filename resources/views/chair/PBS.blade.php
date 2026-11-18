@@ -25,6 +25,7 @@
         $sections = $sections ?? collect();
         $programs = $programs ?? collect();
         $semesters = $semesters ?? collect();
+        $academicYears = $academicYears ?? collect();
         $rooms = $rooms ?? collect();
         $academicYears = $academicYears ?? collect();
         $years = $years ?? [1, 2, 3, 4]; // year levels (1–4)
@@ -34,6 +35,7 @@
         $departments = $departments ?? ($programs ?? collect());
         $programs = $programs ?? ($departments ?? collect());
         $activeSemester = $activeSemester ?? null;
+        $selectedAcademicYearId = $selectedAcademicYearId ?? optional($activeSemester)->sem_ay_id;
         $selectedSection = $selectedSection ?? null;
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -421,7 +423,16 @@
                                 </div>
                             </div>
 
-                            <label for="filter-semester" class="sr-only">Academic year and semester</label>
+                            <label for="filter-academic-year" class="sr-only">Academic year</label>
+                            <select id="filter-academic-year" onchange="applyAcademicYear()" class="pbs-filter order-1 min-w-[150px]">
+                                @foreach ($academicYears as $yearOption)
+                                    <option value="{{ $yearOption->ay_id }}" @selected((string) $selectedAcademicYearId === (string) $yearOption->ay_id)>
+                                        {{ $yearOption->ay_academic_year ?? $yearOption->ay_year_label }}{{ $yearOption->ay_is_active ? ' · Current' : ' · Archived' }}
+                                    </option>
+                                @endforeach
+                            </select>
+
+                            <label for="filter-semester" class="sr-only">Semester</label>
                             <select id="filter-semester" onchange="applyFilters()"
                                 class="pbs-filter order-1 min-w-[190px]">
                                 <option value="">Select semester</option>
