@@ -34,7 +34,6 @@
         $departments = $departments ?? ($programs ?? collect());
         $programs = $programs ?? ($departments ?? collect());
         $activeSemester = $activeSemester ?? null;
-        $selectedAcademicYearId = $selectedAcademicYearId ?? optional($activeSemester)->sem_ay_id;
         $selectedSection = $selectedSection ?? null;
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -286,15 +285,18 @@
                             class="flex flex-wrap items-center gap-1.5 px-3 py-2.5 border-b border-slate-200 bg-slate-50">
 
                             {{-- Department selector (combines program and department) --}}
-                            <select id="filter-department" onchange="applyFilters()"
-                                class="pbs-filter order-2 min-w-[150px] bg-blue-50 border-blue-300 text-blue-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
-                                <option value="">DEPARTMENT</option>
-                                @foreach ($allDepartments as $dept)
-                                    <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
-                                        {{ $dept->dept_code }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <div class="order-3 flex min-w-[150px] flex-col gap-1">
+                                <label for="filter-department" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Department</label>
+                                <select id="filter-department" onchange="applyFilters()"
+                                    class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                    <option value="">Select department</option>
+                                    @foreach ($allDepartments as $dept)
+                                        <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
+                                            {{ $dept->dept_code }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
                             {{-- The native select remains the selected value for existing PBS logic. --}}
                             <select id="filter-section" onchange="applyFilters()" class="sr-only"
@@ -422,27 +424,31 @@
                                 </div>
                             </div>
 
-                            <label for="filter-academic-year" class="sr-only">Academic year</label>
-                            <select id="filter-academic-year" onchange="applyAcademicYear()" class="pbs-filter order-1 min-w-[150px]">
-                                @foreach ($academicYears as $yearOption)
-                                    <option value="{{ $yearOption->ay_id }}" @selected((string) $selectedAcademicYearId === (string) $yearOption->ay_id)>
-                                        {{ $yearOption->ay_academic_year ?? $yearOption->ay_year_label }}{{ $yearOption->ay_is_active ? ' · Current' : ' · Archived' }}
-                                    </option>
-                                @endforeach
-                            </select>
+                            <div class="order-1 flex min-w-[150px] flex-col gap-1">
+                                <label for="filter-academic-year" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Academic year</label>
+                                <select id="filter-academic-year" onchange="applyAcademicYear()"
+                                    class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                    @foreach ($academicYears as $yearOption)
+                                        <option value="{{ $yearOption->ay_id }}" @selected((string) $selectedAcademicYearId === (string) $yearOption->ay_id)>
+                                            {{ $yearOption->ay_academic_year ?? $yearOption->ay_year_label }}{{ $yearOption->ay_is_active ? ' · Current' : ' · Archived' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="order-2 flex min-w-[190px] flex-col gap-1">
+                                <label for="filter-semester" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Semester</label>
+                                <select id="filter-semester" onchange="applyFilters()"
+                                    class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                    <option value="">Select semester</option>
+                                    @foreach ($semesters as $semester)
+                                        <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
+                                            {{ $semester->label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                            <label for="filter-semester" class="sr-only">Semester</label>
-                            <select id="filter-semester" onchange="applyFilters()"
-                                class="pbs-filter order-1 min-w-[190px]">
-                                <option value="">Select semester</option>
-                                @foreach ($semesters as $semester)
-                                    <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
-                                        {{ $semester->label }}
-                                    </option>
-                                @endforeach
-                            </select>
-
-                            <div class="order-3 flex overflow-hidden rounded-md border border-slate-300">
+                            <div class="order-5 flex self-end overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                                 <button type="button" id="shift-day" onclick="setShift('day')"
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
                                 <button type="button" id="shift-night" onclick="setShift('night')"

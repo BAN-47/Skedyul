@@ -137,17 +137,15 @@ class PbsController extends Controller
 
         $requestedAcademicYearId = $request->query('academic_year');
         $activeSem = $this->activeSemester($request->query('semester'));
-        if ($requestedAcademicYearId
-            && (string) ($activeSem->sem_ay_id ?? '') !== (string) $requestedAcademicYearId) {
-            $yearSemesterId = DB::table('semester')
+        if ($requestedAcademicYearId && (string) ($activeSem?->sem_ay_id ?? '') !== (string) $requestedAcademicYearId) {
+            $firstSemesterId = DB::table('semester')
                 ->where('sem_ay_id', $requestedAcademicYearId)
                 ->orderByRaw("CASE WHEN sem_name = '1st Semester' THEN 0 ELSE 1 END")
                 ->orderBy('sem_start_date')
                 ->value('sem_id');
-            $activeSem = $yearSemesterId ? $this->activeSemester((string) $yearSemesterId) : null;
+            $activeSem = $firstSemesterId ? $this->activeSemester((string) $firstSemesterId) : $activeSem;
         }
-        $activeSem ??= $this->activeSemester();
-        $selectedAcademicYearId = $activeSem->sem_ay_id ?? $requestedAcademicYearId;
+        $selectedAcademicYearId = $activeSem?->sem_ay_id ?? $requestedAcademicYearId;
         $canPlotSelectedSemester = $activeSem && $this->semesterIsWritable($activeSem->sem_id);
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
@@ -316,8 +314,6 @@ class PbsController extends Controller
                 ])
                 ->get()
                 ->map(function ($sem) use ($officialSemesterName) {
-                    $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
-                    $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
                     $label = trim((string) ($sem->sem_name ?? ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
