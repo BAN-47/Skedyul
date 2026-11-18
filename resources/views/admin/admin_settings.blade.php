@@ -217,7 +217,7 @@
                             <td>
                               @unless($reviewIsCurrent)
                                 <button type="button" class="btn btn-secondary btn-sm"
-                                  @if(!$reviewSecondDatesConfigured) disabled title="Set valid 2nd Semester dates before switching" @endif
+                                  @if(!$reviewSecondDatesConfigured && $reviewYear->ay_is_active) disabled title="Set valid 2nd Semester dates before switching" @endif
                                   onclick="activateAcademicSemester('{{ $reviewSemester->sem_id }}', @js(($reviewYear->ay_academic_year ?? $reviewYear->ay_year_label).' · '.$reviewSemester->sem_name), {{ $reviewYear->ay_is_active ? 'false' : 'true' }})">
                                   {{ $reviewYear->ay_is_active ? 'Switch Now' : 'Make Current' }}
                                 </button>

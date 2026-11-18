@@ -288,15 +288,16 @@ class AcademicYearController extends Controller
             return response()->json(['success' => false, 'message' => 'Academic semester not found.'], 404);
         }
 
-        if (empty($target->sem_start_date) || empty($target->sem_end_date)
-            || $target->sem_end_date <= $target->sem_start_date) {
+        $isArchivedYear = ! (bool) $target->ay_is_active;
+        if (! $isArchivedYear && (empty($target->sem_start_date) || empty($target->sem_end_date)
+            || $target->sem_end_date <= $target->sem_start_date)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This semester has incomplete or invalid dates. Set valid dates before making it current.',
             ], 422);
         }
 
-        if ($target->sem_name === '2nd Semester') {
+        if (! $isArchivedYear && $target->sem_name === '2nd Semester') {
             $firstSemesterEnd = DB::table('semester')
                 ->where('sem_ay_id', $target->sem_ay_id)
                 ->where('sem_name', '1st Semester')
