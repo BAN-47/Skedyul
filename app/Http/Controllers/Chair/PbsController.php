@@ -318,7 +318,7 @@ class PbsController extends Controller
                 ->map(function ($sem) use ($officialSemesterName) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
-                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
+                    $label = trim((string) ($sem->sem_name ?? ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {

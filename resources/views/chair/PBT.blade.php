@@ -1216,7 +1216,7 @@
                     : 1);
             window.ALL_CATEGORIES = @json($categories ?? []);
         </script>
-        <script src="{{ asset('js/pbt.js') }}?v={{ filemtime(public_path('js/pbt.js')) }}" defer></script>
+        <script src="{{ asset('js/pbt.js') }}" defer></script>
         <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
         @if (session('error') || session('success'))

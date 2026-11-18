@@ -399,7 +399,6 @@ function applyAcademicYear() {
     const params = new URLSearchParams(window.location.search);
     const academicYear = document.getElementById("filter-academic-year")?.value || "";
     academicYear ? params.set("academic_year", academicYear) : params.delete("academic_year");
-    // The controller selects the first available semester in the chosen year.
     params.delete("semester");
     try { sessionStorage.removeItem("pbs-add-another"); } catch (_) {}
     window.location.search = params.toString();

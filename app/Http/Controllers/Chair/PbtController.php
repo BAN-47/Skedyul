@@ -260,10 +260,10 @@ class PbtController extends Controller
             'departments'      => $allDepartments,
             'chairDepartment'  => $chairDepartment,
             'academicYears'    => $academicYears,
-            'selectedAcademicYearId' => $selectedAcademicYearId ?? $activeSem?->sem_ay_id,
+            'selectedAcademicYearId' => $selectedAcademicYearId,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-                ->when($selectedAcademicYearId ?? $activeSem?->sem_ay_id, fn ($query, $yearId) => $query->where('s.sem_ay_id', $yearId))
+                ->when($selectedAcademicYearId, fn ($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))
                 ->where(function ($query) {
                     $query->where('s.sem_is_active', true)
                         ->orWhereNull('s.sem_ay_id')
@@ -290,7 +290,7 @@ class PbtController extends Controller
                 ->map(function ($sem) use ($officialSemesterName) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
-                    $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
+                    $label = trim((string) ($sem->sem_name ?? ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {

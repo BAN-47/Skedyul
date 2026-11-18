@@ -25,7 +25,6 @@
         $sections = $sections ?? collect();
         $programs = $programs ?? collect();
         $semesters = $semesters ?? collect();
-        $academicYears = $academicYears ?? collect();
         $rooms = $rooms ?? collect();
         $academicYears = $academicYears ?? collect();
         $years = $years ?? [1, 2, 3, 4]; // year levels (1–4)
