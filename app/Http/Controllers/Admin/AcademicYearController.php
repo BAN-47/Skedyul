@@ -47,6 +47,13 @@ class AcademicYearController extends Controller
                 || $this->normalizeYear((string) ($row->ay_year_label ?? '')) === $yearLabel;
         });
         $isNewAcademicYear = ! $existingYear;
+        $currentSemester = DB::table('semester')->where('sem_is_active', true)->first();
+        $isConfiguringUpcomingSecond = ! $isNewAcademicYear
+            && (bool) ($existingYear->ay_is_active ?? false)
+            && $validated['sem_name'] === '2nd Semester'
+            && $currentSemester
+            && (string) $currentSemester->sem_ay_id === (string) $existingYear->ay_id
+            && $currentSemester->sem_name === '1st Semester';
 
         if ($existingYear && !(bool) $existingYear->ay_is_active
             && DB::table('academic_year')->where('ay_is_active', true)->exists()) {
@@ -95,7 +102,7 @@ class AcademicYearController extends Controller
         $semName = $isNewAcademicYear ? '1st Semester' : $validated['sem_name'];
 
         try {
-            $result = DB::transaction(function () use ($validated, $yearLabel, $semName, $existingYear, $isNewAcademicYear) {
+            $result = DB::transaction(function () use ($validated, $yearLabel, $semName, $existingYear, $isNewAcademicYear, $isConfiguringUpcomingSecond) {
                 $previousYear = DB::table('academic_year')->where('ay_is_active', true)->first();
                 if ($isNewAcademicYear) {
                     // Fill any older archive gaps as well as snapshotting the
@@ -105,7 +112,9 @@ class AcademicYearController extends Controller
                 }
 
                 // 1) Academic year: find or create, set active
-                DB::table('academic_year')->update(['ay_is_active' => false]);
+                if (! $isConfiguringUpcomingSecond) {
+                    DB::table('academic_year')->update(['ay_is_active' => false]);
+                }
 
                 $ayId = $existingYear->ay_id ?? (string) Str::uuid();
                 $ayPayload = [
@@ -127,7 +136,9 @@ class AcademicYearController extends Controller
                 }
 
                 // Only update a semester belonging to this academic year.
-                DB::table('semester')->update(['sem_is_active' => false]);
+                if (! $isConfiguringUpcomingSecond) {
+                    DB::table('semester')->update(['sem_is_active' => false]);
+                }
                 if ($isNewAcademicYear && self::hasColumn('semester', 'sem_is_plotting_enabled')) {
                     DB::table('semester')->update(['sem_is_plotting_enabled' => false]);
                 }
@@ -137,8 +148,9 @@ class AcademicYearController extends Controller
                     ->where('sem_name', $semName)
                     ->first();
 
-                // Always enable plotting for active semesters
-                $plottingEnabled = true;
+                // Configuring a future 2nd Semester must not make it current;
+                // Admin can enable Advance Plotting or switch it manually later.
+                $plottingEnabled = ! $isConfiguringUpcomingSecond;
 
                 if (! $sem) {
                     $semId = (string) Str::uuid();
@@ -148,24 +160,29 @@ class AcademicYearController extends Controller
                         'sem_ay_id' => $ayId,
                         'sem_start_date' => $validated['sem_start_date'],
                         'sem_end_date' => $validated['sem_end_date'],
-                        'sem_is_active' => true,
-                        'sem_is_plotting_enabled' => $plottingEnabled,
+                        'sem_is_active' => ! $isConfiguringUpcomingSecond,
+                        'sem_is_plotting_enabled' => $isConfiguringUpcomingSecond
+                            ? (bool) ($sem->sem_is_plotting_enabled ?? false)
+                            : $plottingEnabled,
                     ];
                     DB::table('semester')->insert($insert);
                 } else {
                     $update = [
                         'sem_start_date' => $validated['sem_start_date'],
                         'sem_end_date' => $validated['sem_end_date'],
-                        'sem_is_active' => true,
-                        'sem_is_plotting_enabled' => $plottingEnabled,
+                        'sem_is_active' => ! $isConfiguringUpcomingSecond,
+                        'sem_is_plotting_enabled' => $isConfiguringUpcomingSecond
+                            ? (bool) ($sem->sem_is_plotting_enabled ?? false)
+                            : $plottingEnabled,
                     ];
                     DB::table('semester')->where('sem_id', $sem->sem_id)->update($update);
                 }
 
-                // A new academic year always has both term records. The 2nd
-                // semester's dates are intentionally placeholders until Admin
-                // sets them when the 1st semester ends; it is not active or
-                // available for advance plotting yet.
+                // A new academic year always has both term records. Use a
+                // valid date range for the inactive 2nd-semester placeholder:
+                // copying the 1st-semester range satisfies databases that
+                // enforce end_date > start_date, while the overlap ensures
+                // auto-advance/advance plotting cannot treat it as configured.
                 if ($isNewAcademicYear) {
                     $second = DB::table('semester')
                         ->where('sem_ay_id', $ayId)
@@ -173,13 +190,12 @@ class AcademicYearController extends Controller
                         ->first();
 
                     if (! $second) {
-                        $placeholderDate = $validated['sem_end_date'];
                         DB::table('semester')->insert([
                             'sem_id' => (string) Str::uuid(),
                             'sem_name' => '2nd Semester',
                             'sem_ay_id' => $ayId,
-                            'sem_start_date' => $placeholderDate,
-                            'sem_end_date' => $placeholderDate,
+                            'sem_start_date' => $validated['sem_start_date'],
+                            'sem_end_date' => $validated['sem_end_date'],
                             'sem_is_active' => false,
                             'sem_is_plotting_enabled' => false,
                         ]);
@@ -188,6 +204,7 @@ class AcademicYearController extends Controller
 
                 return [
                     'label' => $yearLabel.' · '.$semName,
+                    'configured_upcoming_semester' => $isConfiguringUpcomingSecond,
                     'archived_year' => $isNewAcademicYear ? ($previousYear?->ay_academic_year ?? null) : null,
                 ];
             });
@@ -202,8 +219,10 @@ class AcademicYearController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Current period set to '.$result['label'].($result['archived_year'] ? '. Previous academic year schedules were archived and advance plotting was reset.' : ''),
-            'label' => $result['label'].' (Current)',
+            'message' => $result['configured_upcoming_semester']
+                ? 'Dates saved for '.$result['label'].'. 1st Semester remains current; enable Advance Plotting or switch semesters when ready.'
+                : 'Current period set to '.$result['label'].($result['archived_year'] ? '. Previous academic year schedules were archived and advance plotting was reset.' : ''),
+            'label' => $result['label'].($result['configured_upcoming_semester'] ? ' (Dates saved)' : ' (Current)'),
         ]);
     }
 
@@ -269,12 +288,26 @@ class AcademicYearController extends Controller
             return response()->json(['success' => false, 'message' => 'Academic semester not found.'], 404);
         }
 
-        if (empty($target->sem_start_date) || empty($target->sem_end_date)
-            || $target->sem_end_date <= $target->sem_start_date) {
+        $isArchivedYear = ! (bool) $target->ay_is_active;
+        if (! $isArchivedYear && (empty($target->sem_start_date) || empty($target->sem_end_date)
+            || $target->sem_end_date <= $target->sem_start_date)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This semester has incomplete or invalid dates. Set valid dates before making it current.',
             ], 422);
+        }
+
+        if (! $isArchivedYear && $target->sem_name === '2nd Semester') {
+            $firstSemesterEnd = DB::table('semester')
+                ->where('sem_ay_id', $target->sem_ay_id)
+                ->where('sem_name', '1st Semester')
+                ->value('sem_end_date');
+            if ($firstSemesterEnd && $target->sem_start_date <= $firstSemesterEnd) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Set the 2nd Semester dates so they start after the 1st Semester ends before switching.',
+                ], 422);
+            }
         }
 
         if (! Schema::hasTable('schedule_archives')) {
@@ -482,6 +515,10 @@ class AcademicYearController extends Controller
 
         $activeYear = DB::table('academic_year')->where('ay_is_active', true)->first();
         $activeSemester = DB::table('semester')->where('sem_is_active', true)->first();
+        $firstSemesterEnd = DB::table('semester')
+            ->where('sem_ay_id', $semester->sem_ay_id)
+            ->where('sem_name', '1st Semester')
+            ->value('sem_end_date');
         $isValidAdvanceTarget = !$activeYear
             || !$activeSemester
             ? false
@@ -489,6 +526,9 @@ class AcademicYearController extends Controller
                 && (string) $activeSemester->sem_ay_id === (string) $activeYear->ay_id
                 && $activeSemester->sem_name === '1st Semester'
                 && $semester->sem_name === '2nd Semester'
+                && $firstSemesterEnd
+                && $semester->sem_start_date > $firstSemesterEnd
+                && $semester->sem_end_date > $semester->sem_start_date
                 && !(bool) $semester->sem_is_active);
 
         // Permit disabling stale legacy flags (for example, Advance Plotting
