@@ -4,7 +4,6 @@
     {{-- LOGO --}}
     <div class="sidebar-logo">
         <div class="admin-brand">
-            <span class="admin-brand-mark">S</span>
             <div class="min-w-0 text-left">
                 <div class="sidebar-logo-text">SKED<span>YUL</span></div>
                 <div class="admin-brand-caption">Academic Core</div>

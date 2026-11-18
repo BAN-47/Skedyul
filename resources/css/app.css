@@ -830,10 +830,9 @@
         background-image: linear-gradient(180deg, #14294f 0%, #172e59 58%, #10223f 100%);
     }
     .admin-sidebar .sidebar-logo { @apply px-5 py-5 text-left; border-color: rgba(255,255,255,.09); }
-    .admin-brand { @apply flex items-center gap-2.5; }
-    .admin-brand-mark { @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-950/30; }
-    .admin-sidebar .sidebar-logo-text { @apply text-[17px] tracking-tight; }
-    .admin-brand-caption { @apply mt-0.5 text-[9px] font-semibold uppercase tracking-[.12em] text-blue-100/50; }
+    .admin-brand { @apply flex items-center gap-3; }
+    .admin-sidebar .sidebar-logo-text { @apply text-[23px] font-black tracking-tight leading-none; }
+    .admin-brand-caption { @apply mt-1 text-[10px] font-semibold uppercase tracking-[.12em] text-blue-100/50; }
     .admin-role-badge { @apply ml-auto rounded-md bg-blue-600/20 px-2 py-1 text-[9px] font-bold tracking-wide text-blue-200; }
     .admin-sidebar .sidebar-user { @apply px-4 py-4; }
     .admin-sidebar .sidebar-avatar { @apply h-10 w-10 border border-blue-300/20 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-950/25; }

@@ -193,8 +193,7 @@
                             $reviewIsPlotting = (bool) $reviewSemester->sem_is_plotting_enabled
                               && (bool) $reviewYear->ay_is_active
                               && $reviewSemester->sem_name === '2nd Semester'
-                              && ($activeSemester->sem_name ?? null) === '1st Semester'
-                              && $reviewSecondDatesConfigured;
+                              && ($activeSemester->sem_name ?? null) === '1st Semester';
                           @endphp
                           <tr>
                             <td class="font-semibold">{{ $reviewSemester->sem_name }}</td>
@@ -204,10 +203,10 @@
                                 <span class="badge badge-green">Current</span>
                               @elseif($reviewIsPlotting)
                                 <span class="badge badge-blue">Advance plotting</span>
-                              @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && !$reviewSecondDatesConfigured)
-                                <span class="badge badge-grey">Dates not configured</span>
                               @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && ($activeSemester->sem_name ?? null) === '1st Semester')
                                 <span class="badge badge-grey">Advance plotting off</span>
+                              @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && !$reviewSecondDatesConfigured)
+                                <span class="badge badge-grey">Dates not configured</span>
                               @elseif(!$reviewYear->ay_is_active)
                                 <span class="badge badge-grey">Archived · View only</span>
                               @else
@@ -280,16 +279,6 @@
                         ->where('sem_name', '2nd Semester')
                         ->first()
                     : null;
-                $firstSemesterForPlotting = optional($activeYear)->ay_id
-                    ? \App\Models\Semester::query()->where('sem_ay_id', $activeYear->ay_id)
-                        ->where('sem_name', '1st Semester')->first()
-                    : null;
-                $advanceDatesConfigured = $inactiveSemester && $firstSemesterForPlotting
-                    && $firstSemesterForPlotting->sem_end_date
-                    && $inactiveSemester->sem_start_date
-                    && $inactiveSemester->sem_end_date
-                    && $inactiveSemester->sem_start_date->gt($firstSemesterForPlotting->sem_end_date)
-                    && $inactiveSemester->sem_end_date->gt($inactiveSemester->sem_start_date);
                 $advanceFlagEnabled = (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false);
               @endphp
 
@@ -298,15 +287,14 @@
                 <div class="flex items-center gap-2">
                   <label class="toggle-switch">
                     <input type="checkbox" id="ay-plotting-enabled"
-                          @disabled(!$advanceDatesConfigured && !$advanceFlagEnabled)
                           {{ $advanceFlagEnabled ? 'checked' : '' }}
                           onchange="togglePlottingEnabled('{{ optional($inactiveSemester)->sem_id }}', this)">
                     <span class="toggle-track {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                   <span class="text-[12px] text-slate-600">Allow chairs to plot the upcoming 2nd Semester of this academic year</span>
                 </div>
-                @if($inactiveSemester && !$advanceDatesConfigured)
-                  <p class="mt-2 text-[11px] text-amber-700">Set the 2nd Semester dates in the Semester form above. Saving those dates keeps 1st Semester current.</p>
+                @if($inactiveSemester)
+                  <p class="mt-2 text-[11px] text-slate-500">This toggle controls chair access to 2nd Semester plotting. Date settings do not prevent enabling or disabling it.</p>
                 @endif
               </div>
 

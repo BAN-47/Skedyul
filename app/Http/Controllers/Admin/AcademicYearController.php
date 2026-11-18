@@ -515,10 +515,6 @@ class AcademicYearController extends Controller
 
         $activeYear = DB::table('academic_year')->where('ay_is_active', true)->first();
         $activeSemester = DB::table('semester')->where('sem_is_active', true)->first();
-        $firstSemesterEnd = DB::table('semester')
-            ->where('sem_ay_id', $semester->sem_ay_id)
-            ->where('sem_name', '1st Semester')
-            ->value('sem_end_date');
         $isValidAdvanceTarget = !$activeYear
             || !$activeSemester
             ? false
@@ -526,9 +522,6 @@ class AcademicYearController extends Controller
                 && (string) $activeSemester->sem_ay_id === (string) $activeYear->ay_id
                 && $activeSemester->sem_name === '1st Semester'
                 && $semester->sem_name === '2nd Semester'
-                && $firstSemesterEnd
-                && $semester->sem_start_date > $firstSemesterEnd
-                && $semester->sem_end_date > $semester->sem_start_date
                 && !(bool) $semester->sem_is_active);
 
         // Permit disabling stale legacy flags (for example, Advance Plotting
