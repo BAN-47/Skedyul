@@ -179,22 +179,33 @@
                     <table class="data-table min-w-[520px]">
                       <thead><tr><th>Semester</th><th>Dates</th><th>Status</th><th>Action</th></tr></thead>
                       <tbody>
+                        @php $reviewFirstSemester = $reviewSemesters->firstWhere('sem_name', '1st Semester'); @endphp
                         @forelse($reviewSemesters as $reviewSemester)
                           @php
                             $reviewIsCurrent = (bool) $reviewSemester->sem_is_active;
+                            $reviewSecondDatesConfigured = $reviewSemester->sem_name !== '2nd Semester'
+                              || ($reviewFirstSemester
+                                && $reviewFirstSemester->sem_end_date
+                                && $reviewSemester->sem_start_date
+                                && $reviewSemester->sem_end_date
+                                && $reviewSemester->sem_start_date->gt($reviewFirstSemester->sem_end_date)
+                                && $reviewSemester->sem_end_date->gt($reviewSemester->sem_start_date));
                             $reviewIsPlotting = (bool) $reviewSemester->sem_is_plotting_enabled
                               && (bool) $reviewYear->ay_is_active
                               && $reviewSemester->sem_name === '2nd Semester'
-                              && ($activeSemester->sem_name ?? null) === '1st Semester';
+                              && ($activeSemester->sem_name ?? null) === '1st Semester'
+                              && $reviewSecondDatesConfigured;
                           @endphp
                           <tr>
                             <td class="font-semibold">{{ $reviewSemester->sem_name }}</td>
-                            <td>{{ $reviewSemester->sem_start_date?->format('M j, Y') ?? 'Dates not set' }} – {{ $reviewSemester->sem_end_date?->format('M j, Y') ?? 'Dates not set' }}</td>
+                            <td>{{ $reviewSecondDatesConfigured ? ($reviewSemester->sem_start_date?->format('M j, Y') ?? 'Dates not set').' – '.($reviewSemester->sem_end_date?->format('M j, Y') ?? 'Dates not set') : 'Set dates using the semester form below' }}</td>
                             <td>
                               @if($reviewIsCurrent)
                                 <span class="badge badge-green">Current</span>
                               @elseif($reviewIsPlotting)
                                 <span class="badge badge-blue">Advance plotting</span>
+                              @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && !$reviewSecondDatesConfigured)
+                                <span class="badge badge-grey">Dates not configured</span>
                               @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && ($activeSemester->sem_name ?? null) === '1st Semester')
                                 <span class="badge badge-grey">Advance plotting off</span>
                               @elseif(!$reviewYear->ay_is_active)
@@ -206,6 +217,7 @@
                             <td>
                               @unless($reviewIsCurrent)
                                 <button type="button" class="btn btn-secondary btn-sm"
+                                  @if(!$reviewSecondDatesConfigured) disabled title="Set valid 2nd Semester dates before switching" @endif
                                   onclick="activateAcademicSemester('{{ $reviewSemester->sem_id }}', @js(($reviewYear->ay_academic_year ?? $reviewYear->ay_year_label).' · '.$reviewSemester->sem_name), {{ $reviewYear->ay_is_active ? 'false' : 'true' }})">
                                   {{ $reviewYear->ay_is_active ? 'Switch Now' : 'Make Current' }}
                                 </button>
@@ -268,6 +280,17 @@
                         ->where('sem_name', '2nd Semester')
                         ->first()
                     : null;
+                $firstSemesterForPlotting = optional($activeYear)->ay_id
+                    ? \App\Models\Semester::query()->where('sem_ay_id', $activeYear->ay_id)
+                        ->where('sem_name', '1st Semester')->first()
+                    : null;
+                $advanceDatesConfigured = $inactiveSemester && $firstSemesterForPlotting
+                    && $firstSemesterForPlotting->sem_end_date
+                    && $inactiveSemester->sem_start_date
+                    && $inactiveSemester->sem_end_date
+                    && $inactiveSemester->sem_start_date->gt($firstSemesterForPlotting->sem_end_date)
+                    && $inactiveSemester->sem_end_date->gt($inactiveSemester->sem_start_date);
+                $advanceFlagEnabled = (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false);
               @endphp
 
               <div class="mb-1" @if(!$inactiveSemester) style="display:none;" @endif>
@@ -275,12 +298,16 @@
                 <div class="flex items-center gap-2">
                   <label class="toggle-switch">
                     <input type="checkbox" id="ay-plotting-enabled"
-                          {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'checked' : '' }}
+                          @disabled(!$advanceDatesConfigured && !$advanceFlagEnabled)
+                          {{ $advanceFlagEnabled ? 'checked' : '' }}
                           onchange="togglePlottingEnabled('{{ optional($inactiveSemester)->sem_id }}', this)">
                     <span class="toggle-track {{ (bool) (optional($inactiveSemester)->sem_is_plotting_enabled ?? false) ? 'on' : '' }}"><span class="toggle-thumb"></span></span>
                   </label>
                   <span class="text-[12px] text-slate-600">Allow chairs to plot the upcoming 2nd Semester of this academic year</span>
                 </div>
+                @if($inactiveSemester && !$advanceDatesConfigured)
+                  <p class="mt-2 text-[11px] text-amber-700">Set the 2nd Semester dates in the Semester form above. Saving those dates keeps 1st Semester current.</p>
+                @endif
               </div>
 
               <p class="text-[11px] text-slate-400 mt-1 mb-2">
