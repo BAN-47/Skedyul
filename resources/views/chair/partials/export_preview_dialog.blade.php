@@ -28,8 +28,25 @@
         modal.style.zIndex = '10000';
         modal.style.display = 'none';
 
+        let previewOpener = null;
+        const closeUnderlyingEditors = () => {
+            ['modal-add-schedule', 'modal-edit-schedule', 'modal-delete-schedule'].forEach((id) => {
+                const editor = document.getElementById(id);
+                if (!editor) return;
+                editor.style.display = 'none';
+                editor.setAttribute('hidden', '');
+                editor.classList.remove('active');
+            });
+            try { sessionStorage.removeItem('pbs-add-another'); } catch (_) {}
+        };
         const closeModal = () => {
-            modal.style.display = 'none';
+            if (modal.contains(document.activeElement)) {
+                const fallback = document.querySelector('button[onclick="downloadPbsExport()"]');
+                const returnFocus = previewOpener instanceof HTMLElement && previewOpener.isConnected
+                    ? previewOpener
+                    : fallback;
+                returnFocus?.focus();
+            }            modal.style.display = 'none';
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             modal.setAttribute('aria-hidden', 'true');
@@ -37,6 +54,8 @@
         };
 
         const openPreview = async (url) => {
+            previewOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            closeUnderlyingEditors();
             modal.style.display = 'flex';
             modal.classList.remove('hidden');
             modal.classList.add('flex');

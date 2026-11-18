@@ -8,6 +8,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SKEDYUL — Program by Section (PBS)</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        .modal-overlay[hidden] {
+            display: none !important;
+        }
+    </style>
 </head>
 
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
@@ -417,7 +422,8 @@
                             </div>
 
                             <label for="filter-semester" class="sr-only">Academic year and semester</label>
-                            <select id="filter-semester" onchange="applyFilters()" class="pbs-filter order-1 min-w-[190px]">
+                            <select id="filter-semester" onchange="applyFilters()"
+                                class="pbs-filter order-1 min-w-[190px]">
                                 <option value="">Select semester</option>
                                 @foreach ($semesters as $semester)
                                     <option value="{{ $semester->sem_id }}" @selected(($filters['semester'] ?? '') === $semester->sem_id)>
@@ -639,7 +645,7 @@
 
 
     {{-- ══════════════ MODAL: ADD ══════════════ --}}
-    <div class="modal-overlay" id="modal-add-schedule">
+    <div class="modal-overlay" id="modal-add-schedule" style="display:none" hidden>
         <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
             <div class="modal-header">
                 <div class="modal-title text-indigo-700">Add Schedule</div>
@@ -830,7 +836,7 @@
 
 
     {{-- ══════════════ MODAL: EDIT ══════════════ --}}
-    <div class="modal-overlay" id="modal-edit-schedule">
+    <div class="modal-overlay" id="modal-edit-schedule" style="display:none" hidden>
         <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]">
             <div class="modal-header">
                 <div class="modal-title text-indigo-700">Edit Schedule</div>
@@ -975,7 +981,7 @@
 
 
     {{-- ══════════════ MODAL: DELETE ══════════════ --}}
-    <div class="modal-overlay" id="modal-delete-schedule">
+    <div class="modal-overlay" id="modal-delete-schedule" style="display:none" hidden>
         <div class="modal-box w-[420px] max-w-[calc(100vw-32px)]">
             <div class="modal-header">
                 <div class="modal-title text-red-600">Delete Schedule</div>
@@ -1014,116 +1020,7 @@
                     class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
             </div>
         </div>
-        <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
     </div>
-
-    <div class="mb-3">
-        <label class="field-label">Department</label>
-        <select id="edit-department" class="field-input">
-            <option value="">-- Select Department --</option>
-            @foreach ($allDepartments as $dept)
-                <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
-                    {{ $dept->dept_name }}
-                </option>
-            @endforeach
-        </select>
-    </div>
-
-    {{-- SECTION (triggers subject filter) --}}
-    <div class="mb-3">
-        <label class="field-label">Section</label>
-        <select id="edit-section" class="field-input">
-            <option value="">-- Select Section --</option>
-            @foreach ($sections as $sec)
-                <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
-                    data-year-level="{{ $sec->sec_year_level ?? '' }}"
-                    data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    {{-- SUBJECT + CATEGORY --}}
-    <div class="flex items-end gap-2 mb-3">
-        <div class="flex-1">
-            <label class="field-label">Category</label>
-            <select id="edit-category" class="field-input !py-[9px]" onchange="filterEditSubjectsByCategory()">
-                <option value="">-- All --</option>
-                @foreach ($categories as $cat)
-                    <option value="{{ $cat }}">{{ $cat }}</option>
-                @endforeach
-            </select>
-        </div>
-        <div class="flex-[3]">
-            <label class="field-label">Subject/Course</label>
-            <select id="edit-subject" class="field-input">
-                <option value="">-- Select Subject --</option>
-                @foreach ($subjects as $sub)
-                    <option value="{{ $sub->course_id ?? $sub->subj_id }}"
-                        data-dept-id="{{ $sub->course_dept_id ?? '' }}"
-                        data-course-code="{{ $sub->course_code ?? ($sub->subj_code ?? '') }}"
-                        data-year-level="{{ $sub->course_year_level ?? '' }}"
-                        data-category="{{ $sub->course_category ?? '' }}"
-                        data-semester="{{ $sub->course_semester ?? '' }}"
-                        data-lecture-hours="{{ $sub->course_lecture_hours ?? 0 }}"
-                        data-lab-hours="{{ $sub->course_lab_hours ?? 0 }}">
-                        {{ $sub->course_code ?? $sub->subj_code }} — {{ $sub->course_name ?? $sub->subj_name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Professor</label>
-        <select id="edit-faculty" class="field-input">
-            <option value="">-- Select Professor --</option>
-            @foreach ($faculty as $f)
-                <option value="{{ $f->fac_id }}">
-                    {{ trim(implode(' ', array_filter([$f->fac_first_name, $f->fac_last_name, $f->fac_suffix]))) }}
-                </option>
-            @endforeach
-        </select>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Room</label>
-        <select id="edit-room" class="field-input">
-            <option value="">-- Select Room --</option>
-            @foreach ($rooms as $r)
-                <option value="{{ $r->room_id }}">
-                    {{ $r->room_name }}{{ !empty($r->room_type) ? ', ' . $r->room_type : '' }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Day</label>
-        <select id="edit-day" class="field-input">
-            <option value="">-- Select Day --</option>
-            @foreach ($days as $d)
-                <option value="{{ $d }}">{{ $d }}</option>
-            @endforeach
-        </select>
-    </div>
-
-    <div class="grid grid-cols-2 gap-3 mb-3">
-        <div>
-            <label class="field-label">Start Time</label>
-            <input type="time" id="edit-start" step="1800" class="field-input">
-        </div>
-        <div>
-            <label class="field-label">End Time</label>
-            <input type="time" id="edit-end" step="1800" class="field-input">
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="field-label">Description (optional)</label>
-        <textarea id="edit-description" rows="3" class="field-input resize-y"></textarea>
-    </div>
-
-    </div>
-
 
     {{-- TOAST --}}
     <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
@@ -1195,7 +1092,7 @@
                 ? 2
                 : 1);
     </script>
-    <script src="{{ asset('js/pbs.js') }}" defer></script>
+    <script src="{{ asset('js/pbs.js') }}?v={{ filemtime(public_path('js/pbs.js')) }}" defer></script>
     <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
     @if (session('error') || session('success'))
@@ -1256,6 +1153,12 @@
 
     <script>
         async function downloadPbsExport() {
+            // Close editors and clear stale add-another state before opening preview.
+            try {
+                sessionStorage.removeItem('pbs-add-another');
+            } catch (_) {}
+            ['modal-add-schedule', 'modal-edit-schedule', 'modal-delete-schedule'].forEach(closeModal);
+
             const section = document.getElementById('filter-section')?.value || '';
             const semester = document.getElementById('filter-semester')?.value || '';
             const studentCountInput = document.getElementById('section-student-count');
