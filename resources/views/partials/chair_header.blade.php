@@ -1,7 +1,7 @@
 <div class="topbar">
     <div class="topbar-title">{{ $title ?? 'Department Chair Dashboard' }}</div>
     <div class="flex items-center gap-2.5">
-        @if(!empty($badgeText))
+        @if (!empty($badgeText))
             <span class="badge badge-blue text-[11px]">{{ $badgeText }}</span>
         @endif
         <div id="topbar-notif-bell" class="relative">
@@ -36,177 +36,194 @@
     ];
 @endphp
 <script>
-let chairHeaderNotifOpen = false;
-const CHAIR_HEADER_NOTIFICATION_ENDPOINTS = @json($chairHeaderNotificationEndpoints);
+    let chairHeaderNotifOpen = false;
+    const CHAIR_HEADER_NOTIFICATION_ENDPOINTS = @json($chairHeaderNotificationEndpoints);
 
-function chairHeaderToggleNotifDropdown() {
-    chairHeaderNotifOpen = !chairHeaderNotifOpen;
-    const dd = document.getElementById('notif-dropdown');
-    if (dd) dd.style.display = chairHeaderNotifOpen ? 'block' : 'none';
-    if (chairHeaderNotifOpen) loadChairHeaderNotifications();
-}
-
-document.addEventListener('click', function (e) {
-    const bell = document.getElementById('topbar-notif-bell');
-    if (bell && !bell.contains(e.target)) {
-        chairHeaderNotifOpen = false;
+    function chairHeaderToggleNotifDropdown() {
+        chairHeaderNotifOpen = !chairHeaderNotifOpen;
         const dd = document.getElementById('notif-dropdown');
-        if (dd) dd.style.display = 'none';
+        if (dd) dd.style.display = chairHeaderNotifOpen ? 'block' : 'none';
+        if (chairHeaderNotifOpen) loadChairHeaderNotifications();
     }
-});
 
-async function chairHeaderRequest(url, options = {}) {
-    const response = await fetch(url, {
-        ...options,
-        headers: { 'Accept': 'application/json', ...(options.headers || {}) },
+    document.addEventListener('click', function(e) {
+        const bell = document.getElementById('topbar-notif-bell');
+        if (bell && !bell.contains(e.target)) {
+            chairHeaderNotifOpen = false;
+            const dd = document.getElementById('notif-dropdown');
+            if (dd) dd.style.display = 'none';
+        }
     });
-    let result;
-    try {
-        result = await response.json();
-    } catch {
-        throw new Error('The server returned an unexpected response.');
-    }
-    if (!response.ok) throw new Error(result.message || 'Unable to update notifications.');
-    return result;
-}
 
-function chairHeaderShowMessage(message) {
-    const list = document.getElementById('notif-list');
-    if (!list) return;
-    const item = document.createElement('div');
-    item.className = 'p-4 text-sm text-slate-400 text-center';
-    item.textContent = message;
-    list.replaceChildren(item);
-}
-
-async function loadChairHeaderNotifications() {
-    chairHeaderShowMessage('Loading notifications…');
-    try {
-        const notifications = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.index);
-        if (!Array.isArray(notifications)) throw new Error('The server returned invalid notifications.');
-        renderChairHeaderNotifList(notifications);
-    } catch (error) {
-        chairHeaderShowMessage(error.message || 'Failed to load notifications.');
-    }
-}
-
-function renderChairHeaderNotifList(notifications) {
-    const list = document.getElementById('notif-list');
-    if (!list) return;
-
-    if (!notifications.length) {
-        chairHeaderShowMessage('No notifications yet.');
-        return;
+    async function chairHeaderRequest(url, options = {}) {
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Accept': 'application/json',
+                ...(options.headers || {})
+            },
+        });
+        let result;
+        try {
+            result = await response.json();
+        } catch {
+            throw new Error('The server returned an unexpected response.');
+        }
+        if (!response.ok) throw new Error(result.message || 'Unable to update notifications.');
+        return result;
     }
 
-    const dotColors = {
-        conflict: '#dc2626',
-        overload: '#d97706',
-        reminder: '#2563eb',
-        info: '#2563eb',
-    };
-
-    const fragment = document.createDocumentFragment();
-    notifications.forEach(notification => {
+    function chairHeaderShowMessage(message) {
+        const list = document.getElementById('notif-list');
+        if (!list) return;
         const item = document.createElement('div');
-        item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;
-        if (!notification.notif_is_read) {
-            item.setAttribute('role', 'button');
-            item.tabIndex = 0;
-            item.addEventListener('click', () => chairHeaderMarkRead(notification.notif_id, item));
-            item.addEventListener('keydown', event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    chairHeaderMarkRead(notification.notif_id, item);
-                }
-            });
+        item.className = 'p-4 text-sm text-slate-400 text-center';
+        item.textContent = message;
+        list.replaceChildren(item);
+    }
+
+    async function loadChairHeaderNotifications() {
+        chairHeaderShowMessage('Loading notifications…');
+        try {
+            const notifications = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.index);
+            if (!Array.isArray(notifications)) throw new Error('The server returned invalid notifications.');
+            renderChairHeaderNotifList(notifications);
+        } catch (error) {
+            chairHeaderShowMessage(error.message || 'Failed to load notifications.');
+        }
+    }
+
+    function renderChairHeaderNotifList(notifications) {
+        const list = document.getElementById('notif-list');
+        if (!list) return;
+
+        if (!notifications.length) {
+            chairHeaderShowMessage('No notifications yet.');
+            return;
         }
 
-        const dot = document.createElement('div');
-        dot.className = 'notif-drop-dot';
-        dot.style.backgroundColor = dotColors[notification.notif_type] || '#94a3b8';
+        const dotColors = {
+            conflict: '#dc2626',
+            overload: '#d97706',
+            reminder: '#2563eb',
+            approval: '#16a34a',
+            returned: '#d97706',
+            info: '#2563eb',
+        };
 
-        const content = document.createElement('div');
-        const text = document.createElement('div');
-        text.className = 'notif-drop-text';
-        const title = document.createElement('b');
-        title.textContent = notification.notif_title || 'Notification';
-        text.append(title, document.createTextNode(` — ${notification.notif_message || ''}`));
-        const time = document.createElement('div');
-        time.className = 'notif-drop-time';
-        time.textContent = chairHeaderFormatTime(notification.notif_created_at);
-        content.append(text, time);
-        item.append(dot, content);
-        fragment.appendChild(item);
-    });
-    list.replaceChildren(fragment);
-}
+        const fragment = document.createDocumentFragment();
+        notifications.forEach(notification => {
+            const item = document.createElement('div');
+            item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;
+            if (!notification.notif_is_read) {
+                item.setAttribute('role', 'button');
+                item.tabIndex = 0;
+                item.addEventListener('click', () => chairHeaderMarkRead(notification.notif_id, item));
+                item.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        chairHeaderMarkRead(notification.notif_id, item);
+                    }
+                });
+            }
 
-function chairHeaderFormatTime(isoString) {
-    const date = new Date(isoString);
-    if (Number.isNaN(date.getTime())) return '';
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const isYesterday = date.toDateString() === yesterday.toDateString();
-    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (isToday) return `Today, ${timeStr}`;
-    if (isYesterday) return `Yesterday, ${timeStr}`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
-}
+            const dot = document.createElement('div');
+            dot.className = 'notif-drop-dot';
+            dot.style.backgroundColor = dotColors[notification.notif_type] || '#94a3b8';
 
-async function chairHeaderMarkRead(id, el) {
-    if (!el) return;
-    if (!el.classList.contains('unread')) return;
-
-    try {
-        const url = CHAIR_HEADER_NOTIFICATION_ENDPOINTS.read.replace('__notification_id__', encodeURIComponent(id));
-        await chairHeaderRequest(url, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+            const content = document.createElement('div');
+            const text = document.createElement('div');
+            text.className = 'notif-drop-text';
+            const title = document.createElement('b');
+            title.textContent = notification.notif_title || 'Notification';
+            text.append(title, document.createTextNode(` — ${notification.notif_message || ''}`));
+            const time = document.createElement('div');
+            time.className = 'notif-drop-time';
+            time.textContent = chairHeaderFormatTime(notification.notif_created_at);
+            content.append(text, time);
+            item.append(dot, content);
+            fragment.appendChild(item);
         });
-        el.classList.remove('unread');
-        el.removeAttribute('role');
-        el.removeAttribute('tabindex');
-        updateChairHeaderNotifCount();
-    } catch (error) {
-        chairHeaderShowMessage(error.message || 'Unable to mark this notification as read.');
+        list.replaceChildren(fragment);
     }
-}
 
-async function chairHeaderMarkAllRead() {
-    try {
-        await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.readAll, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+    function chairHeaderFormatTime(isoString) {
+        const date = new Date(isoString);
+        if (Number.isNaN(date.getTime())) return '';
+        const now = new Date();
+        const isToday = date.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const isYesterday = date.toDateString() === yesterday.toDateString();
+        const timeStr = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
         });
-        document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(el => {
+        if (isToday) return `Today, ${timeStr}`;
+        if (isYesterday) return `Yesterday, ${timeStr}`;
+        return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        }) + ', ' + timeStr;
+    }
+
+    async function chairHeaderMarkRead(id, el) {
+        if (!el) return;
+        if (!el.classList.contains('unread')) return;
+
+        try {
+            const url = CHAIR_HEADER_NOTIFICATION_ENDPOINTS.read.replace('__notification_id__', encodeURIComponent(
+                id));
+            await chairHeaderRequest(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+            });
             el.classList.remove('unread');
             el.removeAttribute('role');
             el.removeAttribute('tabindex');
-        });
-        updateChairHeaderNotifCount();
-    } catch (error) {
-        chairHeaderShowMessage(error.message || 'Unable to mark notifications as read.');
-    }
-}
-
-async function updateChairHeaderNotifCount() {
-    try {
-        const result = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.unreadCount);
-        const unread = Number(result.count);
-        if (!Number.isInteger(unread) || unread < 0) throw new Error('The server returned an invalid notification count.');
-        const badge = document.getElementById('notif-count');
-        if (badge) {
-            badge.textContent = unread;
-            badge.style.display = unread > 0 ? 'inline' : 'none';
+            updateChairHeaderNotifCount();
+        } catch (error) {
+            chairHeaderShowMessage(error.message || 'Unable to mark this notification as read.');
         }
-    } catch (error) {
-        console.error('Unable to refresh chair notification count:', error);
     }
-}
 
-updateChairHeaderNotifCount();
-setInterval(updateChairHeaderNotifCount, 30000);
+    async function chairHeaderMarkAllRead() {
+        try {
+            await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.readAll, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+            });
+            document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(el => {
+                el.classList.remove('unread');
+                el.removeAttribute('role');
+                el.removeAttribute('tabindex');
+            });
+            updateChairHeaderNotifCount();
+        } catch (error) {
+            chairHeaderShowMessage(error.message || 'Unable to mark notifications as read.');
+        }
+    }
+
+    async function updateChairHeaderNotifCount() {
+        try {
+            const result = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.unreadCount);
+            const unread = Number(result.count);
+            if (!Number.isInteger(unread) || unread < 0) throw new Error(
+                'The server returned an invalid notification count.');
+            const badge = document.getElementById('notif-count');
+            if (badge) {
+                badge.textContent = unread;
+                badge.style.display = unread > 0 ? 'inline' : 'none';
+            }
+        } catch (error) {
+            console.error('Unable to refresh chair notification count:', error);
+        }
+    }
+
+    updateChairHeaderNotifCount();
+    setInterval(updateChairHeaderNotifCount, 30000);
 </script>

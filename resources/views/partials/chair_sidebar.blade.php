@@ -7,8 +7,9 @@
 
     <div class="sidebar-user">
         <div class="sidebar-avatar">
-            @if($chairSidebarProfile?->dc_profile_image)
-                <img src="{{ \App\Services\ProfileImageStorage::url($chairSidebarProfile->dc_profile_image, 'chair_profile') }}" alt="Profile photo" class="h-full w-full rounded-full object-cover">
+            @if ($chairSidebarProfile?->dc_profile_image)
+                <img src="{{ \App\Services\ProfileImageStorage::url($chairSidebarProfile->dc_profile_image, 'chair_profile') }}"
+                    alt="Profile photo" class="h-full w-full rounded-full object-cover">
             @else
                 {{ collect(explode(' ', Auth::user()->usr_name))->map(fn($n) => strtoupper($n[0]))->take(2)->implode('') }}
             @endif
@@ -16,8 +17,10 @@
         <div class="overflow-hidden">
             <div class="sidebar-user-name">{{ Auth::user()->usr_name }}</div>
             <div class="sidebar-user-role">Department Chair</div>
-            <div class="truncate text-[11px] text-slate-400" title="{{ $chairSidebarProfile?->program?->dept_name ?? 'Department not assigned' }}">
-                Handling: {{ $chairSidebarProfile?->program?->dept_code ?? $chairSidebarProfile?->program?->dept_name ?? 'Department not assigned' }}
+            <div class="truncate text-[11px] text-slate-400"
+                title="{{ $chairSidebarProfile?->program?->dept_name ?? 'Department not assigned' }}">
+                Handling:
+                {{ $chairSidebarProfile?->program?->dept_code ?? ($chairSidebarProfile?->program?->dept_name ?? 'Department not assigned') }}
             </div>
         </div>
     </div>
@@ -60,8 +63,8 @@
 
         <div class="nav-section-label">Submission</div>
         <a href="{{ route('chair.submit_dean') }}"
-            class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
-            <span class="nav-icon"></span> PBT Submission
+            class="nav-item {{ request()->routeIs('chair.submit_dean*') ? 'active' : '' }}">
+            <span class="nav-icon"></span> Schedule Submissions
         </a>
 
         <div class="nav-section-label">System</div>

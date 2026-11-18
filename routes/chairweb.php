@@ -66,6 +66,8 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
 
     // Dean schedule submission
     Route::get('/submit-dean', [ScheduleSubmissionController::class, 'index'])->name('chair.submit_dean');
+    Route::get('/submit-dean/{id}', [ScheduleSubmissionController::class, 'show'])->name('chair.submit_dean.show');
+    Route::get('/submit-dean/{id}/edit', [ScheduleSubmissionController::class, 'edit'])->name('chair.submit_dean.edit');
     Route::post('/submit-dean', [ScheduleSubmissionController::class, 'store'])->name('chair.submit_dean.store');
 
     // Export reports and faculty PBT workbook

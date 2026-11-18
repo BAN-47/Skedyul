@@ -102,9 +102,15 @@
                     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                         @if ($selectedFaculty)
                             @if ($activeSemester)
-                                <button type="button" onclick="openModal('modal-submit-dean')" class="btn btn-primary">
-                                    Submit to Dean
-                                </button>
+                                <form method="POST" action="{{ route('chair.submit_dean.store') }}">
+                                    @csrf
+                                    <input type="hidden" name="faculty_id" value="{{ $selectedFaculty->fac_id }}">
+                                    <input type="hidden" name="return_to_pbt" value="1">
+                                    <input type="hidden" name="shift" value="{{ $shift }}">
+                                    <button type="submit" class="btn btn-primary">
+                                        Submit to Dean
+                                    </button>
+                                </form>
                             @endif
                             <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
                                 class="btn btn-secondary">Download XLSX</a>
@@ -145,15 +151,16 @@
                                     ->filter(function ($s) {
                                         $course = $s->course ?? $s->subject;
 
-                                        return $course
-                                            && ($course->course_code ?? $course->subj_code ?? null) !== 'REC'
-                                            && ($course->course_name ?? $course->subj_name ?? null)
-                                                !== 'Research, Extension and Consultation Time';
+                                        return $course &&
+                                            ($course->course_code ?? ($course->subj_code ?? null)) !== 'REC' &&
+                                            ($course->course_name ?? ($course->subj_name ?? null)) !==
+                                                'Research, Extension and Consultation Time';
                                     })
                                     ->unique(function ($s) {
                                         $course = $s->course ?? $s->subject;
                                         $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
-                                        return ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) . ($isOjt ? '' : '|' . ($s->sch_sec_id ?? ''));
+                                        return ($s->sch_course_id ?? ($s->sch_subj_id ?? '')) .
+                                            ($isOjt ? '' : '|' . ($s->sch_sec_id ?? ''));
                                     })
                                     ->values();
                             @endphp
@@ -183,13 +190,21 @@
                                                 $code = $course->course_code ?? ($course->subj_code ?? '—');
                                                 $title = $course->course_name ?? ($course->subj_name ?? '—');
                                                 $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
-                                                $courseUnits = \App\Services\ScheduleAssignmentService::courseUnits($course);
+                                                $courseUnits = \App\Services\ScheduleAssignmentService::courseUnits(
+                                                    $course,
+                                                );
                                                 $courseHours = \App\Services\ScheduleAssignmentService::courseHours(
                                                     $course,
                                                 );
-                                                $courseMeetings = $summarySchedules->where('sch_course_id', $s->sch_course_id);
+                                                $courseMeetings = $summarySchedules->where(
+                                                    'sch_course_id',
+                                                    $s->sch_course_id,
+                                                );
                                                 if (!$isOjt) {
-                                                    $courseMeetings = $courseMeetings->where('sch_sec_id', $s->sch_sec_id);
+                                                    $courseMeetings = $courseMeetings->where(
+                                                        'sch_sec_id',
+                                                        $s->sch_sec_id,
+                                                    );
                                                 }
                                                 $meetingHours = fn($meeting) => \Illuminate\Support\Carbon::parse(
                                                     $meeting->sch_start_time,
@@ -197,16 +212,31 @@
                                                     \Illuminate\Support\Carbon::parse($meeting->sch_end_time),
                                                 ) / 60;
                                                 $scheduledHours = $isOjt
-                                                    ? $courseMeetings->unique(fn ($meeting) => $meeting->sch_day.'|'.$meeting->sch_start_time.'|'.$meeting->sch_end_time)->sum($meetingHours)
+                                                    ? $courseMeetings
+                                                        ->unique(
+                                                            fn($meeting) => $meeting->sch_day .
+                                                                '|' .
+                                                                $meeting->sch_start_time .
+                                                                '|' .
+                                                                $meeting->sch_end_time,
+                                                        )
+                                                        ->sum($meetingHours)
                                                     : $courseMeetings->sum($meetingHours);
                                                 $secName = $isOjt
-                                                    ? $courseMeetings->map(fn ($meeting) => $meeting->section?->sec_name)->filter()->unique()->implode(', ')
-                                                    : (optional($s->section)->sec_name ?? '—');
+                                                    ? $courseMeetings
+                                                        ->map(fn($meeting) => $meeting->section?->sec_name)
+                                                        ->filter()
+                                                        ->unique()
+                                                        ->implode(', ')
+                                                    : optional($s->section)->sec_name ?? '—';
                                                 $studs = $isOjt
-                                                    ? $courseMeetings->map(fn ($meeting) => $meeting->section)->filter()->unique('sec_id')->sum(fn ($section) => (int) $section->sec_no_of_student)
-                                                    :
-                                                    optional($s->section)->sec_no_of_student ??
-                                                    (optional($s->section)->sec_max_capacity ?? '—');
+                                                    ? $courseMeetings
+                                                        ->map(fn($meeting) => $meeting->section)
+                                                        ->filter()
+                                                        ->unique('sec_id')
+                                                        ->sum(fn($section) => (int) $section->sec_no_of_student)
+                                                    : optional($s->section)->sec_no_of_student ??
+                                                        (optional($s->section)->sec_max_capacity ?? '—');
                                             @endphp
                                             <tr class="border-b border-slate-100 text-slate-700">
                                                 <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">
@@ -249,11 +279,13 @@
                                     <span>{{ $loadStats['units'] ?? '—' }}</span>
                                 </div>
                                 <div class="flex justify-between gap-2">
-                                    <span class="font-bold">Scheduled Hours/Week ({{ ucfirst($selectedShift ?? 'day') }}):</span>
+                                    <span class="font-bold">Scheduled Hours/Week
+                                        ({{ ucfirst($selectedShift ?? 'day') }}):</span>
                                     <span>{{ $loadStats['hours_week'] ?? '—' }}</span>
                                 </div>
                                 <div class="flex justify-between gap-2">
-                                    <span class="font-bold">Assigned Workload Hours/Week ({{ ucfirst($selectedShift ?? 'day') }}):</span>
+                                    <span class="font-bold">Assigned Workload Hours/Week
+                                        ({{ ucfirst($selectedShift ?? 'day') }}):</span>
                                     <span>{{ $loadStats['workload_hours'] ?? '—' }}</span>
                                 </div>
                                 @if (!empty($loadStats['is_part_time']))
@@ -528,23 +560,31 @@
                                             $courseName = $course?->course_name ?? $course?->subj_name;
                                             $isOjt = \App\Services\ScheduleAssignmentService::isOjt($course);
                                             $sharedSectionNames = $isOjt
-                                                ? $summarySchedules->filter(fn ($meeting) =>
-                                                    $meeting->sch_course_id === $s->sch_course_id
-                                                    && $meeting->sch_day === $s->sch_day
-                                                    && substr((string) $meeting->sch_start_time, 0, 5) === substr((string) $s->sch_start_time, 0, 5)
-                                                    && substr((string) $meeting->sch_end_time, 0, 5) === substr((string) $s->sch_end_time, 0, 5)
-                                                    && $meeting->sch_room_id === $s->sch_room_id
-                                                )->map(fn ($meeting) => $meeting->section?->sec_name)->filter()->unique()->implode(', ')
-                                                : ($s->section->sec_name ?? '');
-                                            $isRec = $courseCode === 'REC'
-                                                || $courseName === 'Research, Extension and Consultation Time';
+                                                ? $summarySchedules
+                                                    ->filter(
+                                                        fn($meeting) => $meeting->sch_course_id === $s->sch_course_id &&
+                                                            $meeting->sch_day === $s->sch_day &&
+                                                            substr((string) $meeting->sch_start_time, 0, 5) ===
+                                                                substr((string) $s->sch_start_time, 0, 5) &&
+                                                            substr((string) $meeting->sch_end_time, 0, 5) ===
+                                                                substr((string) $s->sch_end_time, 0, 5) &&
+                                                            $meeting->sch_room_id === $s->sch_room_id,
+                                                    )
+                                                    ->map(fn($meeting) => $meeting->section?->sec_name)
+                                                    ->filter()
+                                                    ->unique()
+                                                    ->implode(', ')
+                                                : $s->section->sec_name ?? '';
+                                            $isRec =
+                                                $courseCode === 'REC' ||
+                                                $courseName === 'Research, Extension and Consultation Time';
                                         @endphp
 
                                         <div class="group relative z-20 m-[3px] rounded-md overflow-hidden bg-emerald-500 border border-emerald-600 text-white shadow-sm flex flex-col"
                                             style="grid-column: {{ $dayIndex + 2 }}; grid-row: {{ $row }} / span {{ $span }};"
                                             data-schedule-id="{{ $s->sch_id }}"
                                             data-subject="{{ $s->sch_subj_id }}" data-section="{{ $s->sch_sec_id }}"
-                                            data-department="{{ $s->section?->sec_dept_id ?? $course?->course_dept_id ?? '' }}"
+                                            data-department="{{ $s->section?->sec_dept_id ?? ($course?->course_dept_id ?? '') }}"
                                             data-room="{{ $s->sch_room_id }}" data-semester="{{ $s->sch_sem_id }}"
                                             data-day="{{ $s->sch_day }}"
                                             data-start="{{ substr($s->sch_start_time, 0, 5) }}"
@@ -564,7 +604,7 @@
                                                 class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
                                                 <div
                                                     class="{{ $isRec ? 'text-[10px] leading-tight break-words' : 'text-[13px] tracking-wide' }} font-extrabold">
-                                                    {{ $isRec ? ($courseName ?? 'Research, Extension and Consultation Time') : ($courseCode ?? '—') }}
+                                                    {{ $isRec ? $courseName ?? 'Research, Extension and Consultation Time' : $courseCode ?? '—' }}
                                                 </div>
                                                 <a href="{{ route('chair.pbs', ['section' => $s->sch_sec_id, 'department' => $s->section?->sec_dept_id, 'semester' => $s->sch_sem_id, 'shift' => $shift === 'night' ? 'night' : 'day']) }}"
                                                     onclick="event.stopPropagation()"
@@ -612,11 +652,13 @@
                                 Correct:</div>
                             <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
                                 {{ $signoff['reviewed_by'] ?? 'Dean not assigned' }}</div>
-                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}</div>
+                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}
+                            </div>
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
-                            <div class="w-full border-b border-slate-700 px-1 pb-1 text-center text-sm font-bold uppercase">
+                            <div
+                                class="w-full border-b border-slate-700 px-1 pb-1 text-center text-sm font-bold uppercase">
                                 {{ $signoff['campus_director'] ?? '' }}
                             </div>
                             <div class="text-xs text-slate-600">Campus Director</div>
@@ -672,20 +714,29 @@
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
-                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
+                                data-year-level="{{ $sec->sec_year_level ?? '' }}"
+                                data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
                 <div class="mb-3 hidden" id="add-ojt-sections-wrap">
-                    <span class="field-label">Year 4 sections <span class="font-normal normal-case text-slate-400">(select one or more)</span></span>
-                    <div id="add-ojt-sections" class="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2"></div>
+                    <span class="field-label">Year 4 sections <span
+                            class="font-normal normal-case text-slate-400">(select one or more)</span></span>
+                    <div id="add-ojt-sections"
+                        class="mt-1.5 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2"></div>
                 </div>
                 <div class="mb-3 hidden" id="add-ojt-summary-wrap">
-                    <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
-                        <input type="checkbox" id="add-ojt-is-evening" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    <label
+                        class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
+                        <input type="checkbox" id="add-ojt-is-evening"
+                            class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                         <span>Is Evening?</span>
                     </label>
-                    <p id="add-ojt-summary-notice" class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800" role="status" aria-live="polite">
+                    <p id="add-ojt-summary-notice"
+                        class="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800"
+                        role="status" aria-live="polite">
                         The 5 OJT units will count in the Day summary.
                     </p>
                 </div>
@@ -709,8 +760,8 @@
                             @foreach ($subjects as $sub)
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                                     data-dept-id="{{ $sub->course_dept_id ?? '' }}"
-                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
-                                    data-course-name="{{ $sub->course_name ?? $sub->subj_name ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? ($sub->subj_code ?? '') }}"
+                                    data-course-name="{{ $sub->course_name ?? ($sub->subj_name ?? '') }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
                                     data-category="{{ $sub->course_category ?? '' }}"
@@ -836,7 +887,10 @@
                     <select id="edit-section" class="field-input">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
-                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-year-level="{{ $sec->sec_year_level ?? '' }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}</option>
+                            <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
+                                data-year-level="{{ $sec->sec_year_level ?? '' }}"
+                                data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}">{{ $sec->sec_name }}
+                            </option>
                         @endforeach
                     </select>
                 </div>
@@ -860,7 +914,7 @@
                             @foreach ($subjects as $sub)
                                 <option value="{{ $sub->course_id ?? $sub->subj_id }}"
                                     data-dept-id="{{ $sub->course_dept_id ?? '' }}"
-                                    data-course-code="{{ $sub->course_code ?? $sub->subj_code ?? '' }}"
+                                    data-course-code="{{ $sub->course_code ?? ($sub->subj_code ?? '') }}"
                                     data-year-level="{{ $sub->course_year_level ?? '' }}"
                                     data-category="{{ $sub->course_category ?? '' }}"
                                     data-semester="{{ $sub->course_semester ?? '' }}"
@@ -962,128 +1016,132 @@
                     class="btn btn-danger opacity-50 cursor-not-allowed">Delete Schedule</button>
             </div>
         </div>
-    {{-- ══════════════ MODAL: SUBMIT PBT TO DEAN ══════════════ --}}
-    @if ($selectedFaculty && $activeSemester)
-        <div class="modal-overlay" id="modal-submit-dean">
-            <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]" role="dialog" aria-modal="true"
-                aria-labelledby="submit-dean-modal-title">
-                <div class="modal-header">
-                    <div class="modal-title text-indigo-700" id="submit-dean-modal-title">Submit PBT to Dean</div>
-                    <button type="button" onclick="closeModal('modal-submit-dean')" class="modal-close"
-                        aria-label="Close submit confirmation">✕</button>
-                </div>
+        {{-- ══════════════ MODAL: SUBMIT PBT TO DEAN ══════════════ --}}
+        @if ($selectedFaculty && $activeSemester)
+            <div class="modal-overlay" id="modal-submit-dean">
+                <div class="modal-box w-[520px] max-w-[calc(100vw-32px)]" role="dialog" aria-modal="true"
+                    aria-labelledby="submit-dean-modal-title">
+                    <div class="modal-header">
+                        <div class="modal-title text-indigo-700" id="submit-dean-modal-title">Submit PBT to Dean</div>
+                        <button type="button" onclick="closeModal('modal-submit-dean')" class="modal-close"
+                            aria-label="Close submit confirmation">✕</button>
+                    </div>
 
-                <div class="max-h-[62vh] overflow-y-auto pr-1">
-                    <div class="mb-3">
-                        <label class="field-label">Semester</label>
-                        <div class="field-input bg-slate-100 font-semibold text-slate-700">
-                            {{ $activeSemester->label ?? ($activeSemester->sem_name ?? 'Selected semester') }}
+                    <div class="max-h-[62vh] overflow-y-auto pr-1">
+                        <div class="mb-3">
+                            <label class="field-label">Semester</label>
+                            <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                                {{ $activeSemester->label ?? ($activeSemester->sem_name ?? 'Selected semester') }}
+                            </div>
+                        </div>
+
+                        <div
+                            class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
+                            Faculty:
+                            <span class="font-bold text-slate-900">
+                                {{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}
+                            </span>
+                        </div>
+
+                        <div
+                            class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-800">
+                            This will send this faculty member’s active-semester PBT schedule to the Dean for review.
+                            The system will block submission if required schedule details are missing or schedule
+                            conflicts
+                            are found.
                         </div>
                     </div>
 
-                    <div
-                        class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
-                        Faculty:
-                        <span class="font-bold text-slate-900">
-                            {{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}
-                        </span>
-                    </div>
+                    <form method="POST" action="{{ route('chair.submit_dean.store') }}"
+                        class="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                        @csrf
+                        <input type="hidden" name="faculty_id" value="{{ $selectedFaculty->fac_id }}">
+                        <input type="hidden" name="return_to_pbt" value="1">
+                        <input type="hidden" name="shift" value="{{ $shift }}">
 
-                    <div
-                        class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-relaxed text-amber-800">
-                        This will send this faculty member’s active-semester PBT schedule to the Dean for review.
-                        The system will block submission if required schedule details are missing or schedule conflicts
-                        are found.
-                    </div>
+                        <button type="button" onclick="closeModal('modal-submit-dean')" class="btn btn-secondary">
+                            Cancel
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            Confirm &amp; Submit to Dean
+                        </button>
+                    </form>
                 </div>
-
-                <form method="POST" action="{{ route('chair.submit_dean.store') }}"
-                    class="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
-                    @csrf
-                    <input type="hidden" name="faculty_id" value="{{ $selectedFaculty->fac_id }}">
-                    <input type="hidden" name="return_to_pbt" value="1">
-                    <input type="hidden" name="shift" value="{{ $shift }}">
-
-                    <button type="button" onclick="closeModal('modal-submit-dean')" class="btn btn-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        Confirm &amp; Submit to Dean
-                    </button>
-                </form>
             </div>
-        </div>
-    @endif
+        @endif
 
-    {{-- TOAST --}}
-    <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
+        {{-- TOAST --}}
+        <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
-    <script>
-        window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
-        window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
-        window.COLLEGE_SECTIONS = {
-            @foreach ($allDepartments as $dept)
-                "{{ $dept->dept_id }}": [
-                    @php $deptSections = $sections->where('sec_dept_id', $dept->dept_id); @endphp
-                    @foreach ($deptSections as $sec)
-                        {
-                            id: "{{ $sec->sec_id }}",
-                            name: "{{ $sec->sec_name }}",
-                            dept: "{{ $sec->sec_dept_id }}",
-                            isEvening: "{{ $sec->sec_is_evening ? '1' : '0' }}",
-                            year: "{{ $sec->sec_year_level }}"
-                        },
-                    @endforeach
-                ],
-            @endforeach
-        };
-        window.COLLEGE_SUBJECTS = {
-            @foreach ($allDepartments as $dept)
-                "{{ $dept->dept_id }}": [
-                    @foreach ($subjects->where('course_dept_id', $dept->dept_id) as $sub)
-                        {
-                            id: "{{ $sub->course_id ?? $sub->subj_id }}",
-                            code: "{{ $sub->course_code ?? $sub->subj_code }}",
-                            name: "{{ $sub->course_name ?? $sub->subj_name }}",
-                            dept: "{{ $sub->course_dept_id ?? '' }}",
-                            year: "{{ $sub->course_year_level ?? '' }}",
-                            sem: "{{ $sub->course_semester ?? '' }}",
-                            cat: "{{ $sub->course_category ?? '' }}",
-                            lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
-                            labHours: "{{ $sub->course_lab_hours ?? 0 }}"
-                        },
-                    @endforeach
-                ],
-            @endforeach
-        };
-        window.ALL_SUBJECTS_LIST = [
-            @foreach ($allSubjects as $sub)
-                {
-                    id: "{{ $sub->course_id ?? $sub->subj_id }}",
-                    code: "{{ $sub->course_code ?? $sub->subj_code }}",
-                    name: "{{ $sub->course_name ?? $sub->subj_name }}",
-                    year: "{{ $sub->course_year_level ?? '' }}",
-                    sem: "{{ $sub->course_semester ?? '' }}",
-                    cat: "{{ $sub->course_category ?? '' }}",
-                    dept: "{{ $sub->course_dept_id ?? '' }}",
-                    lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
-                    labHours: "{{ $sub->course_lab_hours ?? 0 }}"
-                },
-            @endforeach
-        ];
-        window.ACTIVE_COURSE_SEMESTER = @json(str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') || str_contains(strtolower($activeSemester->sem_name ?? ''), 'second') ? 2 : 1);
-        window.ALL_CATEGORIES = @json($categories ?? []);
-    </script>
-    <script src="{{ asset('js/pbt.js') }}" defer></script>
-    <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
-
-    @if (session('error') || session('success'))
         <script>
-            document.addEventListener('DOMContentLoaded', () => {
-                showToast(@json(session('error') ?? session('success')));
-            });
+            window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
+            window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
+            window.COLLEGE_SECTIONS = {
+                @foreach ($allDepartments as $dept)
+                    "{{ $dept->dept_id }}": [
+                        @php $deptSections = $sections->where('sec_dept_id', $dept->dept_id); @endphp
+                        @foreach ($deptSections as $sec)
+                            {
+                                id: "{{ $sec->sec_id }}",
+                                name: "{{ $sec->sec_name }}",
+                                dept: "{{ $sec->sec_dept_id }}",
+                                isEvening: "{{ $sec->sec_is_evening ? '1' : '0' }}",
+                                year: "{{ $sec->sec_year_level }}"
+                            },
+                        @endforeach
+                    ],
+                @endforeach
+            };
+            window.COLLEGE_SUBJECTS = {
+                @foreach ($allDepartments as $dept)
+                    "{{ $dept->dept_id }}": [
+                        @foreach ($subjects->where('course_dept_id', $dept->dept_id) as $sub)
+                            {
+                                id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                                code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                                name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                                dept: "{{ $sub->course_dept_id ?? '' }}",
+                                year: "{{ $sub->course_year_level ?? '' }}",
+                                sem: "{{ $sub->course_semester ?? '' }}",
+                                cat: "{{ $sub->course_category ?? '' }}",
+                                lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                                labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                            },
+                        @endforeach
+                    ],
+                @endforeach
+            };
+            window.ALL_SUBJECTS_LIST = [
+                @foreach ($allSubjects as $sub)
+                    {
+                        id: "{{ $sub->course_id ?? $sub->subj_id }}",
+                        code: "{{ $sub->course_code ?? $sub->subj_code }}",
+                        name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                        year: "{{ $sub->course_year_level ?? '' }}",
+                        sem: "{{ $sub->course_semester ?? '' }}",
+                        cat: "{{ $sub->course_category ?? '' }}",
+                        dept: "{{ $sub->course_dept_id ?? '' }}",
+                        lecHours: "{{ $sub->course_lecture_hours ?? 0 }}",
+                        labHours: "{{ $sub->course_lab_hours ?? 0 }}"
+                    },
+                @endforeach
+            ];
+            window.ACTIVE_COURSE_SEMESTER = @json(str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') ||
+                str_contains(strtolower($activeSemester->sem_name ?? ''), 'second')
+                    ? 2
+                    : 1);
+            window.ALL_CATEGORIES = @json($categories ?? []);
         </script>
-    @endif
+        <script src="{{ asset('js/pbt.js') }}" defer></script>
+        <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
+
+        @if (session('error') || session('success'))
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    showToast(@json(session('error') ?? session('success')));
+                });
+            </script>
+        @endif
 
 </body>
 

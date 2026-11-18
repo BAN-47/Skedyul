@@ -1,359 +1,317 @@
 <?php
 
-namespace App\Http\Controllers\Dean;
+namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
-use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Schedule_Submission;
-use App\Services\FacultyNameFormatter;
 use App\Models\Semester;
+use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
-class PendingApprovalsController extends Controller
+class ScheduleSubmissionController extends Controller
 {
-    private function getUserScope()
+    public function index(Request $request)
     {
-        $user = Auth::user();
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
-        if (!$user) {
-            return false;
-        }
+        abort_if(
+            !$chair || !$chair->dc_dept_id,
+            403,
+            'Your account is not assigned to a program department.'
+        );
 
-        if ($user->usr_role === 'system_admin') {
-            return ['type' => 'all'];
-        }
+        $semester = Semester::with('academicYear')
+            ->where('sem_is_active', true)
+            ->first();
 
-        if ($user->usr_role === 'dean') {
-            $dean = Dean::where('dean_usr_id', $user->usr_id)->first();
+        $submissions = Schedule_Submission::with([
+            'faculty.user',
+            'section',
+            'semester.academicYear',
+            'submittedBy',
+            'reviewedBy',
+        ])
+            ->where('schsub_dept_id', $chair->dc_dept_id)
+            ->whereIn('schsub_type', ['pbs', 'pbt'])
+            ->when(
+                $semester,
+                fn($query) => $query->where('schsub_sem_id', $semester->sem_id),
+                fn($query) => $query->whereRaw('1 = 0')
+            )
+            ->orderByDesc('schsub_submitted_at')
+            ->paginate(10)
+            ->withQueryString();
 
-            return $dean && $dean->dean_college_id
-                ? ['type' => 'college', 'id' => $dean->dean_college_id]
-                : false;
-        }
+        $submissions->getCollection()->transform(function ($submission) {
+            $snapshot = $submission->schsub_schedule_snapshot;
+            $submission->class_count = is_array($snapshot)
+                ? count($snapshot)
+                : $submission->schedules()->count();
 
-        if ($user->usr_role === 'department_chair') {
-            $chair = Dept_Chair::where('dc_usr_id', $user->usr_id)->first();
+            return $submission;
+        });
 
-            return $chair && $chair->dc_dept_id
-                ? ['type' => 'department', 'id' => $chair->dc_dept_id]
-                : false;
-        }
-
-        return false;
+        return view('chair.submit_dean', compact('semester', 'submissions'));
     }
-
-    private function applyUserScope($query, array $scope)
+    public function store(Request $request)
     {
-        if ($scope['type'] === 'college') {
-            $query->whereHas(
-                'department',
-                fn($departmentQuery) =>
-                $departmentQuery->where('dept_college_id', $scope['id'])
-            );
-        } elseif ($scope['type'] === 'department') {
-            $query->where('schsub_dept_id', $scope['id']);
-        }
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
-        return $query;
-    }
+        abort_if(
+            !$chair || !$chair->dc_dept_id,
+            403,
+            'Your account is not assigned to a program department.'
+        );
 
-    private function canAccessSubmission(array $scope, Schedule_Submission $submission): bool
-    {
-        if ($scope['type'] === 'all') {
-            return true;
-        }
+        $validated = $request->validate([
+            'faculty_id' => ['required', 'uuid'],
+        ]);
 
-        if ($scope['type'] === 'department') {
-            return $submission->schsub_dept_id === $scope['id'];
-        }
-
-        return $scope['type'] === 'college'
-            && $submission->department
-            && $submission->department->dept_college_id === $scope['id'];
-    }
-
-    public function index()
-    {
-        $scope = $this->getUserScope();
-
-        if ($scope === false) {
-            abort(403, 'You do not have access to this page.');
-        }
+        $departmentId = $chair->dc_dept_id;
+        $faculty = Faculty::with('user')
+            ->where('fac_id', $validated['faculty_id'])
+            ->where('fac_dept_id', $departmentId)
+            ->firstOrFail();
 
         $semester = Semester::where('sem_is_active', true)->first();
 
-        $query = Schedule_Submission::with([
-            'department',
-            'faculty.user',
-            'section',
-            'semester',
-            'submittedBy',
-            'reviewedBy',
-        ]);
+        if (!$semester) {
+            return back()->with('error', 'There is no active semester to submit.');
+        }
 
-        $this->applyUserScope($query, $scope);
+        $departmentSchedules = $this->departmentSchedules(
+            $departmentId,
+            $semester->sem_id
+        );
 
-        $submissions = $query
-            ->when(
-                $semester,
-                fn($submissionQuery) =>
-                $submissionQuery->where('schsub_sem_id', $semester->sem_id)
-            )
-            ->whereIn('schsub_type', ['pbt', 'pbs'])
-            ->orderByDesc('schsub_submitted_at')
-            ->get()
-            ->map(function ($submission) {
-                $submission->faculty_count = Faculty::where(
-                    'fac_dept_id',
-                    $submission->schsub_dept_id
-                )->count();
+        $allDepartmentSchedules = (clone $departmentSchedules)->get();
 
-                $submission->conflict_count = $this->submissionConflictCount($submission);
+        $facultySchedules = $allDepartmentSchedules
+            ->where('sch_fac_id', $faculty->fac_id)
+            ->values();
 
-                return $submission;
-            });
+        if ($facultySchedules->isEmpty()) {
+            return back()
+                ->with('error', 'This faculty member has no scheduled classes to submit.')
+                ->withInput();
+        }
 
-        $pendingCount = $submissions->where('schsub_status', 'pending')->count();
-        $approvedCount = $submissions->where('schsub_status', 'approved')->count();
-        $returnedCount = $submissions->where('schsub_status', 'returned')->count();
+        $scheduler = app(ScheduleAssignmentService::class);
 
-        return view('dean.pending_approvals', compact(
-            'submissions',
-            'semester',
-            'pendingCount',
-            'approvedCount',
-            'returnedCount'
-        ));
+        if (!$scheduler->scheduleDetailsAreComplete($facultySchedules)) {
+            return back()
+                ->with('error', 'Every class in this PBT must have a faculty member and course. A section is required except for REC.')
+                ->withInput();
+        }
+
+        if ($scheduler->submissionConflictCount($allDepartmentSchedules, $faculty->fac_id) > 0) {
+            return back()
+                ->with('error', 'Resolve this faculty member’s schedule conflicts before submitting the PBT.')
+                ->withInput();
+        }
+
+        $submission = Schedule_Submission::where('schsub_dept_id', $departmentId)
+            ->where('schsub_type', 'pbt')
+            ->where('schsub_sem_id', $semester->sem_id)
+            ->where('schsub_fac_id', $faculty->fac_id)
+            ->first();
+
+        if ($submission && $submission->schsub_status !== 'returned') {
+            $message = 'This PBT has already been submitted and is ' . $submission->schsub_status . '.';
+
+            if ($request->boolean('return_to_pbt')) {
+                $shift = $request->input('shift') === 'night' ? 'night' : 'day';
+
+                return redirect()
+                    ->route('chair.pbt', [
+                        'faculty' => $faculty->fac_id,
+                        'shift' => $shift,
+                    ])
+                    ->with('error', $message);
+            }
+
+            return redirect()
+                ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
+                ->with('error', $message);
+        }
+
+        $facultyName = $faculty->user->usr_name
+            ?? trim(implode(' ', array_filter([
+                $faculty->fac_first_name,
+                $faculty->fac_middle_name,
+                $faculty->fac_last_name,
+                $faculty->fac_suffix,
+            ])));
+
+        $snapshot = $facultySchedules->map(fn($schedule) => [
+            'schedule_id' => $schedule->sch_id,
+            'faculty' => $facultyName,
+            'subject_code' => $schedule->subject->course_code,
+            'subject_name' => $schedule->subject->course_name,
+            'section' => $schedule->section?->sec_name,
+            'room' => $schedule->room?->room_name,
+            'day' => $schedule->sch_day,
+            'start_time' => $schedule->sch_start_time,
+            'end_time' => $schedule->sch_end_time,
+        ])->values()->all();
+
+        DB::transaction(function () use (
+            $submission,
+            $departmentId,
+            $faculty,
+            $semester,
+            $snapshot
+        ) {
+            $values = [
+                'schsub_dept_id' => $departmentId,
+                'schsub_fac_id' => $faculty->fac_id,
+                'schsub_type' => 'pbt',
+                'schsub_sec_id' => null,
+                'schsub_sem_id' => $semester->sem_id,
+                'schsub_submitted_by' => Auth::id(),
+                'schsub_submitted_at' => now(),
+                'schsub_reviewed_by' => null,
+                'schsub_reviewed_at' => null,
+                'schsub_status' => 'pending',
+                'schsub_remarks' => null,
+                'schsub_schedule_snapshot' => $snapshot,
+            ];
+
+            if ($submission) {
+                $submission->update($values);
+            } else {
+                Schedule_Submission::create($values);
+            }
+        });
+
+        if ($request->boolean('return_to_pbt')) {
+            $shift = $request->input('shift') === 'night' ? 'night' : 'day';
+
+            return redirect()
+                ->route('chair.pbt', [
+                    'faculty' => $faculty->fac_id,
+                    'shift' => $shift,
+                ])
+                ->with('success', 'This faculty PBT was submitted to the dean for review.');
+        }
+
+        return redirect()
+            ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
+            ->with('success', 'This faculty PBT was submitted to the dean for review.');
     }
 
-    public function review(string $id)
+    public function show(string $id)
     {
-        $scope = $this->getUserScope();
-
-        if ($scope === false) {
-            abort(403, 'Unauthorized action.');
-        }
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        abort_if(!$chair || !$chair->dc_dept_id, 403, 'Your account is not assigned to a program department.');
 
         $submission = Schedule_Submission::with([
             'department',
             'faculty.user',
             'section',
-            'semester',
+            'semester.academicYear',
             'submittedBy',
+            'reviewedBy',
         ])->findOrFail($id);
 
         abort_unless(
-            $this->canAccessSubmission($scope, $submission),
+            (string) $submission->schsub_dept_id === (string) $chair->dc_dept_id,
             403,
-            'You can only review schedules for your authorized college or department.'
+            'You cannot view submissions outside your department.'
         );
 
-        if (!empty($submission->schsub_schedule_snapshot)) {
-            $schedules = collect($submission->schsub_schedule_snapshot)
-                ->map(fn($schedule) => (object) [
-                    'faculty_name' => $schedule['faculty'] ?? 'Unknown',
-                    'subject_code' => $schedule['subject_code'] ?? '—',
-                    'section_name' => $schedule['section'] ?? '—',
-                    'room_name' => $schedule['room'] ?? '—',
-                    'sch_day' => $schedule['day'] ?? '',
-                    'sch_start_time' => $schedule['start_time'] ?? '00:00',
-                    'sch_end_time' => $schedule['end_time'] ?? '00:00',
-                    'has_conflict' => false,
-                ]);
-        } else {
-            $scheduleQuery = Schedule::with([
-                'faculty.user',
-                'subject',
-                'section',
-                'room',
-            ])
+        $snapshot = collect($submission->schsub_schedule_snapshot ?? []);
+        if ($snapshot->isEmpty()) {
+            $query = Schedule::with(['faculty.user', 'subject', 'section', 'room'])
                 ->where('sch_sem_id', $submission->schsub_sem_id)
-                ->where('sch_is_active', true)
-                ->whereHas('faculty', function ($facultyQuery) use ($submission) {
-                    $facultyQuery->where('fac_dept_id', $submission->schsub_dept_id);
+                ->where('sch_is_active', true);
 
-                    if ($submission->schsub_fac_id) {
-                        $facultyQuery->where('fac_id', $submission->schsub_fac_id);
-                    }
-                });
-
-            if (($submission->schsub_type ?? 'pbt') === 'pbs' && $submission->schsub_sec_id) {
-                $scheduleQuery->where('sch_sec_id', $submission->schsub_sec_id);
+            if ($submission->schsub_type === 'pbs' && $submission->schsub_sec_id) {
+                $query->where('sch_sec_id', $submission->schsub_sec_id);
+            } elseif ($submission->schsub_fac_id) {
+                $query->where('sch_fac_id', $submission->schsub_fac_id);
             }
 
-            $schedules = $scheduleQuery
-                ->orderBy('sch_day')
-                ->orderBy('sch_start_time')
-                ->get()
-                ->map(function ($schedule) {
-                    $schedule->has_conflict = Schedule::where('sch_fac_id', $schedule->sch_fac_id)
-                        ->where('sch_day', $schedule->sch_day)
-                        ->where('sch_start_time', $schedule->sch_start_time)
-                        ->where('sch_sem_id', $schedule->sch_sem_id)
-                        ->where('sch_id', '!=', $schedule->sch_id)
-                        ->exists();
-
-                    $schedule->faculty_name = FacultyNameFormatter::format($schedule->faculty) ?: 'Unknown';
-                    $schedule->subject_code = $schedule->subject?->course_code;
-                    $schedule->section_name = $schedule->section?->sec_name;
-                    $schedule->room_name = $schedule->room?->room_name;
-
-                    return $schedule;
-                });
+            $snapshot = $query->orderBy('sch_day')->orderBy('sch_start_time')->get()
+                ->map(fn($schedule) => [
+                    'faculty' => \App\Services\FacultyNameFormatter::format($schedule->faculty) ?: 'Unknown Faculty',
+                    'subject_code' => $schedule->subject?->course_code ?? '—',
+                    'subject_name' => $schedule->subject?->course_name ?? '',
+                    'section' => $schedule->section?->sec_name ?? '—',
+                    'room' => $schedule->room?->room_name ?? '—',
+                    'day' => $schedule->sch_day,
+                    'start_time' => $schedule->sch_start_time,
+                    'end_time' => $schedule->sch_end_time,
+                ]);
         }
 
-        $conflictCount = $schedules->where('has_conflict', true)->count();
+        $rows = $snapshot->values();
 
-        return view('dean.ReviewModalContent', compact(
-            'submission',
-            'schedules',
-            'conflictCount'
-        ));
+        return view('chair.submission_detail', compact('submission', 'rows'));
     }
 
-    public function approve(Request $request, string $id)
+    public function edit(string $id)
     {
-        $scope = $this->getUserScope();
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        abort_if(!$chair || !$chair->dc_dept_id, 403, 'Your account is not assigned to a program department.');
 
-        if ($scope === false) {
-            abort(403, 'Unauthorized action.');
+        $submission = Schedule_Submission::with('section')
+            ->where('schsub_dept_id', $chair->dc_dept_id)
+            ->findOrFail($id);
+
+        if ($submission->schsub_status !== 'returned') {
+            return redirect()
+                ->route('chair.submit_dean')
+                ->with('error', 'Only submissions returned by the Dean can be edited and resubmitted.');
         }
 
-        $submission = Schedule_Submission::with('department')->findOrFail($id);
+        if ($submission->schsub_type === 'pbs') {
+            $shift = $submission->section?->sec_is_evening ? 'night' : 'day';
 
-        abort_unless(
-            $this->canAccessSubmission($scope, $submission),
-            403,
-            'You cannot approve a schedule outside your authorized college or department.'
-        );
-
-        if ($submission->schsub_status !== 'pending') {
-            return back()->with('error', 'Only pending schedule submissions can be approved.');
-        }
-
-        if ($this->submissionConflictCount($submission) > 0) {
-            return back()->with(
-                'error',
-                'Cannot approve this schedule because it has unresolved conflicts.'
-            );
-        }
-
-        try {
-            $submission->update([
-                'schsub_status' => 'approved',
-                'schsub_reviewed_by' => Auth::id(),
-                'schsub_reviewed_at' => now(),
-                'schsub_remarks' => $request->input('remarks'),
+            return redirect()->route('chair.pbs', [
+                'department' => $chair->dc_dept_id,
+                'section' => $submission->schsub_sec_id,
+                'semester' => $submission->schsub_sem_id,
+                'shift' => $shift,
             ]);
-        } catch (\Throwable $exception) {
-            return back()->with('error', 'Unable to approve this PBT due to a database error.');
         }
 
-        return redirect()
-            ->route('dean.pending_approvals')
-            ->with('success', ($submission->schsub_type === 'pbs' ? 'PBS' : 'Faculty PBT') . ' approved successfully.');
-    }
+        $scheduleRows = collect($submission->schsub_schedule_snapshot ?? []);
+        $eveningCount = $scheduleRows->filter(function ($row) {
+            $start = $row['start_time'] ?? null;
+            if (!$start) {
+                return false;
+            }
 
-    public function returnToChair(Request $request, string $id)
-    {
-        $scope = $this->getUserScope();
+            try {
+                $time = \Illuminate\Support\Carbon::parse($start);
+                return ($time->hour * 60 + $time->minute) >= (16 * 60);
+            } catch (\Throwable $exception) {
+                return false;
+            }
+        })->count();
+        $shift = $eveningCount > ($scheduleRows->count() / 2) ? 'night' : 'day';
 
-        if ($scope === false) {
-            abort(403, 'Unauthorized action.');
-        }
-
-        $request->validate([
-            'remarks' => ['required', 'string', 'min:5', 'max:1000'],
+        return redirect()->route('chair.pbt', [
+            'faculty' => $submission->schsub_fac_id,
+            'semester' => $submission->schsub_sem_id,
+            'shift' => $shift,
         ]);
-
-        $submission = Schedule_Submission::with('department')->findOrFail($id);
-
-        abort_unless(
-            $this->canAccessSubmission($scope, $submission),
-            403,
-            'You cannot return a schedule outside your authorized college or department.'
-        );
-
-        try {
-            $submission->update([
-                'schsub_status' => 'returned',
-                'schsub_reviewed_by' => Auth::id(),
-                'schsub_reviewed_at' => now(),
-                'schsub_remarks' => $request->input('remarks'),
-            ]);
-        } catch (\Throwable $exception) {
-            return back()->with('error', 'Unable to return this PBT due to a database error.');
-        }
-
-        return redirect()
-            ->route('dean.pending_approvals')
-            ->with('success', ($submission->schsub_type === 'pbs' ? 'PBS' : 'Faculty PBT') . ' returned to the chair with remarks.');
     }
-
-    private function submissionConflictCount(Schedule_Submission $submission): int
+    private function departmentSchedules(string $departmentId, string $semesterId)
     {
-        if (!empty($submission->schsub_schedule_snapshot)) {
-            return 0;
-        }
-
-        $query = Schedule::query()
-            ->where('sch_sem_id', $submission->schsub_sem_id)
+        return Schedule::with(['faculty.user', 'subject', 'section', 'room'])
+            ->where('sch_sem_id', $semesterId)
             ->where('sch_is_active', true)
-            ->whereHas('faculty', function ($facultyQuery) use ($submission) {
-                $facultyQuery->where('fac_dept_id', $submission->schsub_dept_id);
-
-                if ($submission->schsub_fac_id) {
-                    $facultyQuery->where('fac_id', $submission->schsub_fac_id);
-                }
-            })
-            ->whereExists(function ($conflictQuery) {
-                $conflictQuery->selectRaw('1')
-                    ->from('schedule as conflicting_schedule')
-                    ->whereColumn(
-                        'conflicting_schedule.sch_sem_id',
-                        'schedule.sch_sem_id'
-                    )
-                    ->whereColumn(
-                        'conflicting_schedule.sch_day',
-                        'schedule.sch_day'
-                    )
-                    ->whereColumn(
-                        'conflicting_schedule.sch_start_time',
-                        '<',
-                        'schedule.sch_end_time'
-                    )
-                    ->whereColumn(
-                        'conflicting_schedule.sch_end_time',
-                        '>',
-                        'schedule.sch_start_time'
-                    )
-                    ->whereColumn(
-                        'conflicting_schedule.sch_id',
-                        '!=',
-                        'schedule.sch_id'
-                    )
-                    ->where('conflicting_schedule.sch_is_active', true)
-                    ->where(function ($resourceQuery) {
-                        $resourceQuery
-                            ->whereColumn(
-                                'conflicting_schedule.sch_fac_id',
-                                'schedule.sch_fac_id'
-                            )
-                            ->orWhereColumn(
-                                'conflicting_schedule.sch_room_id',
-                                'schedule.sch_room_id'
-                            )
-                            ->orWhereColumn(
-                                'conflicting_schedule.sch_sec_id',
-                                'schedule.sch_sec_id'
-                            );
-                    });
-            });
-
-        return $query->count();
+            ->whereHas(
+                'faculty',
+                fn($query) => $query->where('fac_dept_id', $departmentId)
+            );
     }
 }
