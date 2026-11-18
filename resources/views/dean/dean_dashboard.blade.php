@@ -37,7 +37,6 @@
             <div class="topbar">
                 <div class="topbar-title">Dean Dashboard</div>
                 <div class="flex items-center gap-2">
-                    <a href="{{ route('dean.schedule_reports') }}" class="btn btn-primary">Export Report</a>
                     <a href="{{ route('dean.pending_approvals') }}" class="btn btn-secondary flex items-center gap-1.5">
                         Pending Approvals
                         @if (($pendingDeptCount ?? 0) > 0)

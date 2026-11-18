@@ -53,16 +53,6 @@
             <span class="nav-icon"></span> Program by Teacher (PBT)
         </a>
 
-        <div class="nav-section-label">Reports</div>
-        <a href="{{ route('dean.schedule_reports') }}"
-            class="nav-item {{ request()->routeIs('dean.schedule_reports') ? 'active' : '' }}">
-            <span class="nav-icon"></span> Schedule Reports
-        </a>
-        <a href="{{ route('dean.pbt_export') }}"
-            class="nav-item {{ request()->routeIs('dean.pbt_export*') ? 'active' : '' }}">
-            <span class="nav-icon"></span> Faculty PBT Exports
-        </a>
-
         <div class="nav-section-label">System</div>
         <a href="{{ route('dean.settings') }}"
             class="nav-item {{ request()->routeIs('dean.settings') ? 'active' : '' }}">
