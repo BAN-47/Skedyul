@@ -348,7 +348,7 @@ class PbsExportController extends Controller
         $metadata->setCoordinates('L2');
         $metadata->setOffsetX(71);
         $metadata->setOffsetY(3);
-        $metadata->setHeight(73);
+        $metadata->setHeight(60);
         $metadata->setWorksheet($sheet);
     }
 
@@ -379,7 +379,7 @@ class PbsExportController extends Controller
             ->values();
 
         $sheet->setCellValue('D15', $students);
-        
+
         // Loop through all assigned courses (limit to template capacity: rows 16-30)
         foreach ($courses->take(15) as $index => $schedule) {
             $row = 16 + $index;
@@ -390,7 +390,7 @@ class PbsExportController extends Controller
             if (isset($sheet->getMergeCells()[$descriptionRange])) {
                 $sheet->unmergeCells($descriptionRange);
             }
-            
+
             $sheet->getStyle('B' . $row)->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                 ->setVertical(Alignment::VERTICAL_CENTER);

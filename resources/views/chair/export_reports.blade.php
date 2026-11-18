@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -97,7 +97,8 @@
                                     No active faculty members are linked to your college.
                                 </div>
                             @else
-                                <form method="GET" action="{{ route('chair.export_reports.pbt') }}" class="space-y-5">
+                                <form method="GET" action="{{ route('chair.export_reports.pbt.preview') }}"
+                                    data-export-preview-form class="space-y-5">
                                     <div>
                                         <label for="semester" class="mb-2 block text-sm font-semibold text-slate-700">
                                             Academic year and semester
@@ -105,8 +106,7 @@
                                         <select id="semester" name="semester" required
                                             class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100">
                                             @foreach ($semesters as $option)
-                                                <option value="{{ $option->sem_id }}"
-                                                    @selected($semester?->sem_id === $option->sem_id)>
+                                                <option value="{{ $option->sem_id }}" @selected($semester?->sem_id === $option->sem_id)>
                                                     {{ $option->label }}
                                                 </option>
                                             @endforeach
@@ -145,7 +145,7 @@
 
                                         <button type="submit"
                                             class="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                            Download PBT Excel
+                                            Preview PBT Export
                                         </button>
                                     </div>
                                 </form>
@@ -245,6 +245,7 @@
             </div>
         </main>
     </div>
+    @include('chair.partials.export_preview_dialog')
 </body>
 
 </html>

@@ -36,8 +36,9 @@
 
                 <div class="flex items-center justify-end gap-3 mb-4 no-print">
                     <div class="ml-auto flex items-center justify-end gap-2">
-                        <a href="{{ route('chair.mis.word', request()->query()) }}" class="btn btn-primary">
-                            Download DOCX
+                        <a href="{{ route('chair.mis.export.preview', request()->query()) }}" data-export-preview
+                            class="btn btn-primary">
+                            Preview MIS Export
                         </a>
 
                     </div>
@@ -322,6 +323,7 @@
                 .finally(() => _misSaving.delete(id));
         }
     </script>
+    @include('chair.partials.export_preview_dialog')
 </body>
 
 </html>

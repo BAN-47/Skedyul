@@ -90,7 +90,11 @@
             @include('partials.chair_header', [
                 'title' => 'Program by Section (PBS)',
                 'collegeContext' => $chairDepartment?->department?->college_name,
-                'contextTag' => collect([$chairDepartment?->dept_code, $activeSemester?->ay_academic_year, $activeSemester?->sem_name])->filter()->implode(' · '),
+                'contextTag' => collect([
+                    $chairDepartment?->dept_code,
+                    $activeSemester?->ay_academic_year,
+                    $activeSemester?->sem_name,
+                ])->filter()->implode(' · '),
             ])
 
             <div class="page-content" id="page-pbs">
@@ -125,8 +129,8 @@
                                 {{ $pbsSubmitLabel }}
                             </button>
                         </form>
-                        <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Download PBS
-                            Excel</button>
+                        <button type="button" onclick="downloadPbsExport()" class="btn btn-primary">Preview PBS
+                            Export</button>
                     </div>
                 </div>
 
@@ -287,13 +291,13 @@
                             </select>
 
                             {{-- The native select remains the selected value for existing PBS logic. --}}
-                            <select id="filter-section" onchange="applyFilters()" class="sr-only" aria-label="Selected PBS section">
+                            <select id="filter-section" onchange="applyFilters()" class="sr-only"
+                                aria-label="Selected PBS section">
                                 <option value="">SECTION</option>
                                 @foreach ($sections as $sec)
                                     <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
                                         data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}"
-                                        data-year="{{ $sec->sec_year_level }}"
-                                        @selected(($filters['section'] ?? '') === $sec->sec_id)>
+                                        data-year="{{ $sec->sec_year_level }}" @selected(($filters['section'] ?? '') === $sec->sec_id)>
                                         {{ $sec->sec_name }}
                                     </option>
                                 @endforeach
@@ -301,30 +305,53 @@
 
                             <div id="pbs-section-picker" class="relative">
                                 <span class="mr-1 text-[11px] font-medium text-slate-500">Section:</span>
-                                <button type="button" id="pbs-section-picker-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="pbs-section-picker-menu"
+                                <button type="button" id="pbs-section-picker-trigger" aria-haspopup="dialog"
+                                    aria-expanded="false" aria-controls="pbs-section-picker-menu"
                                     class="flex min-w-[180px] items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
-                                    <span class="h-2 w-2 shrink-0 rounded-full {{ $selectedSection ? ($selectedSection->sec_is_evening ? 'bg-violet-500' : 'bg-amber-500') : 'bg-slate-300' }}"></span>
-                                    <span id="pbs-section-picker-label" class="max-w-[140px] truncate font-bold text-slate-800">{{ $selectedSection?->sec_name ?? 'Select section' }}</span>
-                                    <span id="pbs-section-picker-shift" class="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">{{ $selectedSection ? ($selectedSection->sec_is_evening ? 'Evening' : 'Day') : 'Browse' }}</span>
-                                    <svg class="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.22a.75.75 0 0 1 1.06 0L10 10.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/></svg>
+                                    <span
+                                        class="h-2 w-2 shrink-0 rounded-full {{ $selectedSection ? ($selectedSection->sec_is_evening ? 'bg-violet-500' : 'bg-amber-500') : 'bg-slate-300' }}"></span>
+                                    <span id="pbs-section-picker-label"
+                                        class="max-w-[140px] truncate font-bold text-slate-800">{{ $selectedSection?->sec_name ?? 'Select section' }}</span>
+                                    <span id="pbs-section-picker-shift"
+                                        class="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">{{ $selectedSection ? ($selectedSection->sec_is_evening ? 'Evening' : 'Day') : 'Browse' }}</span>
+                                    <svg class="ml-auto h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 20 20"
+                                        fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd"
+                                            d="M5.22 7.22a.75.75 0 0 1 1.06 0L10 10.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.28a.75.75 0 0 1 0-1.06Z"
+                                            clip-rule="evenodd" />
+                                    </svg>
                                 </button>
-                                <div id="pbs-section-picker-menu" role="dialog" aria-label="Choose a section" class="absolute left-0 top-full z-[120] mt-2 hidden w-[min(92vw,440px)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                <div id="pbs-section-picker-menu" role="dialog" aria-label="Choose a section"
+                                    class="absolute left-0 top-full z-[120] mt-2 hidden w-[min(92vw,440px)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                                     <div class="border-b border-slate-100 p-3">
                                         <label for="pbs-section-search" class="sr-only">Search sections</label>
-                                        <input id="pbs-section-search" type="search" placeholder="Search section name..." class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                        <input id="pbs-section-search" type="search"
+                                            placeholder="Search section name..."
+                                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                                     </div>
                                     <div class="border-b border-slate-100 px-3 py-2">
-                                        <div class="flex rounded-lg bg-slate-100 p-1" role="group" aria-label="Filter by shift">
+                                        <div class="flex rounded-lg bg-slate-100 p-1" role="group"
+                                            aria-label="Filter by shift">
                                             @foreach ([['all', 'All Sections'], ['day', '☀ Day'], ['evening', '☾ Evening']] as [$sectionFilter, $sectionLabel])
-                                                <button type="button" data-section-shift-filter="{{ $sectionFilter }}" aria-pressed="{{ ($sectionShiftFilter ?? 'all') === $sectionFilter ? 'true' : 'false' }}" class="flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold transition">
-                                                    {{ $sectionLabel }} <span id="section-filter-count-{{ $sectionFilter }}" class="ml-0.5 text-[9px] opacity-70"></span>
+                                                <button type="button"
+                                                    data-section-shift-filter="{{ $sectionFilter }}"
+                                                    aria-pressed="{{ ($sectionShiftFilter ?? 'all') === $sectionFilter ? 'true' : 'false' }}"
+                                                    class="flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold transition">
+                                                    {{ $sectionLabel }} <span
+                                                        id="section-filter-count-{{ $sectionFilter }}"
+                                                        class="ml-0.5 text-[9px] opacity-70"></span>
                                                 </button>
                                             @endforeach
                                         </div>
-                                        <div class="mt-2 flex flex-wrap gap-1" role="group" aria-label="Filter by year level">
-                            @foreach ([['all', 'All Years'], ['1', '1st Year'], ['2', '2nd Year'], ['3', '3rd Year'], ['4', '4th Year'], ['5', '5th Year']] as [$sectionYear, $sectionYearLabel])
-                                                <button type="button" data-section-year-filter="{{ $sectionYear }}" aria-pressed="{{ ($sectionYearFilter ?? 'all') === $sectionYear ? 'true' : 'false' }}" class="rounded-full border px-2 py-1 text-[9px] font-semibold transition">
-                                                    {{ $sectionYearLabel }} <span id="section-year-count-{{ $sectionYear }}" class="opacity-70"></span>
+                                        <div class="mt-2 flex flex-wrap gap-1" role="group"
+                                            aria-label="Filter by year level">
+                                            @foreach ([['all', 'All Years'], ['1', '1st Year'], ['2', '2nd Year'], ['3', '3rd Year'], ['4', '4th Year'], ['5', '5th Year']] as [$sectionYear, $sectionYearLabel])
+                                                <button type="button" data-section-year-filter="{{ $sectionYear }}"
+                                                    aria-pressed="{{ ($sectionYearFilter ?? 'all') === $sectionYear ? 'true' : 'false' }}"
+                                                    class="rounded-full border px-2 py-1 text-[9px] font-semibold transition">
+                                                    {{ $sectionYearLabel }} <span
+                                                        id="section-year-count-{{ $sectionYear }}"
+                                                        class="opacity-70"></span>
                                                 </button>
                                             @endforeach
                                         </div>
@@ -332,26 +359,58 @@
                                     <div id="pbs-section-list" class="max-h-[340px] overflow-y-auto p-2">
                                         @foreach ([['day', 'Day Sections'], ['evening', 'Evening Sections']] as [$sectionGroup, $sectionGroupLabel])
                                             <section data-section-group="{{ $sectionGroup }}" class="mb-2 last:mb-0">
-                                                <div class="sticky top-0 z-10 flex items-center justify-between bg-white px-2 py-1.5 text-[9px] font-extrabold uppercase tracking-wide {{ $sectionGroup === 'day' ? 'text-amber-700' : 'text-violet-700' }}">
-                                                    <span>{{ $sectionGroup === 'day' ? '☀' : '☾' }} {{ $sectionGroupLabel }}</span>
-                                                    <span id="section-group-count-{{ $sectionGroup }}" class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500"></span>
+                                                <div
+                                                    class="sticky top-0 z-10 flex items-center justify-between bg-white px-2 py-1.5 text-[9px] font-extrabold uppercase tracking-wide {{ $sectionGroup === 'day' ? 'text-amber-700' : 'text-violet-700' }}">
+                                                    <span>{{ $sectionGroup === 'day' ? '☀' : '☾' }}
+                                                        {{ $sectionGroupLabel }}</span>
+                                                    <span id="section-group-count-{{ $sectionGroup }}"
+                                                        class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500"></span>
                                                 </div>
-                                                @foreach ($sections->filter(fn ($sec) => ($sec->sec_is_evening ? 'evening' : 'day') === $sectionGroup) as $sec)
-                                                    @php $yearLabel = match ((int) $sec->sec_year_level) { 1 => '1st Year', 2 => '2nd Year', 3 => '3rd Year', 4 => '4th Year', default => 'Year not set' }; @endphp
-                                                    <button type="button" data-section-option data-section-id="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}" data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}" data-year="{{ $sec->sec_year_level }}" data-search="{{ strtolower($sec->sec_name . ' ' . $yearLabel) }}" class="mb-1 flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-slate-700 transition hover:border-blue-100 hover:bg-blue-50">
-                                                        <span class="h-2 w-2 shrink-0 rounded-full {{ $sectionGroup === 'day' ? 'bg-amber-500' : 'bg-violet-500' }}"></span>
+                                                @foreach ($sections->filter(fn($sec) => ($sec->sec_is_evening ? 'evening' : 'day') === $sectionGroup) as $sec)
+                                                    @php
+                                                        $yearLabel = match ((int) $sec->sec_year_level) {
+                                                            1 => '1st Year',
+                                                            2 => '2nd Year',
+                                                            3 => '3rd Year',
+                                                            4 => '4th Year',
+                                                            default => 'Year not set',
+                                                        };
+                                                    @endphp
+                                                    <button type="button" data-section-option
+                                                        data-section-id="{{ $sec->sec_id }}"
+                                                        data-dept-id="{{ $sec->sec_dept_id }}"
+                                                        data-is-evening="{{ $sec->sec_is_evening ? '1' : '0' }}"
+                                                        data-year="{{ $sec->sec_year_level }}"
+                                                        data-search="{{ strtolower($sec->sec_name . ' ' . $yearLabel) }}"
+                                                        class="mb-1 flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-slate-700 transition hover:border-blue-100 hover:bg-blue-50">
+                                                        <span
+                                                            class="h-2 w-2 shrink-0 rounded-full {{ $sectionGroup === 'day' ? 'bg-amber-500' : 'bg-violet-500' }}"></span>
                                                         <span class="min-w-0 flex-1">
-                                                            <span class="flex items-center gap-1.5 text-[11px] font-bold"><span class="truncate">{{ $sec->sec_name }}</span>@if(($filters['section'] ?? '') === $sec->sec_id)<span class="shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[8px] text-blue-700">Selected</span>@endif</span>
-                                                            <span class="mt-0.5 block text-[9px] text-slate-400">{{ $yearLabel }} · {{ $sec->sec_no_of_student !== null ? $sec->sec_no_of_student . ' students' : 'Student count not set' }}</span>
+                                                            <span
+                                                                class="flex items-center gap-1.5 text-[11px] font-bold"><span
+                                                                    class="truncate">{{ $sec->sec_name }}</span>
+                                                                @if (($filters['section'] ?? '') === $sec->sec_id)
+                                                                    <span
+                                                                        class="shrink-0 rounded bg-blue-100 px-1 py-0.5 text-[8px] text-blue-700">Selected</span>
+                                                                @endif
+                                                            </span>
+                                                            <span
+                                                                class="mt-0.5 block text-[9px] text-slate-400">{{ $yearLabel }}
+                                                                ·
+                                                                {{ $sec->sec_no_of_student !== null ? $sec->sec_no_of_student . ' students' : 'Student count not set' }}</span>
                                                         </span>
-                                                        <span class="shrink-0 text-[9px] font-semibold text-slate-400">{{ $sectionGroup === 'day' ? 'Day' : 'Evening' }}</span>
+                                                        <span
+                                                            class="shrink-0 text-[9px] font-semibold text-slate-400">{{ $sectionGroup === 'day' ? 'Day' : 'Evening' }}</span>
                                                     </button>
                                                 @endforeach
                                             </section>
                                         @endforeach
-                                        <div id="pbs-section-no-results" class="hidden px-3 py-8 text-center text-xs text-slate-400">No sections match these filters.</div>
+                                        <div id="pbs-section-no-results"
+                                            class="hidden px-3 py-8 text-center text-xs text-slate-400">No sections
+                                            match these filters.</div>
                                     </div>
-                                    <div class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-3 py-2 text-[9px] text-slate-500">
+                                    <div
+                                        class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-3 py-2 text-[9px] text-slate-500">
                                         <span>Choose a section to open its PBS timetable</span>
                                         <span>Day / Evening · Year</span>
                                     </div>
@@ -562,7 +621,8 @@
                                 Correct:</div>
                             <div class="border-b border-slate-700 pb-1 text-sm font-bold uppercase">
                                 {{ $signoff['reviewed_by'] ?? 'Dean not assigned' }}</div>
-                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}</div>
+                            <div class="text-xs text-slate-600">{{ $signoff['reviewed_title'] ?? 'Director / Dean' }}
+                            </div>
                         </div>
                         <div class="flex min-h-28 flex-col justify-between text-center">
                             <div class="text-left text-xs font-bold text-slate-700">Approved by:</div>
@@ -599,8 +659,9 @@
 
                 <div>
                     <label class="field-label">Department</label>
-                    <select id="add-department" class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100" disabled
-                        title="Change department using the PBS header filters">
+                    <select id="add-department"
+                        class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100"
+                        disabled title="Change department using the PBS header filters">
                         <option value="">-- Select Department --</option>
                         @foreach ($allDepartments as $dept)
                             <option value="{{ $dept->dept_id }}" @selected(($selectedDeptId ?? '') === $dept->dept_id)>
@@ -613,8 +674,9 @@
                 {{-- ── SECTION (triggers subject filter by year level) ── --}}
                 <div class="mb-3">
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100" disabled
-                        title="Change section using the PBS header filters"
+                    <select id="add-section"
+                        class="field-input appearance-none cursor-not-allowed bg-slate-100 text-slate-700 opacity-100"
+                        disabled title="Change section using the PBS header filters"
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
@@ -634,7 +696,8 @@
                             onchange="filterSubjectsByCategory()">
                             <option value="">-- All --</option>
                             @foreach ($categories as $cat)
-                                <option value="{{ $cat }}" @selected($selectedCategory === $cat)>{{ $cat }}
+                                <option value="{{ $cat }}" @selected($selectedCategory === $cat)>
+                                    {{ $cat }}
                                 </option>
                             @endforeach
                         </select>
@@ -1196,10 +1259,9 @@
             const section = document.getElementById('filter-section')?.value || '';
             const semester = document.getElementById('filter-semester')?.value || '';
             const studentCountInput = document.getElementById('section-student-count');
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
             if (!section || !semester) {
-                const message = 'Select a section and semester before exporting the PBS.';
+                const message = 'Select a section and semester before previewing the PBS.';
                 if (typeof showToast === 'function') showToast(message);
                 else window.alert(message);
                 return;
@@ -1207,7 +1269,7 @@
 
             const count = Number(String(studentCountInput?.value ?? '').trim());
             if (!Number.isInteger(count) || count < 0 || count > 500) {
-                const message = 'Enter a valid student count from 0 to 500 before exporting.';
+                const message = 'Enter a valid student count from 0 to 500 before previewing.';
                 if (typeof showToast === 'function') showToast(message);
                 else window.alert(message);
                 return;
@@ -1216,42 +1278,22 @@
             if (window.__pbsExportInProgress) return;
             window.__pbsExportInProgress = true;
 
-            const headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrf,
-                'X-Requested-With': 'XMLHttpRequest',
-            };
-
             try {
-                const countResponse = await fetch(@json(route('chair.pbs.section.students')), {
-                    method: 'PUT',
-                    headers,
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        sec_id: section,
-                        sec_no_of_student: count
-                    }),
-                });
-                const countData = await countResponse.json().catch(() => ({}));
-
-                if (!countResponse.ok || !countData.success) {
-                    throw new Error(countData.message || 'Could not save the student count.');
-                }
-                if (studentCountInput && countData.sec_no_of_student != null) {
-                    studentCountInput.value = countData.sec_no_of_student;
-                }
-
-                const url = new URL(@json(route('chair.pbs.export')), window.location.origin);
+                const url = new URL(@json(route('chair.pbs.export.preview')), window.location.origin);
                 url.searchParams.set('section', section);
                 url.searchParams.set('semester', semester);
                 url.searchParams.set(
                     'shift',
                     new URLSearchParams(window.location.search).get('shift') === 'night' ? 'night' : 'day'
                 );
-                window.location.assign(url.toString());
+                url.searchParams.set('student_count', String(count));
+                if (typeof window.openChairExportPreview === 'function') {
+                    await window.openChairExportPreview(url.toString());
+                } else {
+                    window.location.assign(url.toString());
+                }
             } catch (error) {
-                const message = error instanceof Error ? error.message : 'Could not prepare the PBS export.';
+                const message = error instanceof Error ? error.message : 'Could not prepare the PBS preview.';
                 if (typeof showToast === 'function') showToast(message);
                 else window.alert(message);
             } finally {
@@ -1260,6 +1302,7 @@
         }
     </script>
 
+    @include('chair.partials.export_preview_dialog')
 </body>
 
 </html>
