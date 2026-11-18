@@ -286,8 +286,8 @@
 
                             {{-- Department selector (combines program and department) --}}
                             <div class="order-3 flex min-w-[150px] flex-col gap-1">
-                                <label for="filter-department" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Department</label>
                                 <select id="filter-department" onchange="applyFilters()"
+                                    aria-label="Select department" title="Select department"
                                     class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                                     <option value="">Select department</option>
                                     @foreach ($allDepartments as $dept)
@@ -425,8 +425,8 @@
                             </div>
 
                             <div class="order-1 flex min-w-[150px] flex-col gap-1">
-                                <label for="filter-academic-year" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Academic year</label>
                                 <select id="filter-academic-year" onchange="applyAcademicYear()"
+                                    aria-label="Select academic year" title="Select academic year"
                                     class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                                     @foreach ($academicYears as $yearOption)
                                         <option value="{{ $yearOption->ay_id }}" @selected((string) $selectedAcademicYearId === (string) $yearOption->ay_id)>
@@ -436,8 +436,8 @@
                                 </select>
                             </div>
                             <div class="order-2 flex min-w-[190px] flex-col gap-1">
-                                <label for="filter-semester" class="px-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Semester</label>
                                 <select id="filter-semester" onchange="applyFilters()"
+                                    aria-label="Select semester" title="Select semester"
                                     class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
                                     <option value="">Select semester</option>
                                     @foreach ($semesters as $semester)
