@@ -72,7 +72,7 @@
         <div class="nav-section-label">Submission</div>
         <a href="{{ route('chair.submit_dean') }}"
             class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
-            <span class="nav-icon"><i class="ti ti-send" aria-hidden="true"></i></span> PBT Submission
+            <span class="nav-icon"><i class="ti ti-send" aria-hidden="true"></i></span> Schedule Submission
         </a>
 
         <div class="nav-section-label">System</div>

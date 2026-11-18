@@ -95,7 +95,11 @@
             @include('partials.chair_header', [
                 'title' => 'Program by Teacher (PBT)',
                 'collegeContext' => $chairDepartment?->department?->college_name,
-                'contextTag' => collect([$chairDepartment?->dept_code, $activeSemester?->ay_academic_year, $activeSemester?->sem_name])->filter()->implode(' · '),
+                'contextTag' => collect([
+                    $chairDepartment?->dept_code,
+                    $activeSemester?->ay_academic_year,
+                    $activeSemester?->sem_name,
+                ])->filter()->implode(' · '),
             ])
 
             <div class="page-content" id="page-pbt">
@@ -116,8 +120,8 @@
                                     </button>
                                 </form>
                             @endif
-                            <a href="{{ route('chair.export_reports.pbt', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
-                                class="btn btn-secondary">Download XLSX</a>
+                            <a href="{{ route('chair.export_reports.pbt.preview', ['faculty_id' => $selectedFaculty->fac_id, 'semester' => $activeSemester?->sem_id]) }}"
+                                data-export-preview class="btn btn-secondary">Preview PBT Export</a>
                         @endif
                     </div>
                 </div>
@@ -518,13 +522,17 @@
                                                 <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
                                                     style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
                                                 </div>
-                                            @else
+                                            @elseif($canPlotSelectedSemester ?? false)
                                                 <button type="button"
                                                     onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
                                                     class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
                                                     style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
                                                     title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}">
                                                 </button>
+                                            @else
+                                                <div class="pbs-cell border-l border-b border-slate-100 bg-slate-50/40 cursor-not-allowed"
+                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
+                                                    title="Archived semester — view only"></div>
                                             @endif
                                         @endfor
                                     @endfor
@@ -594,6 +602,7 @@
                                             data-start="{{ substr($s->sch_start_time, 0, 5) }}"
                                             data-end="{{ substr($s->sch_end_time, 0, 5) }}">
 
+                                            @if ($canPlotSelectedSemester ?? false)
                                             <div
                                                 class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
                                                 <button type="button"
@@ -603,6 +612,7 @@
                                                     onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
                                                     class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
                                             </div>
+                                            @endif
 
                                             <div
                                                 class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
@@ -724,19 +734,30 @@
                             </option>
                         @endforeach
                     </select>
-                    <button type="button" data-pbt-section-trigger aria-expanded="false" class="field-input flex w-full items-center justify-between text-left">
+                    <button type="button" data-pbt-section-trigger aria-expanded="false"
+                        class="field-input flex w-full items-center justify-between text-left">
                         <span data-pbt-section-label>-- Select Section --</span><span aria-hidden="true">⌄</span>
                     </button>
-                    <div data-pbt-section-panel class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
-                        <input type="search" data-pbt-section-search placeholder="Search sections..." class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
+                    <div data-pbt-section-panel
+                        class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                        <input type="search" data-pbt-section-search placeholder="Search sections..."
+                            class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
                         <div class="mb-2 flex gap-1" role="group" aria-label="Filter sections by shift">
-                            <button type="button" data-pbt-shift="all" class="rounded border px-2 py-1 text-[10px]">All <span data-pbt-shift-count="all"></span></button>
-                            <button type="button" data-pbt-shift="day" class="rounded border px-2 py-1 text-[10px]">Day <span data-pbt-shift-count="day"></span></button>
-                            <button type="button" data-pbt-shift="evening" class="rounded border px-2 py-1 text-[10px]">Evening <span data-pbt-shift-count="evening"></span></button>
+                            <button type="button" data-pbt-shift="all"
+                                class="rounded border px-2 py-1 text-[10px]">All <span
+                                    data-pbt-shift-count="all"></span></button>
+                            <button type="button" data-pbt-shift="day"
+                                class="rounded border px-2 py-1 text-[10px]">Day <span
+                                    data-pbt-shift-count="day"></span></button>
+                            <button type="button" data-pbt-shift="evening"
+                                class="rounded border px-2 py-1 text-[10px]">Evening <span
+                                    data-pbt-shift-count="evening"></span></button>
                         </div>
                         <div class="mb-2 flex flex-wrap gap-1" role="group" aria-label="Filter sections by year">
                             @foreach ([['all', 'All years'], ['1', '1st'], ['2', '2nd'], ['3', '3rd'], ['4', '4th'], ['5', '5th']] as [$yearFilter, $yearText])
-                                <button type="button" data-pbt-year="{{ $yearFilter }}" class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span data-pbt-year-count="{{ $yearFilter }}"></span></button>
+                                <button type="button" data-pbt-year="{{ $yearFilter }}"
+                                    class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span
+                                        data-pbt-year-count="{{ $yearFilter }}"></span></button>
                             @endforeach
                         </div>
                         <div data-pbt-section-options class="max-h-48 overflow-y-auto"></div>
@@ -914,19 +935,30 @@
                             </option>
                         @endforeach
                     </select>
-                    <button type="button" data-pbt-section-trigger aria-expanded="false" class="field-input flex w-full items-center justify-between text-left">
+                    <button type="button" data-pbt-section-trigger aria-expanded="false"
+                        class="field-input flex w-full items-center justify-between text-left">
                         <span data-pbt-section-label>-- Select Section --</span><span aria-hidden="true">⌄</span>
                     </button>
-                    <div data-pbt-section-panel class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
-                        <input type="search" data-pbt-section-search placeholder="Search sections..." class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
+                    <div data-pbt-section-panel
+                        class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                        <input type="search" data-pbt-section-search placeholder="Search sections..."
+                            class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
                         <div class="mb-2 flex gap-1" role="group" aria-label="Filter sections by shift">
-                            <button type="button" data-pbt-shift="all" class="rounded border px-2 py-1 text-[10px]">All <span data-pbt-shift-count="all"></span></button>
-                            <button type="button" data-pbt-shift="day" class="rounded border px-2 py-1 text-[10px]">Day <span data-pbt-shift-count="day"></span></button>
-                            <button type="button" data-pbt-shift="evening" class="rounded border px-2 py-1 text-[10px]">Evening <span data-pbt-shift-count="evening"></span></button>
+                            <button type="button" data-pbt-shift="all"
+                                class="rounded border px-2 py-1 text-[10px]">All <span
+                                    data-pbt-shift-count="all"></span></button>
+                            <button type="button" data-pbt-shift="day"
+                                class="rounded border px-2 py-1 text-[10px]">Day <span
+                                    data-pbt-shift-count="day"></span></button>
+                            <button type="button" data-pbt-shift="evening"
+                                class="rounded border px-2 py-1 text-[10px]">Evening <span
+                                    data-pbt-shift-count="evening"></span></button>
                         </div>
                         <div class="mb-2 flex flex-wrap gap-1" role="group" aria-label="Filter sections by year">
                             @foreach ([['all', 'All years'], ['1', '1st'], ['2', '2nd'], ['3', '3rd'], ['4', '4th'], ['5', '5th']] as [$yearFilter, $yearText])
-                                <button type="button" data-pbt-year="{{ $yearFilter }}" class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span data-pbt-year-count="{{ $yearFilter }}"></span></button>
+                                <button type="button" data-pbt-year="{{ $yearFilter }}"
+                                    class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span
+                                        data-pbt-year-count="{{ $yearFilter }}"></span></button>
                             @endforeach
                         </div>
                         <div data-pbt-section-options class="max-h-48 overflow-y-auto"></div>
@@ -1155,6 +1187,7 @@
                         id: "{{ $sub->course_id ?? $sub->subj_id }}",
                         code: "{{ $sub->course_code ?? $sub->subj_code }}",
                         name: "{{ $sub->course_name ?? $sub->subj_name }}",
+                        deptCode: "{{ $sub->program?->dept_code ?? '' }}",
                         year: "{{ $sub->course_year_level ?? '' }}",
                         sem: "{{ $sub->course_semester ?? '' }}",
                         cat: "{{ $sub->course_category ?? '' }}",
@@ -1164,6 +1197,7 @@
                     },
                 @endforeach
             ];
+            window.CAN_PLOT_SELECTED_SEMESTER = @json($canPlotSelectedSemester ?? false);
             window.ACTIVE_COURSE_SEMESTER = @json(str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') ||
                 str_contains(strtolower($activeSemester->sem_name ?? ''), 'second')
                     ? 2
@@ -1181,6 +1215,7 @@
             </script>
         @endif
 
+        @include('chair.partials.export_preview_dialog')
 </body>
 
 </html>

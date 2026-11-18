@@ -14,24 +14,21 @@ function filterSubjectsByCategory() {
 function populateSubjectOptions(select, category, sectionId, departmentId) {
     const section = document.getElementById(sectionId);
     const selectedSection = section?.options[section.selectedIndex];
-    const deptId = selectedSection?.dataset.deptId || document.getElementById(departmentId)?.value || document.getElementById('edit-department-id')?.value || '';
     const year = selectedSection?.dataset.yearLevel || '';
     const semester = String(getSelectedCourseSemester() || '');
     const subjects = (window.ALL_SUBJECTS_LIST || []).filter(subject => {
-        // Category browsing is global; regular subject browsing remains
-        // scoped to the selected department, section year level, and term.
+        // Courses are global; the target section's year and selected term remain filters.
         if (category) return String(subject.cat) === String(category);
-        const deptMatch = !deptId || !subject.dept || String(subject.dept) === String(deptId);
         const yearMatch = !year || !subject.year || String(subject.year) === String(year);
         const semMatch = subject.code === 'REC' || !semester || !subject.sem || String(subject.sem) === semester;
-        return deptMatch && yearMatch && semMatch;
+        return yearMatch && semMatch;
     });
 
     select.innerHTML = '<option value="">-- Select Subject --</option>';
     subjects.forEach(subject => {
         const option = document.createElement('option');
         option.value = subject.id;
-        option.textContent = subject.code + ' — ' + subject.name;
+        option.textContent = subject.code + ' — ' + subject.name + (subject.deptCode ? ` (${subject.deptCode})` : '');
         option.dataset.departmentId = subject.dept || '';
         option.dataset.yearLevel = subject.year || '';
         option.dataset.semester = subject.sem || '';
@@ -569,7 +566,7 @@ document.addEventListener("DOMContentLoaded", () => {
             subjects.forEach((sub) => {
                 const opt = document.createElement("option");
                 opt.value = sub.id;
-                opt.textContent = sub.code + " — " + sub.name;
+                opt.textContent = sub.code + " — " + sub.name + (sub.deptCode ? ` (${sub.deptCode})` : '');
                 opt.dataset.departmentId = sub.dept || deptId;
                 opt.dataset.yearLevel = sub.year;
                 opt.dataset.semester = sub.sem;
@@ -725,6 +722,10 @@ function restoreAddAnotherState() {
 }
 
 function openAddModal(day, startTime) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     if (!SELECTED_TEACHER) {
         showToast("Select a teacher first.");
         return;
@@ -900,6 +901,10 @@ function submitAdd(keepOpen = false) {
 
 /* ── EDIT ── */
 function openEditModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError("edit-error");
     syncSelectedSemesterFields();
     document.getElementById("edit-id").value = block.dataset.scheduleId;
@@ -993,6 +998,10 @@ function submitEdit() {
 let deleteCode = "";
 
 function openDeleteModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError("delete-error");
     const id = block.dataset.scheduleId;
     document.getElementById("delete-id").value = id;
@@ -1059,6 +1068,10 @@ function submitDelete() {
 
 /* ── toolbar ── */
 function clearAll() {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     if (
         !confirm(
             "Clear all plotted schedules for this teacher? This cannot be undone.",

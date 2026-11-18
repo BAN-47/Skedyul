@@ -1,8 +1,27 @@
-<div class="topbar">
-    <div class="topbar-title">{{ $title ?? 'SKEDYUL' }}</div>
+@php
+    $adminAppHost = (string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?? '');
+    $adminOnLaravelCloud = str_contains(strtolower($adminAppHost), 'laravel.cloud');
+@endphp
+<div class="topbar admin-topbar">
+    <div class="topbar-title admin-topbar-heading">
+        <div class="admin-topbar-title-row">
+            <span>{{ $title ?? 'SKEDYUL' }}</span>
+            @if($adminOnLaravelCloud)
+                <span class="admin-cloud-pill"><span class="admin-cloud-dot"></span> Laravel Cloud</span>
+            @endif
+        </div>
+        <span class="admin-topbar-subtitle">{{ request()->routeIs('admin.dashboard') ? 'Academic Scheduling & Resource Analytics' : 'SKEDYUL Academic Core' }}</span>
+    </div>
+    <div class="admin-topbar-actions">
+        @if(isset($semester) || isset($academicYear))
+            <div class="admin-term-pill">
+                <span class="admin-term-dot"></span>
+                <span>{{ $academicYear->ay_academic_year ?? $academicYear->ay_year_label ?? 'Academic year not set' }} · {{ $semester->sem_name ?? 'Semester not set' }}</span>
+            </div>
+        @endif
     <div id="topbar-notif-bell" class="relative">
         <button type="button" onclick="toggleNotifDropdown()"
-            class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
+            class="admin-notification-button flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
             Notifications
             <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                 {{ $notifCount ?? 0 }}
@@ -19,6 +38,7 @@
                 </button>
             </div>
         </div>
+    </div>
     </div>
 </div>
 

@@ -39,6 +39,7 @@ class ScheduleAssignmentService
         'Vice-President' => 3,
         'University Director' => 6,
         'Campus Director' => 6,
+        'UD Data Protection Officer' => 6,
         'Assistant Campus Director' => 9,
         'Dean of Instruction' => 9,
         'College Dean' => 9,
@@ -47,7 +48,9 @@ class ScheduleAssignmentService
         'PERG Chair' => 16,
         'Campus Secretary' => 16,
         'College Secretary' => 16,
-        ];
+        'Research Chair' => 16,
+        'MIS Officer' => 30,
+    ];
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
@@ -383,8 +386,8 @@ class ScheduleAssignmentService
                     && $schedule->sch_sec_id !== $data['sec_id'];
                 $sourceLoadHasOtherSchedules = $isSameFacultySectionChange
                     && Schedule::where('sch_load_id', $sourceLoad->sl_id)
-                        ->where('sch_id', '!=', $schedule->sch_id)
-                        ->exists();
+                    ->where('sch_id', '!=', $schedule->sch_id)
+                    ->exists();
 
                 $targetLoad = Study_Load::where([
                     'sl_fac_id' => $data['fac_id'],
@@ -555,15 +558,15 @@ class ScheduleAssignmentService
 
             $schedulesToDelete = self::isOjt($schedule->subject)
                 ? Schedule::query()
-                    ->where('sch_fac_id', $facultyId)
-                    ->where('sch_sem_id', $semesterId)
-                    ->where('sch_is_active', $schedule->sch_is_active)
-                    ->where('sch_course_id', $schedule->sch_course_id)
-                    ->where('sch_day', $schedule->sch_day)
-                    ->where('sch_room_id', $schedule->sch_room_id)
-                    ->where('sch_start_time', $schedule->sch_start_time)
-                    ->where('sch_end_time', $schedule->sch_end_time)
-                    ->get()
+                ->where('sch_fac_id', $facultyId)
+                ->where('sch_sem_id', $semesterId)
+                ->where('sch_is_active', $schedule->sch_is_active)
+                ->where('sch_course_id', $schedule->sch_course_id)
+                ->where('sch_day', $schedule->sch_day)
+                ->where('sch_room_id', $schedule->sch_room_id)
+                ->where('sch_start_time', $schedule->sch_start_time)
+                ->where('sch_end_time', $schedule->sch_end_time)
+                ->get()
                 : collect([$schedule]);
 
             $loadIds = $schedulesToDelete->pluck('sch_load_id')->filter()->unique();

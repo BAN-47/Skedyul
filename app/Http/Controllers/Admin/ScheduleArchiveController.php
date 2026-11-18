@@ -37,11 +37,12 @@ class ScheduleArchiveController extends Controller
             ]);
         }
 
-        $academicYears = DB::query()
-            ->fromSub($this->archiveRecords(), 'archive_records')
-            ->select('ay_id', 'year_label')
-            ->whereNotNull('ay_id')
-            ->distinct()
+        // List every archived academic year, including years with no schedule
+        // rows yet, so the archive is a year history rather than a schedule-only list.
+        $academicYears = DB::table('academic_year')
+            ->where('ay_is_active', false)
+            ->select('ay_id')
+            ->selectRaw("COALESCE(ay_academic_year, ay_year_label, 'Academic year unavailable') as year_label")
             ->orderByDesc('year_label')
             ->get();
 
@@ -51,13 +52,10 @@ class ScheduleArchiveController extends Controller
             : ($academicYears->first()->ay_id ?? '');
 
         $semesters = $selectedYear !== ''
-            ? DB::query()
-                ->fromSub($this->archiveRecords(), 'archive_records')
-                ->where('ay_id', $selectedYear)
-                ->select('sem_id', 'semester_name')
-                ->whereNotNull('sem_id')
-                ->distinct()
-                ->orderByRaw("CASE WHEN LOWER(semester_name) LIKE '1st%' THEN 1 WHEN LOWER(semester_name) LIKE '2nd%' THEN 2 ELSE 3 END")
+            ? DB::table('semester')
+                ->where('sem_ay_id', $selectedYear)
+                ->select('sem_id', 'sem_name as semester_name')
+                ->orderByRaw("CASE WHEN LOWER(sem_name) LIKE '1st%' THEN 1 WHEN LOWER(sem_name) LIKE '2nd%' THEN 2 ELSE 3 END")
                 ->get()
             : collect();
 

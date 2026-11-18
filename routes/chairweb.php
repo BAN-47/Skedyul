@@ -13,6 +13,7 @@ use App\Http\Controllers\Chair\PbtExportController;
 use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
+use App\Http\Controllers\Chair\ExportPreviewController;
 
 Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
@@ -48,6 +49,7 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     // MIS — Class Program for MIS
     Route::get('/mis', [MisController::class, 'index'])->name('chair.mis');
     Route::get('/mis/export/word', [MisController::class, 'exportWord'])->name('chair.mis.word');
+    Route::get('/mis/export/preview', [ExportPreviewController::class, 'mis'])->name('chair.mis.export.preview');
     Route::put('/mis/{id}/code', [MisController::class, 'updateMisCode'])->name('chair.mis.code');
 
     // Subjects
@@ -72,7 +74,9 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
 
     // Export reports and faculty PBT workbook
     Route::get('/export-reports', [PbtExportController::class, 'index'])->name('chair.export_reports');
+    Route::get('/export-reports/pbt/preview', [ExportPreviewController::class, 'pbt'])->name('chair.export_reports.pbt.preview');
     Route::get('/export-reports/pbt', [PbtExportController::class, 'download'])->name('chair.export_reports.pbt');
+    Route::get('/pbs/export/preview', [ExportPreviewController::class, 'pbs'])->name('chair.pbs.export.preview');
     Route::get('/pbs/export', [PbsExportController::class, 'download'])->name('chair.pbs.export');
 
     Route::get('/settings', function () {
