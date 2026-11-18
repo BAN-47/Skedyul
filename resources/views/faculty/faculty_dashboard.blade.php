@@ -99,7 +99,7 @@
             </div>
           </div>
           @if ($mobileApkAvailable)
-            <a href="{{ asset('downloads/skedyul-mobile.apk') }}" download="Skedyul.apk" class="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-800 shadow-md transition hover:-translate-y-0.5 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-800 sm:w-auto">
+            <a href="{{ asset('downloads/skedyul-mobile.apk') }}?v={{ filemtime(public_path('downloads/skedyul-mobile.apk')) }}" download="Skedyul.apk" class="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-blue-800 shadow-md transition hover:-translate-y-0.5 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-800 sm:w-auto">
               <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3"></path></svg>
               Download APK
             </a>
