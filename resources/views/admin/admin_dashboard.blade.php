@@ -31,7 +31,7 @@
                 <div class="relative z-10 flex items-start justify-between gap-4">
                     <div class="flex-1">
                         <div class="text-[11px] font-bold uppercase tracking-[1.5px] text-white/40 mb-1.5">
-                            Welcome back, Tech Admin
+                            Welcome back, {{ Auth::user()->usr_name }}
                         </div>
                         <div id="quote-text" class="text-[22px] leading-snug font-bold text-white mb-2.5 italic">
                             "Education is the most powerful weapon which you can use to change the world."
@@ -49,88 +49,105 @@
                     </div>
                     <div class="text-right flex-shrink-0">
                         <div class="text-[44px] opacity-[.12] leading-none mb-2.5">"</div>
-                        <div class="text-[11px] text-white/30">AY 2025–2026 · 1st Sem</div>
-                        <div class="text-[11px] text-white/30 mt-1">Last backup</div>
-                        <div class="text-[12px] font-bold text-emerald-400">Today 06:00 AM ✓</div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- ══ STAT CARDS ROW 1 ══ --}}
-            <div class="grid grid-cols-4 gap-3 mb-3">
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-blue-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Total Users</div>
-                    <div class="stat-value">{{ $totalUsers }}</div>
-                    <div class="stat-sub">4 roles registered</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-green-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">System Status</div>
-                    <div class="text-[20px] font-extrabold text-slate-900 leading-none mb-1">{{ $dbStatus }}</div>
-                    <div class="stat-sub">Vercel · Supabase active</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-amber-500"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Total Faculty</div>
-                    <div class="stat-value">{{ $totalFaculty }}</div>
-                    <div class="stat-sub">BSIS · BSIT · BIT-CT</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-cyan-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">DB Records</div>
-                    <div class="stat-value">{{ $dbRecords }}</div>
-                    <div class="stat-sub">Supabase PostgreSQL</div>
-                </div>
-            </div>
-
-            {{-- ══ STAT CARDS ROW 2 ══ --}}
-            <div class="grid grid-cols-4 gap-3 mb-4">
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-violet-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Total Sections</div>
-                    <div class="stat-value">{{ $totalSections }}</div>
-                    <div class="stat-sub">Across 3 programs</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-green-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Subjects Offered</div>
-                    <div class="stat-value">{{ $subjectsOffered }}</div>
-                    <div class="stat-sub">This semester</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-bar bg-cyan-600"></div>
-                    <div class="stat-icon"></div>
-                    <div class="stat-label">Rooms Available</div>
-                    <div class="stat-value">{{ $roomsAvailable }}</div>
-                    <div class="stat-sub">{{ $roomsOccupied }} currently occupied</div>
-                </div>
-            </div>
-
-            {{-- ══ DEPT FACULTY STATS ══ --}}
-            <div class="card mb-4">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">Department Faculty Distribution</div>
-                        <div class="card-sub">Faculty count per department</div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                    @foreach($deptFacultyStats as $dept)
-                        <div class="flex flex-col items-center justify-center rounded-xl bg-slate-50 px-3 py-3 border border-slate-100">
-                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-tight text-center">{{ $dept->dept_code }}</div>
-                            <div class="text-xl font-extrabold text-slate-800">{{ $dept->faculty_count }}</div>
-                            <div class="text-[10px] text-slate-500">Faculty</div>
+                        <div class="text-[11px] text-white/60">Current academic term</div>
+                        <div class="text-[12px] font-bold text-white mt-1">
+                            {{ $academicYear->ay_academic_year ?? $academicYear->ay_year_label ?? 'No active academic year' }}
+                            · {{ $semester->sem_name ?? 'No active semester' }}
                         </div>
-                    @endforeach
+                    </div>
                 </div>
             </div>
+
+            {{-- ══ SYSTEM SUMMARY ══ --}}
+            <div class="grid grid-cols-2 gap-3 mb-4 sm:grid-cols-3 2xl:grid-cols-7">
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-blue-600"></div>
+                    <span class="admin-metric-icon bg-blue-50 text-blue-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM20 8v6m3-3h-6"/></svg></span>
+                    <div class="stat-label">Total Users</div><div class="stat-value">{{ number_format($totalUsers) }}</div><div class="stat-sub">All registered roles</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-amber-500"></div>
+                    <span class="admin-metric-icon bg-amber-50 text-amber-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2m3-13v6m3-3h-6"/></svg></span>
+                    <div class="stat-label">Total Faculty</div><div class="stat-value">{{ number_format($totalFaculty) }}</div><div class="stat-sub">Across all colleges</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar {{ $dbStatus === 'Online' ? 'bg-green-600' : 'bg-red-500' }}"></div>
+                    <span class="admin-metric-icon {{ $dbStatus === 'Online' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700' }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v5c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.8-5"/></svg></span>
+                    <div class="stat-label">System Status</div><div class="stat-value {{ $dbStatus === 'Online' ? 'text-green-700' : 'text-red-600' }}">{{ $dbStatus }}</div><div class="stat-sub">{{ $platformName }} · {{ $databaseDriver }}</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-cyan-600"></div>
+                    <span class="admin-metric-icon bg-cyan-50 text-cyan-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>
+                    <div class="stat-label">DB Records</div><div class="stat-value">{{ number_format($dbRecords) }}</div><div class="stat-sub">Users, sections, courses, rooms</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-violet-600"></div>
+                    <span class="admin-metric-icon bg-violet-50 text-violet-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg></span>
+                    <div class="stat-label">Total Sections</div><div class="stat-value">{{ number_format($totalSections) }}</div><div class="stat-sub">All academic years and semesters</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-indigo-600"></div>
+                    <span class="admin-metric-icon bg-indigo-50 text-indigo-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h4"/><path d="m16 16 2 2 4-4"/></svg></span>
+                    <div class="stat-label">Total Courses</div><div class="stat-value">{{ number_format($subjectsOffered) }}</div><div class="stat-sub">Across all colleges</div>
+                </article>
+                <article class="stat-card admin-metric-card group">
+                    <div class="stat-card-bar bg-emerald-600"></div>
+                    <span class="admin-metric-icon bg-emerald-50 text-emerald-700"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 9h.01M15 9h.01"/></svg></span>
+                    <div class="stat-label">Total Rooms</div><div class="stat-value">{{ number_format($totalRooms) }}</div><div class="stat-sub">{{ number_format($roomsAvailable) }} available · {{ number_format($roomsOccupied) }} in use</div>
+                </article>
+            </div>
+
+            {{-- ══ DEPARTMENT FACULTY DISTRIBUTION ══ --}}
+            <section class="card mb-4 admin-faculty-distribution" aria-labelledby="faculty-distribution-title">
+                <div class="card-header flex-wrap gap-3">
+                    <div>
+                        <div class="card-title" id="faculty-distribution-title">Department Faculty Distribution</div>
+                        <div class="card-sub">Active teaching rosters categorized by college</div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5" role="tablist" aria-label="Filter departments by college">
+                        <button type="button" class="faculty-college-filter active" data-college-filter="all" role="tab" aria-selected="true">All Colleges</button>
+                        @foreach($facultyDistributionGroups as $collegeGroup)
+                            <button type="button" class="faculty-college-filter" data-college-filter="{{ $collegeGroup['id'] }}" role="tab" aria-selected="false">{{ $collegeGroup['code'] }}</button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10" id="faculty-distribution-grid">
+                    @forelse($facultyDistributionGroups as $collegeGroup)
+                        @foreach($collegeGroup['departments'] as $dept)
+                            <article class="faculty-distribution-dept" data-college="{{ $collegeGroup['id'] }}" title="{{ $dept->dept_name }} · {{ $collegeGroup['name'] }}">
+                                <div class="text-[9px] font-bold uppercase tracking-wide text-slate-500">{{ $dept->dept_code ?: $dept->dept_name }}</div>
+                                <div class="mt-1 text-2xl font-extrabold leading-none {{ $dept->faculty_count > 0 ? 'text-blue-700' : 'text-slate-400' }}">{{ $dept->faculty_count }}</div>
+                                <div class="mt-1 text-[9px] font-medium text-slate-500">{{ Str::plural('Faculty', $dept->faculty_count) }}</div>
+                            </article>
+                        @endforeach
+                    @empty
+                        <div class="col-span-full rounded-lg bg-slate-50 p-5 text-center text-xs text-slate-500">No departments are registered yet.</div>
+                    @endforelse
+                </div>
+
+                <div class="mt-4 border-t border-slate-100 pt-3" id="college-faculty-quota">
+                    <div class="mb-2 text-[9px] font-bold uppercase tracking-[.1em] text-slate-500">College faculty distribution</div>
+                    <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+                        @foreach($facultyDistributionGroups as $collegeGroup)
+                            @php
+                                $collegePercent = $totalActiveFacultyInColleges > 0
+                                    ? round(($collegeGroup['faculty_count'] / $totalActiveFacultyInColleges) * 100, 1)
+                                    : 0;
+                            @endphp
+                            <div class="faculty-college-quota" data-college="{{ $collegeGroup['id'] }}">
+                                <div class="mb-1 flex items-center justify-between gap-2 text-[10px]">
+                                    <span class="truncate font-semibold text-slate-600" title="{{ $collegeGroup['name'] }}">{{ $collegeGroup['name'] }}</span>
+                                    <span class="shrink-0 text-slate-500">{{ $collegeGroup['faculty_count'] }} · {{ $collegePercent }}%</span>
+                                </div>
+                                <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full bg-blue-600 transition-all" style="width:{{ $collegePercent }}%"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
 
             <div class="card mb-4">
                 <div class="card-header">
@@ -163,11 +180,141 @@
                 </div>
             </div>
 
+            {{-- ══ GLOBAL TEACHING ANALYTICS ══ --}}
+            <div class="card mb-4 overflow-hidden">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Top 3 Most Plotted Faculty — All Colleges</div>
+                        <div class="card-sub">
+                            Ranked by scheduled weekly hours across every college
+                            @if($semester)
+                                · {{ $semester->sem_name }}
+                                @if($academicYear)
+                                    · AY {{ $academicYear->ay_academic_year ?? $academicYear->ay_year_label }}
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+                    <span class="badge badge-blue">{{ number_format($totalScheduledHours, 1) }} scheduled hours</span>
+                </div>
+
+                @if($topFaculty->isNotEmpty())
+                    @php $leaderMaxHours = max(1, (float) $topFaculty->max('total_hours')); @endphp
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        @foreach($topFaculty as $index => $leader)
+                            @php
+                                $rankStyles = [
+                                    ['border-amber-400', 'bg-amber-50', 'text-amber-700', 'bg-amber-500'],
+                                    ['border-slate-300', 'bg-slate-100', 'text-slate-600', 'bg-slate-400'],
+                                    ['border-orange-300', 'bg-orange-50', 'text-orange-700', 'bg-orange-400'],
+                                ][$index] ?? ['border-slate-200', 'bg-slate-50', 'text-slate-600', 'bg-slate-400'];
+                                $loadPercent = min(100, (int) round(($leader['total_hours'] / $leaderMaxHours) * 100));
+                            @endphp
+                            <article class="rounded-2xl border-2 {{ $rankStyles[0] }} bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                                <div class="mb-4 flex items-start justify-between gap-3">
+                                    <div class="flex min-w-0 items-center gap-3">
+                                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $rankStyles[1] }} text-sm font-extrabold {{ $rankStyles[2] }}">#{{ $index + 1 }}</span>
+                                        <div class="min-w-0">
+                                            <h3 class="truncate text-sm font-extrabold text-slate-900" title="{{ $leader['name'] }}">{{ $leader['name'] }}</h3>
+                                            <p class="truncate text-[11px] text-slate-500" title="{{ $leader['college'] }} · {{ $leader['department'] }}">{{ $leader['college'] }} · {{ $leader['department'] }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="shrink-0 rounded-full {{ $rankStyles[1] }} px-2 py-1 text-[9px] font-bold uppercase tracking-wide {{ $rankStyles[2] }}">#{{ $index + 1 }}</span>
+                                </div>
+
+                                <div class="flex items-baseline justify-between gap-2">
+                                    <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Weekly scheduled load</span>
+                                    <span class="text-lg font-extrabold text-slate-900">{{ number_format($leader['total_hours'], 1) }}<span class="ml-1 text-xs font-semibold text-slate-400">hrs</span></span>
+                                </div>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full {{ $rankStyles[3] }} transition-all" style="width:{{ $loadPercent }}%"></div>
+                                </div>
+
+                                <div class="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-xl bg-slate-50 py-2.5 text-center">
+                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Day</div><div class="text-xs font-extrabold text-emerald-600">{{ number_format($leader['day_hours'], 1) }}h</div></div>
+                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Evening</div><div class="text-xs font-extrabold text-indigo-600">{{ number_format($leader['evening_hours'], 1) }}h</div></div>
+                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Classes</div><div class="text-xs font-extrabold text-slate-700">{{ $leader['classes'] }}</div></div>
+                                </div>
+                                @if($leader['courses']->isNotEmpty())
+                                    <p class="mt-3 truncate text-[10px] text-slate-500" title="{{ $leader['courses']->implode(', ') }}">Courses: {{ $leader['courses']->implode(', ') }}</p>
+                                @endif
+                            </article>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                        <div class="text-sm font-semibold text-slate-600">No active schedules found for this semester.</div>
+                        <div class="mt-1 text-xs text-slate-400">The faculty ranking will appear when active schedules have been plotted.</div>
+                    </div>
+                @endif
+            </div>
+
+            @php
+                $weeklyPeakDay = $weeklyPattern->sortByDesc('sections')->first();
+                $weeklyMaxSections = max(1, (int) $weeklyPattern->max('sections'));
+                $weeklyPeakRoomSections = (int) $weeklyPattern
+                    ->map(fn ($day) => $day['most_used_room']['sections_count'] ?? 0)
+                    ->max();
+            @endphp
+            <section class="card mb-4 admin-weekly-pattern" id="admin-weekly-pattern">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Sections Scheduled by Day</div>
+                        <div class="card-sub">Distinct sections with active schedules across all colleges</div>
+                    </div>
+                    <div class="flex items-center gap-1 rounded-xl bg-slate-100 p-1" role="group" aria-label="Weekly pattern display">
+                        <button type="button" class="weekly-pattern-mode active" data-mode="sections" aria-pressed="true">Sections</button>
+                        <button type="button" class="weekly-pattern-mode" data-mode="rooms" aria-pressed="false">Room Util.</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                    @foreach($weeklyPattern as $day)
+                        @php
+                            $dayPercent = min(100, (int) round(($day['sections'] / $weeklyMaxSections) * 100));
+                            $roomSections = (int) ($day['most_used_room']['sections_count'] ?? 0);
+                            $roomPercent = $weeklyPeakRoomSections > 0 ? min(100, (int) round(($roomSections / $weeklyPeakRoomSections) * 100)) : 0;
+                            $isPeakDay = $day['sections'] > 0 && $weeklyPeakDay && $day['sections'] === $weeklyPeakDay['sections'];
+                            $isPeakRoom = $roomSections > 0 && $roomSections === $weeklyPeakRoomSections;
+                            $isClosedDay = $day['sections'] <= 0;
+                            $mostUsedRoom = $day['most_used_room'];
+                        @endphp
+                        <article class="weekly-pattern-day rounded-xl border {{ $isPeakDay ? 'border-blue-300 bg-blue-50' : ($day['sections'] > 0 ? 'border-blue-100 bg-slate-50' : 'border-slate-100 bg-slate-50') }} p-2.5 transition hover:border-blue-200"
+                            data-classes="{{ $day['classes'] }}"
+                            data-sections="{{ $day['sections'] }}"
+                            data-room-name="{{ $mostUsedRoom['name'] ?? 'No room used' }}"
+                            data-room-sections="{{ $roomSections }}"
+                            data-room-classes="{{ $mostUsedRoom['class_count'] ?? 0 }}"
+                            data-room-section-list="{{ isset($mostUsedRoom['sections']) ? $mostUsedRoom['sections']->take(4)->implode(', ') : '' }}"
+                            data-section-width="{{ $dayPercent }}"
+                            data-room-width="{{ $roomPercent }}"
+                            data-section-closed-label="{{ $isClosedDay ? 'No active sections' : $day['classes'] . ' scheduled classes' }}"
+                            data-closed="{{ $isClosedDay ? 'true' : 'false' }}">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-[10px] font-extrabold tracking-wide text-slate-500">{{ $day['short'] }}</span>
+                                @if($isPeakDay)<span class="weekly-pattern-section-peak rounded bg-blue-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">PEAK</span>@endif
+                                @if($isPeakRoom)<span class="weekly-pattern-room-peak rounded bg-emerald-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">ROOM PEAK</span>@endif
+                                @if(!$isPeakDay && !$isPeakRoom)<span class="text-[9px] text-slate-400">{{ $day['sections'] }} {{ Str::plural('section', $day['sections']) }}</span>@endif
+                            </div>
+                            <div class="weekly-pattern-value mt-2 truncate text-xl font-extrabold {{ $day['sections'] > 0 ? 'text-slate-900' : 'text-slate-300' }}">{{ $day['sections'] }} {{ Str::plural('section', $day['sections']) }}</div>
+                            <div class="weekly-pattern-track mt-2 h-5 overflow-hidden rounded bg-white">
+                                <div class="weekly-pattern-bar h-full rounded bg-blue-600 transition-all" style="width:{{ $dayPercent }}%"></div>
+                            </div>
+                            <div class="weekly-pattern-caption mt-1 truncate text-[9px] text-slate-500">{{ $isClosedDay ? 'No active sections' : $day['classes'] . ' scheduled classes' }}</div>
+                            <div class="weekly-pattern-room-caption mt-1">
+                                <div class="weekly-pattern-room-name truncate text-[10px] font-bold text-emerald-700">{{ $mostUsedRoom['name'] ?? 'No room used' }}</div>
+                                <div class="weekly-pattern-room-stats text-[9px] text-slate-500">{{ $roomSections }} {{ Str::plural('section', $roomSections) }} · {{ $mostUsedRoom['class_count'] ?? 0 }} classes</div>
+                                <div class="weekly-pattern-room-sections mt-0.5 truncate text-[8px] text-slate-400" title="{{ isset($mostUsedRoom['sections']) ? $mostUsedRoom['sections']->implode(', ') : '' }}">{{ isset($mostUsedRoom['sections']) ? $mostUsedRoom['sections']->take(3)->implode(', ') : '' }}</div>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+
             {{-- ══ USER ACCOUNTS + SYSTEM INFO ══ --}}
-            <div class="grid grid-cols-12 gap-3 mb-4">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-3 mb-4">
 
                 {{-- User Accounts Table --}}
-                <div class="col-span-8 card">
+                <div class="col-span-1 xl:col-span-8 card">
                     <div class="card-header">
                         <div>
                             <div class="card-title">User Accounts</div>
@@ -245,20 +392,16 @@
                 </div>
 
                 {{-- System Info + Role Distribution --}}
-                <div class="col-span-4 flex flex-col gap-3">
+                <div class="col-span-1 xl:col-span-4 flex flex-col gap-3">
 
                     <div class="card">
                         <div class="card-title mb-3">System Info</div>
                         <div class="text-[12px] text-slate-500 leading-[1.8]">
-                            <div>🌐 <b class="text-slate-700">Host:</b> Vercel (Production)</div>
-                            <div>🗄️ <b class="text-slate-700">DB:</b> Supabase PostgreSQL</div>
-                            <div>🔐 <b class="text-slate-700">Auth:</b> JWT + Laravel</div>
-                            <div>📱 <b class="text-slate-700">Mobile:</b> React Native</div>
-                            <div>🎨 <b class="text-slate-700">Web UI:</b> Tailwind CSS</div>
-                            <div class="mt-2 pt-2 border-t border-slate-100">
-                                <div class="text-[11px] text-slate-400">Last backup</div>
-                                <div class="font-bold text-green-600">Today, 06:00 AM ✓</div>
-                            </div>
+                            <div><b class="text-slate-700">App environment:</b> {{ ucfirst(app()->environment()) }}</div>
+                            <div><b class="text-slate-700">Database driver:</b> {{ strtoupper(config('database.default')) }}</div>
+                            <div><b class="text-slate-700">Current term:</b> {{ $semester->sem_name ?? 'Not configured' }}</div>
+                            <div><b class="text-slate-700">Active schedule entries:</b> {{ number_format($scheduleRowsCount) }}</div>
+                            <div><b class="text-slate-700">Weekly plotted hours:</b> {{ number_format($totalScheduledHours, 1) }}</div>
                         </div>
                     </div>
 
@@ -287,17 +430,17 @@
             </div>
 
             {{-- ══ SECTIONS + SCHEDULE COMPLETION ══ --}}
-            <div class="grid grid-cols-12 gap-3 mb-4">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-3 mb-4">
 
-                <div class="col-span-8 card">
+                <div class="col-span-1 xl:col-span-8 card">
                     <div class="card-header">
                         <div>
                             <div class="card-title">Current Sections</div>
                             <div class="card-sub">
-                                AY {{ $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
+                                AY {{ $academicYear->ay_academic_year ?? $academicYear->ay_year_label ?? 'N/A' }} · {{ $semester->sem_name ?? 'N/A' }}
                             </div>
                         </div>
-                        <span class="badge badge-blue">{{ $totalSections }} Total</span>
+                        <span class="badge badge-blue">{{ $currentTermSectionCount }} This Term</span>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="data-table" id="dash-sections-table">
@@ -346,7 +489,7 @@
                 </div>
 
                 {{-- Schedule Completion --}}
-                <div class="col-span-4 card">
+                <div class="col-span-1 xl:col-span-4 card">
                     <div class="card-title mb-0.5">Schedule Completion</div>
                     <div class="card-sub mb-4">Percent of assigned courses with an active schedule</div>
 
@@ -401,9 +544,9 @@
             </div>
 
             {{-- ══ SUBJECTS + ROOM UTILIZATION ══ --}}
-            <div class="grid grid-cols-12 gap-3 mb-4">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-3 mb-4">
 
-                <div class="col-span-8 card">
+                <div class="col-span-1 xl:col-span-8 card">
                     <div class="card-header">
                         <div>
                             <div class="card-title">Subjects Offered</div>
@@ -450,7 +593,7 @@
                 </div>
 
                 {{-- Room Utilization --}}
-                <div class="col-span-4 card">
+                <div class="col-span-1 xl:col-span-4 card">
                     <div class="card-title mb-0.5">Room Utilization</div>
                     <div class="card-sub mb-3">This week</div>
 
@@ -508,6 +651,17 @@
                 </div>
             </div>
 
+            <footer class="admin-dashboard-footer">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="admin-footer-brand">SKEDYUL</span>
+                    <span class="text-slate-300">·</span>
+                    <span>Academic Scheduling & Faculty Workload System</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>{{ $academicYear->ay_academic_year ?? $academicYear->ay_year_label ?? 'Academic year not configured' }} · {{ $semester->sem_name ?? 'Semester not configured' }}</span>
+                    <span class="admin-footer-status"><span></span> Admin workspace</span>
+                </div>
+            </footer>
         </div>{{-- end page-content --}}
     </div>{{-- end app-main --}}
 </div>{{-- end app-shell --}}
@@ -641,6 +795,73 @@
     render('sec');
     render('subj');
   });
+})();
+</script>
+
+<script>
+(function () {
+    document.querySelectorAll('[data-college-filter]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const selectedCollege = button.dataset.collegeFilter;
+            document.querySelectorAll('[data-college-filter]').forEach((tab) => {
+                const selected = tab === button;
+                tab.classList.toggle('active', selected);
+                tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+            });
+            document.querySelectorAll('.faculty-distribution-dept, .faculty-college-quota').forEach((item) => {
+                item.hidden = selectedCollege !== 'all' && item.dataset.college !== selectedCollege;
+            });
+        });
+    });
+
+    const weeklyCard = document.getElementById('admin-weekly-pattern');
+    if (!weeklyCard) return;
+
+    weeklyCard.querySelectorAll('[data-mode]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const roomMode = button.dataset.mode === 'rooms';
+            weeklyCard.classList.toggle('room-util-active', roomMode);
+            weeklyCard.querySelectorAll('[data-mode]').forEach((modeButton) => {
+                const selected = modeButton === button;
+                modeButton.classList.toggle('active', selected);
+                modeButton.setAttribute('aria-pressed', selected ? 'true' : 'false');
+            });
+
+            weeklyCard.querySelectorAll('.weekly-pattern-day').forEach((day) => {
+                const value = roomMode ? Number(day.dataset.roomSections || 0) : Number(day.dataset.sections || 0);
+                const width = roomMode ? day.dataset.roomWidth : day.dataset.sectionWidth;
+                const valueElement = day.querySelector('.weekly-pattern-value');
+                const bar = day.querySelector('.weekly-pattern-bar');
+                if (valueElement) {
+                    valueElement.textContent = roomMode
+                        ? (value > 0 ? day.dataset.roomName : 'No room used')
+                        : `${value} ${value === 1 ? 'section' : 'sections'}`;
+                    valueElement.classList.toggle('text-sm', roomMode);
+                    valueElement.classList.toggle('text-xl', !roomMode);
+                    valueElement.classList.toggle('text-slate-300', value === 0);
+                    valueElement.classList.toggle('text-slate-900', value > 0 && !roomMode);
+                    valueElement.classList.toggle('text-emerald-700', value > 0 && roomMode);
+                }
+                if (bar) bar.style.width = `${width || 0}%`;
+                const sectionCaption = day.querySelector('.weekly-pattern-caption');
+                if (sectionCaption) sectionCaption.textContent = day.dataset.sectionClosedLabel || '';
+                const roomName = day.querySelector('.weekly-pattern-room-name');
+                const roomStats = day.querySelector('.weekly-pattern-room-stats');
+                const roomSections = day.querySelector('.weekly-pattern-room-sections');
+                const sectionCount = Number(day.dataset.roomSections || 0);
+                const classCount = Number(day.dataset.roomClasses || 0);
+                if (roomName) roomName.textContent = sectionCount > 0 ? (day.dataset.roomName || 'No room used') : 'No room used';
+                if (roomStats) roomStats.textContent = sectionCount > 0
+                    ? `${sectionCount} ${sectionCount === 1 ? 'section' : 'sections'} · ${classCount} classes`
+                    : 'No scheduled rooms';
+                if (roomSections) {
+                    roomSections.textContent = sectionCount > 0 ? (day.dataset.roomSectionList || '') : '';
+                    roomSections.title = roomSections.textContent;
+                }
+                day.classList.toggle('opacity-60', roomMode && value === 0);
+            });
+        });
+    });
 })();
 </script>
 

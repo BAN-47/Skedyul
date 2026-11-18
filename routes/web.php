@@ -268,6 +268,12 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
         }
 
         $academicYears = \App\Models\AcademicYear::query()->orderByDesc('ay_academic_year')->get();
+        $requestedReviewYear = request()->query('review_year');
+        $reviewYear = $academicYears->firstWhere('ay_id', $requestedReviewYear) ?? $activeYear;
+        $reviewSemesters = $reviewYear
+            ? \App\Models\Semester::query()->where('sem_ay_id', $reviewYear->ay_id)
+                ->orderBy('sem_start_date')->get()
+            : collect();
         $semesters = \App\Models\Semester::query()
             ->when($activeYear, fn($q) => $q->where('sem_ay_id', $activeYear->ay_id))
             ->orderBy('sem_name')
@@ -291,6 +297,8 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
             'activeSemester' => $activeSemester,
             'activeYear'     => $activeYear,
             'academicYears'  => $academicYears,
+            'reviewYear'     => $reviewYear,
+            'reviewSemesters' => $reviewSemesters,
             'semesters'      => $semesters,
             'ayStart'        => $ayStart,
             'ayEnd'          => $ayEnd,
@@ -301,6 +309,9 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
 
     Route::put('/academic-year', [AcademicYearController::class, 'update'])
         ->name('admin.academic-year.update');
+
+    Route::post('/academic-year/semester/{id}/activate', [AcademicYearController::class, 'activateArchivedSemester'])
+        ->name('admin.academic-year.semester.activate');
 
     Route::post('/semester/{id}/toggle-plotting', [AcademicYearController::class, 'togglePlotting'])
         ->name('admin.semester.toggle-plotting');

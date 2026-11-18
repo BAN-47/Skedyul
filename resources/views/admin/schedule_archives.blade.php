@@ -91,6 +91,11 @@
                             <div class="text-base font-bold text-slate-700">No archived semesters found</div>
                             <p class="mt-1 text-sm text-slate-500">Schedules from completed academic years will appear here.</p>
                         </section>
+                    @elseif ($facultyMembers->isEmpty())
+                        <section class="card px-4 py-12 text-center">
+                            <div class="text-base font-bold text-slate-700">No schedules archived for this semester</div>
+                            <p class="mt-1 text-sm text-slate-500">This academic year is available in the archive, but it has no preserved schedule rows for the selected semester.</p>
+                        </section>
                     @elseif (!$selectedFaculty)
                         <section class="card px-4 py-12 text-center">
                             <div class="text-base font-bold text-slate-700">Choose a faculty member</div>

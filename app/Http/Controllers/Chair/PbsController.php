@@ -52,7 +52,7 @@ class PbsController extends Controller
     {
         $semesterQuery = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label');
+            ->select('s.*', 'ay.ay_academic_year', 'ay.ay_year_label', 'ay.ay_is_active');
         $sem = $selectedId
             ? (clone $semesterQuery)->where('s.sem_id', $selectedId)->first()
             : null;
@@ -70,6 +70,23 @@ class PbsController extends Controller
         $semName = $sem->sem_name ?? '';
         $yearDisp = $year !== '' ? str_replace('-', ' - ', $year) : '';
         $sem->label = trim($semName . ($yearDisp !== '' ? ', AY ' . $yearDisp : ''));
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+        if (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
+            $sem->label .= ' (Archived · View only)';
+        } elseif ((bool) $sem->sem_is_active) {
+            $sem->label .= ' (Current)';
+        } elseif ((bool) ($sem->ay_is_active ?? false)
+            && $semName === '2nd Semester'
+            && $officialSemesterName === '1st Semester'
+            && (bool) ($sem->sem_is_plotting_enabled ?? false)) {
+            $sem->label .= ' (Advance plotting)';
+        } elseif ((bool) ($sem->ay_is_active ?? false)
+            && $semName === '2nd Semester'
+            && $officialSemesterName === '1st Semester') {
+            $sem->label .= ' (Upcoming · View only)';
+        } else {
+            $sem->label .= ' (View only)';
+        }
         $sem->ay_academic_year = $year;
         return $sem;
     }
@@ -105,6 +122,7 @@ class PbsController extends Controller
                 'chairProgram'     => null,
                 'chairDepartment'  => null,
                 'activeSemester'   => $this->activeSemester(),
+                'canPlotSelectedSemester' => false,
                 'selectedSection'  => null,
                 'pbsSubmission'    => null,
                 'canSubmitPbs'     => false,
@@ -118,6 +136,7 @@ class PbsController extends Controller
         $filters['department'] = $selectedDeptId;
 
         $activeSem = $this->activeSemester($request->query('semester'));
+        $canPlotSelectedSemester = $activeSem && $this->semesterIsWritable($activeSem->sem_id);
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
         $sectionShiftFilter = in_array($request->query('section_shift', 'all'), ['all', 'day', 'evening'], true)
@@ -238,6 +257,8 @@ class PbsController extends Controller
             ->orderBy('fac_first_name')
             ->get();
 
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
         return response()->view('chair.PBS', [
             'schedules'        => $schedules,
             'subjects'         => $subjects,
@@ -262,18 +283,33 @@ class PbsController extends Controller
                     's.sem_id',
                     's.sem_name',
                     's.sem_is_active',
+                    's.sem_is_plotting_enabled',
                     's.sem_start_date',
                     's.sem_ay_id',
                     'ay.ay_academic_year',
                     'ay.ay_year_label',
+                    'ay.ay_is_active',
                 ])
                 ->get()
-                ->map(function ($sem) {
+                ->map(function ($sem) use ($officialSemesterName) {
                     $ay = $sem->ay_year_label ?? $sem->ay_academic_year ?? '';
                     $ayDisp = $ay !== '' ? str_replace('-', ' - ', $ay) : '';
                     $label = trim(($sem->sem_name ?? '') . ($ayDisp !== '' ? ', AY ' . $ayDisp : ''));
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
+                    } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
+                        $label .= ' (Archived · View only)';
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester'
+                        && !empty($sem->sem_is_plotting_enabled)) {
+                        $label .= ' (Advance plotting)';
+                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                        && $sem->sem_name === '2nd Semester'
+                        && $officialSemesterName === '1st Semester') {
+                        $label .= ' (Upcoming · View only)';
+                    } else {
+                        $label .= ' (View only)';
                     }
                     $sem->label = $label !== '' ? $label : $sem->sem_name;
                     return $sem;
@@ -285,6 +321,7 @@ class PbsController extends Controller
             'chairProgram'     => $allDepartments->first(),
             'chairDepartment'  => $allDepartments->first(),
             'activeSemester'   => $activeSem,
+            'canPlotSelectedSemester' => (bool) $canPlotSelectedSemester,
             'selectedSection'  => $selectedSection,
             'pbsSubmission'    => $pbsSubmission,
             'canSubmitPbs'     => (bool) $canSubmitPbs,
@@ -317,8 +354,27 @@ class PbsController extends Controller
         if (!$collegeId || (string) $section->program?->dept_college_id !== (string) $collegeId) {
             abort(403, 'You can only schedule sections within your college.');
         }
+        if (!$this->semesterIsWritable($data['sem_id'])) {
+            abort(403, 'This semester is archived or not enabled for plotting.');
+        }
 
         return $data;
+    }
+
+    private function semesterIsWritable(string $semesterId): bool
+    {
+        $semester = DB::table('semester as s')
+            ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+            ->where('s.sem_id', $semesterId)
+            ->first(['s.sem_name', 's.sem_is_active', 's.sem_is_plotting_enabled', 's.sem_ay_id', 'ay.ay_is_active']);
+
+        $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+
+        return $semester && (((bool) $semester->sem_is_active && (bool) $semester->ay_is_active)
+            || (!empty($semester->ay_is_active)
+                && $semester->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester'
+                && (bool) $semester->sem_is_plotting_enabled));
     }
 
     public function store(Request $request)
@@ -359,6 +415,9 @@ class PbsController extends Controller
         $data = $request->validate([
             'sem_id' => 'required|uuid|exists:semester,sem_id',
         ]);
+        if (!$this->semesterIsWritable($data['sem_id'])) {
+            return response()->json(['success' => false, 'message' => 'Archived semesters are read-only.'], 403);
+        }
         $schedule = Schedule::find($id);
         if (!$schedule || (string) $schedule->sch_sem_id !== (string) $data['sem_id']) {
             return response()->json([
@@ -385,6 +444,9 @@ class PbsController extends Controller
             'section' => 'required|uuid|exists:section,sec_id',
             'semester' => 'required|uuid|exists:semester,sem_id',
         ]);
+        if (!$this->semesterIsWritable($data['semester'])) {
+            return response()->json(['success' => false, 'message' => 'Archived semesters are read-only.'], 403);
+        }
         $sectionId = $data['section'];
 
         $departmentId = $this->chairProgramId();

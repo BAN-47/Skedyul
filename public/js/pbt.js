@@ -722,6 +722,10 @@ function restoreAddAnotherState() {
 }
 
 function openAddModal(day, startTime) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     if (!SELECTED_TEACHER) {
         showToast("Select a teacher first.");
         return;
@@ -897,6 +901,10 @@ function submitAdd(keepOpen = false) {
 
 /* ── EDIT ── */
 function openEditModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError("edit-error");
     syncSelectedSemesterFields();
     document.getElementById("edit-id").value = block.dataset.scheduleId;
@@ -990,6 +998,10 @@ function submitEdit() {
 let deleteCode = "";
 
 function openDeleteModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError("delete-error");
     const id = block.dataset.scheduleId;
     document.getElementById("delete-id").value = id;
@@ -1056,6 +1068,10 @@ function submitDelete() {
 
 /* ── toolbar ── */
 function clearAll() {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     if (
         !confirm(
             "Clear all plotted schedules for this teacher? This cannot be undone.",

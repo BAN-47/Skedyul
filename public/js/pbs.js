@@ -76,13 +76,18 @@ function filterEditSubjectsByCategory() {
 }
 
 /* ── modal helpers ── */
-const PBS_EDITOR_MODAL_IDS = ["modal-add-schedule", "modal-edit-schedule", "modal-delete-schedule"];
+const PBS_EDITOR_MODAL_IDS = [
+    "modal-add-schedule",
+    "modal-edit-schedule",
+    "modal-delete-schedule",
+];
 
 // Keep editor overlays outside layout containers that can clip fixed dialogs.
 function mountPbsEditorModals() {
     PBS_EDITOR_MODAL_IDS.forEach((id) => {
         const modal = document.getElementById(id);
-        if (modal && modal.parentElement !== document.body) document.body.appendChild(modal);
+        if (modal && modal.parentElement !== document.body)
+            document.body.appendChild(modal);
     });
 }
 function openModal(id) {
@@ -829,6 +834,11 @@ function restoreAddAnotherState() {
 
 function openAddModal(day, startTime) {
     clearInlineError("add-error");
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast("Archived semesters are view only.");
+        return;
+    }
+    clearInlineError("add-error");
 
     // Reset schedule details while keeping department and section fixed by the header.
     ["add-subject", "add-faculty", "add-room", "add-description"].forEach(
@@ -999,6 +1009,11 @@ function submitAdd(keepOpen = false) {
 /* ── EDIT ── */
 function openEditModal(block) {
     clearInlineError("edit-error");
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast("Archived semesters are view only.");
+        return;
+    }
+    clearInlineError("edit-error");
 
     document.getElementById("edit-id").value = block.dataset.scheduleId || "";
     document.getElementById("edit-section").value = block.dataset.section || "";
@@ -1104,6 +1119,11 @@ function submitEdit() {
 let deleteCode = "";
 
 function openDeleteModal(block) {
+    clearInlineError("delete-error");
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast("Archived semesters are view only.");
+        return;
+    }
     clearInlineError("delete-error");
     const id = block.dataset.scheduleId;
     document.getElementById("delete-id").value = id;
@@ -1215,6 +1235,16 @@ async function saveSectionCount() {
 }
 
 function clearAll() {
+    if (
+        !confirm(
+            "Clear all plotted schedules for the current filter? This cannot be undone.",
+        )
+    )
+        return;
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast("Archived semesters are view only.");
+        return;
+    }
     if (
         !confirm(
             "Clear all plotted schedules for the current filter? This cannot be undone.",
