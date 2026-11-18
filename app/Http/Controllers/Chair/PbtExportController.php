@@ -20,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Drawing;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class PbtExportController extends Controller
@@ -154,6 +155,9 @@ class PbtExportController extends Controller
             ]);
         }
 
+        $this->addFormMetadata($daySheet, 'P2');
+        $this->addFormMetadata($eveningSheet, 'Q2');
+
         $facultyName = FacultyNameFormatter::format($faculty);
 
         $chairSignature = app(ScheduleSignatoryFormatter::class)->formatRoleName($chair, 'dc_')
@@ -217,6 +221,21 @@ class PbtExportController extends Controller
         return $chair;
     }
 
+    private function addFormMetadata($sheet, string $anchor): void
+    {
+        $imagePath = app(\App\Services\ExportTemplateStorage::class)->localPath('PBS_Form_Metadata.png');
+        abort_unless($imagePath, 500, 'The form metadata image is missing.');
+
+        $metadata = new Drawing();
+        $metadata->setName('PBT Form Metadata');
+        $metadata->setDescription('INS Form 5B-1, February 15, 2021, Revision 0');
+        $metadata->setPath($imagePath);
+        $metadata->setCoordinates($anchor);
+        $metadata->setOffsetX(0);
+        $metadata->setOffsetY(3);
+        $metadata->setHeight(60);
+        $metadata->setWorksheet($sheet);
+    }
     private function fillDaySheet(
         $sheet,
         Faculty $faculty,

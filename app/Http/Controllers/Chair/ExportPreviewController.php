@@ -129,8 +129,11 @@ class ExportPreviewController extends Controller
             ->orderBy('sch_start_time')
             ->get();
 
-        $rows = $allSchedules
+        $shiftSchedules = $allSchedules
             ->filter(fn($schedule) => $this->scheduleOverlapsShift($schedule, $isEvening))
+            ->values();
+
+        $rows = $shiftSchedules
             ->map(fn($schedule) => [
                 'section' => $section->sec_name,
                 'faculty' => FacultyNameFormatter::format($schedule->faculty) ?: '—',
@@ -149,7 +152,7 @@ class ExportPreviewController extends Controller
 
         abort_if($rows->isEmpty(), 422, 'There are no active plotted classes for this section and semester.');
 
-        $coursesByShift = $this->courseSummaryByShift($allSchedules);
+        $coursesByShift = $this->courseSummaryByShift($shiftSchedules, $activeShiftKey);
 
         $semesterLabel = $this->semesterLabel($semester);
         $studentCount = $data['student_count'] ?? $section->sec_no_of_student ?? 0;
@@ -263,10 +266,29 @@ class ExportPreviewController extends Controller
             $end = Carbon::parse($schedule->sch_end_time);
             $startMinutes = $start->hour * 60 + $start->minute;
             $endMinutes = $end->hour * 60 + $end->minute;
+            $day = strtoupper(substr(trim((string) $schedule->sch_day), 0, 3));
 
-            return $evening
-                ? $startMinutes < 22 * 60 && $endMinutes > 16 * 60
-                : $startMinutes < 16 * 60 && $endMinutes > 7 * 60;
+            if ($endMinutes <= $startMinutes) {
+                return false;
+            }
+
+            if ($evening) {
+                // Evening template weekends run from 7 AM to 10 PM.
+                if (in_array($day, ['SAT', 'SUN'], true)) {
+                    return $startMinutes >= 7 * 60 && $endMinutes <= 22 * 60;
+                }
+
+                return in_array($day, ['MON', 'TUE', 'WED', 'THU', 'FRI'], true)
+                    && $startMinutes >= 16 * 60 && $endMinutes <= 22 * 60;
+            }
+
+            if (!in_array($day, ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], true)) {
+                return false;
+            }
+
+            // Day template has a noon break and ends at 5 PM.
+            return ($startMinutes >= 7 * 60 && $endMinutes <= 12 * 60)
+                || ($startMinutes >= 13 * 60 && $endMinutes <= 17 * 60);
         } catch (\Throwable $exception) {
             return false;
         }
@@ -282,24 +304,24 @@ class ExportPreviewController extends Controller
         }
     }
 
-    private function courseSummaryByShift($schedules): array
+    private function courseSummaryByShift($schedules, ?string $shiftOverride = null): array
     {
         $rows = $schedules
             ->filter(fn($schedule) => $schedule->subject && $schedule->section)
-            ->groupBy(function ($schedule) {
-                $shift = $this->scheduleShiftKey($schedule);
+            ->groupBy(function ($schedule) use ($shiftOverride) {
+                $shift = $shiftOverride ?? $this->scheduleShiftKey($schedule);
                 $courseId = $schedule->subject->course_id ?? $schedule->sch_course_id ?? '';
                 $sectionId = $schedule->section->sec_id ?? '';
 
                 return $shift . '|' . $courseId . '|' . $sectionId;
             })
-            ->map(function ($meetings) {
+            ->map(function ($meetings) use ($shiftOverride) {
                 $schedule = $meetings->first();
                 $course = $schedule->subject;
                 $section = $schedule->section;
 
                 return [
-                    'shift' => $this->scheduleShiftKey($schedule),
+                    'shift' => $shiftOverride ?? $this->scheduleShiftKey($schedule),
                     'course_code' => $course->course_code ?? '—',
                     'course_name' => $course->course_name ?? '—',
                     'degree_section' => $section->sec_name ?? '—',

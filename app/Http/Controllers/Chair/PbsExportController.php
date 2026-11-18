@@ -60,13 +60,6 @@ class PbsExportController extends Controller
             ->where('sch_sec_id', $section->sec_id)
             ->where('sch_sem_id', $semester->sem_id)
             ->where('sch_is_active', true)
-            ->when(
-                isset($validated['shift']) && $isEvening,
-                fn($query) => $query->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
-                fn($query) => isset($validated['shift'])
-                    ? $query->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
-                    : $query
-            )
             ->with(['subject', 'faculty', 'room'])
             ->orderByRaw("CASE UPPER(sch_day)
                 WHEN 'MONDAY' THEN 1 WHEN 'MON' THEN 1
@@ -78,7 +71,9 @@ class PbsExportController extends Controller
                 WHEN 'SUNDAY' THEN 7 WHEN 'SUN' THEN 7
                 ELSE 8 END")
             ->orderBy('sch_start_time')
-            ->get();
+            ->get()
+            ->filter(fn(Schedule $schedule) => $this->scheduleFitsExportGrid($schedule, $isEvening))
+            ->values();
 
         $college = $section->program?->department;
         $collegeDean = $college
@@ -596,6 +591,21 @@ class PbsExportController extends Controller
         $last = 13 + (int) ceil(($end - $gridStart) / $minutesPerRow) - 1;
 
         return [$first, min(42, max($first, $last))];
+    }
+
+    private function scheduleFitsExportGrid(Schedule $schedule, bool $isEvening): bool
+    {
+        $day = $this->dayKey((string) $schedule->sch_day);
+        $start = $this->minutes((string) $schedule->sch_start_time);
+        $end = $this->minutes((string) $schedule->sch_end_time);
+
+        if ($day === '' || $end <= $start) {
+            return false;
+        }
+
+        return $isEvening
+            ? $this->eveningRows($day, $start, $end) !== null
+            : $this->dayRows($start, $end) !== null && $day !== 'SUN';
     }
 
     private function facultyLabel($faculty): string
