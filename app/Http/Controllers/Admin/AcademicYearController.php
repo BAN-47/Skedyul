@@ -48,11 +48,19 @@ class AcademicYearController extends Controller
         });
         $isNewAcademicYear = ! $existingYear;
 
+        if ($existingYear && !(bool) $existingYear->ay_is_active
+            && DB::table('academic_year')->where('ay_is_active', true)->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Archived academic years cannot be made current again. Create a new academic year to continue scheduling.',
+            ], 422);
+        }
+
         if ($isNewAcademicYear && ! $request->boolean('confirm_new_academic_year')) {
             return response()->json([
                 'success' => false,
                 'confirmation_required' => true,
-                'message' => 'Creating a new academic year will archive the previous year’s 1st and 2nd semester schedules, reset schedule plotting, and turn Advance Plotting off. The new year will start in 1st Semester. Continue?',
+                'message' => 'Creating a new academic year keeps existing schedules in the archives, locks previous academic years for editing, turns Advance Plotting off, and starts the new year in 1st Semester. Continue?',
             ], 409);
         }
 
@@ -61,6 +69,20 @@ class AcademicYearController extends Controller
                 'success' => false,
                 'message' => 'Academic year-specific semesters are not available in the database. No changes were made.',
             ], 422);
+        }
+
+        if (! $isNewAcademicYear && $validated['sem_name'] === '2nd Semester') {
+            $firstSemester = DB::table('semester')
+                ->where('sem_ay_id', $existingYear->ay_id)
+                ->where('sem_name', '1st Semester')
+                ->first();
+
+            if ($firstSemester && $validated['sem_start_date'] <= $firstSemester->sem_end_date) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The 2nd Semester start date must be after the 1st Semester end date.',
+                ], 422);
+            }
         }
 
         if ($isNewAcademicYear && ! Schema::hasTable('schedule_archives')) {
@@ -75,8 +97,11 @@ class AcademicYearController extends Controller
         try {
             $result = DB::transaction(function () use ($validated, $yearLabel, $semName, $existingYear, $isNewAcademicYear) {
                 $previousYear = DB::table('academic_year')->where('ay_is_active', true)->first();
-                if ($isNewAcademicYear && $previousYear) {
-                    $this->archiveAcademicYearSchedules($previousYear->ay_id);
+                if ($isNewAcademicYear) {
+                    // Fill any older archive gaps as well as snapshotting the
+                    // currently active year. This never deletes live schedule rows.
+                    DB::table('academic_year')->pluck('ay_id')
+                        ->each(fn ($yearId) => $this->archiveAcademicYearSchedules((string) $yearId));
                 }
 
                 // 1) Academic year: find or create, set active
@@ -135,6 +160,30 @@ class AcademicYearController extends Controller
                         'sem_is_plotting_enabled' => $plottingEnabled,
                     ];
                     DB::table('semester')->where('sem_id', $sem->sem_id)->update($update);
+                }
+
+                // A new academic year always has both term records. The 2nd
+                // semester's dates are intentionally placeholders until Admin
+                // sets them when the 1st semester ends; it is not active or
+                // available for advance plotting yet.
+                if ($isNewAcademicYear) {
+                    $second = DB::table('semester')
+                        ->where('sem_ay_id', $ayId)
+                        ->where('sem_name', '2nd Semester')
+                        ->first();
+
+                    if (! $second) {
+                        $placeholderDate = $validated['sem_end_date'];
+                        DB::table('semester')->insert([
+                            'sem_id' => (string) Str::uuid(),
+                            'sem_name' => '2nd Semester',
+                            'sem_ay_id' => $ayId,
+                            'sem_start_date' => $placeholderDate,
+                            'sem_end_date' => $placeholderDate,
+                            'sem_is_active' => false,
+                            'sem_is_plotting_enabled' => false,
+                        ]);
+                    }
                 }
 
                 return [
@@ -233,6 +282,13 @@ class AcademicYearController extends Controller
                 }
                 $second = $secondQuery->first();
                 if ($second) {
+                    if (empty($second->sem_start_date)
+                        || empty($second->sem_end_date)
+                        || $second->sem_start_date <= $active->sem_end_date
+                        || $second->sem_end_date <= $second->sem_start_date) {
+                        return 'Set valid 2nd Semester dates in Admin Settings before switching semesters.';
+                    }
+
                     DB::table('semester')->update(['sem_is_active' => false]);
                     DB::table('semester')->where('sem_id', $second->sem_id)->update(['sem_is_active' => true]);
 
@@ -315,6 +371,13 @@ class AcademicYearController extends Controller
                 }
                 $second = $secondQuery->first();
                 if ($second) {
+                    if (empty($second->sem_start_date)
+                        || empty($second->sem_end_date)
+                        || $second->sem_start_date <= $active->sem_end_date
+                        || $second->sem_end_date <= $second->sem_start_date) {
+                        return 'Set valid 2nd Semester dates in Admin Settings before switching semesters.';
+                    }
+
                     DB::table('semester')->update(['sem_is_active' => false]);
                     DB::table('semester')->where('sem_id', $second->sem_id)->update(['sem_is_active' => true]);
 
@@ -344,6 +407,21 @@ class AcademicYearController extends Controller
                 'success' => false,
                 'message' => 'Semester not found.'
             ], 404);
+        }
+
+        $activeYear = DB::table('academic_year')->where('ay_is_active', true)->first();
+        $activeSemester = DB::table('semester')->where('sem_is_active', true)->first();
+        if (!$activeYear
+            || !$activeSemester
+            || (string) $semester->sem_ay_id !== (string) $activeYear->ay_id
+            || (string) $activeSemester->sem_ay_id !== (string) $activeYear->ay_id
+            || $activeSemester->sem_name !== '1st Semester'
+            || $semester->sem_name !== '2nd Semester'
+            || (bool) $semester->sem_is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Advance plotting can only be changed for the inactive 2nd Semester of the current academic year while 1st Semester is current.',
+            ], 422);
         }
 
         $newValue = !$semester->sem_is_plotting_enabled;

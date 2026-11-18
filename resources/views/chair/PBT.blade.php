@@ -522,13 +522,17 @@
                                                 <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
                                                     style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
                                                 </div>
-                                            @else
+                                            @elseif($canPlotSelectedSemester ?? false)
                                                 <button type="button"
                                                     onclick="openAddModal('{{ $cellDay }}', '{{ $cellTime }}')"
                                                     class="pbs-cell border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} hover:bg-blue-50 cursor-pointer transition"
                                                     style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
                                                     title="Add schedule — {{ $cellDay }} {{ \Illuminate\Support\Carbon::createFromTime(intdiv($mins, 60), $mins % 60)->format('g:i A') }}">
                                                 </button>
+                                            @else
+                                                <div class="pbs-cell border-l border-b border-slate-100 bg-slate-50/40 cursor-not-allowed"
+                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
+                                                    title="Archived semester — view only"></div>
                                             @endif
                                         @endfor
                                     @endfor
@@ -598,6 +602,7 @@
                                             data-start="{{ substr($s->sch_start_time, 0, 5) }}"
                                             data-end="{{ substr($s->sch_end_time, 0, 5) }}">
 
+                                            @if ($canPlotSelectedSemester ?? false)
                                             <div
                                                 class="absolute inset-x-0 top-0 z-10 hidden group-hover:flex gap-0.5 p-0.5">
                                                 <button type="button"
@@ -607,6 +612,7 @@
                                                     onclick="event.stopPropagation(); openDeleteModal(this.closest('[data-schedule-id]'))"
                                                     class="flex-1 rounded-sm bg-white/90 hover:bg-white py-[3px] text-[9px] font-bold text-red-700">Delete</button>
                                             </div>
+                                            @endif
 
                                             <div
                                                 class="flex-1 flex flex-col items-center justify-center text-center px-2 py-2 leading-snug">
@@ -1191,6 +1197,7 @@
                     },
                 @endforeach
             ];
+            window.CAN_PLOT_SELECTED_SEMESTER = @json($canPlotSelectedSemester ?? false);
             window.ACTIVE_COURSE_SEMESTER = @json(str_contains(strtolower($activeSemester->sem_name ?? ''), '2nd') ||
                 str_contains(strtolower($activeSemester->sem_name ?? ''), 'second')
                     ? 2

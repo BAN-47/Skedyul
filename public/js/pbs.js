@@ -605,6 +605,10 @@ function restoreAddAnotherState() {
 }
 
 function openAddModal(day, startTime) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError('add-error');
 
     // Reset schedule details while keeping department and section fixed by the header.
@@ -724,6 +728,10 @@ function submitAdd(keepOpen = false) {
 
 /* ── EDIT ── */
 function openEditModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError('edit-error');
 
     document.getElementById('edit-id').value       = block.dataset.scheduleId || '';
@@ -818,6 +826,10 @@ function submitEdit() {
 let deleteCode = '';
 
 function openDeleteModal(block) {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     clearInlineError('delete-error');
     const id = block.dataset.scheduleId;
     document.getElementById('delete-id').value = id;
@@ -925,6 +937,10 @@ async function saveSectionCount() {
 }
 
 function clearAll() {
+    if (window.CAN_PLOT_SELECTED_SEMESTER === false) {
+        showToast('Archived semesters are view only.');
+        return;
+    }
     if (!confirm('Clear all plotted schedules for the current filter? This cannot be undone.')) return;
 
     const params = new URLSearchParams(window.location.search);

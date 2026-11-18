@@ -168,8 +168,12 @@
                 <div>
                   <label class="field-label">Semester</label>
                   <select class="field-input" id="ay-semester">
-                    <option value="1st Semester" @selected((optional($activeSemester)->sem_name ?? '') === '1st Semester')>1st Semester</option>
-                    <option value="2nd Semester" @selected((optional($activeSemester)->sem_name ?? '') === '2nd Semester')>2nd Semester</option>
+                    @php
+                      $firstSemester = $semesters->firstWhere('sem_name', '1st Semester');
+                      $secondSemester = $semesters->firstWhere('sem_name', '2nd Semester');
+                    @endphp
+                    <option value="1st Semester" data-start="{{ $firstSemester?->sem_start_date?->format('Y-m-d') ?? '' }}" data-end="{{ $firstSemester?->sem_end_date?->format('Y-m-d') ?? '' }}" @selected((optional($activeSemester)->sem_name ?? '') === '1st Semester')>1st Semester</option>
+                    <option value="2nd Semester" data-start="{{ $secondSemester?->sem_start_date?->format('Y-m-d') ?? '' }}" data-end="{{ $secondSemester?->sem_end_date?->format('Y-m-d') ?? '' }}" @selected((optional($activeSemester)->sem_name ?? '') === '2nd Semester')>2nd Semester</option>
                   </select>
                   <p class="text-[11px] text-slate-400 mt-1" id="ay-semester-note">Each semester is saved separately for its academic year.</p>
                 </div>
@@ -187,10 +191,13 @@
               </div>
               
               @php
-                $inactiveSemester = \App\Models\Semester::query()
-                    ->where('sem_is_active', false)
-                    ->where('sem_ay_id', optional($activeYear)->ay_id)
-                    ->first();
+                $inactiveSemester = (optional($activeSemester)->sem_name === '1st Semester')
+                    ? \App\Models\Semester::query()
+                        ->where('sem_is_active', false)
+                        ->where('sem_ay_id', optional($activeYear)->ay_id)
+                        ->where('sem_name', '2nd Semester')
+                        ->first()
+                    : null;
               @endphp
 
               <div class="mb-1" @if(!$inactiveSemester) style="display:none;" @endif>
@@ -500,10 +507,19 @@ function updateAcademicYearMode() {
   if (isNewYear) semesterInput.value = '1st Semester';
   if (note) {
     note.textContent = isNewYear
-      ? 'A new academic year always starts in 1st Semester. Its plotting starts fresh after you confirm.'
-      : 'Each semester is saved separately for its academic year.';
+      ? 'A new year starts in 1st Semester. Both semester records are created; set 2nd-semester dates when the 1st semester ends.'
+      : 'Each semester has its own dates. Set 2nd-semester dates when the 1st semester ends.';
   }
 }
+
+document.getElementById('ay-semester')?.addEventListener('change', function () {
+  if (this.disabled) return;
+  const option = this.selectedOptions[0];
+  const startInput = document.getElementById('ay-start');
+  const endInput = document.getElementById('ay-end');
+  if (option?.dataset.start) startInput.value = option.dataset.start;
+  if (option?.dataset.end) endInput.value = option.dataset.end;
+});
 
 document.getElementById('ay-year')?.addEventListener('input', updateAcademicYearMode);
 updateAcademicYearMode();

@@ -326,6 +326,21 @@
         @apply flex-1 text-lg font-bold text-slate-900 dark:text-slate-100;
     }
 
+    .admin-topbar {
+        @apply min-h-[68px] h-auto justify-between gap-4 px-6;
+        box-shadow: 0 1px 0 rgba(148,163,184,.06), 0 4px 14px rgba(15,23,42,.025);
+    }
+    .admin-topbar-heading { @apply flex min-w-0 flex-col justify-center; }
+    .admin-topbar-title-row { @apply flex items-center gap-2.5 text-[15px] leading-tight; }
+    .admin-topbar-subtitle { @apply mt-1 text-[10px] font-medium leading-tight text-slate-400; }
+    .admin-topbar-actions { @apply flex flex-shrink-0 items-center gap-3; }
+    .admin-cloud-pill, .admin-term-pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold; }
+    .admin-cloud-pill { @apply border-emerald-100 bg-emerald-50 text-emerald-700; }
+    .admin-cloud-dot, .admin-term-dot { @apply h-1.5 w-1.5 rounded-full bg-emerald-500; }
+    .admin-term-pill { @apply max-w-[260px] border-blue-100 bg-blue-50 text-blue-800; }
+    .admin-term-pill span:last-child { @apply truncate; }
+    .admin-notification-button { @apply border border-slate-200 bg-slate-50 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700; }
+
     /* ── PAGE CONTENT ────────────────────────────────────────────────────── */
     /* Scrollable area below the topbar */
     .page-content {
@@ -348,6 +363,43 @@
     .stat-card {
         @apply relative bg-white dark:bg-slate-900 rounded-2xl p-5
             border border-slate-200 dark:border-slate-800 overflow-hidden;
+    }
+
+    .admin-metric-card {
+        @apply min-h-[138px] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-900/[.05];
+    }
+    .admin-metric-card .stat-label { @apply pr-10 text-[9px] tracking-[.08em]; }
+    .admin-metric-card .stat-value { @apply text-[25px]; }
+    .admin-metric-card .stat-sub { @apply text-[10px] leading-snug; }
+    .admin-metric-icon { @apply absolute right-3.5 top-3.5 flex h-8 w-8 items-center justify-center rounded-xl transition duration-200 group-hover:scale-105; }
+    .admin-metric-icon svg { @apply h-4 w-4; }
+    .admin-dashboard-footer { @apply mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-slate-200/80 px-1 pt-4 pb-1 text-[10px] text-slate-400; }
+    .admin-footer-brand { @apply font-extrabold tracking-wide text-slate-600; }
+    .admin-footer-status { @apply inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700; }
+    .admin-footer-status span { @apply h-1.5 w-1.5 rounded-full bg-emerald-500; }
+    .faculty-college-filter { @apply rounded-lg px-2 py-1.5 text-[9px] font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-800; }
+    .faculty-college-filter.active { @apply bg-blue-100 text-blue-800; }
+    .faculty-distribution-dept { @apply flex min-h-[78px] flex-col items-center justify-center rounded-lg border border-blue-50 bg-blue-50/70 px-2 py-2 text-center transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50; }
+    .faculty-college-quota[hidden], .faculty-distribution-dept[hidden] { display: none; }
+    .weekly-pattern-mode { @apply rounded-lg px-2.5 py-1.5 text-[9px] font-semibold text-slate-500 transition hover:text-blue-700; }
+    .weekly-pattern-mode.active { @apply bg-white text-blue-700 shadow-sm; }
+    .weekly-pattern-room-caption { display: none; }
+    .weekly-pattern-room-peak { display: none; }
+    .admin-weekly-pattern.room-util-active .weekly-pattern-caption { display: none; }
+    .admin-weekly-pattern.room-util-active .weekly-pattern-room-caption { display: block; }
+    .admin-weekly-pattern.room-util-active .weekly-pattern-bar { @apply bg-emerald-500; }
+    .admin-weekly-pattern.room-util-active .weekly-pattern-section-peak { display: none; }
+    .admin-weekly-pattern.room-util-active .weekly-pattern-room-peak { display: inline-flex; }
+
+    @media (max-width: 760px) {
+        .admin-topbar { @apply px-3; }
+        .admin-topbar-title-row { @apply text-[13px]; }
+        .admin-topbar-subtitle { @apply hidden; }
+        .admin-topbar-actions { @apply gap-1.5; }
+        .admin-term-pill { @apply max-w-[145px] px-2 text-[9px]; }
+        .admin-cloud-pill { @apply hidden; }
+        .admin-notification-button { @apply px-2.5 py-2 text-[11px]; }
+        .admin-dashboard-footer { @apply text-[9px]; }
     }
 
     /* Colored top accent bar — add color class: bg-blue-600, bg-green-600, etc. */
@@ -771,6 +823,32 @@
         @apply w-[240px] h-screen flex flex-col flex-shrink-0
                bg-[#1a2d5a] z-10 shadow-[4px_0_24px_rgba(0,0,0,.15)];
     }
+
+    /* Admin shell polish: clearer hierarchy, icon rails, and a brighter active state. */
+    .admin-sidebar {
+        @apply w-[252px] bg-[#14294f] shadow-[8px_0_30px_rgba(15,23,42,.12)];
+        background-image: linear-gradient(180deg, #14294f 0%, #172e59 58%, #10223f 100%);
+    }
+    .admin-sidebar .sidebar-logo { @apply px-5 py-5 text-left; border-color: rgba(255,255,255,.09); }
+    .admin-brand { @apply flex items-center gap-2.5; }
+    .admin-brand-mark { @apply flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-sm font-black text-white shadow-lg shadow-blue-950/30; }
+    .admin-sidebar .sidebar-logo-text { @apply text-[17px] tracking-tight; }
+    .admin-brand-caption { @apply mt-0.5 text-[9px] font-semibold uppercase tracking-[.12em] text-blue-100/50; }
+    .admin-role-badge { @apply ml-auto rounded-md bg-blue-600/20 px-2 py-1 text-[9px] font-bold tracking-wide text-blue-200; }
+    .admin-sidebar .sidebar-user { @apply px-4 py-4; }
+    .admin-sidebar .sidebar-avatar { @apply h-10 w-10 border border-blue-300/20 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-950/25; }
+    .admin-sidebar .sidebar-user-role { @apply text-[10px] text-blue-100/55; }
+    .admin-sidebar .sidebar-nav { @apply py-2; }
+    .admin-sidebar .nav-section-label { @apply px-4 pt-4 pb-2 text-[9px] tracking-[.13em] text-blue-100/40; }
+    .admin-sidebar .nav-item { @apply mx-2 my-0.5 rounded-xl border-l-0 px-3 py-2.5 text-[12px] text-blue-100/70; min-height: 40px; }
+    .admin-sidebar .nav-item:hover { @apply translate-x-0.5 bg-white/[.07] text-white; }
+    .admin-sidebar .nav-item.active { @apply bg-blue-500/20 font-bold text-white shadow-sm; box-shadow: inset 3px 0 #60a5fa, 0 5px 14px rgba(2, 15, 42, .12); }
+    .admin-sidebar .nav-icon { @apply flex h-7 w-7 items-center justify-center rounded-lg bg-white/[.06] text-sm text-blue-100/75; }
+    .admin-sidebar .nav-item.active .nav-icon { @apply bg-blue-500/25 text-blue-100; }
+    .admin-sidebar .sidebar-bottom { @apply px-3 py-3; }
+    .admin-sidebar-version { @apply mb-2 flex items-center justify-between rounded-lg bg-black/15 px-3 py-2 text-[9px] text-blue-100/50; }
+    .admin-sidebar-version strong { @apply font-bold tracking-wide text-blue-100/80; }
+    .admin-sidebar .btn-logout { @apply rounded-xl border-white/10 py-2.5 text-blue-100/70 hover:bg-red-600/15 hover:text-red-200; }
 
     .sidebar-logo {
         @apply px-5 pt-6 pb-5 border-b border-white/[.08] text-center;
