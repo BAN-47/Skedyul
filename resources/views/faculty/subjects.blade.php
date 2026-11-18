@@ -18,74 +18,15 @@
   <div class="main">
 
     @php
-      // ── Build the weekly grid from the flat $subjects collection ─────────
-      $gridDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-
-      // Rotating palette so each subject keeps a consistent color across the grid
-      $palette = ['#e07a5f','#81b29a','#6fa8dc','#3d5a80','#f2a154','#a8d5a2','#c65b7c','#4a90a4'];
-      $subjColors = [];
-      $colorIdx = 0;
-
-      // day => [ hour => block ]   (block placed only on its start hour; rowspan covers the rest)
-      $dayBlocks = [];
-      $hasEveningSched = false; // true once any class starts at or after 4:00 PM
-
-      // Left-side "Summary of Subjects" panel — one row per unique subject code
-      $summaryRows = [];
-
-      // Flat list (not keyed by hour) — used both by the header's "today's schedule"
-      // feed and, further below, to build the grid.
       $scheduleForJs = [];
-
-      // Messages from the chair/dean — wire this to a real announcements query
-      // (e.g. $announcements = Announcement::forFaculty($faculty->id)->latest()->get())
-      // once that table/relationship exists; this sample array is just a placeholder.
-      $announcements = $announcements ?? [
-          ['from' => 'Chair Rodrigo Tan', 'role' => 'BSIS Chair', 'initials' => 'RT', 'color' => '#d97706',
-           'message' => 'Please submit your consultation hours schedule by Friday.', 'time' => '2h ago'],
-          ['from' => 'Dean Villaceran', 'role' => 'Dean, CCICT', 'initials' => 'DV', 'color' => '#0891b2',
-           'message' => 'IS102 will be under maintenance next Monday — classes moved to IS201.', 'time' => 'Yesterday'],
-      ];
-
-      // Guard: keep Summary + grid renderable even when controller passes null/empty
       $subjects = $subjects ?? collect();
 
       foreach ($subjects as $entry) {
           $subj = $entry['subject'];
           $code = $subj->subj_code ?? 'N/A';
-
-          if (!isset($subjColors[$code])) {
-              $subjColors[$code] = $palette[$colorIdx % count($palette)];
-              $colorIdx++;
-          }
-
-          if (!isset($summaryRows[$code])) {
-              $summaryRows[$code] = [
-                  'code'     => $code,
-                  'name'     => $subj->subj_name ?? 'N/A',
-                  // wire this to a real enrollment count (e.g. $entry['total_students'])
-                  // once that figure is available from the controller
-                  'students' => $entry['total_students'] ?? '—',
-                  'color'    => $subjColors[$code],
-              ];
-          }
-
           foreach ($entry['schedules'] as $sched) {
               $startTs = \Carbon\Carbon::parse($sched['start']);
               $endTs   = \Carbon\Carbon::parse($sched['end']);
-
-              $startHour = (int) $startTs->format('H');
-              $endHour   = (int) $endTs->format('H');
-              if ((int) $endTs->format('i') > 0) {
-                  $endHour++; // round a partial hour up so the block still gets a row
-              }
-              $duration = max(1, $endHour - $startHour);
-
-              // Evening starts at 4:00 PM, matching the faculty schedule view.
-              if ($startHour >= 16) {
-                  $hasEveningSched = true;
-              }
-
               $scheduleForJs[] = [
                   'code'  => $code,
                   'room'  => $entry['room'],
@@ -93,107 +34,130 @@
                   'start' => $startTs->format('H:i'),
                   'end'   => $endTs->format('H:i'),
               ];
-
-              $dayBlocks[$sched['day']][$startHour] = [
-                  'code'      => $code,
-                  'name'      => $subj->subj_name ?? 'N/A',
-                  'units'     => $subj->subj_units ?? '—',
-                  'lec'       => $subj->subj_lec_hours ?? 0,
-                  'lab'       => $subj->subj_lab_hours ?? 0,
-                  'room'      => $entry['room'],
-                  'section'   => $entry['sections'],
-                  'start'     => $startTs->format('g:i A'),
-                  'end'       => $endTs->format('g:i A'),
-                  'start_raw' => $startTs->format('H:i'),
-                  'end_raw'   => $endTs->format('H:i'),
-                  'duration'  => $duration,
-                  'color'     => $subjColors[$code],
-              ];
           }
       }
-
-      // Track, per day, which hours are already "consumed" by a rowspan above them
-      $skipUntil = array_fill_keys($gridDays, 0);
-
-      $dayRange   = range(7, 15);  // 7AM – 4PM (last row: 3–4 PM)
-      $eveningRange = range(16, 21); // Evening table: 4 PM – 10 PM
     @endphp
 
     @include('partials.faculty_header', [
         'title' => 'My Subjects',
+        'semesterLabel' => $activeSemester
+            ? trim(($activeSemester->sem_name ?? '') . ' ' . ($activeSemester->academicYear?->ay_academic_year ?? ''))
+            : 'No active semester',
+        'activeSemester' => $activeSemester,
         'scheduleFeed' => $scheduleForJs,
-        'announcements' => $announcements,
     ])
 
     <!-- FACULTY SUBJECTS PAGE -->
     <div id="page-faculty-subjects" class="page active faculty-page-enter">
 
-      <!-- CARD WRAPPER (Tailwind) -->
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-        <div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
-          <div>
-            <div class="text-base font-bold text-gray-900">My Subjects</div>
-          </div>
+      @php
+        $daySubjectCount = $subjects->filter(fn ($entry) => $entry['schedules']->contains(fn ($schedule) => (int) \Illuminate\Support\Carbon::parse($schedule['start'])->format('H') < 16))->count();
+        $eveningSubjectCount = $subjects->filter(fn ($entry) => $entry['schedules']->contains(fn ($schedule) => (int) \Illuminate\Support\Carbon::parse($schedule['start'])->format('H') >= 16))->count();
+        $semesterText = $activeSemester
+          ? trim(($activeSemester->sem_name ?? '') . ' ' . ($activeSemester->academicYear?->ay_academic_year ?? ''))
+          : 'No active semester';
+      @endphp
 
-          <!-- DAY / EVENING TOGGLE -->
-          <div class="inline-flex items-center bg-gray-100 rounded-lg p-1 gap-1 shrink-0">
-            <button id="btn-view-day" type="button" onclick="switchScheduleView('day')"
-                    class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-white text-gray-900 shadow-sm">
-              Day
-            </button>
-            <button id="btn-view-evening" type="button" onclick="switchScheduleView('evening')"
-                    class="px-3.5 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 text-gray-500">
-              Evening
-            </button>
-          </div>
+      <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div class="mb-1 text-[10px] font-bold uppercase tracking-[.16em] text-slate-400">Academics <span class="mx-1 text-slate-300">/</span> Faculty Workload <span class="mx-1 text-slate-300">/</span> <span class="text-blue-600">My Subjects</span></div>
+          <h1 class="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">My Subjects &amp; Teaching Load</h1>
+          <p class="mt-1 text-xs text-slate-500">Your assigned courses, scheduled sections, and weekly workload.</p>
         </div>
-        <div class="overflow-x-auto"><table class="w-full min-w-[760px] border-collapse">
-          <thead>
-            <tr>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Code</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Subject Name</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Units</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Lec Hrs</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Lab Hrs</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Sections</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Room</th>
-              <th class="whitespace-nowrap border-b-2 border-slate-200 px-3.5 py-2.5 text-left text-[11px] font-bold uppercase tracking-[.6px] text-slate-400 dark:border-slate-700">Schedule</th>
-            </tr>
-          </thead>
-          <tbody>
-            @forelse ($subjects as $entry)
-              @php $subj = $entry['subject']; @endphp
-              <tr class="subject-row cursor-pointer transition-colors hover:[&>td]:bg-slate-50 dark:hover:[&>td]:bg-slate-800"
-                data-code="{{ $subj->subj_code ?? '' }}"
-                data-name="{{ $subj->subj_name ?? '' }}"
-                data-units="{{ $subj->subj_units ?? '' }}"
-                data-lec="{{ $subj->subj_lec_hours ?? 0 }}"
-                data-lab="{{ $subj->subj_lab_hours ?? 0 }}"
-                data-room="{{ $entry['room'] }}"
-                data-section="{{ $entry['sections'] }}"
-                data-schedule="{{ $entry['schedules']->map(fn($s) => $s['day'] . ' ' . \Illuminate\Support\Carbon::parse($s['start'])->format('g:i A') . '–' . \Illuminate\Support\Carbon::parse($s['end'])->format('g:i A'))->implode(', ') }}">
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><span class="font-mono font-bold text-blue-600">{{ $subj->subj_code ?? 'N/A' }}</span></td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200"><b>{{ $subj->subj_name ?? 'N/A' }}</b></td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_units ?? '—' }}</td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_lec_hours ?? '—' }}</td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $subj->subj_lab_hours ?? '—' }}</td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $entry['sections'] ?: '—' }}</td>
-                <td class="border-b border-slate-100 px-3.5 py-3 text-[13px] text-slate-900 dark:border-slate-800 dark:text-slate-200">{{ $entry['room'] }}</td>
-                <td class="subj-schedule border-b border-slate-100 px-3.5 py-3 text-xs text-slate-400 dark:border-slate-800">
-                  @foreach ($entry['schedules'] as $sched)
-                    <div class="sched-row" data-day="{{ $sched['day'] }}" data-start="{{ $sched['start'] }}" data-end="{{ $sched['end'] }}">
-                      {{ $sched['day'] }} {{ \Illuminate\Support\Carbon::parse($sched['start'])->format('g:i A') }}–{{ \Illuminate\Support\Carbon::parse($sched['end'])->format('g:i A') }}
-                      <span class="sched-status-inline"></span>
-                    </div>
-                  @endforeach
-                </td>
-              </tr>
-            @empty
-              <tr><td colspan="8" class="px-3.5 py-8 text-center text-[13px] text-slate-400">No subjects assigned this semester.</td></tr>
-            @endforelse
-          </tbody>
-        </table></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{{ $semesterText }}{{ $activeSemester?->sem_is_active ? ' · Active' : '' }}</span>
+          <a href="{{ route('faculty.schedule') }}" class="inline-flex min-h-9 items-center gap-2 rounded-lg bg-blue-600 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700"><i class="ti ti-calendar-week" aria-hidden="true"></i>Weekly Timetable</a>
+        </div>
       </div>
+
+      <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+        <article class="faculty-subject-summary border-t-2 border-blue-600">
+          <div class="flex items-start justify-between"><span class="faculty-summary-label">Assigned Subjects</span><span class="faculty-summary-icon bg-blue-50 text-blue-600"><i class="ti ti-book-2" aria-hidden="true"></i></span></div>
+          <div class="mt-3 flex items-baseline gap-2"><strong>{{ $subjects->count() }}</strong><span>Active this semester</span></div>
+          <div class="mt-2 text-[10px] text-slate-500">{{ $daySubjectCount }} day · {{ $eveningSubjectCount }} evening</div>
+        </article>
+        <article class="faculty-subject-summary border-t-2 border-emerald-500">
+          <div class="flex items-start justify-between"><span class="faculty-summary-label">Weekly Contact Load</span><span class="faculty-summary-icon bg-emerald-50 text-emerald-600"><i class="ti ti-clock-hour-4" aria-hidden="true"></i></span></div>
+          <div class="mt-3 flex items-baseline gap-2"><strong>{{ number_format($weeklyContactLoad, 1) }}</strong><span>hours / week</span></div>
+          <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:{{ min(100, round($weeklyContactLoad / max(1, $maxHours) * 100)) }}%"></div></div>
+          <div class="mt-1 text-[10px] text-slate-500">{{ number_format($maxHours, 1) }}h weekly load limit</div>
+        </article>
+        <article class="faculty-subject-summary border-t-2 border-violet-500">
+          <div class="flex items-start justify-between"><span class="faculty-summary-label">Enrolled Students</span><span class="faculty-summary-icon bg-violet-50 text-violet-600"><i class="ti ti-users" aria-hidden="true"></i></span></div>
+          <div class="mt-3 flex items-baseline gap-2"><strong>{{ $enrolledStudents }}</strong><span>across {{ $sectionCount }} sections</span></div>
+          <div class="mt-2 text-[10px] text-slate-500">Based on section enrollment records</div>
+        </article>
+        <article class="faculty-subject-summary border-t-2 border-cyan-500">
+          <div class="flex items-start justify-between"><span class="faculty-summary-label">Lab Subjects &amp; Rooms</span><span class="faculty-summary-icon bg-cyan-50 text-cyan-600"><i class="ti ti-device-laptop" aria-hidden="true"></i></span></div>
+          <div class="mt-3 flex items-baseline gap-2"><strong>{{ $labSubjectCount }}</strong><span>lab subjects</span></div>
+          <div class="mt-2 truncate text-[10px] text-slate-500" title="{{ $labRoomNames->implode(', ') }}">{{ $labRoomNames->isNotEmpty() ? $labRoomNames->implode(', ') : 'No lab room assigned' }}</div>
+        </article>
+      </div>
+
+      <section aria-label="Search and filter subjects" class="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+        <label class="relative block min-w-0 flex-1 sm:max-w-md">
+          <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400" aria-hidden="true"></i>
+          <input id="subject-search" type="search" placeholder="Search course code, title, section, or room" class="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100" autocomplete="off">
+        </label>
+        <div class="inline-flex w-full items-center gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 sm:w-auto" role="group" aria-label="Filter subjects by shift">
+          <button type="button" class="subject-shift-filter active" data-subject-shift="all">All shifts <span>{{ $subjects->count() }}</span></button>
+          <button type="button" class="subject-shift-filter" data-subject-shift="day">☀ Day <span>{{ $daySubjectCount }}</span></button>
+          <button type="button" class="subject-shift-filter" data-subject-shift="evening">☾ Evening <span>{{ $eveningSubjectCount }}</span></button>
+        </div>
+      </section>
+
+      <div id="faculty-subject-cards" class="grid grid-cols-1 gap-3 2xl:grid-cols-2">
+        @forelse ($subjects as $entry)
+          @php
+            $subj = $entry['subject'];
+            $code = $subj->subj_code ?? 'N/A';
+            $name = $subj->subj_name ?? 'N/A';
+            $hasDay = $entry['schedules']->contains(fn ($schedule) => (int) \Illuminate\Support\Carbon::parse($schedule['start'])->format('H') < 16);
+            $hasEvening = $entry['schedules']->contains(fn ($schedule) => (int) \Illuminate\Support\Carbon::parse($schedule['start'])->format('H') >= 16);
+            $courseHours = \App\Services\ScheduleAssignmentService::courseHours($subj);
+            $scheduleText = $entry['schedules']->map(fn ($schedule) => $schedule['day'] . ' ' . \Illuminate\Support\Carbon::parse($schedule['start'])->format('g:i A') . '–' . \Illuminate\Support\Carbon::parse($schedule['end'])->format('g:i A'))->implode(', ');
+          @endphp
+          <article class="faculty-subject-card" data-subject-card data-code="{{ $code }}" data-name="{{ $name }}" data-section="{{ $entry['sections'] }}" data-room="{{ $entry['room'] }}" data-day="{{ $hasDay ? '1' : '0' }}" data-evening="{{ $hasEvening ? '1' : '0' }}" data-units="{{ $subj->subj_units ?? '' }}" data-lec="{{ $subj->subj_lec_hours ?? 0 }}" data-lab="{{ $subj->subj_lab_hours ?? 0 }}" data-schedule="{{ $scheduleText }}" data-color="#2563eb">
+            <div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between sm:p-5">
+              <div class="flex min-w-0 items-start gap-3">
+                <span class="faculty-subject-code">{{ $code }}</span>
+                <div class="min-w-0">
+                  <h2 class="break-words text-sm font-extrabold leading-snug text-slate-900">{{ $name }}</h2>
+                  <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span class="faculty-subject-badge">{{ number_format((float) ($subj->subj_units ?? 0), 1) }} Academic Units</span>
+                    @if($hasDay)<span class="faculty-shift-badge day">☀ Day</span>@endif
+                    @if($hasEvening)<span class="faculty-shift-badge evening">☾ Evening</span>@endif
+                  </div>
+                  <div class="mt-2 text-[10px] text-slate-500">{{ number_format((float) ($subj->subj_lec_hours ?? 0), 1) }}h lecture · {{ number_format((float) ($subj->subj_lab_hours ?? 0), 1) }}h lab weekly</div>
+                </div>
+              </div>
+              <button type="button" class="faculty-subject-details" onclick="openWebSubjectDetailFromCard(this)"><i class="ti ti-list-details" aria-hidden="true"></i> View details</button>
+            </div>
+            <div class="grid grid-cols-1 gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:grid-cols-3 sm:px-5">
+              <div><div class="faculty-subject-meta-label">Schedule &amp; Shift</div><div class="mt-1 space-y-1 text-[11px] font-semibold text-slate-700">
+                @foreach ($entry['schedules'] as $sched)
+                  @php $scheduleShift = (int) \Illuminate\Support\Carbon::parse($sched['start'])->format('H') >= 16 ? 'evening' : 'day'; @endphp
+                  <div class="subject-schedule-line" data-subject-schedule data-schedule-shift="{{ $scheduleShift }}" data-day="{{ $sched['day'] }}" data-start="{{ \Illuminate\Support\Carbon::parse($sched['start'])->format('H:i:s') }}" data-end="{{ \Illuminate\Support\Carbon::parse($sched['end'])->format('H:i:s') }}">{{ $sched['day'] }} · {{ \Illuminate\Support\Carbon::parse($sched['start'])->format('g:i A') }}–{{ \Illuminate\Support\Carbon::parse($sched['end'])->format('g:i A') }} <span class="faculty-shift-badge {{ $scheduleShift }}">{{ ucfirst($scheduleShift) }}</span><span class="sched-status-inline"></span></div>
+                @endforeach
+              </div></div>
+              <div><div class="faculty-subject-meta-label">Sections &amp; Students</div><div class="mt-1 text-xs font-bold text-slate-800">{{ $entry['sections'] ?: 'No section listed' }}</div><div class="mt-0.5 text-[10px] text-slate-500">{{ $entry['students'] }} enrolled</div></div>
+              <div><div class="faculty-subject-meta-label">Assigned Room</div><div class="mt-1 text-xs font-bold text-slate-800">{{ $entry['room'] }}</div><div class="mt-0.5 text-[10px] text-slate-500">{{ number_format((float) $courseHours, 1) }} workload hours</div></div>
+            </div>
+          </article>
+        @empty
+          <div class="col-span-full rounded-xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
+            <i class="ti ti-books text-3xl text-slate-300" aria-hidden="true"></i>
+            <p class="mt-2 text-sm font-bold text-slate-700">No subjects assigned this semester</p>
+            <p class="mt-1 text-xs text-slate-500">Your approved course assignments will appear here.</p>
+          </div>
+        @endforelse
+        <div id="subject-search-empty" class="hidden col-span-full rounded-xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center text-xs text-slate-500">No subjects match your search and shift filters.</div>
+      </div>
+
+      <footer class="mt-7 flex flex-col gap-2 border-t border-slate-200 pt-4 text-[10px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+        <span><strong class="font-extrabold tracking-wide text-slate-600">SKEDYUL</strong> Faculty Information System · Academic Timetabling &amp; Workload</span>
+        <span>{{ $faculty->department->dept_code ?? 'Faculty' }} Department · {{ $semesterText }}</span>
+      </footer>
     </div>
 
   </div><!-- end .main -->
@@ -262,39 +226,49 @@ function openWebSubjectDetail(code, name, units, lec, lab, dept, room, section, 
   openModal('modal-web-subject-detail');
 }
 
-// ── DAY / EVENING SCHEDULE TOGGLE ───────────────────────────────────────
-function switchScheduleView(view) {
-  const dayBtn   = document.getElementById('btn-view-day');
-  const eveningBtn = document.getElementById('btn-view-evening');
-  if (!dayBtn || !eveningBtn) return;
+// Search and filter assigned subjects without hiding the underlying schedule data.
+function applyFacultySubjectFilters() {
+  const query = (document.getElementById('subject-search')?.value || '').trim().toLowerCase();
+  const activeShift = document.querySelector('.subject-shift-filter.active')?.dataset.subjectShift || 'all';
+  let visibleCount = 0;
 
-  const activeClasses   = ['bg-white', 'text-gray-900', 'shadow-sm'];
-  const inactiveClasses = ['text-gray-500'];
+  document.querySelectorAll('[data-subject-card]').forEach(card => {
+    const searchText = [card.dataset.code, card.dataset.name, card.dataset.section, card.dataset.room].join(' ').toLowerCase();
+    const matchesSearch = !query || searchText.includes(query);
+    const matchesShift = activeShift === 'all' || card.dataset[activeShift] === '1';
+    const visible = matchesSearch && matchesShift;
+    card.classList.toggle('hidden', !visible);
+    if (visible) visibleCount++;
 
-  const activate = (btn) => { btn.classList.add(...activeClasses); btn.classList.remove(...inactiveClasses); };
-  const deactivate = (btn) => { btn.classList.remove(...activeClasses); btn.classList.add(...inactiveClasses); };
-
-  const showEvening = view === 'evening';
-  document.querySelectorAll('.subject-row').forEach(row => {
-    let visibleSchedules = 0;
-    row.querySelectorAll('.sched-row').forEach(schedule => {
-      const [hour, minute] = schedule.dataset.start.split(':').map(Number);
-      const isEvening = hour >= 16;
-      const visible = showEvening ? isEvening : !isEvening;
-      schedule.classList.toggle('hidden', !visible);
-      if (visible) visibleSchedules++;
+    card.querySelectorAll('[data-schedule-shift]').forEach(line => {
+      line.classList.toggle('hidden', activeShift !== 'all' && line.dataset.scheduleShift !== activeShift);
     });
-    row.classList.toggle('hidden', visibleSchedules === 0);
   });
 
-  if (showEvening) {
-    activate(eveningBtn);
-    deactivate(dayBtn);
-  } else {
-    activate(dayBtn);
-    deactivate(eveningBtn);
-  }
+  const emptyState = document.getElementById('subject-search-empty');
+  if (emptyState) emptyState.classList.toggle('hidden', visibleCount > 0 || !document.querySelector('[data-subject-card]'));
 }
+
+function openWebSubjectDetailFromCard(button) {
+  const card = button?.closest('[data-subject-card]');
+  if (!card) return;
+  openWebSubjectDetail(
+    card.dataset.code, card.dataset.name, card.dataset.units,
+    card.dataset.lec, card.dataset.lab, '', card.dataset.room,
+    card.dataset.section, card.dataset.schedule, card.dataset.color
+  );
+}
+
+document.querySelectorAll('.subject-shift-filter').forEach(button => {
+  button.addEventListener('click', () => {
+    document.querySelectorAll('.subject-shift-filter').forEach(filter => {
+      filter.classList.toggle('active', filter === button);
+      filter.setAttribute('aria-pressed', String(filter === button));
+    });
+    applyFacultySubjectFilters();
+  });
+});
+document.getElementById('subject-search')?.addEventListener('input', applyFacultySubjectFilters);
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
@@ -309,7 +283,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── LIVE STATUS BADGE, pinned to the right edge of each block's code line ──
+// ── Live class status on each scheduled subject ──────────────────────────
 function parseTimeToday(timeStr) {
   const [h, m, s] = timeStr.split(':').map(Number);
   const d = new Date();
@@ -323,19 +297,17 @@ function updateSubjectScheduleStatuses() {
   const now = new Date();
   const todayName = DAY_NAMES[now.getDay()];
 
-  document.querySelectorAll('.subj-block').forEach(cell => {
-    const statusEl = cell.querySelector('.sched-status-inline');
+  document.querySelectorAll('[data-subject-schedule]').forEach(schedule => {
+    const statusEl = schedule.querySelector('.sched-status-inline');
     if (!statusEl) return;
 
-    if (cell.dataset.day !== todayName) {
+    if (schedule.dataset.day !== todayName) {
       statusEl.innerHTML = '';
       return;
     }
 
-    const start = parseTimeToday(cell.dataset.start);
-    const end = parseTimeToday(cell.dataset.end);
-
-    const badgeBase = 'text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap tracking-wide leading-tight';
+    const start = parseTimeToday(schedule.dataset.start);
+    const end = parseTimeToday(schedule.dataset.end);
 
     if (now < start) {
       statusEl.innerHTML = ` <span class="badge badge-blue text-[10px]">Today</span>`;
@@ -350,14 +322,9 @@ function updateSubjectScheduleStatuses() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  applyFacultySubjectFilters();
   updateSubjectScheduleStatuses();
   setInterval(updateSubjectScheduleStatuses, 30000); // refresh every 30s
-
-  // Default view: Evening if it's currently 4:00 PM or later, otherwise Day.
-  // The buttons always let the user override this manually.
-  const now = new Date();
-  const isEveningHours = now.getHours() >= 16;
-  switchScheduleView(isEveningHours ? 'evening' : 'day');
 });
 </script>
 </body>

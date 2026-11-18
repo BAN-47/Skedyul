@@ -120,6 +120,12 @@ class PbsController extends Controller
         $activeSem = $this->activeSemester($request->query('semester'));
         $filters['semester'] = $activeSem->sem_id ?? null;
         $shiftKey = $request->query('shift', 'day') === 'night' ? 'evening' : 'day';
+        $sectionShiftFilter = in_array($request->query('section_shift', 'all'), ['all', 'day', 'evening'], true)
+            ? $request->query('section_shift', 'all')
+            : 'all';
+        $sectionYearFilter = in_array($request->query('section_year', 'all'), ['all', '1', '2', '3', '4'], true)
+            ? $request->query('section_year', 'all')
+            : 'all';
 
         // Sections for all departments in college (so department switcher in modal works)
         $sections = Section::query()
@@ -249,6 +255,8 @@ class PbsController extends Controller
             'departments'      => $allDepartments,
             'allDepartments'   => $allDepartments,
             'selectedDeptId'   => $selectedDeptId,
+            'sectionShiftFilter' => $sectionShiftFilter,
+            'sectionYearFilter' => $sectionYearFilter,
             'categories'       => $categories,
             'selectedCategory' => $selectedCategory,
             'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),

@@ -17,7 +17,7 @@ class FacultyDashboardController extends Controller
             ->where('fac_usr_id', auth()->id())
             ->firstOrFail();
 
-        $activeSemester = Semester::where('sem_is_active', true)->first();
+        $activeSemester = Semester::with('academicYear')->where('sem_is_active', true)->first();
 
         $facultyLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when($activeSemester, fn ($q) => $q->where('sl_sem_id', $activeSemester->sem_id))
@@ -51,6 +51,14 @@ class FacultyDashboardController extends Controller
         $mySections = $schedules->pluck('section.sec_name')->filter()->unique()->values();
 
         $today = Carbon::now()->format('l');
+        $greeting = match (true) {
+            now()->hour < 12 => 'Good morning',
+            now()->hour < 18 => 'Good afternoon',
+            default => 'Good evening',
+        };
+        $semesterLabel = $activeSemester
+            ? trim($activeSemester->sem_name . ' ' . ($activeSemester->academicYear?->ay_academic_year ?? ''))
+            : 'No active semester';
         $todaySchedule = $schedules->where('sch_day', $today)->sortBy('sch_start_time')->values();
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $weeklyScheduleCounts = collect($weekDays)->map(fn ($day) => [
@@ -61,7 +69,7 @@ class FacultyDashboardController extends Controller
         return view('faculty.faculty_dashboard', compact(
             'faculty', 'totalHours', 'maxHours', 'dayHours', 'dayMaxHours',
             'eveningHours', 'eveningMaxHours', 'weeklyScheduleCounts',
-            'mySubjects', 'mySections', 'todaySchedule', 'today'
+            'mySubjects', 'mySections', 'todaySchedule', 'today', 'greeting', 'semesterLabel', 'activeSemester'
         ));
     }
 }

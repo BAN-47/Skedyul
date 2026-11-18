@@ -1,7 +1,25 @@
 <div class="topbar">
-    <div class="topbar-title">{{ $title ?? 'Department Chair Dashboard' }}</div>
+    <div class="topbar-title min-w-0">
+        @if (!empty($collegeContext))
+            <div class="flex min-w-0 items-center gap-2">
+                <a href="{{ route('chair.dashboard') }}"
+                    class="shrink-0 text-[13px] font-bold text-slate-800 no-underline hover:text-blue-700">Dashboard</a>
+                <span class="shrink-0 text-slate-300" aria-hidden="true">/</span>
+                <span class="truncate text-[11px] font-medium leading-tight text-slate-600">{{ $collegeContext }}</span>
+            </div>
+            @if (!empty($title) && strtolower(trim($title)) !== 'dashboard')
+                <div class="truncate text-[10px] font-medium text-slate-400">{{ $title }}</div>
+            @endif
+        @else
+            {{ $title ?? 'Department Chair Dashboard' }}
+        @endif
+    </div>
     <div class="flex items-center gap-2.5">
-        @if (!empty($badgeText))
+        @if (!empty($contextTag))
+            <span
+                class="hidden max-w-[19rem] truncate rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-bold text-blue-700 sm:inline-flex sm:items-center"
+                title="{{ $contextTag }}">{{ $contextTag }}</span>
+        @elseif(!empty($badgeText))
             <span class="badge badge-blue text-[11px]">{{ $badgeText }}</span>
         @endif
         <div id="topbar-notif-bell" class="relative">

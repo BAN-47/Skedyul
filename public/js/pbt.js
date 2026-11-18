@@ -401,8 +401,143 @@ function updateOjtSummaryNotice() {
     }
 }
 
+function initPbtSectionPickers() {
+    const pickers = Array.from(document.querySelectorAll('[data-pbt-section-picker]'));
+    const refreshers = [];
+
+    pickers.forEach((picker) => {
+        const select = picker.querySelector('select');
+        const trigger = picker.querySelector('[data-pbt-section-trigger]');
+        const label = picker.querySelector('[data-pbt-section-label]');
+        const panel = picker.querySelector('[data-pbt-section-panel]');
+        const search = picker.querySelector('[data-pbt-section-search]');
+        const optionsList = picker.querySelector('[data-pbt-section-options]');
+        if (!select || !trigger || !label || !panel || !optionsList) return;
+
+        let shiftFilter = 'all';
+        let yearFilter = 'all';
+
+        const sectionOptions = () => Array.from(select.options).filter((option) => option.value);
+        const yearValue = (option) => String(option.dataset.yearLevel || option.dataset.year || '');
+        const matchesShift = (option, filter) => filter === 'all'
+            || (filter === 'evening' ? option.dataset.isEvening === '1' : option.dataset.isEvening !== '1');
+
+        const render = () => {
+            const options = sectionOptions();
+            const query = (search?.value || '').trim().toLowerCase();
+            const visibleOptions = options.filter((option) =>
+                matchesShift(option, shiftFilter)
+                && (yearFilter === 'all' || yearValue(option) === yearFilter)
+                && (!query || option.textContent.toLowerCase().includes(query))
+            );
+
+            optionsList.replaceChildren();
+            visibleOptions.forEach((option) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'mb-1 flex w-full items-center justify-between rounded px-2.5 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50';
+                button.setAttribute('aria-selected', String(select.value === option.value));
+                const isEvening = option.dataset.isEvening === '1';
+                const year = yearValue(option);
+                const details = document.createElement('span');
+                details.className = 'text-[9px] text-slate-400';
+                details.textContent = `${year ? `Year ${year}` : 'Year not set'} · ${isEvening ? 'Evening' : 'Day'}`;
+                const name = document.createElement('span');
+                name.className = 'truncate pr-3 font-semibold';
+                name.textContent = option.textContent.trim();
+                button.append(name, details);
+                button.addEventListener('click', () => {
+                    select.value = option.value;
+                    select.dispatchEvent(new Event('change', { bubbles: true }));
+                    panel.classList.add('hidden');
+                    trigger.setAttribute('aria-expanded', 'false');
+                });
+                optionsList.appendChild(button);
+            });
+
+            const noOptions = document.createElement('p');
+            noOptions.className = 'px-2 py-4 text-center text-xs text-slate-400';
+            noOptions.textContent = 'No sections match these filters.';
+            noOptions.classList.toggle('hidden', visibleOptions.length > 0);
+            optionsList.appendChild(noOptions);
+
+            const selected = select.selectedOptions[0];
+            label.textContent = selected?.value ? selected.textContent.trim() : '-- Select Section --';
+            picker.querySelectorAll('[data-pbt-shift]').forEach((button) => {
+                const active = button.dataset.pbtShift === shiftFilter;
+                button.classList.toggle('bg-indigo-600', active);
+                button.classList.toggle('text-white', active);
+                button.classList.toggle('bg-white', !active);
+                button.classList.toggle('text-slate-600', !active);
+            });
+            picker.querySelectorAll('[data-pbt-year]').forEach((button) => {
+                const active = button.dataset.pbtYear === yearFilter;
+                button.classList.toggle('border-indigo-300', active);
+                button.classList.toggle('bg-indigo-50', active);
+                button.classList.toggle('text-indigo-700', active);
+                button.classList.toggle('border-slate-200', !active);
+                button.classList.toggle('text-slate-500', !active);
+            });
+
+            ['all', 'day', 'evening'].forEach((filter) => {
+                const count = options.filter((option) =>
+                    (yearFilter === 'all' || yearValue(option) === yearFilter) && matchesShift(option, filter)
+                ).length;
+                const countNode = picker.querySelector(`[data-pbt-shift-count="${filter}"]`);
+                if (countNode) countNode.textContent = String(count);
+            });
+            ['all', '1', '2', '3', '4', '5'].forEach((filter) => {
+                const count = options.filter((option) =>
+                    matchesShift(option, shiftFilter) && (filter === 'all' || yearValue(option) === filter)
+                ).length;
+                const countNode = picker.querySelector(`[data-pbt-year-count="${filter}"]`);
+                if (countNode) countNode.textContent = String(count);
+            });
+        };
+
+        refreshers.push(render);
+        trigger.addEventListener('click', () => {
+            const opening = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !opening);
+            trigger.setAttribute('aria-expanded', String(opening));
+            if (opening) {
+                if (search) search.value = '';
+                render();
+                search?.focus();
+            }
+        });
+        search?.addEventListener('input', render);
+        select.addEventListener('change', render);
+        picker.querySelectorAll('[data-pbt-shift]').forEach((button) => button.addEventListener('click', () => {
+            shiftFilter = button.dataset.pbtShift || 'all';
+            render();
+        }));
+        picker.querySelectorAll('[data-pbt-year]').forEach((button) => button.addEventListener('click', () => {
+            yearFilter = button.dataset.pbtYear || 'all';
+            render();
+        }));
+        panel.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                panel.classList.add('hidden');
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.focus();
+            }
+        });
+        document.addEventListener('click', (event) => {
+            if (!picker.contains(event.target)) {
+                panel.classList.add('hidden');
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+        render();
+    });
+
+    window.refreshPbtSectionPickers = () => refreshers.forEach((refresh) => refresh());
+}
+
 // Wire up section → subject filter for Add + Edit modals
 document.addEventListener("DOMContentLoaded", () => {
+    initPbtSectionPickers();
     const addDept = document.getElementById("add-department");
     if (addDept) {
         addDept.addEventListener("change", () => {
@@ -427,6 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 opt.dataset.isEvening = String(sec.isEvening || "0");
                 sectionSelect.appendChild(opt);
             });
+            window.refreshPbtSectionPickers?.();
 
             subjectSelect.innerHTML =
                 '<option value="">-- Select Subject --</option>';
@@ -497,6 +633,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 opt.dataset.isEvening = String(sec.isEvening || "0");
                 sectionSelect.appendChild(opt);
             });
+            window.refreshPbtSectionPickers?.();
             if (subjectSelect) {
                 subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
             }
@@ -574,7 +711,17 @@ function restoreAddAnotherState() {
         input.checked = (state.sections || []).includes(input.value);
     });
     document.getElementById("add-room").value = state.room || "";
+    document.querySelectorAll(".add-day-checkbox").forEach((input) => {
+        input.checked = (state.days || []).includes(input.value);
+    });
+    document.getElementById("add-start").value = state.startTime || "";
+    document.getElementById("add-end").value = state.endTime || "";
     openModal("modal-add-schedule");
+    if (state.startTime && state.endTime) {
+        showToast(`Next schedule time: ${state.startTime}–${state.endTime}`);
+    } else if (state.startTime) {
+        showToast(`Next schedule starts at ${state.startTime}; choose an end time.`);
+    }
 }
 
 function openAddModal(day, startTime) {
@@ -705,6 +852,16 @@ function submitAdd(keepOpen = false) {
             if (data.success) {
                 showToast(data.message || "Schedule added.");
                 if (keepOpen) {
+                    const timeToMinutes = (time) => {
+                        const [hours, minutes] = time.split(":").map(Number);
+                        return hours * 60 + minutes;
+                    };
+                    const durationMinutes = timeToMinutes(payload.end_time) - timeToMinutes(payload.start_time);
+                    const nextStartMinutes = timeToMinutes(payload.end_time);
+                    const nextStart = nextStartMinutes < 22 * 60 ? payload.end_time : "";
+                    const nextEnd = nextStart && nextStartMinutes + durationMinutes <= 22 * 60
+                        ? addMinutesToTime(nextStart, durationMinutes)
+                        : "";
                     try {
                         sessionStorage.setItem(
                             "pbt-add-another",
@@ -716,18 +873,14 @@ function submitAdd(keepOpen = false) {
                             subject: document.getElementById("add-subject").value,
                             room: document.getElementById("add-room").value,
                             category: document.getElementById("add-category").value,
+                            days: payload.days,
+                            startTime: nextStart,
+                            endTime: nextEnd,
                             }),
                         );
                     } catch {
                         showToast("Schedule saved, but the add-another form could not be preserved.");
                     }
-                    document
-                        .querySelectorAll(".add-day-checkbox")
-                        .forEach((input) => {
-                            input.checked = false;
-                        });
-                    document.getElementById("add-start").value = "";
-                    document.getElementById("add-end").value = "";
                     document.getElementById("add-description").value = "";
                     setAddButtonsLoading(false);
                 } else {
@@ -756,6 +909,7 @@ function openEditModal(block) {
         departmentSelect.dispatchEvent(new Event("change"));
     }
     document.getElementById("edit-section").value = block.dataset.section || "";
+    document.getElementById("edit-section").dispatchEvent(new Event("change", { bubbles: true }));
     const categorySelect = document.getElementById("edit-category");
     if (categorySelect) categorySelect.value = "";
     // Filter subjects by the section's year level first, then set subject

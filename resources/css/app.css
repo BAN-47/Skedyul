@@ -18,6 +18,215 @@
     --font-mono: 'DM Mono', ui-monospace, monospace;
 }
 
+/* Faculty portal dashboard touches: keep the existing navy/blue system, with a clearer
+   active navigation state and compact context in the shared top bar. */
+.faculty-sidebar .faculty-sidebar-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .65rem;
+}
+
+.faculty-sidebar .sidebar-logo-text { font-size: 24px; }
+
+.faculty-portal-badge {
+    border: 1px solid rgba(96, 165, 250, .35);
+    border-radius: 5px;
+    background: rgba(37, 99, 235, .2);
+    color: #93c5fd;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    padding: 3px 5px;
+}
+
+.faculty-sidebar .nav-item {
+    margin-right: .6rem;
+    border-radius: 0 .8rem .8rem 0;
+}
+
+.faculty-sidebar .nav-item.active {
+    background: linear-gradient(90deg, rgba(37, 99, 235, .62), rgba(37, 99, 235, .22));
+    box-shadow: inset 3px 0 #60a5fa;
+    border-left-color: transparent;
+    color: #fff;
+}
+
+.faculty-sidebar .nav-icon { color: #bfdbfe; }
+.faculty-sidebar .nav-item.active .nav-icon { color: #fff; }
+
+.faculty-term-active,
+.faculty-term-pill {
+    align-items: center;
+    white-space: nowrap;
+}
+
+.faculty-term-active {
+    gap: 5px;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 4px 8px;
+}
+
+.faculty-term-active > span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.faculty-term-pill {
+    display: inline-flex;
+    max-width: 230px;
+    gap: 6px;
+    border: 1px solid #dbeafe;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1e40af;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 7px 10px;
+}
+
+.faculty-term-pill span { overflow: hidden; text-overflow: ellipsis; }
+
+.faculty-subject-summary {
+    min-width: 0;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.faculty-summary-label,
+.faculty-subject-meta-label {
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.faculty-summary-icon {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border-radius: 9px;
+    font-size: 15px;
+}
+
+.faculty-subject-summary > div:nth-child(2) strong {
+    color: #0f172a;
+    font-size: 25px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.faculty-subject-summary > div:nth-child(2) span {
+    color: #64748b;
+    font-size: 10px;
+}
+
+.faculty-subject-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .045);
+    transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.faculty-subject-card:hover {
+    transform: translateY(-1px);
+    border-color: #93c5fd;
+    box-shadow: 0 8px 24px rgba(30, 64, 175, .08);
+}
+
+.faculty-subject-code {
+    display: grid;
+    width: 42px;
+    min-height: 42px;
+    flex: 0 0 auto;
+    place-items: center;
+    overflow-wrap: anywhere;
+    border-radius: 12px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+    padding: 4px;
+}
+
+.faculty-subject-badge,
+.faculty-shift-badge {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.faculty-subject-badge { border: 1px solid #dbeafe; background: #eff6ff; color: #1d4ed8; }
+.faculty-shift-badge.day { background: #fff7ed; color: #c2410c; }
+.faculty-shift-badge.evening { background: #f5f3ff; color: #6d28d9; }
+
+.faculty-subject-details {
+    display: inline-flex;
+    min-height: 34px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #fff;
+    color: #1d4ed8;
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.faculty-subject-details:hover { background: #eff6ff; }
+.faculty-subject-meta-label { font-size: 8px; color: #94a3b8; }
+.subject-schedule-line { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+
+.subject-shift-filter {
+    display: inline-flex;
+    min-height: 30px;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 5px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: #64748b;
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.subject-shift-filter span { color: #94a3b8; }
+.subject-shift-filter.active { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+.subject-shift-filter.active span { color: #1d4ed8; }
+
+@media (max-width: 520px) {
+    .faculty-term-pill { max-width: 118px; padding: 6px 8px; font-size: 9px; }
+    .faculty-notification-label { display: none; }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    SHARED COMPONENTS
    Used across: admin_dashboard, user_accounts, rooms, settings,
@@ -631,6 +840,30 @@
         @apply w-full py-2.5 border border-white/[.12] rounded-lg bg-transparent
                text-white/50 text-[12px] font-semibold cursor-pointer transition-all
                hover:bg-red-600/15 hover:border-red-500/40 hover:text-red-300;
+    }
+
+    /* Chair navigation keeps the shared navy palette with brighter, clearer states. */
+    .chair-sidebar .nav-item {
+        @apply rounded-r-xl mr-2.5 transition-all duration-200;
+    }
+
+    .chair-sidebar .nav-item:hover {
+        @apply translate-x-0.5 bg-white/[.08] text-white;
+    }
+
+    .chair-sidebar .nav-item.active {
+        background: linear-gradient(90deg, rgba(59, 130, 246, .34), rgba(59, 130, 246, .09));
+        box-shadow: inset 3px 0 #60a5fa;
+        border-left-color: transparent;
+    }
+
+    .chair-sidebar .nav-icon {
+        @apply text-blue-200/80;
+    }
+
+    .chair-sidebar .nav-item.active .nav-icon,
+    .chair-sidebar .nav-item:hover .nav-icon {
+        @apply text-blue-200;
     }
 
     /* ── QUOTE BANNER ────────────────────────────────────────────────────── */

@@ -276,6 +276,10 @@ function applyFilters() {
     section ? params.set('section', section) : params.delete('section');
     const semester = document.getElementById('filter-semester')?.value || '';
     semester ? params.set('semester', semester) : params.delete('semester');
+    const sectionShift = window.PBS_SECTION_SHIFT_FILTER || 'all';
+    const sectionYear = window.PBS_SECTION_YEAR_FILTER || 'all';
+    sectionShift === 'all' ? params.delete('section_shift') : params.set('section_shift', sectionShift);
+    sectionYear === 'all' ? params.delete('section_year') : params.set('section_year', sectionYear);
     params.set('shift', getCurrentShift());
 
     window.location.search = params.toString();
@@ -336,18 +340,144 @@ document.addEventListener('DOMContentLoaded', () => {
     const headerDept = document.getElementById('filter-department');
     const headerSection = document.getElementById('filter-section');
     if (headerDept && headerSection) {
+        const picker = document.getElementById('pbs-section-picker');
+        const pickerTrigger = document.getElementById('pbs-section-picker-trigger');
+        const pickerMenu = document.getElementById('pbs-section-picker-menu');
+        const pickerSearch = document.getElementById('pbs-section-search');
+        const sectionRows = Array.from(document.querySelectorAll('[data-section-option]'));
+        const sectionGroups = Array.from(document.querySelectorAll('[data-section-group]'));
+        const noSectionResults = document.getElementById('pbs-section-no-results');
+
         const filterSections = () => {
             const deptId = headerDept.value;
-            Array.from(headerSection.options).forEach(option => {
+            const shift = window.PBS_SECTION_SHIFT_FILTER || 'all';
+            const year = window.PBS_SECTION_YEAR_FILTER || 'all';
+            const search = (pickerSearch?.value || '').trim().toLowerCase();
+            const options = Array.from(headerSection.options).filter(option => option.value);
+            const sectionMatchesDept = section => !deptId || section.dataset.deptId === deptId;
+            const sectionMatchesShift = section => shift === 'all' || (shift === 'evening' ? section.dataset.isEvening === '1' : section.dataset.isEvening !== '1');
+            const sectionMatchesYear = section => year === 'all' || String(section.dataset.year || '') === year;
+
+            options.forEach(option => {
                 if (!option.value) return;
-                const show = !deptId || option.dataset.deptId === deptId;
+                const show = sectionMatchesDept(option) && sectionMatchesShift(option) && sectionMatchesYear(option);
                 option.hidden = !show;
                 option.style.display = show ? '' : 'none';
             });
             if (headerSection.selectedOptions[0]?.hidden) headerSection.value = '';
+
+            let visibleRowCount = 0;
+            sectionRows.forEach(row => {
+                const show = sectionMatchesDept(row) && sectionMatchesShift(row) && sectionMatchesYear(row)
+                    && (!search || row.dataset.search.includes(search));
+                row.classList.toggle('hidden', !show);
+                visibleRowCount += show ? 1 : 0;
+            });
+            sectionGroups.forEach(group => {
+                const visible = group.querySelectorAll('[data-section-option]:not(.hidden)').length;
+                group.classList.toggle('hidden', visible === 0);
+                const count = document.getElementById(`section-group-count-${group.dataset.sectionGroup}`);
+                if (count) count.textContent = String(visible);
+            });
+            noSectionResults?.classList.toggle('hidden', visibleRowCount > 0);
+
+            const shiftCounts = {
+                all: options.filter(option => sectionMatchesDept(option) && sectionMatchesYear(option)).length,
+                day: options.filter(option => sectionMatchesDept(option) && sectionMatchesYear(option) && option.dataset.isEvening !== '1').length,
+                evening: options.filter(option => sectionMatchesDept(option) && sectionMatchesYear(option) && option.dataset.isEvening === '1').length,
+            };
+            Object.entries(shiftCounts).forEach(([key, count]) => {
+                const node = document.getElementById(`section-filter-count-${key}`);
+                if (node) node.textContent = String(count);
+            });
+
+            const years = ['all', '1', '2', '3', '4', '5'];
+            years.forEach(key => {
+                const count = options.filter(option => sectionMatchesDept(option) && sectionMatchesShift(option)
+                    && (key === 'all' || String(option.dataset.year || '') === key)).length;
+                const node = document.getElementById(`section-year-count-${key}`);
+                if (node) node.textContent = String(count);
+            });
+
+            document.querySelectorAll('[data-section-shift-filter]').forEach(button => {
+                const active = button.dataset.sectionShiftFilter === shift;
+                button.setAttribute('aria-pressed', String(active));
+                button.classList.toggle('bg-white', active);
+                button.classList.toggle('text-slate-800', active);
+                button.classList.toggle('shadow-sm', active);
+                button.classList.toggle('text-slate-500', !active);
+            });
+            document.querySelectorAll('[data-section-year-filter]').forEach(button => {
+                const active = button.dataset.sectionYearFilter === year;
+                button.setAttribute('aria-pressed', String(active));
+                button.classList.toggle('border-blue-200', active);
+                button.classList.toggle('bg-blue-50', active);
+                button.classList.toggle('text-blue-700', active);
+                button.classList.toggle('border-slate-200', !active);
+                button.classList.toggle('bg-white', !active);
+                button.classList.toggle('text-slate-500', !active);
+            });
         };
         headerDept.addEventListener('change', filterSections);
+        pickerSearch?.addEventListener('input', filterSections);
         filterSections();
+
+        const setPickerFilter = (kind, value) => {
+            const previousSection = headerSection.value;
+            if (kind === 'shift') window.PBS_SECTION_SHIFT_FILTER = value;
+            else window.PBS_SECTION_YEAR_FILTER = value;
+            filterSections();
+
+            if (previousSection && !headerSection.value) {
+                applyFilters();
+                return;
+            }
+            const params = new URLSearchParams(window.location.search);
+            const key = kind === 'shift' ? 'section_shift' : 'section_year';
+            value === 'all' ? params.delete(key) : params.set(key, value);
+            const query = params.toString();
+            window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+        };
+
+        document.querySelectorAll('[data-section-shift-filter]').forEach(button => {
+            button.addEventListener('click', () => setPickerFilter('shift', button.dataset.sectionShiftFilter || 'all'));
+        });
+        document.querySelectorAll('[data-section-year-filter]').forEach(button => {
+            button.addEventListener('click', () => setPickerFilter('year', button.dataset.sectionYearFilter || 'all'));
+        });
+
+        pickerTrigger?.addEventListener('click', () => {
+            const opening = pickerMenu?.classList.contains('hidden') ?? false;
+            pickerMenu?.classList.toggle('hidden', !opening);
+            pickerTrigger.setAttribute('aria-expanded', String(opening));
+            if (opening) pickerSearch?.focus();
+        });
+        sectionRows.forEach(row => {
+            row.addEventListener('click', () => {
+                headerSection.value = row.dataset.sectionId || '';
+                const option = headerSection.selectedOptions[0];
+                const label = document.getElementById('pbs-section-picker-label');
+                const shiftLabel = document.getElementById('pbs-section-picker-shift');
+                if (label) label.textContent = option?.textContent.trim() || 'Select section';
+                if (shiftLabel) shiftLabel.textContent = option?.dataset.isEvening === '1' ? 'Evening' : 'Day';
+                pickerMenu?.classList.add('hidden');
+                pickerTrigger?.setAttribute('aria-expanded', 'false');
+                applyFilters();
+            });
+        });
+        document.addEventListener('click', event => {
+            if (picker && !picker.contains(event.target)) {
+                pickerMenu?.classList.add('hidden');
+                pickerTrigger?.setAttribute('aria-expanded', 'false');
+            }
+        });
+        pickerMenu?.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                pickerMenu.classList.add('hidden');
+                pickerTrigger?.setAttribute('aria-expanded', 'false');
+                pickerTrigger?.focus();
+            }
+        });
     }
 
     const addDept = document.getElementById('add-department');

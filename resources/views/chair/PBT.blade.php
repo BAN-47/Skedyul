@@ -92,7 +92,11 @@
         {{-- ══════════ MAIN ══════════ --}}
         <div class="app-main">
 
-            @include('partials.chair_header', ['title' => 'Program By Teacher (PBT)'])
+            @include('partials.chair_header', [
+                'title' => 'Program by Teacher (PBT)',
+                'collegeContext' => $chairDepartment?->department?->college_name,
+                'contextTag' => collect([$chairDepartment?->dept_code, $activeSemester?->ay_academic_year, $activeSemester?->sem_name])->filter()->implode(' · '),
+            ])
 
             <div class="page-content" id="page-pbt">
 
@@ -708,9 +712,9 @@
                 </div>
 
                 {{-- ── SECTION (triggers subject filter) ── --}}
-                <div class="mb-3" id="add-single-section-wrap">
+                <div class="relative mb-3" id="add-single-section-wrap" data-pbt-section-picker>
                     <label class="field-label">Section</label>
-                    <select id="add-section" class="field-input"
+                    <select id="add-section" class="sr-only"
                         onchange="filterSubjectsBySection('add-section', 'add-subject')">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
@@ -720,6 +724,23 @@
                             </option>
                         @endforeach
                     </select>
+                    <button type="button" data-pbt-section-trigger aria-expanded="false" class="field-input flex w-full items-center justify-between text-left">
+                        <span data-pbt-section-label>-- Select Section --</span><span aria-hidden="true">⌄</span>
+                    </button>
+                    <div data-pbt-section-panel class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                        <input type="search" data-pbt-section-search placeholder="Search sections..." class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
+                        <div class="mb-2 flex gap-1" role="group" aria-label="Filter sections by shift">
+                            <button type="button" data-pbt-shift="all" class="rounded border px-2 py-1 text-[10px]">All <span data-pbt-shift-count="all"></span></button>
+                            <button type="button" data-pbt-shift="day" class="rounded border px-2 py-1 text-[10px]">Day <span data-pbt-shift-count="day"></span></button>
+                            <button type="button" data-pbt-shift="evening" class="rounded border px-2 py-1 text-[10px]">Evening <span data-pbt-shift-count="evening"></span></button>
+                        </div>
+                        <div class="mb-2 flex flex-wrap gap-1" role="group" aria-label="Filter sections by year">
+                            @foreach ([['all', 'All years'], ['1', '1st'], ['2', '2nd'], ['3', '3rd'], ['4', '4th'], ['5', '5th']] as [$yearFilter, $yearText])
+                                <button type="button" data-pbt-year="{{ $yearFilter }}" class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span data-pbt-year-count="{{ $yearFilter }}"></span></button>
+                            @endforeach
+                        </div>
+                        <div data-pbt-section-options class="max-h-48 overflow-y-auto"></div>
+                    </div>
                 </div>
                 <div class="mb-3 hidden" id="add-ojt-sections-wrap">
                     <span class="field-label">Year 4 sections <span
@@ -882,9 +903,9 @@
                 <input type="hidden" id="edit-id">
 
                 {{-- SECTION (triggers subject filter) --}}
-                <div class="mb-3">
+                <div class="relative mb-3" data-pbt-section-picker>
                     <label class="field-label">Section</label>
-                    <select id="edit-section" class="field-input">
+                    <select id="edit-section" class="sr-only">
                         <option value="">-- Select Section --</option>
                         @foreach ($sections as $sec)
                             <option value="{{ $sec->sec_id }}" data-dept-id="{{ $sec->sec_dept_id }}"
@@ -893,6 +914,23 @@
                             </option>
                         @endforeach
                     </select>
+                    <button type="button" data-pbt-section-trigger aria-expanded="false" class="field-input flex w-full items-center justify-between text-left">
+                        <span data-pbt-section-label>-- Select Section --</span><span aria-hidden="true">⌄</span>
+                    </button>
+                    <div data-pbt-section-panel class="absolute z-50 mt-1 hidden w-[min(100%,420px)] rounded-lg border border-slate-200 bg-white p-2 shadow-xl">
+                        <input type="search" data-pbt-section-search placeholder="Search sections..." class="mb-2 w-full rounded-md border border-slate-200 px-2.5 py-2 text-xs outline-none focus:border-indigo-400">
+                        <div class="mb-2 flex gap-1" role="group" aria-label="Filter sections by shift">
+                            <button type="button" data-pbt-shift="all" class="rounded border px-2 py-1 text-[10px]">All <span data-pbt-shift-count="all"></span></button>
+                            <button type="button" data-pbt-shift="day" class="rounded border px-2 py-1 text-[10px]">Day <span data-pbt-shift-count="day"></span></button>
+                            <button type="button" data-pbt-shift="evening" class="rounded border px-2 py-1 text-[10px]">Evening <span data-pbt-shift-count="evening"></span></button>
+                        </div>
+                        <div class="mb-2 flex flex-wrap gap-1" role="group" aria-label="Filter sections by year">
+                            @foreach ([['all', 'All years'], ['1', '1st'], ['2', '2nd'], ['3', '3rd'], ['4', '4th'], ['5', '5th']] as [$yearFilter, $yearText])
+                                <button type="button" data-pbt-year="{{ $yearFilter }}" class="rounded-full border px-2 py-1 text-[9px]">{{ $yearText }} <span data-pbt-year-count="{{ $yearFilter }}"></span></button>
+                            @endforeach
+                        </div>
+                        <div data-pbt-section-options class="max-h-48 overflow-y-auto"></div>
+                    </div>
                 </div>
 
                 {{-- SUBJECT + CATEGORY --}}
