@@ -249,6 +249,16 @@ class PbtController extends Controller
             'chairDepartment'  => $chairDepartment,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
+                ->where(function ($query) {
+                    $query->where('s.sem_is_active', true)
+                        ->orWhereNull('s.sem_ay_id')
+                        ->orWhere('ay.ay_is_active', false)
+                        ->orWhere(function ($advance) {
+                            $advance->where('ay.ay_is_active', true)
+                                ->where('s.sem_name', '2nd Semester')
+                                ->where('s.sem_is_plotting_enabled', true);
+                        });
+                })
                 ->orderByDesc('s.sem_start_date')
                 ->select([
                     's.sem_id',

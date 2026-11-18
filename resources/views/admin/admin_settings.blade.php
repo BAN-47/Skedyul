@@ -195,6 +195,8 @@
                                 <span class="badge badge-green">Current</span>
                               @elseif($reviewIsPlotting)
                                 <span class="badge badge-blue">Advance plotting</span>
+                              @elseif($reviewYear->ay_is_active && $reviewSemester->sem_name === '2nd Semester' && ($activeSemester->sem_name ?? null) === '1st Semester')
+                                <span class="badge badge-grey">Advance plotting off</span>
                               @elseif(!$reviewYear->ay_is_active)
                                 <span class="badge badge-grey">Archived · View only</span>
                               @else
