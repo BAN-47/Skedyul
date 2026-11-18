@@ -303,8 +303,7 @@
                                 @endforeach
                             </select>
 
-                            <div id="pbs-section-picker" class="relative">
-                                <span class="mr-1 text-[11px] font-medium text-slate-500">Section:</span>
+                            <div id="pbs-section-picker" class="relative order-3">
                                 <button type="button" id="pbs-section-picker-trigger" aria-haspopup="dialog"
                                     aria-expanded="false" aria-controls="pbs-section-picker-menu"
                                     class="flex min-w-[180px] items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
@@ -434,7 +433,7 @@
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase border-l border-slate-300">Evening</button>
                             </div>
 
-                            <div class="ml-auto text-[11px] text-slate-400 italic">
+                            <div class="order-4 ml-auto text-[11px] text-slate-400 italic">
                                 Click an empty time slot below to add a schedule
                             </div>
                         </div>
