@@ -15,13 +15,14 @@ function populateSubjectOptions(select, category, sectionId, departmentId) {
     const section = document.getElementById(sectionId);
     const selectedSection = section?.options[section.selectedIndex];
     const year = selectedSection?.dataset.yearLevel || '';
+    const department = selectedSection?.dataset.deptId || document.getElementById(departmentId)?.value || '';
     const semester = String(getSelectedCourseSemester() || '');
     const subjects = (window.ALL_SUBJECTS_LIST || []).filter(subject => {
-        // Courses are global; the target section's year and selected term remain filters.
-        if (category) return String(subject.cat) === String(category);
-        const yearMatch = !year || !subject.year || String(subject.year) === String(year);
-        const semMatch = subject.code === 'REC' || !semester || !subject.sem || String(subject.sem) === semester;
-        return yearMatch && semMatch;
+        const departmentMatch = !department || String(subject.dept) === String(department);
+        const yearMatch = !year || String(subject.year) === String(year);
+        const semMatch = subject.code === 'REC' || !semester || String(subject.sem) === semester;
+        const categoryMatch = !category || String(subject.cat) === String(category);
+        return departmentMatch && yearMatch && semMatch && categoryMatch;
     });
 
     select.innerHTML = '<option value="">-- Select Subject --</option>';

@@ -221,7 +221,8 @@ class PbsController extends Controller
                 ->get();
         }
 
-        // Courses for this department, filtered by section year + active semester + category
+        // Keep category choices global; filter the subject list by selected
+        // section department/year, active semester, and optional category.
         // course_year_level: 1–4 | course_semester: 1 = 1st sem, 2 = 2nd sem
         $selectedCategory = $request->query('category');
 
@@ -229,23 +230,25 @@ class PbsController extends Controller
             ->where('course_is_active', true)
             ->orderBy('course_code');
 
+        if ($selectedSection?->sec_dept_id) {
+            $subjectsQuery->where('course_dept_id', $selectedSection->sec_dept_id);
+        }
+        if (!empty($selectedSection?->sec_year_level)) {
+            $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
+        }
+
+        $semNum = null;
+        $semName = strtolower((string) ($activeSem->sem_name ?? ''));
+        if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
+            $semNum = 2;
+        } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
+            $semNum = 1;
+        }
+        if ($semNum !== null) {
+            $subjectsQuery->where('course_semester', $semNum);
+        }
         if (!empty($selectedCategory)) {
             $subjectsQuery->where('course_category', $selectedCategory);
-        } else {
-            if (!empty($selectedSection?->sec_year_level)) {
-                $subjectsQuery->where('course_year_level', (int) $selectedSection->sec_year_level);
-            }
-
-            $semNum = null;
-            $semName = strtolower((string) ($activeSem->sem_name ?? ''));
-            if (str_contains($semName, '2nd') || str_contains($semName, 'second')) {
-                $semNum = 2;
-            } elseif (str_contains($semName, '1st') || str_contains($semName, 'first')) {
-                $semNum = 1;
-            }
-            if ($semNum !== null) {
-                $subjectsQuery->where('course_semester', $semNum);
-            }
         }
 
         $subjects = $subjectsQuery->get();
