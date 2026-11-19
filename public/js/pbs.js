@@ -1260,8 +1260,8 @@ async function saveSectionCount() {
         showToast("Select a section to save its student count.");
         return;
     }
-    if (count === null || !Number.isInteger(count) || count < 0) {
-        showToast("Enter a valid non-negative student count.");
+    if (count === null || !Number.isInteger(count) || count < 0 || count > 500) {
+        showToast("Enter a whole number of students from 0 to 500.");
         return;
     }
 
@@ -1288,7 +1288,8 @@ async function saveSectionCount() {
         if (input && data.sec_no_of_student != null) {
             input.value = data.sec_no_of_student;
         }
-        showToast("Student count saved.");
+        showToast(data.message || "Student count saved.");
+        setTimeout(() => window.location.reload(), 350);
     } catch (e) {
         showToast("Network error saving student count.");
     }

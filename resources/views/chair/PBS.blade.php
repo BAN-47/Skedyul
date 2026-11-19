@@ -191,6 +191,7 @@
                                 <div class="px-2 py-1 border-l border-slate-200">
                                     <input type="number" id="section-student-count" min="0" max="500"
                                         step="1"
+                                        onkeydown="if (event.key === 'Enter') { event.preventDefault(); saveSectionCount(); }"
                                         class="w-full max-w-[72px] rounded border border-slate-300 px-2 py-0.5 text-[12px] font-extrabold text-slate-900"
                                         placeholder="50" value="{{ $studentCount ?? '' }}"
                                         {{ empty($selectedSection) ? 'disabled' : '' }}
@@ -311,7 +312,7 @@
                                 @endforeach
                             </select>
 
-                            <div id="pbs-section-picker" class="relative order-4">
+                            <div id="pbs-section-picker" class="relative order-5">
                                 <button type="button" id="pbs-section-picker-trigger" aria-haspopup="dialog"
                                     aria-expanded="false" aria-controls="pbs-section-picker-menu"
                                     class="flex min-w-[180px] items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
@@ -329,7 +330,7 @@
                                     </svg>
                                 </button>
                                 <div id="pbs-section-picker-menu" role="dialog" aria-label="Choose a section"
-                                    class="absolute left-0 top-full z-[120] mt-2 hidden w-[min(92vw,440px)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                    class="absolute right-0 top-full z-[120] mt-2 hidden max-h-[min(80vh,680px)] w-[min(92vw,440px)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                                     <div class="border-b border-slate-100 p-3">
                                         <label for="pbs-section-search" class="sr-only">Search sections</label>
                                         <input id="pbs-section-search" type="search"
@@ -363,7 +364,7 @@
                                             @endforeach
                                         </div>
                                     </div>
-                                    <div id="pbs-section-list" class="max-h-[340px] overflow-y-auto p-2">
+                                    <div id="pbs-section-list" class="max-h-[min(42vh,340px)] overflow-y-auto p-2">
                                         @foreach ([['day', 'Day Sections'], ['evening', 'Evening Sections']] as [$sectionGroup, $sectionGroupLabel])
                                             <section data-section-group="{{ $sectionGroup }}" class="mb-2 last:mb-0">
                                                 <div
@@ -448,7 +449,7 @@
                                 </select>
                             </div>
 
-                            <div class="order-5 flex self-end overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                            <div class="order-4 flex self-end overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                                 <button type="button" id="shift-day" onclick="setShift('day')"
                                     class="px-2.5 py-1.5 text-[11px] font-bold uppercase">Day</button>
                                 <button type="button" id="shift-night" onclick="setShift('night')"
@@ -1149,53 +1150,6 @@
             });
         </script>
     @endif
-
-
-    <script>
-        function saveSectionStudents() {
-            const sectionId = document.getElementById('filter-section')?.value || '';
-            const input = document.getElementById('section-student-count');
-            const count = input ? parseInt(input.value, 10) : NaN;
-
-            if (!sectionId) {
-                showToast('Select a section first.');
-                return;
-            }
-            if (Number.isNaN(count) || count < 0) {
-                showToast('Enter a valid number of students (0 or more).');
-                return;
-            }
-
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-            fetch('{{ route('chair.pbs.section.students') }}', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': csrf,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        sec_id: sectionId,
-                        sec_no_of_student: count,
-                    }),
-                })
-                .then(async (res) => {
-                    const data = await res.json().catch(() => ({}));
-                    if (!res.ok || !data.success) {
-                        showToast(data.message || 'Could not save student count');
-                        return;
-                    }
-                    showToast(data.message || 'Student count saved');
-                    if (input && data.sec_no_of_student != null) {
-                        input.value = data.sec_no_of_student;
-                    }
-                })
-                .catch(() => showToast('Network error saving student count'));
-        }
-    </script>
-
 
 
     <script>
