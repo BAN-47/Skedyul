@@ -944,13 +944,37 @@
 
                 <div class="mb-3">
                     <label class="field-label">Professor</label>
-                    <select id="edit-faculty" class="field-input">
-                        <option value="">-- Select Professor --</option>
-                        @foreach ($faculty as $f)
-                            <option value="{{ $f->fac_id }}">{{ $f->fac_first_name }} {{ $f->fac_last_name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <div class="relative" id="pbs-edit-teacher-picker">
+                        <input type="hidden" id="edit-faculty" value="">
+                        <button type="button" id="pbs-edit-teacher-trigger" onclick="togglePbsEditTeacherPicker()"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-[13px] font-semibold text-slate-600 shadow-sm transition hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                            <span id="pbs-edit-teacher-label" class="block truncate">Choose a professor</span>
+                            <span aria-hidden="true" class="text-slate-400">⌄</span>
+                        </button>
+                        <div id="pbs-edit-teacher-panel"
+                            class="hidden absolute left-0 top-[calc(100%+6px)] z-[70] w-full min-w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+                            <div class="border-b border-slate-100 bg-slate-50 p-3">
+                                <div class="mb-2 text-sm font-bold text-slate-800">Select a professor</div>
+                                <input id="pbs-edit-teacher-search" type="search" oninput="filterPbsEditTeachers(this.value)"
+                                    placeholder="Search by name..." autocomplete="off" aria-label="Search professors"
+                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                            </div>
+                            <div id="pbs-edit-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
+                                @foreach ($faculty as $f)
+                                    @php $professorName = \App\Services\FacultyNameFormatter::format($f); @endphp
+                                    <button type="button" role="option" aria-selected="false"
+                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}" data-label="{{ $professorName }}"
+                                        onclick="selectPbsEditTeacher(this)"
+                                        class="pbs-edit-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
+                                        <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
+                                        <span class="pbs-edit-teacher-check hidden text-sm font-bold text-indigo-600" aria-hidden="true">✓</span>
+                                    </button>
+                                @endforeach
+                                <div id="pbs-edit-teacher-empty" class="hidden px-3 py-6 text-center text-[13px] text-slate-500">No professors match that search.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mb-3">

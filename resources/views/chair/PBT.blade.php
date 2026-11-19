@@ -21,6 +21,13 @@
         $facultyPartTime = $facultyPartTime ?? collect();
         $deans = $deans ?? collect();
         $facultyChairs = $facultyChairs ?? collect();
+        $editableFaculty = collect($facultyFullTime)
+            ->concat($facultyPartTime)
+            ->concat($facultyChairs)
+            ->concat($deans)
+            ->unique('fac_id')
+            ->sortBy('fac_last_name')
+            ->values();
         $sections = $sections ?? collect();
         $programs = $programs ?? collect();
         $semesters = $semesters ?? collect();
@@ -610,6 +617,7 @@
                                             data-schedule-id="{{ $s->sch_id }}"
                                             data-subject="{{ $s->sch_subj_id }}" data-section="{{ $s->sch_sec_id }}"
                                             data-department="{{ $s->section?->sec_dept_id ?? ($course?->course_dept_id ?? '') }}"
+                                            data-faculty="{{ $s->sch_fac_id }}"
                                             data-room="{{ $s->sch_room_id }}" data-semester="{{ $s->sch_sem_id }}"
                                             data-day="{{ $s->sch_day }}"
                                             data-start="{{ substr($s->sch_start_time, 0, 5) }}"
@@ -716,10 +724,8 @@
                     <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
                 </div>
 
-                <div
-                    class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
-                    Teacher: <span
-                        class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
+                <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
+                    Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
                 </div>
 
                 <div class="mb-3">
@@ -916,12 +922,6 @@
                     <input type="hidden" id="edit-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
                 </div>
 
-                <div
-                    class="mb-3 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-[12.5px] text-slate-600">
-                    Teacher: <span
-                        class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
-                </div>
-
                 <div class="mb-3">
                     <label class="field-label">Department</label>
                     <select id="edit-department" class="field-input w-full">
@@ -932,6 +932,40 @@
                             </option>
                         @endforeach
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="field-label">Professor</label>
+                    <div class="relative" id="pbt-edit-teacher-picker">
+                        <input type="hidden" id="edit-faculty" value="">
+                        <button type="button" id="pbt-edit-teacher-trigger" onclick="togglePbtEditTeacherPicker()"
+                            aria-haspopup="listbox" aria-expanded="false"
+                            class="field-input flex w-full items-center justify-between text-left">
+                            <span id="pbt-edit-teacher-label" class="block truncate">Choose a professor</span>
+                            <span aria-hidden="true" class="text-slate-400">⌄</span>
+                        </button>
+                        <div id="pbt-edit-teacher-panel"
+                            class="absolute left-0 top-[calc(100%+6px)] z-[70] hidden w-full min-w-[260px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                            <div class="border-b border-slate-100 bg-slate-50 p-3">
+                                <input id="pbt-edit-teacher-search" type="search" oninput="filterPbtEditTeachers(this.value)"
+                                    placeholder="Search professors..." autocomplete="off" aria-label="Search professors"
+                                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                            </div>
+                            <div id="pbt-edit-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
+                                @foreach ($editableFaculty as $person)
+                                    @php $professorName = \App\Services\FacultyNameFormatter::format($person); @endphp
+                                    <button type="button" role="option" aria-selected="false"
+                                        data-id="{{ $person->fac_id }}" data-name="{{ strtolower($professorName) }}"
+                                        data-label="{{ $professorName }}" onclick="selectPbtEditTeacher(this)"
+                                        class="pbt-edit-teacher-option flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50">
+                                        <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
+                                        <span class="pbt-edit-teacher-check hidden font-bold text-indigo-600" aria-hidden="true">✓</span>
+                                    </button>
+                                @endforeach
+                                <div id="pbt-edit-teacher-empty" class="hidden px-3 py-5 text-center text-sm text-slate-500">No professors match that search.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <input type="hidden" id="edit-id">

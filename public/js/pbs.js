@@ -231,6 +231,48 @@ function selectPbsTeacher(option) {
         .setAttribute("aria-expanded", "false");
 }
 
+function setPbsEditTeacher(facultyId) {
+    const option = [...document.querySelectorAll(".pbs-edit-teacher-option")]
+        .find((item) => item.dataset.id === String(facultyId || ""));
+    const input = document.getElementById("edit-faculty");
+    const label = document.getElementById("pbs-edit-teacher-label");
+    if (input) input.value = option?.dataset.id || "";
+    if (label) label.textContent = option?.dataset.label || "Choose a professor";
+    document.querySelectorAll(".pbs-edit-teacher-option").forEach((item) => {
+        const selected = item === option;
+        item.setAttribute("aria-selected", String(selected));
+        item.classList.toggle("bg-indigo-50", selected);
+        item.querySelector(".pbs-edit-teacher-check")?.classList.toggle("hidden", !selected);
+    });
+}
+
+function togglePbsEditTeacherPicker() {
+    const panel = document.getElementById("pbs-edit-teacher-panel");
+    const trigger = document.getElementById("pbs-edit-teacher-trigger");
+    if (!panel || !trigger) return;
+    panel.classList.toggle("hidden");
+    trigger.setAttribute("aria-expanded", String(!panel.classList.contains("hidden")));
+    if (!panel.classList.contains("hidden")) {
+        const search = document.getElementById("pbs-edit-teacher-search");
+        search.value = "";
+        filterPbsEditTeachers("");
+        setTimeout(() => search.focus(), 30);
+    }
+}
+
+function filterPbsEditTeachers(query) {
+    const q = query.trim().toLowerCase();
+    const options = [...document.querySelectorAll(".pbs-edit-teacher-option")];
+    options.forEach((option) => { option.style.display = option.dataset.name.includes(q) ? "" : "none"; });
+    document.getElementById("pbs-edit-teacher-empty")?.classList.toggle("hidden", options.some((option) => option.style.display !== "none"));
+}
+
+function selectPbsEditTeacher(option) {
+    setPbsEditTeacher(option.dataset.id);
+    document.getElementById("pbs-edit-teacher-panel")?.classList.add("hidden");
+    document.getElementById("pbs-edit-teacher-trigger")?.setAttribute("aria-expanded", "false");
+}
+
 document.addEventListener("click", (event) => {
     const picker = document.getElementById("pbs-teacher-picker");
     if (!picker || picker.contains(event.target)) return;
@@ -238,6 +280,13 @@ document.addEventListener("click", (event) => {
     document
         .getElementById("pbs-teacher-trigger")
         ?.setAttribute("aria-expanded", "false");
+});
+
+document.addEventListener("click", (event) => {
+    const picker = document.getElementById("pbs-edit-teacher-picker");
+    if (picker?.contains(event.target)) return;
+    document.getElementById("pbs-edit-teacher-panel")?.classList.add("hidden");
+    document.getElementById("pbs-edit-teacher-trigger")?.setAttribute("aria-expanded", "false");
 });
 
 /*
@@ -1033,7 +1082,7 @@ function openEditModal(block) {
     // Filter subjects by section year level first, then set the subject
     filterSubjectsBySection("edit-section", "edit-subject");
     document.getElementById("edit-subject").value = block.dataset.subject || "";
-    document.getElementById("edit-faculty").value = block.dataset.faculty || "";
+    setPbsEditTeacher(block.dataset.faculty || "");
     document.getElementById("edit-day").value = block.dataset.day || "";
     document.getElementById("edit-start").value = block.dataset.start || "";
     document.getElementById("edit-end").value = block.dataset.end || "";

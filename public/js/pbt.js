@@ -211,6 +211,55 @@ function selectTeacher(facultyId) {
     window.location.search = params.toString();
 }
 
+function setPbtEditTeacher(facultyId) {
+    const option = [...document.querySelectorAll(".pbt-edit-teacher-option")]
+        .find((item) => item.dataset.id === String(facultyId || ""));
+    const input = document.getElementById("edit-faculty");
+    const label = document.getElementById("pbt-edit-teacher-label");
+    if (input) input.value = option?.dataset.id || "";
+    if (label) label.textContent = option?.dataset.label || "Choose a professor";
+    document.querySelectorAll(".pbt-edit-teacher-option").forEach((item) => {
+        const selected = item === option;
+        item.setAttribute("aria-selected", String(selected));
+        item.classList.toggle("bg-indigo-50", selected);
+        item.querySelector(".pbt-edit-teacher-check")?.classList.toggle("hidden", !selected);
+    });
+}
+
+function togglePbtEditTeacherPicker() {
+    const panel = document.getElementById("pbt-edit-teacher-panel");
+    const trigger = document.getElementById("pbt-edit-teacher-trigger");
+    if (!panel || !trigger) return;
+    panel.classList.toggle("hidden");
+    trigger.setAttribute("aria-expanded", String(!panel.classList.contains("hidden")));
+    if (!panel.classList.contains("hidden")) {
+        const search = document.getElementById("pbt-edit-teacher-search");
+        search.value = "";
+        filterPbtEditTeachers("");
+        setTimeout(() => search.focus(), 30);
+    }
+}
+
+function filterPbtEditTeachers(query) {
+    const q = query.trim().toLowerCase();
+    const options = [...document.querySelectorAll(".pbt-edit-teacher-option")];
+    options.forEach((option) => { option.style.display = option.dataset.name.includes(q) ? "" : "none"; });
+    document.getElementById("pbt-edit-teacher-empty")?.classList.toggle("hidden", options.some((option) => option.style.display !== "none"));
+}
+
+function selectPbtEditTeacher(option) {
+    setPbtEditTeacher(option.dataset.id);
+    document.getElementById("pbt-edit-teacher-panel")?.classList.add("hidden");
+    document.getElementById("pbt-edit-teacher-trigger")?.setAttribute("aria-expanded", "false");
+}
+
+document.addEventListener("click", (event) => {
+    const picker = document.getElementById("pbt-edit-teacher-picker");
+    if (picker?.contains(event.target)) return;
+    document.getElementById("pbt-edit-teacher-panel")?.classList.add("hidden");
+    document.getElementById("pbt-edit-teacher-trigger")?.setAttribute("aria-expanded", "false");
+});
+
 /* ── filters / date nav ── */
 function applyFilters() {
     syncSelectedSemesterFields();
@@ -918,6 +967,7 @@ function openEditModal(block) {
     clearInlineError("edit-error");
     syncSelectedSemesterFields();
     document.getElementById("edit-id").value = block.dataset.scheduleId;
+    setPbtEditTeacher(block.dataset.faculty || SELECTED_TEACHER);
     const departmentSelect = document.getElementById("edit-department");
     if (departmentSelect) {
         departmentSelect.value = block.dataset.department || "";
@@ -944,7 +994,7 @@ function submitEdit() {
     const id = document.getElementById("edit-id").value;
     const payload = {
         subj_id: document.getElementById("edit-subject").value,
-        fac_id: SELECTED_TEACHER,
+        fac_id: document.getElementById("edit-faculty")?.value || "",
         sem_id: document.getElementById("filter-semester")?.value || "",
         prog_id:
             document.getElementById("edit-department")?.value || "",
@@ -957,6 +1007,13 @@ function submitEdit() {
         description: document.getElementById("edit-description").value,
         _method: "PUT",
     };
+
+    if (!payload.fac_id) {
+        const message = "Please select a professor.";
+        showToast(message);
+        showInlineError("edit-error", message);
+        return;
+    }
 
     if (payload.end_time <= payload.start_time) {
         const message = "End time must be later than start time.";
@@ -990,7 +1047,11 @@ function submitEdit() {
             if (data.success) {
                 closeModal("modal-edit-schedule");
                 showToast(data.message || "Schedule updated.");
-                setTimeout(() => location.reload(), 800);
+                setTimeout(() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set("faculty", payload.fac_id);
+                    window.location.search = params.toString();
+                }, 800);
             } else {
                 handleScheduleError(data, "edit-error");
                 setButtonLoading(btn, false);

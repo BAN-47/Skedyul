@@ -264,10 +264,16 @@ class PbtController extends Controller
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->when($selectedAcademicYearId, fn ($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))
-                ->where(function ($query) {
+                ->where(function ($query) use ($officialSemesterName) {
                     $query->where('s.sem_is_active', true)
                         ->orWhereNull('s.sem_ay_id')
                         ->orWhere('ay.ay_is_active', false)
+                        ->orWhere(function ($previousSemester) use ($officialSemesterName) {
+                            $previousSemester->where('ay.ay_is_active', true)
+                                ->where('s.sem_name', '1st Semester')
+                                ->where('s.sem_is_active', false)
+                                ->whereRaw('? = ?', [$officialSemesterName, '2nd Semester']);
+                        })
                         ->orWhere(function ($advance) {
                             $advance->where('ay.ay_is_active', true)
                                 ->where('s.sem_name', '2nd Semester')
@@ -292,6 +298,8 @@ class PbtController extends Controller
                     if (!empty($sem->sem_is_active)) {
                         $label .= ' (Current)';
                     } elseif (isset($sem->ay_is_active) && !(bool) $sem->ay_is_active) {
+                        $label .= ' (Archived · View only)';
+                    } elseif ($sem->sem_name === '1st Semester' && $officialSemesterName === '2nd Semester') {
                         $label .= ' (Archived · View only)';
                     } elseif ((bool) ($sem->ay_is_active ?? false)
                         && $sem->sem_name === '2nd Semester'
