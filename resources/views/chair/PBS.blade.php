@@ -107,8 +107,6 @@
                 {{-- HEADING + ACTIONS --}}
                 <div class="flex items-center justify-end gap-3 mb-4">
                     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
-                        <button type="button" onclick="saveSectionCount()" class="btn btn-secondary">Save Section
-                            Count</button>
                         @php
                             $pbsStatus = $pbsSubmission?->schsub_status;
                             $canSubmitSelectedPbs =
