@@ -176,7 +176,7 @@ class AcademicYearManagementTest extends TestCase
         ]);
     }
 
-    public function test_second_semester_is_created_for_its_year_without_reassigning_another_years_record(): void
+    public function test_configuring_upcoming_second_semester_keeps_first_semester_current(): void
     {
         $this->actingAs($this->admin())
             ->putJson(route('admin.academic-year.update'), [
@@ -188,16 +188,12 @@ class AcademicYearManagementTest extends TestCase
         $this->assertDatabaseHas('semester', [
             'sem_id' => $this->firstSemesterId,
             'sem_ay_id' => $this->activeYearId,
-            'sem_is_active' => false,
+            'sem_is_active' => true,
         ]);
         $this->assertDatabaseHas('semester', [
             'sem_id' => $this->secondSemesterId,
             'sem_ay_id' => $this->activeYearId,
-            'sem_is_active' => true,
-            'sem_is_plotting_enabled' => true,
-        ]);
-        $this->assertDatabaseHas('semester', [
-            'sem_id' => $this->firstSemesterId,
+            'sem_is_active' => false,
             'sem_is_plotting_enabled' => false,
         ]);
         $this->assertSame(
@@ -208,16 +204,20 @@ class AcademicYearManagementTest extends TestCase
 
     public function test_automatic_semester_advance_uses_second_semester_from_the_same_year(): void
     {
-        $otherYearId = $this->insertYear('2026-2027', false);
+        $otherYearId = $this->insertYear('2024-2025', false);
         $otherYearSemesterId = $this->insertSemester(
             $otherYearId,
             '2nd Semester',
-            '2026-01-10',
-            '2026-05-30',
+            '2025-01-10',
+            '2025-05-30',
             false
         );
         DB::table('semester')->where('sem_id', $this->firstSemesterId)->update([
             'sem_end_date' => now()->subDay()->toDateString(),
+        ]);
+        DB::table('semester')->where('sem_id', $this->secondSemesterId)->update([
+            'sem_start_date' => now()->addDay()->toDateString(),
+            'sem_end_date' => now()->addMonths(6)->toDateString(),
         ]);
 
         $notice = AcademicYearController::autoAdvanceIfNeeded();

@@ -7,11 +7,20 @@ const SELECTED_TEACHER = window.PBT_SELECTED_TEACHER;
 function toggleCategoryPicker(key) {
     const picker = document.querySelector(`[data-category-picker="${key}"]`);
     const panel = picker?.querySelector('[data-category-panel]');
-    if (!picker || !panel) return;
+    const trigger = picker?.querySelector('button');
+    if (!picker || !panel || !trigger) return;
     const opening = panel.classList.contains('hidden');
     document.querySelectorAll('[data-category-panel]').forEach((item) => item.classList.add('hidden'));
     if (opening) {
         panel.classList.remove('hidden');
+        const rect = trigger.getBoundingClientRect();
+        Object.assign(panel.style, {
+            position: 'fixed',
+            top: `${Math.min(rect.bottom + 6, window.innerHeight - 220)}px`,
+            left: `${Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 220) - 8))}px`,
+            width: `${Math.min(Math.max(rect.width, 220), window.innerWidth - 16)}px`,
+            zIndex: '1100',
+        });
         const search = picker.querySelector('[data-category-search]');
         if (search) { search.value = ''; renderCategoryChoices(key); search.focus(); }
     }

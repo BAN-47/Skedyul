@@ -39,6 +39,7 @@ class FacultyScheduleSemesterTest extends TestCase
             $table->string('sem_name');
             $table->date('sem_start_date')->nullable();
             $table->boolean('sem_is_active')->default(false);
+            $table->boolean('sem_is_plotting_enabled')->default(false);
         });
         Schema::create('faculty', function (Blueprint $table) {
             $table->uuid('fac_id')->primary();
@@ -130,6 +131,7 @@ class FacultyScheduleSemesterTest extends TestCase
                 'sem_name' => '1st Semester',
                 'sem_start_date' => '2025-08-01',
                 'sem_is_active' => true,
+                'sem_is_plotting_enabled' => false,
             ],
             [
                 'sem_id' => $selectedSemesterId,
@@ -137,6 +139,7 @@ class FacultyScheduleSemesterTest extends TestCase
                 'sem_name' => '2nd Semester',
                 'sem_start_date' => '2026-01-01',
                 'sem_is_active' => false,
+                'sem_is_plotting_enabled' => true,
             ],
         ]);
         $currentCourseId = (string) Str::uuid();

@@ -72,10 +72,14 @@ class ChairTermScheduleIsolationTest extends TestCase
         });
         Schema::create('academic_year', function (Blueprint $table) {
             $table->uuid('ay_id')->primary();
+            $table->boolean('ay_is_active')->default(false);
         });
         Schema::create('semester', function (Blueprint $table) {
             $table->uuid('sem_id')->primary();
             $table->uuid('sem_ay_id')->nullable();
+            $table->string('sem_name')->nullable();
+            $table->boolean('sem_is_active')->default(false);
+            $table->boolean('sem_is_plotting_enabled')->default(false);
         });
         Schema::create('course', function (Blueprint $table) {
             $table->uuid('course_id')->primary();
@@ -126,7 +130,10 @@ class ChairTermScheduleIsolationTest extends TestCase
             'fac_college_id' => $this->collegeId,
             'fac_dept_id' => $this->departmentId,
         ]);
-        DB::table('academic_year')->insert(['ay_id' => $academicYearId]);
+        DB::table('academic_year')->insert([
+            'ay_id' => $academicYearId,
+            'ay_is_active' => true,
+        ]);
         DB::table('section')->insert([
             'sec_id' => $this->sectionId,
             'sec_dept_id' => $this->departmentId,
@@ -138,8 +145,18 @@ class ChairTermScheduleIsolationTest extends TestCase
             'course_lab_hours' => 0,
         ]);
         DB::table('semester')->insert([
-            ['sem_id' => $this->firstSemesterId, 'sem_ay_id' => $academicYearId],
-            ['sem_id' => $this->secondSemesterId, 'sem_ay_id' => $academicYearId],
+            [
+                'sem_id' => $this->firstSemesterId,
+                'sem_ay_id' => $academicYearId,
+                'sem_name' => '1st Semester',
+                'sem_is_active' => true,
+            ],
+            [
+                'sem_id' => $this->secondSemesterId,
+                'sem_ay_id' => $academicYearId,
+                'sem_name' => '2nd Semester',
+                'sem_is_active' => false,
+            ],
         ]);
         DB::table('study_load')->insert([
             [
