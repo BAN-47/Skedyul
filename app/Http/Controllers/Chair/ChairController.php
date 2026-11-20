@@ -56,6 +56,7 @@ class ChairController extends Controller
             : collect();
 
         $faculty = Faculty::with('user')
+            ->where('fac_is_placeholder', false)
             ->where(function ($q) use ($deptId, $programId, $assignedFacultyIds) {
                 if ($programId) {
                     // Program assignment is authoritative; tolerate an outdated
@@ -72,7 +73,7 @@ class ChairController extends Controller
 
         $totalFaculty = $faculty->count();
 
-        $studyLoadsByFaculty = Study_Load::with('subject')
+        $studyLoadsByFaculty = Study_Load::with(['subject', 'section', 'schedules'])
             ->whereIn('sl_fac_id', $faculty->pluck('fac_id'))
             ->when($semester, fn ($q) => $q->where('sl_sem_id', $semester->sem_id))
             ->get()
@@ -83,13 +84,13 @@ class ChairController extends Controller
             $allLoads = $studyLoadsByFaculty->get($f->fac_id, collect());
 
             $shifts = collect(['day', 'evening'])->mapWithKeys(function ($shift) use ($f, $allLoads) {
-                $loads = $allLoads->where('sl_shift', $shift);
-                $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f, $shift);
-                $shiftHours = (float) $loads->sum(
-                    fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
+                $loads = $allLoads->filter(fn ($load) =>
+                    ($load->section?->sec_is_evening ? 'evening' : ($load->sl_shift ?? 'day')) === $shift
                 );
+                $maxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($f, $shift);
+                $shiftHours = \App\Services\ScheduleAssignmentService::scheduledHoursForLoads($loads);
                 $combinedHours = $f->fac_employment_type === 'part_time'
-                    ? (float) $allLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
+                    ? \App\Services\ScheduleAssignmentService::scheduledHoursForLoads($allLoads)
                     : null;
                 $hoursAgainstLimit = $combinedHours ?? $shiftHours;
                 $remaining = max(0, $maxHours - $hoursAgainstLimit);

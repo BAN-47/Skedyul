@@ -27,6 +27,7 @@ class ExportPreviewController extends Controller
         ]);
 
         $faculty = Faculty::with(['user', 'program'])
+            ->where('fac_is_placeholder', false)
             ->where('fac_id', $data['faculty_id'])
             ->whereHas('user')
             ->firstOrFail();

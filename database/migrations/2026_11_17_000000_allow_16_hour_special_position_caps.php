@@ -27,6 +27,29 @@ return new class extends Migration
             )
         SQL);
 
+        // Keep existing faculty rows valid when their position is unset, and
+        // sync every supported position to the same cap used by the app.
+        DB::statement(<<<'SQL'
+            UPDATE public.faculty
+            SET fac_special_position_max_hours = CASE fac_special_position
+                WHEN 'Vice-President' THEN 3
+                WHEN 'University Director' THEN 6
+                WHEN 'Campus Director' THEN 6
+                WHEN 'UD Data Protection Officer' THEN 6
+                WHEN 'Assistant Campus Director' THEN 9
+                WHEN 'Dean of Instruction' THEN 9
+                WHEN 'College Dean' THEN 9
+                WHEN 'Associate College Dean' THEN 12
+                WHEN 'Department Chairperson' THEN 16
+                WHEN 'PERG Chair' THEN 16
+                WHEN 'Campus Secretary' THEN 16
+                WHEN 'College Secretary' THEN 16
+                WHEN 'Research Chair' THEN 16
+                WHEN 'MIS Officer' THEN 30
+                ELSE NULL
+            END
+        SQL);
+
         DB::statement(<<<'SQL'
             ALTER TABLE public.faculty
             ADD CONSTRAINT faculty_special_position_cap_check CHECK (
@@ -38,6 +61,7 @@ return new class extends Migration
                         WHEN 'Vice-President' THEN fac_special_position_max_hours = 3
                         WHEN 'University Director' THEN fac_special_position_max_hours = 6
                         WHEN 'Campus Director' THEN fac_special_position_max_hours = 6
+                        WHEN 'UD Data Protection Officer' THEN fac_special_position_max_hours = 6
                         WHEN 'Assistant Campus Director' THEN fac_special_position_max_hours = 9
                         WHEN 'Dean of Instruction' THEN fac_special_position_max_hours = 9
                         WHEN 'College Dean' THEN fac_special_position_max_hours = 9
@@ -46,6 +70,8 @@ return new class extends Migration
                         WHEN 'PERG Chair' THEN fac_special_position_max_hours = 16
                         WHEN 'Campus Secretary' THEN fac_special_position_max_hours = 16
                         WHEN 'College Secretary' THEN fac_special_position_max_hours = 16
+                        WHEN 'Research Chair' THEN fac_special_position_max_hours = 16
+                        WHEN 'MIS Officer' THEN fac_special_position_max_hours = 30
                         ELSE FALSE
                     END
                 )

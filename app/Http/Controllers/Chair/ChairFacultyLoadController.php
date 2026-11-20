@@ -75,7 +75,8 @@ class ChairFacultyLoadController extends Controller
         // The program assignment is authoritative. Requiring both the college
         // and program IDs excluded faculty whose college link was left stale.
         // Also retain faculty assigned to one of this program's active sections.
-        $faculty = Faculty::where(function ($q) use ($deptChair, $assignedFacultyIds) {
+        $faculty = Faculty::where('fac_is_placeholder', false)
+            ->where(function ($q) use ($deptChair, $assignedFacultyIds) {
                 if ($deptChair->dc_dept_id) {
                     $q->where('fac_dept_id', $deptChair->dc_dept_id);
                 } else {
@@ -103,7 +104,7 @@ class ChairFacultyLoadController extends Controller
                 fn ($q) => $q->where('sl_sem_id', $semester->sem_id),
                 fn ($q) => $q->whereRaw('1 = 0')
             )
-            ->with('subject')
+            ->with(['subject', 'section', 'schedules'])
             ->get()
             ->groupBy('sl_fac_id');
 
@@ -111,11 +112,13 @@ class ChairFacultyLoadController extends Controller
             $allLoads = $studyLoads->get($f->fac_id, collect());
 
             $shifts = collect(['day', 'evening'])->mapWithKeys(function (string $shift) use ($f, $allLoads) {
-                $loads = $allLoads->where('sl_shift', $shift);
+                $loads = $allLoads->filter(fn ($load) =>
+                    ($load->section?->sec_is_evening ? 'evening' : ($load->sl_shift ?? 'day')) === $shift
+                );
                 $totalUnits = $loads->sum(fn ($sl) => (float) ($sl->subject?->course_units ?? 0));
                 $isPartTime = $f->fac_employment_type === 'part_time';
-                $shiftHours = $loads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
-                $combinedHours = $allLoads->sum(fn ($sl) => ScheduleAssignmentService::courseHours($sl->subject));
+                $shiftHours = ScheduleAssignmentService::scheduledHoursForLoads($loads);
+                $combinedHours = ScheduleAssignmentService::scheduledHoursForLoads($allLoads);
                 $hoursAgainstLimit = $isPartTime ? $combinedHours : $shiftHours;
                 $subjectCodes = $loads->map(fn ($sl) => $sl->subject?->course_code)->filter()->unique()->implode(', ');
                 $maxHours = ScheduleAssignmentService::facultyMaxHours($f, $shift);

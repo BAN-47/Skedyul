@@ -781,9 +781,9 @@
                             <div id="pbs-teacher-options" role="listbox" aria-label="Professors"
                                 class="max-h-52 overflow-y-auto p-2">
                                 @foreach ($faculty as $f)
-                                    @php $professorName = trim($f->fac_first_name.' '.$f->fac_last_name); @endphp
+                                    @php $professorName = $f->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : \App\Services\FacultyNameFormatter::format($f); @endphp
                                     <button type="button" role="option" aria-selected="false"
-                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}"
+                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($f->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : $professorName) }}"
                                         data-label="{{ $professorName }}" onclick="selectPbsTeacher(this)"
                                         class="pbs-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
                                         <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
@@ -973,9 +973,9 @@
                             </div>
                             <div id="pbs-edit-teacher-options" role="listbox" aria-label="Professors" class="max-h-52 overflow-y-auto p-2">
                                 @foreach ($faculty as $f)
-                                    @php $professorName = \App\Services\FacultyNameFormatter::format($f); @endphp
+                                    @php $professorName = $f->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : \App\Services\FacultyNameFormatter::format($f); @endphp
                                     <button type="button" role="option" aria-selected="false"
-                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($professorName) }}" data-label="{{ $professorName }}"
+                                        data-id="{{ $f->fac_id }}" data-name="{{ strtolower($f->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : $professorName) }}" data-label="{{ $professorName }}"
                                         onclick="selectPbsEditTeacher(this)"
                                         class="pbs-edit-teacher-option flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] text-slate-700 transition hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none">
                                         <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>

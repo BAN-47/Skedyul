@@ -136,7 +136,9 @@ class ScheduleAssignmentService
                     $created[] = $result['schedule'];
                 }
 
-                $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                if (!app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'])) {
+                    $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                }
 
                 return [
                     'success' => true,
@@ -186,7 +188,9 @@ class ScheduleAssignmentService
                     }
                 }
 
-                $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                if (!app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'])) {
+                    $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                }
                 return ['success' => true, 'message' => 'Shared OJT schedule added for the selected Year 4 sections.', 'schedules' => $created];
             });
         } catch (RuntimeException $e) {
@@ -200,7 +204,8 @@ class ScheduleAssignmentService
 
     public function assign(array $data, bool $syncWorkload = true, bool $refreshResponse = true): array
     {
-        if (!$this->facultyAccountIsActive($data['fac_id'])) {
+        $placeholder = app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'] ?? null);
+        if (!$placeholder && !$this->facultyAccountIsActive($data['fac_id'])) {
             return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
         }
 
@@ -222,7 +227,7 @@ class ScheduleAssignmentService
         }
 
         try {
-            $result = DB::transaction(function () use ($data, $syncWorkload) {
+            $result = DB::transaction(function () use ($data, $syncWorkload, $placeholder) {
                 $course = Course::findOrFail($data['subj_id']);
                 $isRec = $course->course_code === 'REC';
                 $isOjt = self::isOjt($course);
@@ -232,6 +237,12 @@ class ScheduleAssignmentService
                     throw new RuntimeException('SCHEDULE_CONFLICT:' . $conflict);
                 }
 
+                $scheduleShift = $data['shift'] ?? 'day';
+                if (!$isRec) {
+                    // Placeholder classes still count toward the section's course-hour cap.
+                    $this->assertCourseHoursAvailable($data, $course);
+                }
+                if (!$placeholder) {
                 $loadQuery = Study_Load::where([
                     'sl_fac_id' => $data['fac_id'],
                     'sl_course_id' => $data['subj_id'],
@@ -242,11 +253,6 @@ class ScheduleAssignmentService
                 }
                 $studyLoad = $loadQuery->withExists('schedules')->first();
                 $courseHours = self::courseHours($course);
-                if (!$isRec) {
-                    $this->assertCourseHoursAvailable($data, $course);
-                }
-
-                $scheduleShift = $data['shift'] ?? 'day';
                 $sectionIsEvening = !empty($data['sec_id'])
                     && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
                 $workloadShift = self::workloadShiftForAssignment(
@@ -302,10 +308,18 @@ class ScheduleAssignmentService
                     }
                     if ($needsSave) $studyLoad->save();
                 }
+                } else {
+                    $studyLoad = null;
+                    $courseHours = 0;
+                    $hoursAfterAssignment = null;
+                    $maxHours = 0;
+                    $workloadShift = null;
+                }
 
                 $scheduleData = [
-                    'sch_load_id'    => $studyLoad->sl_id,
+                    'sch_load_id'    => $studyLoad?->sl_id,
                     'sch_fac_id'     => $data['fac_id'],
+                    'sch_fac_assignment_dept_id' => $placeholder ? $course->course_dept_id : null,
                     'sch_course_id'  => $data['subj_id'],
                     'sch_sec_id'     => $data['sec_id'],
                     'sch_room_id'    => $data['room_id'],
@@ -320,7 +334,7 @@ class ScheduleAssignmentService
                 ];
                 $schedule = Schedule::create($scheduleData);
 
-                $updatedHours = $syncWorkload
+                $updatedHours = $syncWorkload && !$placeholder
                     ? $this->syncWorkload($data['fac_id'], $data['sem_id'])
                     : null;
 
@@ -333,6 +347,12 @@ class ScheduleAssignmentService
                 ];
             });
             $schedule = $result['schedule'];
+            if ($placeholder && $schedule->sch_fac_assignment_dept_id) {
+                app(UnassignedFacultyService::class)->syncDepartmentNotification(
+                    (string) $schedule->sch_fac_assignment_dept_id,
+                    (string) $schedule->sch_sem_id
+                );
+            }
             $notice = '';
             if ($syncWorkload && $result['hours_after'] !== null) {
                 $hours = $result['hours_after'];
@@ -372,7 +392,8 @@ class ScheduleAssignmentService
 
     public function update(string $scheduleId, array $data): array
     {
-        if (!$this->facultyAccountIsActive($data['fac_id'])) {
+        $placeholder = app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'] ?? null);
+        if (!$placeholder && !$this->facultyAccountIsActive($data['fac_id'])) {
             return ['success' => false, 'conflict' => false, 'message' => 'This faculty account is pending approval or inactive and cannot be assigned a schedule.'];
         }
 
@@ -392,20 +413,49 @@ class ScheduleAssignmentService
 
         $oldFacultyId = null;
         $oldSemesterId = null;
+        $oldAssignmentDepartmentId = null;
         try {
-            $schedule = DB::transaction(function () use ($scheduleId, $data, $isRec, &$oldFacultyId, &$oldSemesterId) {
+            $schedule = DB::transaction(function () use ($scheduleId, $data, $isRec, $placeholder, &$oldFacultyId, &$oldSemesterId, &$oldAssignmentDepartmentId) {
                 $faculty = $this->lockConflictResources($data, $isRec);
                 $schedule = Schedule::whereKey($scheduleId)->lockForUpdate()->firstOrFail();
                 $oldFacultyId = $schedule->sch_fac_id;
                 $oldSemesterId = $schedule->sch_sem_id;
+                $oldAssignmentDepartmentId = $schedule->sch_fac_assignment_dept_id;
 
                 if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {
                     throw new RuntimeException('SCHEDULE_CONFLICT:' . $conflict);
                 }
 
                 $course = Course::findOrFail($data['subj_id']);
+                if (!$isRec) {
+                    // Moving an existing class must obey the section cap for all teachers.
+                    $this->assertCourseHoursAvailable($data, $course, $scheduleId);
+                }
+
+                if ($placeholder) {
+                    $oldLoadId = $schedule->sch_load_id;
+                    $placeholderCourse = Course::findOrFail($data['subj_id']);
+                    $schedule->update([
+                        'sch_load_id' => null,
+                        'sch_fac_id' => $data['fac_id'],
+                        'sch_fac_assignment_dept_id' => $placeholderCourse->course_dept_id,
+                        'sch_course_id' => $data['subj_id'],
+                        'sch_sec_id' => $data['sec_id'],
+                        'sch_room_id' => $data['room_id'],
+                        'sch_sem_id' => $data['sem_id'],
+                        'sch_day' => $data['day'],
+                        'sch_shift' => $data['shift'] ?? $schedule->sch_shift ?? 'day',
+                        'sch_start_time' => $data['start_time'],
+                        'sch_end_time' => $data['end_time'],
+                    ]);
+                    if ($oldLoadId) {
+                        Study_Load::whereKey($oldLoadId)->whereDoesntHave('schedules')->delete();
+                    }
+                    return $schedule;
+                }
+
+                $course = Course::findOrFail($data['subj_id']);
                 $courseHours = self::courseHours($course);
-                $this->assertCourseHoursAvailable($data, $course, $scheduleId);
                 $scheduleShift = $data['shift'] ?? $schedule->sch_shift ?? 'day';
                 $sectionIsEvening = !empty($data['sec_id'])
                     && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
@@ -544,6 +594,7 @@ class ScheduleAssignmentService
                 }
                 $scheduleData = [
                     'sch_fac_id' => $data['fac_id'],
+                    'sch_fac_assignment_dept_id' => null,
                     'sch_course_id' => $data['subj_id'],
                     'sch_sec_id' => $data['sec_id'],
                     'sch_room_id' => $data['room_id'],
@@ -559,7 +610,9 @@ class ScheduleAssignmentService
                         ->whereDoesntHave('schedules')
                         ->delete();
                 }
-                $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                if (!app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'])) {
+                    $this->syncWorkload($data['fac_id'], $data['sem_id']);
+                }
                 return $schedule;
             });
         } catch (RuntimeException $e) {
@@ -570,13 +623,31 @@ class ScheduleAssignmentService
             if (str_starts_with($e->getMessage(), 'COURSE_HOURS:')) return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 13)];
             throw $e;
         }
-        if ($oldFacultyId !== $data['fac_id'] || $oldSemesterId !== $data['sem_id']) $this->syncWorkload($oldFacultyId, $oldSemesterId);
+        if (($oldFacultyId !== $data['fac_id'] || $oldSemesterId !== $data['sem_id'])
+            && $oldFacultyId
+            && !app(UnassignedFacultyService::class)->isPlaceholder($oldFacultyId)) {
+            $this->syncWorkload($oldFacultyId, $oldSemesterId);
+        }
+        if ($placeholder && $schedule->sch_fac_assignment_dept_id) {
+            app(UnassignedFacultyService::class)->syncDepartmentNotification(
+                (string) $schedule->sch_fac_assignment_dept_id,
+                (string) $schedule->sch_sem_id
+            );
+        } elseif (app(UnassignedFacultyService::class)->isPlaceholder($oldFacultyId)
+            && $oldAssignmentDepartmentId
+            && $oldSemesterId) {
+            app(UnassignedFacultyService::class)->syncDepartmentNotification(
+                (string) $oldAssignmentDepartmentId,
+                (string) $oldSemesterId
+            );
+        }
         return ['success' => true, 'schedule' => $schedule->load(['subject', 'faculty', 'section', 'room'])];
     }
 
     public function delete(string $scheduleId): array
     {
-        return DB::transaction(function () use ($scheduleId) {
+        $unassignedNoticeScopes = collect();
+        $result = DB::transaction(function () use ($scheduleId, &$unassignedNoticeScopes) {
             $schedule = Schedule::with('subject')->findOrFail($scheduleId);
             $facultyId = $schedule->sch_fac_id;
             $semesterId = $schedule->sch_sem_id;
@@ -594,12 +665,24 @@ class ScheduleAssignmentService
                 ->get()
                 : collect([$schedule]);
 
+            $unassignedNoticeScopes = $schedulesToDelete
+                ->filter(fn ($item) => app(UnassignedFacultyService::class)->isPlaceholder((string) $item->sch_fac_id))
+                ->map(fn ($item) => [
+                    'department_id' => $item->sch_fac_assignment_dept_id,
+                    'semester_id' => $item->sch_sem_id,
+                ])
+                ->filter(fn ($scope) => $scope['department_id'] && $scope['semester_id'])
+                ->unique(fn ($scope) => $scope['department_id'] . '|' . $scope['semester_id'])
+                ->values();
+
             $loadIds = $schedulesToDelete->pluck('sch_load_id')->filter()->unique();
             Schedule::whereIn('sch_id', $schedulesToDelete->pluck('sch_id'))->delete();
 
             // Keep a study load while it still has schedules on another day.
             Study_Load::whereIn('sl_id', $loadIds)->whereDoesntHave('schedules')->delete();
-            $this->syncWorkload($facultyId, $semesterId);
+            if (!app(UnassignedFacultyService::class)->isPlaceholder($facultyId)) {
+                $this->syncWorkload($facultyId, $semesterId);
+            }
 
             return [
                 'success' => true,
@@ -608,6 +691,15 @@ class ScheduleAssignmentService
                     : 'Schedule deleted.',
             ];
         });
+
+        foreach ($unassignedNoticeScopes as $scope) {
+            app(UnassignedFacultyService::class)->syncDepartmentNotification(
+                (string) $scope['department_id'],
+                (string) $scope['semester_id']
+            );
+        }
+
+        return $result;
     }
 
     public function facultyHours(string $facultyId, string $semesterId): float
@@ -662,6 +754,26 @@ class ScheduleAssignmentService
         return $course
             ? (float) ($course->course_lecture_hours ?? 0) + (float) ($course->course_lab_hours ?? 0)
             : 0.0;
+    }
+
+    /** Sum active scheduled meeting duration for the given faculty loads. */
+    public static function scheduledHoursForLoads(iterable $loads): float
+    {
+        $totalMinutes = 0;
+
+        foreach ($loads as $load) {
+            foreach ($load->schedules ?? [] as $schedule) {
+                if (!$schedule->sch_is_active) {
+                    continue;
+                }
+
+                $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                $totalMinutes += $start->diffInMinutes($end);
+            }
+        }
+
+        return $totalMinutes / 60;
     }
 
     public static function isOjt(?Course $course): bool
@@ -737,6 +849,10 @@ class ScheduleAssignmentService
 
     public function syncWorkload(string $facultyId, string $semesterId, ?float $knownTotalHours = null): float
     {
+        if ($facultyId === UnassignedFacultyService::FACULTY_ID
+            || app(UnassignedFacultyService::class)->isPlaceholder($facultyId)) {
+            return 0.0;
+        }
         $semester = Semester::find($semesterId);
         $workload = Workload::firstOrNew(['wl_fac_id' => $facultyId, 'wl_sem_id' => $semesterId]);
         if (!$workload->exists) $workload->wl_id = (string) \Illuminate\Support\Str::uuid();
@@ -783,9 +899,11 @@ class ScheduleAssignmentService
             $base->where('sch_id', '!=', $excludeScheduleId);
         }
 
-        $facultyClash = (clone $base)->where('sch_fac_id', $data['fac_id'])
-            ->with(['subject', 'section', 'faculty'])
-            ->first();
+        $facultyClash = app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'] ?? null)
+            ? null
+            : (clone $base)->where('sch_fac_id', $data['fac_id'])
+                ->with(['subject', 'section', 'faculty'])
+                ->first();
         $sameSharedOjtMeeting = $isSharedOjt && $facultyClash
             && self::isOjt($facultyClash->subject)
             && $facultyClash->sch_course_id === $course?->course_id
@@ -840,8 +958,10 @@ class ScheduleAssignmentService
 
         $sharedOjt = $this->isSharedOjtMeeting($first, $second);
         $sameFaculty = (string) $first->sch_fac_id === (string) $second->sch_fac_id;
+        $placeholderFaculty = app(UnassignedFacultyService::class)->isPlaceholder((string) $first->sch_fac_id)
+            || app(UnassignedFacultyService::class)->isPlaceholder((string) $second->sch_fac_id);
 
-        if ($sameFaculty && !$sharedOjt) {
+        if ($sameFaculty && !$sharedOjt && !$placeholderFaculty) {
             return true;
         }
 
@@ -977,7 +1097,7 @@ class ScheduleAssignmentService
     {
         $faculty = $schedule->faculty;
         return $faculty
-            ? trim(($faculty->fac_first_name ?? '') . ' ' . ($faculty->fac_last_name ?? ''))
+            ? (FacultyNameFormatter::format($faculty) ?: 'Unassigned')
             : 'the selected professor';
     }
 }

@@ -193,6 +193,7 @@ class DeanScheduleViewerController extends Controller
         $semester = $this->activeSemester();
 
         $facultyMembers = Faculty::with(['user', 'program'])
+            ->where('fac_is_placeholder', false)
             ->where('fac_college_id', $dean->dean_college_id)
             ->get()
             ->sortBy(fn($faculty) => implode('|', [

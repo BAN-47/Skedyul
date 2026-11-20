@@ -60,6 +60,10 @@ class Faculty extends Model
         'fac_bio',
     ];
 
+    protected $casts = [
+        'fac_is_placeholder' => 'boolean',
+    ];
+
 
     public function user()
     {

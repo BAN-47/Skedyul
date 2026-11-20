@@ -11,6 +11,7 @@ use App\Models\Notification;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Schedule;
+use App\Models\Faculty;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -23,7 +24,9 @@ class DashboardController extends Controller
         $users = User::orderBy('usr_name')->paginate(10)->withQueryString();
 
         $roleCounts = [
-            'faculty'          => User::where('usr_role', 'faculty')->count(),
+            'faculty'          => User::where('usr_role', 'faculty')
+                ->whereNotIn('usr_id', Faculty::query()->where('fac_is_placeholder', true)->select('fac_usr_id'))
+                ->count(),
             'department_chair' => User::where('usr_role', 'department_chair')->count(),
             'dean'             => User::where('usr_role', 'dean')->count(),
             'system_admin'     => User::where('usr_role', 'system_admin')->count(),
@@ -168,7 +171,9 @@ class DashboardController extends Controller
             })
             ->get();
 
-        $scheduleAnalytics = $activeSchedules->map(function (Schedule $schedule) {
+        $scheduleAnalytics = $activeSchedules
+            ->reject(fn (Schedule $schedule) => (bool) ($schedule->faculty?->fac_is_placeholder ?? $schedule->studyLoad?->faculty?->fac_is_placeholder ?? false))
+            ->map(function (Schedule $schedule) {
             $faculty = $schedule->faculty ?? $schedule->studyLoad?->faculty;
 
             $minutes = 0;
@@ -178,13 +183,19 @@ class DashboardController extends Controller
                 $minutes = max(0, $start->diffInMinutes($end));
             }
 
-            $shift = strtolower(trim((string) $schedule->sch_shift));
-            if (!in_array($shift, ['day', 'evening'], true)) {
-                $shift = Carbon::parse($schedule->sch_start_time ?: '07:00')->hour >= 17 ? 'evening' : 'day';
-            }
-
             $course = $schedule->course ?? $schedule->studyLoad?->subject;
             $section = $schedule->section ?? $schedule->studyLoad?->section;
+            $loadShift = strtolower(trim((string) ($schedule->studyLoad?->sl_shift ?? '')));
+            $scheduleShift = strtolower(trim((string) $schedule->sch_shift));
+            if ((bool) $section?->sec_is_evening) {
+                $shift = 'evening';
+            } elseif (in_array($loadShift, ['day', 'evening'], true)) {
+                $shift = $loadShift;
+            } elseif (in_array($scheduleShift, ['day', 'evening'], true)) {
+                $shift = $scheduleShift;
+            } else {
+                $shift = Carbon::parse($schedule->sch_start_time ?: '07:00')->hour >= 17 ? 'evening' : 'day';
+            }
             $room = $schedule->room;
             return [
                 'faculty_id' => (string) ($faculty?->fac_id ?? ''),

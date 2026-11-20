@@ -73,6 +73,7 @@ class ScheduleSectionTransferTest extends TestCase
             $table->uuid('sch_id')->primary();
             $table->uuid('sch_load_id')->nullable();
             $table->uuid('sch_fac_id');
+            $table->uuid('sch_fac_assignment_dept_id')->nullable();
             $table->uuid('sch_course_id');
             $table->uuid('sch_sec_id')->nullable();
             $table->uuid('sch_room_id')->nullable();

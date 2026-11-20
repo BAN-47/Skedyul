@@ -199,7 +199,10 @@
                 </div>
 
                 @if($topFaculty->isNotEmpty())
-                    @php $leaderMaxHours = max(1, (float) $topFaculty->max('total_hours')); @endphp
+                    @php
+                        $leaderDayMaxHours = max(1, (float) $topFaculty->max('day_hours'));
+                        $leaderEveningMaxHours = max(1, (float) $topFaculty->max('evening_hours'));
+                    @endphp
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                         @foreach($topFaculty as $index => $leader)
                             @php
@@ -208,7 +211,8 @@
                                     ['border-slate-300', 'bg-slate-100', 'text-slate-600', 'bg-slate-400'],
                                     ['border-orange-300', 'bg-orange-50', 'text-orange-700', 'bg-orange-400'],
                                 ][$index] ?? ['border-slate-200', 'bg-slate-50', 'text-slate-600', 'bg-slate-400'];
-                                $loadPercent = min(100, (int) round(($leader['total_hours'] / $leaderMaxHours) * 100));
+                                $dayPercent = min(100, (int) round(($leader['day_hours'] / $leaderDayMaxHours) * 100));
+                                $eveningPercent = min(100, (int) round(($leader['evening_hours'] / $leaderEveningMaxHours) * 100));
                             @endphp
                             <article class="rounded-2xl border-2 {{ $rankStyles[0] }} bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                                 <div class="mb-4 flex items-start justify-between gap-3">
@@ -226,14 +230,16 @@
                                     <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Weekly scheduled load</span>
                                     <span class="text-lg font-extrabold text-slate-900">{{ number_format($leader['total_hours'], 1) }}<span class="ml-1 text-xs font-semibold text-slate-400">hrs</span></span>
                                 </div>
-                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                                    <div class="h-full rounded-full {{ $rankStyles[3] }} transition-all" style="width:{{ $loadPercent }}%"></div>
-                                </div>
-
-                                <div class="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-xl bg-slate-50 py-2.5 text-center">
-                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Day</div><div class="text-xs font-extrabold text-emerald-600">{{ number_format($leader['day_hours'], 1) }}h</div></div>
-                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Evening</div><div class="text-xs font-extrabold text-indigo-600">{{ number_format($leader['evening_hours'], 1) }}h</div></div>
-                                    <div><div class="text-[9px] font-bold uppercase text-slate-400">Classes</div><div class="text-xs font-extrabold text-slate-700">{{ $leader['classes'] }}</div></div>
+                                <div class="mt-3 space-y-2 rounded-xl bg-slate-50 p-3">
+                                    <div>
+                                        <div class="mb-1 flex justify-between text-[10px] font-semibold"><span class="text-emerald-700">Day</span><span>{{ number_format($leader['day_hours'], 1) }}h</span></div>
+                                        <div class="h-2 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full bg-emerald-500" style="width:{{ $dayPercent }}%"></div></div>
+                                    </div>
+                                    <div>
+                                        <div class="mb-1 flex justify-between text-[10px] font-semibold"><span class="text-indigo-700">Evening</span><span>{{ number_format($leader['evening_hours'], 1) }}h</span></div>
+                                        <div class="h-2 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full bg-indigo-500" style="width:{{ $eveningPercent }}%"></div></div>
+                                    </div>
+                                    <div class="border-t border-slate-200 pt-2 text-center text-[10px] font-semibold text-slate-600">{{ $leader['classes'] }} classes</div>
                                 </div>
                                 @if($leader['courses']->isNotEmpty())
                                     <p class="mt-3 truncate text-[10px] text-slate-500" title="{{ $leader['courses']->implode(', ') }}">Courses: {{ $leader['courses']->implode(', ') }}</p>

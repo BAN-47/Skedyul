@@ -113,6 +113,7 @@ class PbtController extends Controller
         // Build teacher groups from all faculty linked to user accounts, regardless
         // of college. Assignment validation still enforces the active-account rule.
         $allFaculty = Faculty::query()
+            ->where('fac_is_placeholder', false)
             ->whereHas('user')
             ->select('faculty.*')
             ->addSelect([
@@ -124,6 +125,7 @@ class PbtController extends Controller
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
+        $placeholderFaculty = app(\App\Services\UnassignedFacultyService::class)->faculty();
 
         // Reuse the eligible-faculty result for the selected teacher instead
         // of issuing a second remote lookup to Supabase.
@@ -246,6 +248,7 @@ class PbtController extends Controller
             'facultyPartTime'  => $facultyPartTime,
             'facultyChairs'    => $facultyChairs,
             'deans'            => $deans,
+            'placeholderFaculty' => $placeholderFaculty,
 
             'allDepartments'   => $allDepartments,
             'selectedDeptId'   => $request->query('department', $deptId),

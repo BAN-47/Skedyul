@@ -50,7 +50,7 @@ class ScheduleController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
-        $faculty  = Faculty::with('user')->where('fac_college_id', $deptId)->get();
+        $faculty  = Faculty::with('user')->where('fac_is_placeholder', false)->where('fac_college_id', $deptId)->get();
         $subjects = Course::where('course_college_id', $deptId)->where('course_is_active', true)->get();
         $sections = Section::whereHas('program', fn ($q) => $q->where('dept_college_id', $deptId))
             ->when($academicYear, fn ($q) => $q->where('sec_ay_id', $academicYear->ay_id))

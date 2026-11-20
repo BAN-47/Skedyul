@@ -73,6 +73,7 @@ class ChairFacultyLoadSemesterTest extends TestCase
             $table->uuid('sec_id')->primary();
             $table->uuid('sec_dept_id');
             $table->string('sec_name');
+            $table->boolean('sec_is_evening')->default(false);
         });
         Schema::create('faculty', function (Blueprint $table) {
             $table->uuid('fac_id')->primary();
@@ -82,6 +83,7 @@ class ChairFacultyLoadSemesterTest extends TestCase
             $table->string('fac_last_name');
             $table->string('fac_employment_type')->nullable();
             $table->string('fac_special_position')->nullable();
+            $table->boolean('fac_is_placeholder')->default(false);
         });
         Schema::create('course', function (Blueprint $table) {
             $table->uuid('course_id')->primary();
@@ -101,6 +103,13 @@ class ChairFacultyLoadSemesterTest extends TestCase
             $table->string('sl_shift');
             $table->uuid('sl_sec_id');
             $table->uuid('sl_sem_id');
+        });
+        Schema::create('schedule', function (Blueprint $table) {
+            $table->uuid('sch_id')->primary();
+            $table->uuid('sch_load_id');
+            $table->boolean('sch_is_active')->default(true);
+            $table->time('sch_start_time');
+            $table->time('sch_end_time');
         });
 
         $this->collegeId = (string) Str::uuid();
@@ -186,9 +195,11 @@ class ChairFacultyLoadSemesterTest extends TestCase
                 'course_is_active' => true,
             ],
         ]);
+        $firstLoadId = (string) Str::uuid();
+        $secondLoadId = (string) Str::uuid();
         DB::table('study_load')->insert([
             [
-                'sl_id' => (string) Str::uuid(),
+                'sl_id' => $firstLoadId,
                 'sl_fac_id' => $this->facultyId,
                 'sl_course_id' => $firstCourseId,
                 'sl_shift' => 'day',
@@ -196,12 +207,26 @@ class ChairFacultyLoadSemesterTest extends TestCase
                 'sl_sem_id' => $this->firstSemesterId,
             ],
             [
-                'sl_id' => (string) Str::uuid(),
+                'sl_id' => $secondLoadId,
                 'sl_fac_id' => $this->facultyId,
                 'sl_course_id' => $secondCourseId,
                 'sl_shift' => 'evening',
                 'sl_sec_id' => $sectionId,
                 'sl_sem_id' => $this->secondSemesterId,
+            ],
+        ]);
+        DB::table('schedule')->insert([
+            [
+                'sch_id' => (string) Str::uuid(),
+                'sch_load_id' => $firstLoadId,
+                'sch_start_time' => '07:00',
+                'sch_end_time' => '12:00',
+            ],
+            [
+                'sch_id' => (string) Str::uuid(),
+                'sch_load_id' => $secondLoadId,
+                'sch_start_time' => '16:00',
+                'sch_end_time' => '18:00',
             ],
         ]);
     }

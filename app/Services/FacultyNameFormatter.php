@@ -11,6 +11,10 @@ class FacultyNameFormatter
             return '';
         }
 
+        if ((bool) ($faculty->fac_is_placeholder ?? false)) {
+            return 'Unassigned';
+        }
+
         $first = trim((string) ($faculty->fac_first_name ?? ''));
         $middle = trim((string) ($faculty->fac_middle_name ?? ''));
         $last = trim((string) ($faculty->fac_last_name ?? ''));

@@ -9,6 +9,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Services\AdminIssueAttachmentStorage;
 use App\Services\ProfileImageStorage;
+use App\Services\UnassignedFacultyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -199,6 +200,7 @@ class ChairSettingsController extends Controller
 
     public function notificationsList(Request $request)
     {
+        app(UnassignedFacultyService::class)->ensureCurrentDepartmentNotification($this->currentChair());
         $notifications = Notification::where('notif_usr_id', Auth::id())
             ->orderByDesc('notif_created_at')
             ->take(10)
@@ -209,6 +211,7 @@ class ChairSettingsController extends Controller
 
     public function unreadNotificationsCount()
     {
+        app(UnassignedFacultyService::class)->ensureCurrentDepartmentNotification($this->currentChair());
         $count = Notification::where('notif_usr_id', Auth::id())
             ->where('notif_is_read', false)
             ->count();

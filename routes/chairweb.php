@@ -14,6 +14,7 @@ use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
 use App\Http\Controllers\Chair\ExportPreviewController;
+use App\Http\Controllers\Chair\UnassignedFacultyController;
 
 Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
@@ -38,6 +39,10 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
     Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
     Route::post('/pbs/submit-dean', [PbsSubmissionController::class, 'store'])->name('chair.pbs.submit-dean');
+
+    // Classes awaiting a real faculty member from the course's department.
+    Route::get('/faculty-assignment', [UnassignedFacultyController::class, 'index'])->name('chair.unassigned_faculty.index');
+    Route::put('/faculty-assignment/{id}', [UnassignedFacultyController::class, 'assign'])->name('chair.unassigned_faculty.assign');
 
 
     // PBT — Program by Teacher

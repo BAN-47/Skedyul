@@ -53,7 +53,8 @@ class DeanDepartmentController extends Controller
         $deptData = [];
 
         foreach ($departments as $index => $dept) {
-            $facultyList = Faculty::where('fac_college_id', $dept->college_id)->get();
+            $facultyList = Faculty::where('fac_is_placeholder', false)
+                ->where('fac_college_id', $dept->college_id)->get();
 
             $facultyCount = $facultyList->count();
 
@@ -81,11 +82,12 @@ class DeanDepartmentController extends Controller
 
                 // Faculty statically assigned to this program (fac_prog_id), even
                 // with no study_load record yet this semester
-                $staticFacultyIds = Faculty::where('fac_dept_id', $prog->dept_id)->pluck('fac_id');
+                $staticFacultyIds = Faculty::where('fac_is_placeholder', false)
+                    ->where('fac_dept_id', $prog->dept_id)->pluck('fac_id');
 
                 $facultyIds = $facultyIds->merge($staticFacultyIds)->unique();
 
-                $progFaculty = Faculty::whereIn('fac_id', $facultyIds)->get();
+                $progFaculty = Faculty::where('fac_is_placeholder', false)->whereIn('fac_id', $facultyIds)->get();
 
                 $progFacultyRows = $progFaculty->map(function ($f) use ($loadsByFaculty, $hoursByFaculty) {
                     $hasWorkload = $loadsByFaculty->has($f->fac_id);

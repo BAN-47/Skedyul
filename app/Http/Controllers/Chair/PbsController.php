@@ -266,7 +266,9 @@ class PbsController extends Controller
         // Include faculty linked to user accounts across every college. Assignment
         // validation below still enforces the active-account scheduling rule.
         $faculty = Faculty::query()
-            ->whereHas('user')
+            ->where(function ($query) {
+                $query->whereHas('user')->orWhere('fac_is_placeholder', true);
+            })
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
             ->get();
@@ -606,7 +608,7 @@ class PbsController extends Controller
                     'id'           => $sch->sch_id,
                     'course_code'  => $sch->subject?->course_code ?? '',
                     'course_name'  => $sch->subject?->course_name ?? '',
-                    'faculty_name' => $sch->faculty ? trim("{$sch->faculty->fac_first_name} {$sch->faculty->fac_last_name}") : '',
+                    'faculty_name' => \App\Services\FacultyNameFormatter::format($sch->faculty) ?: 'Unassigned',
                     'room_name'    => $sch->room?->room_name ?? '',
                     'day'          => $sch->sch_day,
                     'start_time'   => $sch->sch_start_time ? substr($sch->sch_start_time, 0, 5) : '',

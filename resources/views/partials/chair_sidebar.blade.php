@@ -70,6 +70,10 @@
         </a>
 
         <div class="nav-section-label">Submission</div>
+        <a href="{{ route('chair.unassigned_faculty.index') }}"
+            class="nav-item {{ request()->routeIs('chair.unassigned_faculty.*') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="ti ti-user-question" aria-hidden="true"></i></span> Unassigned Faculty
+        </a>
         <a href="{{ route('chair.submit_dean') }}"
             class="nav-item {{ request()->routeIs('chair.submit_dean') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-send" aria-hidden="true"></i></span> Schedule Submission

@@ -814,6 +814,8 @@ function restoreAddAnotherState() {
 
     const section = document.getElementById("add-section");
     const category = document.getElementById("add-category");
+    const addFaculty = document.getElementById("add-faculty");
+    if (addFaculty) addFaculty.value = SELECTED_TEACHER || state.faculty || window.PBT_PLACEHOLDER_FACULTY || "";
     if (section) section.value = state.section || "";
     if (category) category.value = state.category || "";
     if (category?.value) {
@@ -848,10 +850,8 @@ function openAddModal(day, startTime) {
         showToast('Archived semesters are view only.');
         return;
     }
-    if (!SELECTED_TEACHER) {
-        showToast("Select a teacher first.");
-        return;
-    }
+    const addFaculty = document.getElementById("add-faculty");
+    if (addFaculty) addFaculty.value = SELECTED_TEACHER || window.PBT_PLACEHOLDER_FACULTY || "";
     clearInlineError("add-error");
     syncSelectedSemesterFields();
     ["add-subject", "add-section", "add-room", "add-description"].forEach(
@@ -898,7 +898,7 @@ function submitAdd(keepOpen = false) {
 
     const payload = {
         subj_id: subjId,
-        fac_id: SELECTED_TEACHER,
+        fac_id: document.getElementById("add-faculty")?.value || "",
         sem_id: document.getElementById("filter-semester")?.value || "",
         prog_id:
             document.getElementById("add-department")?.value ||
@@ -924,7 +924,7 @@ function submitAdd(keepOpen = false) {
         !payload.start_time ||
         !payload.end_time
     ) {
-        const m = "Please select the course, at least one day, and both times.";
+        const m = "Please select a professor, course, at least one day, and both times.";
         showToast(m);
         showInlineError("add-error", m);
         return;
@@ -990,6 +990,7 @@ function submitAdd(keepOpen = false) {
                             "pbt-add-another",
                             JSON.stringify({
                             department: document.getElementById("add-department").value,
+                            faculty: document.getElementById("add-faculty").value,
                             section: document.getElementById("add-section").value,
                             sections: selectedSectionIds,
                             ojtIsEvening: document.getElementById('add-ojt-is-evening').checked,

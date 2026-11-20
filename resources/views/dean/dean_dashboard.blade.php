@@ -120,6 +120,10 @@
                         </div>
                         <span class="rounded-full bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">College-wide</span>
                     </div>
+                    @php
+                        $leaderDayMax = max(1, $topFaculty->max('day_hours'));
+                        $leaderEveningMax = max(1, $topFaculty->max('evening_hours'));
+                    @endphp
                     <div class="grid grid-cols-1 gap-3 pb-1 md:grid-cols-3">
                         @forelse($topFaculty ?? [] as $index => $leader)
                             @php
@@ -130,7 +134,8 @@
                                 ][$index] ?? ['border' => 'border-blue-200', 'badge' => 'bg-blue-50 text-blue-700', 'label' => '#' . ($index + 1)];
                                 $leaderInitials = collect(preg_split('/\s+/', trim($leader['name'])))
                                     ->filter()->take(2)->map(fn($part) => strtoupper(substr($part, 0, 1)))->implode('');
-                                $leaderMax = max(1, $topFaculty->max('total_plotted'));
+                                $leaderDayPercent = min(100, round(($leader['day_hours'] / $leaderDayMax) * 100));
+                                $leaderEveningPercent = min(100, round(($leader['evening_hours'] / $leaderEveningMax) * 100));
                             @endphp
                             <div class="rounded-xl border-2 {{ $leaderStyles['border'] }} bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
                                 <div class="flex items-center gap-3">
@@ -145,8 +150,16 @@
                                     <div><div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Plotted load</div><div class="mt-0.5 text-xl font-extrabold text-slate-900">{{ $leader['total_plotted'] }}<span class="ml-1 text-xs font-semibold text-slate-400">hrs</span></div></div>
                                     <div class="text-right text-[10px] font-semibold text-slate-500">{{ $leader['class_count'] }} classes · {{ $leader['section_count'] }} sections</div>
                                 </div>
-                                <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-500" style="width:{{ min(100, round(($leader['total_plotted'] / $leaderMax) * 100)) }}%"></div></div>
-                                <div class="mt-2 flex justify-between text-[10px] font-semibold"><span class="text-emerald-700">Day {{ $leader['day_hours'] }}h</span><span class="text-indigo-700">Evening {{ $leader['evening_hours'] }}h</span></div>
+                                <div class="mt-3 space-y-2">
+                                    <div>
+                                        <div class="mb-1 flex justify-between text-[10px] font-semibold"><span class="text-emerald-700">Day</span><span>{{ number_format($leader['day_hours'], 1) }}h</span></div>
+                                        <div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-emerald-500" style="width:{{ $leaderDayPercent }}%"></div></div>
+                                    </div>
+                                    <div>
+                                        <div class="mb-1 flex justify-between text-[10px] font-semibold"><span class="text-indigo-700">Evening</span><span>{{ number_format($leader['evening_hours'], 1) }}h</span></div>
+                                        <div class="h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-indigo-500" style="width:{{ $leaderEveningPercent }}%"></div></div>
+                                    </div>
+                                </div>
                                 <button type="button" data-faculty-id="{{ $leader['id'] }}" data-faculty-name="{{ $leader['name'] }}" data-faculty-role="{{ $leader['rank'] }} · {{ $leader['department'] }}" data-day-hours="{{ $leader['day_hours'] }}" data-evening-hours="{{ $leader['evening_hours'] }}" onclick="openDeanTimetable(this)" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100">
                                     <span aria-hidden="true">▦</span> View Timetable
                                 </button>

@@ -44,11 +44,12 @@ class DeanDashboardController extends Controller
 
         // Count faculty whose home department belongs to this college.
         $faculty = Faculty::with(['user', 'program'])
+            ->where('fac_is_placeholder', false)
             ->whereIn('fac_dept_id', $departmentIds)
             ->get();
         $totalFaculty = $faculty->count();
 
-        $collegeStudyLoads = Study_Load::with(['subject', 'faculty.program'])
+        $collegeStudyLoads = Study_Load::with(['subject', 'faculty.program', 'section', 'schedules'])
             ->whereHas('section', fn($query) => $query->whereIn('sec_dept_id', $departmentIds))
             ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id), fn($query) => $query->whereRaw('1 = 0'))
             ->get()
@@ -58,10 +59,13 @@ class DeanDashboardController extends Controller
 
         $facultyLoads = $faculty->map(function ($member) use ($studyLoadsByFaculty) {
             $loads = $studyLoadsByFaculty->get($member->fac_id, collect());
-            $dayHours = (float) $loads->where('sl_shift', 'day')
-                ->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
-            $eveningHours = (float) $loads->where('sl_shift', 'evening')
-                ->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+            $shiftForLoad = fn ($load) => $load->section?->sec_is_evening
+                ? 'evening'
+                : ($load->sl_shift ?? 'day');
+            $dayLoads = $loads->filter(fn ($load) => $shiftForLoad($load) === 'day');
+            $eveningLoads = $loads->filter(fn ($load) => $shiftForLoad($load) === 'evening');
+            $dayHours = \App\Services\ScheduleAssignmentService::scheduledHoursForLoads($dayLoads);
+            $eveningHours = \App\Services\ScheduleAssignmentService::scheduledHoursForLoads($eveningLoads);
             $dayMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'day');
             $eveningMaxHours = \App\Services\ScheduleAssignmentService::facultyMaxHours($member, 'evening');
             $hours = $dayHours + $eveningHours;
@@ -154,6 +158,7 @@ class DeanDashboardController extends Controller
             })
             ->with(['faculty.program', 'section', 'course', 'subject', 'room', 'studyLoad.faculty.program', 'studyLoad.section', 'studyLoad.subject'])
             ->get()
+            ->reject(fn (Schedule $schedule) => (bool) ($schedule->faculty?->fac_is_placeholder ?? $schedule->studyLoad?->faculty?->fac_is_placeholder ?? false))
             ->map(function (Schedule $schedule) {
                 $load = $schedule->studyLoad;
                 $section = $schedule->section ?? $load?->section;
@@ -163,10 +168,19 @@ class DeanDashboardController extends Controller
                 $day = strtolower(substr($rawDay, 0, 3));
                 $dayName = collect(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
                     ->first(fn ($candidate) => strtolower(substr($candidate, 0, 3)) === $day) ?? $rawDay;
-                $shiftValue = strtolower((string) ($schedule->sch_shift ?? $load?->sl_shift ?? ''));
-                $shift = str_contains($shiftValue, 'even') || $shiftValue === 'night' || ($shiftValue === '' && (bool) $section?->sec_is_evening)
-                    ? 'evening'
-                    : 'day';
+                $loadShift = strtolower(trim((string) ($load?->sl_shift ?? '')));
+                $scheduleShift = strtolower(trim((string) $schedule->sch_shift));
+                if ((bool) $section?->sec_is_evening) {
+                    $shift = 'evening';
+                } elseif (in_array($loadShift, ['day', 'evening'], true)) {
+                    $shift = $loadShift;
+                } elseif (in_array($scheduleShift, ['day', 'evening'], true)) {
+                    $shift = $scheduleShift;
+                } else {
+                    $shift = \Illuminate\Support\Carbon::parse($schedule->sch_start_time ?: '07:00')->hour >= 17
+                        ? 'evening'
+                        : 'day';
+                }
                 $hours = 0.0;
                 if ($schedule->sch_start_time && $schedule->sch_end_time) {
                     $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);

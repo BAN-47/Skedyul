@@ -103,7 +103,7 @@ class ScheduleReportsController extends Controller
             })
             ->values();
 
-        $facultyQuery = Faculty::with(['user', 'program.department']);
+        $facultyQuery = Faculty::with(['user', 'program.department'])->where('fac_is_placeholder', false);
         if ($collegeId) {
             $facultyQuery->whereHas('program', function ($query) use ($collegeId) {
                 $query->where('dept_college_id', $collegeId);

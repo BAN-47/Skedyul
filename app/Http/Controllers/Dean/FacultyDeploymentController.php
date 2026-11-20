@@ -23,6 +23,7 @@ class FacultyDeploymentController extends Controller
         $collegeId = $dean->dean_college_id;
 
         $facultyQuery = Faculty::with(['department', 'program', 'studyLoads.subject'])
+            ->where('fac_is_placeholder', false)
             ->where('fac_college_id', $collegeId);
 
         $programOrder = ['BSIS' => 1, 'BSIT' => 2, 'BIT-CT' => 3];

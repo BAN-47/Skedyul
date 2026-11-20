@@ -21,10 +21,12 @@
         $facultyPartTime = $facultyPartTime ?? collect();
         $deans = $deans ?? collect();
         $facultyChairs = $facultyChairs ?? collect();
+        $placeholderFaculty = $placeholderFaculty ?? null;
         $editableFaculty = collect($facultyFullTime)
             ->concat($facultyPartTime)
             ->concat($facultyChairs)
             ->concat($deans)
+            ->concat($placeholderFaculty ? collect([$placeholderFaculty]) : collect())
             ->unique('fac_id')
             ->sortBy('fac_last_name')
             ->values();
@@ -724,8 +726,22 @@
                     <input type="hidden" id="add-semester" value="{{ optional($activeSemester)->sem_id ?? '' }}">
                 </div>
 
-                <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] text-slate-600">
-                    Teacher: <span class="font-bold text-slate-900">{{ $selectedFaculty ? \App\Services\FacultyNameFormatter::format($selectedFaculty) : '—' }}</span>
+                <div class="mb-3">
+                    <label class="field-label">Professor</label>
+                    @if ($selectedFaculty)
+                        <div class="field-input bg-slate-100 font-semibold text-slate-700">
+                            {{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}
+                        </div>
+                        <input type="hidden" id="add-faculty" value="{{ $selectedFaculty->fac_id }}">
+                    @else
+                        <select id="add-faculty" class="field-input w-full">
+                            <option value="">-- Select Professor --</option>
+                            @foreach ($editableFaculty as $person)
+                                @php $professorName = $person->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : \App\Services\FacultyNameFormatter::format($person); @endphp
+                                <option value="{{ $person->fac_id }}">{{ $professorName }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
 
                 <div class="mb-3">
@@ -961,10 +977,10 @@
                                 @foreach ($editableFaculty as $person)
                                     @php $professorName = \App\Services\FacultyNameFormatter::format($person); @endphp
                                     <button type="button" role="option" aria-selected="false"
-                                        data-id="{{ $person->fac_id }}" data-name="{{ strtolower($professorName) }}"
-                                        data-label="{{ $professorName }}" onclick="selectPbtEditTeacher(this)"
+                                        data-id="{{ $person->fac_id }}" data-name="{{ strtolower($person->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : $professorName) }}"
+                                        data-label="{{ $person->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : $professorName }}" onclick="selectPbtEditTeacher(this)"
                                         class="pbt-edit-teacher-option flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50">
-                                        <span class="min-w-0 flex-1 truncate">{{ $professorName }}</span>
+                                        <span class="min-w-0 flex-1 truncate">{{ $person->fac_is_placeholder ? \App\Services\UnassignedFacultyService::LABEL : $professorName }}</span>
                                         <span class="pbt-edit-teacher-check hidden font-bold text-indigo-600" aria-hidden="true">✓</span>
                                     </button>
                                 @endforeach
@@ -1205,6 +1221,7 @@
         <script>
             window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
             window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
+            window.PBT_PLACEHOLDER_FACULTY = @json($placeholderFaculty?->fac_id);
             window.COLLEGE_SECTIONS = {
                 @foreach ($allDepartments as $dept)
                     "{{ $dept->dept_id }}": [

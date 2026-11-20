@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Faculty;
+use App\Models\Schedule;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -215,6 +216,20 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         $this->assertSame(22.0, $eveningAfterAssignment);
         $this->assertLessThanOrEqual(30.0, $eveningAfterAssignment);
         $this->assertGreaterThan(30.0, $scheduler->facultyHours($facultyId, $semesterId) + 9);
+    }
+
+    public function test_scheduled_hours_sum_active_meeting_durations_not_course_workload_hours(): void
+    {
+        $loads = collect([
+            (object) [
+                'schedules' => collect([
+                    new Schedule(['sch_is_active' => true, 'sch_start_time' => '07:00', 'sch_end_time' => '12:00']),
+                    new Schedule(['sch_is_active' => false, 'sch_start_time' => '13:00', 'sch_end_time' => '15:00']),
+                ]),
+            ],
+        ]);
+
+        $this->assertSame(5.0, ScheduleAssignmentService::scheduledHoursForLoads($loads));
     }
 
     private function addLoad(string $facultyId, string $semesterId, string $shift, float $hours): void
