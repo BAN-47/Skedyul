@@ -4,6 +4,58 @@
 const SELECTED_DATE = window.PBT_SELECTED_DATE;
 const SELECTED_TEACHER = window.PBT_SELECTED_TEACHER;
 
+function toggleCategoryPicker(key) {
+    const picker = document.querySelector(`[data-category-picker="${key}"]`);
+    const panel = picker?.querySelector('[data-category-panel]');
+    if (!picker || !panel) return;
+    const opening = panel.classList.contains('hidden');
+    document.querySelectorAll('[data-category-panel]').forEach((item) => item.classList.add('hidden'));
+    if (opening) {
+        panel.classList.remove('hidden');
+        const search = picker.querySelector('[data-category-search]');
+        if (search) { search.value = ''; renderCategoryChoices(key); search.focus(); }
+    }
+}
+
+function renderCategoryChoices(key) {
+    const picker = document.querySelector(`[data-category-picker="${key}"]`);
+    const select = document.getElementById(`${key}-category`);
+    const list = picker?.querySelector('[data-category-options]');
+    if (!picker || !select || !list) return;
+    const query = (picker.querySelector('[data-category-search]')?.value || '').trim().toLowerCase();
+    list.replaceChildren();
+    Array.from(select.options).forEach((option) => {
+        const label = option.value ? option.textContent.trim() : 'All categories';
+        if (query && !label.toLowerCase().includes(query)) return;
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.setAttribute('role', 'option');
+        item.setAttribute('aria-selected', String(option.value === select.value));
+        item.className = 'block w-full rounded-lg px-3 py-2 text-left text-xs text-slate-700 hover:bg-blue-50';
+        item.textContent = label;
+        item.addEventListener('click', () => {
+            select.value = option.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            picker.querySelector('[data-category-label]').textContent = label;
+            picker.querySelector('[data-category-panel]').classList.add('hidden');
+        });
+        list.appendChild(item);
+    });
+    if (!list.childElementCount) list.innerHTML = '<p class="px-3 py-3 text-center text-xs text-slate-400">No categories found.</p>';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    ['add', 'edit'].forEach((key) => {
+        const picker = document.querySelector(`[data-category-picker="${key}"]`);
+        const select = document.getElementById(`${key}-category`);
+        if (picker && select) picker.querySelector('[data-category-label]').textContent = select.selectedOptions[0]?.textContent.trim() || 'All categories';
+    });
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('[data-category-picker]')) return;
+        document.querySelectorAll('[data-category-panel]').forEach((item) => item.classList.add('hidden'));
+    });
+});
+
 function filterSubjectsByCategory() {
     const catSel = document.getElementById("add-category");
     const subSel = document.getElementById("add-subject");
@@ -18,11 +70,12 @@ function populateSubjectOptions(select, category, sectionId, departmentId) {
     const department = selectedSection?.dataset.deptId || document.getElementById(departmentId)?.value || '';
     const semester = String(getSelectedCourseSemester() || '');
     const subjects = (window.ALL_SUBJECTS_LIST || []).filter(subject => {
+        // A selected category browses matching courses globally.
+        if (category) return String(subject.cat) === String(category);
         const departmentMatch = !department || String(subject.dept) === String(department);
         const yearMatch = !year || String(subject.year) === String(year);
         const semMatch = subject.code === 'REC' || !semester || String(subject.sem) === semester;
-        const categoryMatch = !category || String(subject.cat) === String(category);
-        return departmentMatch && yearMatch && semMatch && categoryMatch;
+        return departmentMatch && yearMatch && semMatch;
     });
 
     select.innerHTML = '<option value="">-- Select Subject --</option>';

@@ -89,6 +89,29 @@ class ScheduleAssignmentService
         return $scheduleShift;
     }
 
+    /** Weekday schedule tabs have a fixed 4:00 PM boundary. */
+    public static function scheduleTimeMessage(array $data, bool $sectionIsEvening = false): ?string
+    {
+        $day = $data['day'] ?? '';
+        $shift = $sectionIsEvening ? 'evening' : ($data['shift'] ?? 'day');
+        $start = $data['start_time'] ?? '';
+        $end = $data['end_time'] ?? '';
+
+        if (!in_array($day, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], true)) {
+            return null;
+        }
+
+        if ($shift === 'evening' && $start < '16:00') {
+            return 'For evening sections, 7:00 AM–4:00 PM schedules are allowed on Saturday or Sunday only. Monday–Friday evening schedules must start at or after 4:00 PM.';
+        }
+
+        if ($shift === 'day' && $end > '16:00') {
+            return 'Day schedules on weekdays must end by 4:00 PM.';
+        }
+
+        return null;
+    }
+
     /** Assign one course/session to several weekdays as one all-or-nothing action. */
     public function assignMultiple(array $data): array
     {
@@ -185,6 +208,12 @@ class ScheduleAssignmentService
         $isRec = $course->course_code === 'REC';
 
         if ($message = $this->sectionRequirementMessage($course, $data['sec_id'] ?? null)) {
+            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
+        }
+
+        $sectionIsEvening = !empty($data['sec_id'])
+            && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
+        if ($message = self::scheduleTimeMessage($data, $sectionIsEvening)) {
             return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
         }
 
@@ -350,6 +379,11 @@ class ScheduleAssignmentService
         $course = Course::findOrFail($data['subj_id']);
         $isRec = $course->course_code === 'REC';
         if ($message = $this->sectionRequirementMessage($course, $data['sec_id'] ?? null)) {
+            return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
+        }
+        $sectionIsEvening = !empty($data['sec_id'])
+            && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
+        if ($message = self::scheduleTimeMessage($data, $sectionIsEvening)) {
             return ['success' => false, 'conflict' => false, 'status' => 422, 'message' => $message];
         }
         if ($conflict = $this->findConflict($data, $isRec, $scheduleId)) {

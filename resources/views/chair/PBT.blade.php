@@ -806,13 +806,19 @@
                 <div class="flex items-end gap-2 mb-3">
                     <div class="flex-1">
                         <label class="field-label">Category</label>
-                        <select id="add-category" class="field-input !py-[9px]"
-                            onchange="filterSubjectsByCategory()">
+                        <select id="add-category" class="sr-only" onchange="filterSubjectsByCategory()">
                             <option value="">-- All --</option>
                             @foreach ($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
+                        <div class="relative" data-category-picker="add">
+                            <button type="button" class="field-input !py-[9px] flex w-full items-center justify-between gap-2 text-left" aria-haspopup="listbox" aria-expanded="false" onclick="toggleCategoryPicker('add')"><span data-category-label>All categories</span><span aria-hidden="true">⌄</span></button>
+                            <div class="absolute left-0 top-[calc(100%+6px)] z-[90] hidden w-full min-w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" data-category-panel>
+                                <div class="border-b border-slate-100 p-2"><input type="search" data-category-search placeholder="Search categories..." oninput="renderCategoryChoices('add')" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"></div>
+                                <div class="max-h-48 overflow-y-auto p-1" role="listbox" data-category-options></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="flex-[3]">
                         <label class="field-label">Subject</label>
@@ -1016,13 +1022,19 @@
                 <div class="flex items-end gap-2 mb-3">
                     <div class="flex-1">
                         <label class="field-label">Category</label>
-                        <select id="edit-category" class="field-input !py-[9px]"
-                            onchange="filterEditSubjectsByCategory()">
+                        <select id="edit-category" class="sr-only" onchange="filterEditSubjectsByCategory()">
                             <option value="">-- All --</option>
                             @foreach ($categories as $cat)
                                 <option value="{{ $cat }}">{{ $cat }}</option>
                             @endforeach
                         </select>
+                        <div class="relative" data-category-picker="edit">
+                            <button type="button" class="field-input !py-[9px] flex w-full items-center justify-between gap-2 text-left" aria-haspopup="listbox" aria-expanded="false" onclick="toggleCategoryPicker('edit')"><span data-category-label>All categories</span><span aria-hidden="true">⌄</span></button>
+                            <div class="absolute left-0 top-[calc(100%+6px)] z-[90] hidden w-full min-w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl" data-category-panel>
+                                <div class="border-b border-slate-100 p-2"><input type="search" data-category-search placeholder="Search categories..." oninput="renderCategoryChoices('edit')" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"></div>
+                                <div class="max-h-48 overflow-y-auto p-1" role="listbox" data-category-options></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="flex-[3]">
                         <label class="field-label">Subject</label>

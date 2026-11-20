@@ -1,0 +1,1625 @@
+PHPUnit 11.5.55 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.2.12
+
+Time: 00:04.958, Memory: 50.00 MB
+
+There was 1 error:
+
+1) Tests\Feature\AcademicYearManagementTest::test_automatic_semester_advance_uses_second_semester_from_the_same_year
+TypeError: PHPUnit\Framework\Assert::assertStringContainsString(): Argument #2 ($haystack) must be of type string, null given, called in C:\xampp\htdocs\Skedyul\tests\Feature\AcademicYearManagementTest.php on line 225
+
+C:\xampp\htdocs\Skedyul\tests\Feature\AcademicYearManagementTest.php:225
+
+--
+
+There were 5 failures:
+
+1) Tests\Feature\AcademicYearManagementTest::test_second_semester_is_created_for_its_year_without_reassigning_another_years_record
+Failed asserting that a row in the table [semester] matches the attributes {
+    "sem_id": "1dc1efbf-fb09-43b0-9451-60465312b15b",
+    "sem_ay_id": "968e574b-a127-4937-b38e-18d3c89725d9",
+    "sem_is_active": false
+}.
+
+Found similar results: [
+    {
+        "sem_id": "1dc1efbf-fb09-43b0-9451-60465312b15b",
+        "sem_ay_id": "968e574b-a127-4937-b38e-18d3c89725d9",
+        "sem_is_active": 1
+    }
+].
+
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\InteractsWithDatabase.php:43
+C:\xampp\htdocs\Skedyul\tests\Feature\AcademicYearManagementTest.php:188
+
+2) Tests\Feature\ChairTermScheduleIsolationTest::test_pbs_clear_only_removes_the_selected_semester
+Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+PDOException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:420
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(420): PDO->prepare('select "s"."sem...')
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select "s"."sem...', Array)
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#7 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#8 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#9 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(401): Illuminate\Database\Query\Builder->first(Array)
+#10 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(479): App\Http\Controllers\Chair\PbsController->semesterIsWritable('581ab5ef-2c88-4...')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbsController->clear(Object(Illuminate\Http\Request))
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbsController), 'clear')
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#16 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#20 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#66 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('POST', 'http://localhos...', Array, Array, Array, Array, '{"section":"8cd...')
+#67 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(411): Illuminate\Foundation\Testing\TestCase->json('POST', 'http://localhos...', Array, Array, 0)
+#68 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(187): Illuminate\Foundation\Testing\TestCase->postJson('http://localhos...', Array)
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_pbs_clear_only_removes_the_selected_semester()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#75 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#76 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#77 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#78 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = 581ab5ef-2c88-4586-a925-c7d5b94f4727 limit 1) in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:838
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#7 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(401): Illuminate\Database\Query\Builder->first(Array)
+#8 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(479): App\Http\Controllers\Chair\PbsController->semesterIsWritable('581ab5ef-2c88-4...')
+#9 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbsController->clear(Object(Illuminate\Http\Request))
+#10 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbsController), 'clear')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('POST', 'http://localhos...', Array, Array, Array, Array, '{"section":"8cd...')
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(411): Illuminate\Foundation\Testing\TestCase->json('POST', 'http://localhos...', Array, Array, 0)
+#66 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(187): Illuminate\Foundation\Testing\TestCase->postJson('http://localhos...', Array)
+#67 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_pbs_clear_only_removes_the_selected_semester()
+#68 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#75 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#76 {main}
+
+----------------------------------------------------------------------------------
+
+SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = 581ab5ef-2c88-4586-a925-c7d5b94f4727 limit 1)
+
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:175
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php:191
+
+3) Tests\Feature\ChairTermScheduleIsolationTest::test_pbt_clear_only_removes_the_selected_semester
+Expected response status code [200] but received 500.
+Failed asserting that 500 is identical to 200.
+
+The following exception occurred during the last request:
+
+PDOException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:420
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(420): PDO->prepare('select "s"."sem...')
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select "s"."sem...', Array)
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#7 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#8 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#9 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbtController.php(455): Illuminate\Database\Query\Builder->first(Array)
+#10 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbtController.php(521): App\Http\Controllers\Chair\PbtController->semesterIsWritable('f6a2549c-6643-4...')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbtController->clear(Object(Illuminate\Http\Request))
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbtController), 'clear')
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#16 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#20 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#66 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('POST', 'http://localhos...', Array, Array, Array, Array, '{"faculty":"529...')
+#67 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(411): Illuminate\Foundation\Testing\TestCase->json('POST', 'http://localhos...', Array, Array, 0)
+#68 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(205): Illuminate\Foundation\Testing\TestCase->postJson('http://localhos...', Array)
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_pbt_clear_only_removes_the_selected_semester()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#75 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#76 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#77 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#78 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = f6a2549c-6643-4f02-a890-2022f4741f33 limit 1) in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:838
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#7 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbtController.php(455): Illuminate\Database\Query\Builder->first(Array)
+#8 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbtController.php(521): App\Http\Controllers\Chair\PbtController->semesterIsWritable('f6a2549c-6643-4...')
+#9 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbtController->clear(Object(Illuminate\Http\Request))
+#10 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbtController), 'clear')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('POST', 'http://localhos...', Array, Array, Array, Array, '{"faculty":"529...')
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(411): Illuminate\Foundation\Testing\TestCase->json('POST', 'http://localhos...', Array, Array, 0)
+#66 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(205): Illuminate\Foundation\Testing\TestCase->postJson('http://localhos...', Array)
+#67 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_pbt_clear_only_removes_the_selected_semester()
+#68 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#75 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#76 {main}
+
+----------------------------------------------------------------------------------
+
+SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = f6a2549c-6643-4f02-a890-2022f4741f33 limit 1)
+
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:175
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php:209
+
+4) Tests\Feature\ChairTermScheduleIsolationTest::test_chair_cannot_update_delete_or_clear_another_department_pbs_schedule
+Expected response status code [403] but received 500.
+Failed asserting that 500 is identical to 403.
+
+The following exception occurred during the last request:
+
+PDOException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:420
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(420): PDO->prepare('select "s"."sem...')
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(827): Illuminate\Database\Connection->Illuminate\Database\{closure}('select "s"."sem...', Array)
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#7 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#8 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#9 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(401): Illuminate\Database\Query\Builder->first(Array)
+#10 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(450): App\Http\Controllers\Chair\PbsController->semesterIsWritable('56238710-679a-4...')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbsController->destroy(Object(Illuminate\Http\Request), '43ae1135-3588-4...')
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbsController), 'destroy')
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#16 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#20 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#66 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('DELETE', 'http://localhos...', Array, Array, Array, Array, '{"sem_id":"5623...')
+#67 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(501): Illuminate\Foundation\Testing\TestCase->json('DELETE', 'http://localhos...', Array, Array, 0)
+#68 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(228): Illuminate\Foundation\Testing\TestCase->deleteJson('http://localhos...', Array)
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_chair_cannot_update_delete_or_clear_another_department_pbs_schedule()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#75 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#76 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#77 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#78 {main}
+
+Next Illuminate\Database\QueryException: SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = 56238710-679a-4379-b974-8a714868d83a limit 1) in C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php:838
+Stack trace:
+#0 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(794): Illuminate\Database\Connection->runQueryCallback('select "s"."sem...', Array, Object(Closure))
+#1 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Connection.php(411): Illuminate\Database\Connection->run('select "s"."sem...', Array, Object(Closure))
+#2 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3509): Illuminate\Database\Connection->select('select "s"."sem...', Array, true)
+#3 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3494): Illuminate\Database\Query\Builder->runSelect()
+#4 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(4084): Illuminate\Database\Query\Builder->Illuminate\Database\Query\{closure}()
+#5 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php(3493): Illuminate\Database\Query\Builder->onceWithColumns(Array, Object(Closure))
+#6 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Database\Concerns\BuildsQueries.php(366): Illuminate\Database\Query\Builder->get(Array)
+#7 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(401): Illuminate\Database\Query\Builder->first(Array)
+#8 C:\xampp\htdocs\Skedyul\app\Http\Controllers\Chair\PbsController.php(450): App\Http\Controllers\Chair\PbsController->semesterIsWritable('56238710-679a-4...')
+#9 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\ControllerDispatcher.php(46): App\Http\Controllers\Chair\PbsController->destroy(Object(Illuminate\Http\Request), '43ae1135-3588-4...')
+#10 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(265): Illuminate\Routing\ControllerDispatcher->dispatch(Object(Illuminate\Routing\Route), Object(App\Http\Controllers\Chair\PbsController), 'destroy')
+#11 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Route.php(211): Illuminate\Routing\Route->runController()
+#12 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(822): Illuminate\Routing\Route->run()
+#13 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Routing\Router->Illuminate\Routing\{closure}(Object(Illuminate\Http\Request))
+#14 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(202): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#15 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): class@anonymous->handle(Object(Illuminate\Http\Request), Object(Closure))
+#16 C:\xampp\htdocs\Skedyul\app\Http\Middleware\EnsureUserHasRole.php(15): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#17 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\EnsureUserHasRole->handle(Object(Illuminate\Http\Request), Object(Closure), 'department_chai...')
+#18 C:\xampp\htdocs\Skedyul\app\Http\Middleware\PreventBackHistory.php(13): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#19 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): App\Http\Middleware\PreventBackHistory->handle(Object(Illuminate\Http\Request), Object(Closure))
+#20 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Middleware\SubstituteBindings.php(50): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#21 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Routing\Middleware\SubstituteBindings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#22 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Auth\Middleware\Authenticate.php(63): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#23 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Auth\Middleware\Authenticate->handle(Object(Illuminate\Http\Request), Object(Closure))
+#24 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken.php(87): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#25 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\VerifyCsrfToken->handle(Object(Illuminate\Http\Request), Object(Closure))
+#26 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\View\Middleware\ShareErrorsFromSession.php(48): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#27 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\View\Middleware\ShareErrorsFromSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#28 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(120): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#29 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Session\Middleware\StartSession.php(63): Illuminate\Session\Middleware\StartSession->handleStatefulRequest(Object(Illuminate\Http\Request), Object(Illuminate\Session\Store), Object(Closure))
+#30 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Session\Middleware\StartSession->handle(Object(Illuminate\Http\Request), Object(Closure))
+#31 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse.php(36): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#32 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse->handle(Object(Illuminate\Http\Request), Object(Closure))
+#33 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Cookie\Middleware\EncryptCookies.php(74): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#34 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Cookie\Middleware\EncryptCookies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#35 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#36 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(821): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#37 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(800): Illuminate\Routing\Router->runRouteWithinStack(Object(Illuminate\Routing\Route), Object(Illuminate\Http\Request))
+#38 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(764): Illuminate\Routing\Router->runRoute(Object(Illuminate\Http\Request), Object(Illuminate\Routing\Route))
+#39 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Routing\Router.php(753): Illuminate\Routing\Router->dispatchToRoute(Object(Illuminate\Http\Request))
+#40 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(200): Illuminate\Routing\Router->dispatch(Object(Illuminate\Http\Request))
+#41 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(180): Illuminate\Foundation\Http\Kernel->Illuminate\Foundation\Http\{closure}(Object(Illuminate\Http\Request))
+#42 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#43 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull.php(31): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#44 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull->handle(Object(Illuminate\Http\Request), Object(Closure))
+#45 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TransformsRequest.php(21): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#46 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\TrimStrings.php(51): Illuminate\Foundation\Http\Middleware\TransformsRequest->handle(Object(Illuminate\Http\Request), Object(Closure))
+#47 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\TrimStrings->handle(Object(Illuminate\Http\Request), Object(Closure))
+#48 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePostSize.php(27): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#49 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePostSize->handle(Object(Illuminate\Http\Request), Object(Closure))
+#50 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance.php(109): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#51 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance->handle(Object(Illuminate\Http\Request), Object(Closure))
+#52 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\HandleCors.php(61): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#53 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\HandleCors->handle(Object(Illuminate\Http\Request), Object(Closure))
+#54 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\TrustProxies.php(58): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#55 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\TrustProxies->handle(Object(Illuminate\Http\Request), Object(Closure))
+#56 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks.php(22): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#57 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks->handle(Object(Illuminate\Http\Request), Object(Closure))
+#58 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Http\Middleware\ValidatePathEncoding.php(26): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#59 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(219): Illuminate\Http\Middleware\ValidatePathEncoding->handle(Object(Illuminate\Http\Request), Object(Closure))
+#60 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Pipeline\Pipeline.php(137): Illuminate\Pipeline\Pipeline->Illuminate\Pipeline\{closure}(Object(Illuminate\Http\Request))
+#61 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(175): Illuminate\Pipeline\Pipeline->then(Object(Closure))
+#62 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Http\Kernel.php(144): Illuminate\Foundation\Http\Kernel->sendRequestThroughRouter(Object(Illuminate\Http\Request))
+#63 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(607): Illuminate\Foundation\Http\Kernel->handle(Object(Illuminate\Http\Request))
+#64 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(573): Illuminate\Foundation\Testing\TestCase->call('DELETE', 'http://localhos...', Array, Array, Array, Array, '{"sem_id":"5623...')
+#65 C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Foundation\Testing\Concerns\MakesHttpRequests.php(501): Illuminate\Foundation\Testing\TestCase->json('DELETE', 'http://localhos...', Array, Array, 0)
+#66 C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php(228): Illuminate\Foundation\Testing\TestCase->deleteJson('http://localhos...', Array)
+#67 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(1667): Tests\Feature\ChairTermScheduleIsolationTest->test_chair_cannot_update_delete_or_clear_another_department_pbs_schedule()
+#68 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(519): PHPUnit\Framework\TestCase->runTest()
+#69 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestRunner\TestRunner.php(87): PHPUnit\Framework\TestCase->runBare()
+#70 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestCase.php(365): PHPUnit\Framework\TestRunner->run(Object(Tests\Feature\ChairTermScheduleIsolationTest))
+#71 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestCase->run()
+#72 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\Framework\TestSuite.php(369): PHPUnit\Framework\TestSuite->run()
+#73 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\TestRunner.php(64): PHPUnit\Framework\TestSuite->run()
+#74 C:\xampp\htdocs\Skedyul\vendor\phpunit\phpunit\src\TextUI\Application.php(211): PHPUnit\TextUI\TestRunner->run(Object(PHPUnit\TextUI\Configuration\Configuration), Object(PHPUnit\Runner\ResultCache\DefaultResultCache), Object(PHPUnit\Framework\TestSuite))
+#75 Command line code(1): PHPUnit\TextUI\Application->run(Array)
+#76 {main}
+
+----------------------------------------------------------------------------------
+
+SQLSTATE[HY000]: General error: 1 no such column: s.sem_name (Connection: sqlite, Database: :memory:, SQL: select "s"."sem_name", "s"."sem_is_active", "s"."sem_is_plotting_enabled", "s"."sem_ay_id", "ay"."ay_is_active" from "semester" as "s" left join "academic_year" as "ay" on "ay"."ay_id" = "s"."sem_ay_id" where "s"."sem_id" = 56238710-679a-4379-b974-8a714868d83a limit 1)
+
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:175
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:141
+C:\xampp\htdocs\Skedyul\tests\Feature\ChairTermScheduleIsolationTest.php:231
+
+5) Tests\Feature\FacultyScheduleSemesterTest::test_faculty_can_view_selected_semester_without_changing_official_term
+Failed asserting that '<!DOCTYPE html>\n
+<html lang="en">\n
+\n
+<head>\n
+    <link rel="icon" type="image/x-icon" href="http://localhost:8000/favicon.ico?v=1792848231">\n
+    <meta charset="UTF-8">\n
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n
+    <meta name="csrf-token" content="NZtUpqjZdDcLvaWIVn4za2RVNif7Q5KBvcF8toHk">\n
+    <title>SKEDYUL — My Schedule</title>\n
+        <style>\n
+        @media print {\n
+            @page {\n
+                size: landscape;\n
+                margin: 10mm;\n
+            }\n
+\n
+            body {\n
+                background: #fff !important;\n
+                color: #111827 !important;\n
+                overflow: visible !important;\n
+            }\n
+\n
+            .sidebar,\n
+            .topbar,\n
+            .no-print {\n
+                display: none !important;\n
+            }\n
+\n
+            #screen-app,\n
+            .main,\n
+            .page,\n
+            .page-content {\n
+                display: block !important;\n
+                width: 100% !important;\n
+                height: auto !important;\n
+                max-height: none !important;\n
+                overflow: visible !important;\n
+                margin: 0 !important;\n
+                padding: 0 !important;\n
+            }\n
+\n
+            .schedule-layout {\n
+                grid-template-columns: 260px minmax(0, 1fr) !important;\n
+                gap: 8px !important;\n
+            }\n
+\n
+            .schedule-scroll {\n
+                overflow: visible !important;\n
+            }\n
+\n
+            .schedule-min-width {\n
+                min-width: 0 !important;\n
+            }\n
+\n
+            .print-card {\n
+                break-inside: avoid;\n
+                box-shadow: none !important;\n
+            }\n
+\n
+            .signature-card {\n
+                break-inside: avoid;\n
+                margin-top: 12px !important;\n
+            }\n
+\n
+            a {\n
+                color: inherit !important;\n
+                text-decoration: none !important;\n
+            }\n
+        }\n
+    </style>\n
+</head>\n
+\n
+<body class="bg-slate-50 font-sans text-slate-900">\n
+    \n
+    <div id="screen-app" class="screen active flex-row">\n
+        <div class="sidebar faculty-sidebar" id="faculty-sidebar">\n
+    <div class="sidebar-logo faculty-sidebar-logo">\n
+        <div class="sidebar-logo-text">SKED<span>YUL</span></div>\n
+        <span class="faculty-portal-badge">PORTAL</span>\n
+    </div>\n
+\n
+    <div class="sidebar-user">\n
+        <div class="sidebar-avatar">\n
+                            AL\n
+                    </div>\n
+        <div class="overflow-hidden">\n
+            <div class="sidebar-user-name">Ada Lovelace</div>\n
+            <div class="sidebar-user-role">Faculty Member, N/A\n
+            </div>\n
+        </div>\n
+    </div>\n
+\n
+    <div class="sidebar-nav">\n
+        <div class="nav-section-label">Main</div>\n
+        <a href="http://localhost:8000/faculty/dashboard"\n
+            class="nav-item "\n
+            style="text-decoration:none !important;">\n
+            <span class="nav-icon"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span> My Dashboard\n
+        </a>\n
+        <a href="http://localhost:8000/faculty/subjects"\n
+            class="nav-item "\n
+            style="text-decoration:none !important;">\n
+            <span class="nav-icon"><i class="ti ti-book-2" aria-hidden="true"></i></span> My Subjects\n
+        </a>\n
+        <a href="http://localhost:8000/faculty/schedule"\n
+            class="nav-item active"\n
+            style="text-decoration:none !important;">\n
+            <span class="nav-icon"><i class="ti ti-calendar-week" aria-hidden="true"></i></span> My Schedule\n
+        </a>\n
+        <a href="http://localhost:8000/faculty/settings"\n
+            class="nav-item "\n
+            style="text-decoration:none !important;">\n
+            <span class="nav-icon"><i class="ti ti-settings" aria-hidden="true"></i></span> Settings\n
+        </a>\n
+    </div>\n
+\n
+    <div class="sidebar-bottom">\n
+        <form action="http://localhost:8000/logout" method="POST">\n
+            <input type="hidden" name="_token" value="NZtUpqjZdDcLvaWIVn4za2RVNif7Q5KBvcF8toHk" autocomplete="off">            <button type="submit" class="btn-logout">⬅ Sign Out</button>\n
+        </form>\n
+    </div>\n
+</div>\n
+\n
+        <div class="main">\n
+                        <div id="faculty-mobile-nav-backdrop" class="faculty-mobile-nav-backdrop" onclick="closeFacultyMobileNav()" aria-hidden="true"></div>\n
+<div class="topbar">\n
+    <button type="button" class="faculty-mobile-menu-button" onclick="toggleFacultyMobileNav()" aria-label="Open navigation menu" aria-expanded="false" aria-controls="faculty-sidebar">\n
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>\n
+    </button>\n
+    <div class="topbar-title flex items-center gap-2.5">\n
+        <span>My Schedule</span>\n
+                    <span class="faculty-term-active hidden sm:inline-flex"><span aria-hidden="true"></span> Term Active</span>\n
+            </div>\n
+    <div class="flex items-center gap-2.5">\n
+                        <div id="topbar-notif-bell" class="relative">\n
+            <button type="button" onclick="facultyHeaderToggleNotifDropdown()"\n
+                class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">\n
+                <span class="faculty-notification-label">Notifications</span>\n
+                <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">\n
+                    0\n
+                </span>\n
+            </button>\n
+            <div id="notif-dropdown" style="display:none;"\n
+                class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">\n
+                <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>\n
+                <div id="notif-list" class="max-h-80 overflow-y-auto"></div>\n
+                <div class="px-4 py-2.5 border-t border-slate-200 text-center">\n
+                    <button type="button" onclick="facultyHeaderMarkAllRead()"\n
+                        class="text-[12px] text-blue-600 font-semibold bg-transparent border-none cursor-pointer">\n
+                        Mark all as read\n
+                    </button>\n
+                </div>\n
+            </div>\n
+        </div>\n
+    </div>\n
+</div>\n
+\n
+<script>\n
+function toggleFacultyMobileNav() {\n
+    const sidebar = document.getElementById('faculty-sidebar');\n
+    const backdrop = document.getElementById('faculty-mobile-nav-backdrop');\n
+    const button = document.querySelector('.faculty-mobile-menu-button');\n
+    if (!sidebar || !backdrop || !button) return;\n
+    const isOpen = sidebar.classList.toggle('faculty-mobile-nav-open');\n
+    backdrop.classList.toggle('faculty-mobile-nav-backdrop-open', isOpen);\n
+    button.setAttribute('aria-expanded', String(isOpen));\n
+    button.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');\n
+}\n
+\n
+function closeFacultyMobileNav() {\n
+    const sidebar = document.getElementById('faculty-sidebar');\n
+    const backdrop = document.getElementById('faculty-mobile-nav-backdrop');\n
+    const button = document.querySelector('.faculty-mobile-menu-button');\n
+    sidebar?.classList.remove('faculty-mobile-nav-open');\n
+    backdrop?.classList.remove('faculty-mobile-nav-backdrop-open');\n
+    button?.setAttribute('aria-expanded', 'false');\n
+    button?.setAttribute('aria-label', 'Open navigation menu');\n
+}\n
+\n
+document.addEventListener('keydown', event => {\n
+    if (event.key === 'Escape') closeFacultyMobileNav();\n
+});\n
+document.getElementById('faculty-sidebar')?.querySelectorAll('a').forEach(link => {\n
+    link.addEventListener('click', closeFacultyMobileNav);\n
+});\n
+</script>\n
+\n
+<script>\n
+const FACULTY_HEADER_NOTIFICATION_ENDPOINTS = {"index":"http:\/\/localhost:8000\/notifications","unreadCount":"http:\/\/localhost:8000\/notifications\/unread-count","read":"http:\/\/localhost:8000\/notifications\/__notification_id__\/read","readAll":"http:\/\/localhost:8000\/notifications\/read-all"};\n
+let facultyHeaderNotifOpen = false;\n
+\n
+async function facultyHeaderRequest(url, options = {}) {\n
+    const response = await fetch(url, {\n
+        ...options,\n
+        headers: {\n
+            'Accept': 'application/json',\n
+            ...(options.headers || {}),\n
+        },\n
+    });\n
+    let result;\n
+    try {\n
+        result = await response.json();\n
+    } catch {\n
+        throw new Error('The server returned an unexpected response.');\n
+    }\n
+    if (!response.ok) {\n
+        throw new Error(result.message || 'Unable to update notifications.');\n
+    }\n
+    return result;\n
+}\n
+\n
+function facultyHeaderShowNotifMessage(message) {\n
+    const list = document.getElementById('notif-list');\n
+    if (!list) return;\n
+    const item = document.createElement('div');\n
+    item.className = 'px-4 py-6 text-center text-xs text-slate-400';\n
+    item.textContent = message;\n
+    list.replaceChildren(item);\n
+}\n
+\n
+function facultyHeaderFormatNotifTime(value) {\n
+    const date = new Date(value);\n
+    if (Number.isNaN(date.getTime())) return '';\n
+\n
+    const now = new Date();\n
+    const today = date.toDateString() === now.toDateString();\n
+    const yesterday = new Date(now);\n
+    yesterday.setDate(now.getDate() - 1);\n
+    const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });\n
+    if (today) return `Today, ${time}`;\n
+    if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;\n
+    return `${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;\n
+}\n
+\n
+function renderFacultyHeaderNotifList(notifications) {\n
+    const list = document.getElementById('notif-list');\n
+    if (!list) return;\n
+    if (!notifications.length) {\n
+        facultyHeaderShowNotifMessage('No notifications yet.');\n
+        return;\n
+    }\n
+\n
+    const dotColors = {\n
+        conflict: '#dc2626',\n
+        overload: '#d97706',\n
+        reminder: '#2563eb',\n
+        info: '#2563eb',\n
+        assignment: '#2563eb',\n
+        approval: '#16a34a',\n
+    };\n
+    const fragment = document.createDocumentFragment();\n
+\n
+    notifications.forEach(notification => {\n
+        const item = document.createElement('div');\n
+        item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;\n
+        if (!notification.notif_is_read) {\n
+            item.setAttribute('role', 'button');\n
+            item.tabIndex = 0;\n
+            item.addEventListener('click', () => facultyHeaderMarkRead(notification.notif_id, item));\n
+            item.addEventListener('keydown', event => {\n
+                if (event.key === 'Enter' || event.key === ' ') {\n
+                    event.preventDefault();\n
+                    facultyHeaderMarkRead(notification.notif_id, item);\n
+                }\n
+            });\n
+        }\n
+\n
+        const dot = document.createElement('div');\n
+        dot.className = 'notif-drop-dot';\n
+        dot.style.backgroundColor = dotColors[notification.notif_type] || '#94a3b8';\n
+\n
+        const content = document.createElement('div');\n
+        const text = document.createElement('div');\n
+        text.className = 'notif-drop-text';\n
+        const title = document.createElement('b');\n
+        title.textContent = notification.notif_title || 'Notification';\n
+        text.append(title, document.createTextNode(` — ${notification.notif_message || ''}`));\n
+\n
+        const time = document.createElement('div');\n
+        time.className = 'notif-drop-time';\n
+        time.textContent = facultyHeaderFormatNotifTime(notification.notif_created_at);\n
+\n
+        content.append(text, time);\n
+        item.append(dot, content);\n
+        fragment.appendChild(item);\n
+    });\n
+    list.replaceChildren(fragment);\n
+}\n
+\n
+async function loadFacultyHeaderNotifications() {\n
+    facultyHeaderShowNotifMessage('Loading notifications…');\n
+    try {\n
+        const notifications = await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.index);\n
+        if (!Array.isArray(notifications)) throw new Error('The server returned invalid notifications.');\n
+        renderFacultyHeaderNotifList(notifications);\n
+    } catch (error) {\n
+        facultyHeaderShowNotifMessage(error.message || 'Failed to load notifications.');\n
+    }\n
+}\n
+\n
+async function facultyHeaderToggleNotifDropdown() {\n
+    const dd = document.getElementById('notif-dropdown');\n
+    if (!dd) return;\n
+    facultyHeaderNotifOpen = !facultyHeaderNotifOpen;\n
+    dd.style.display = facultyHeaderNotifOpen ? 'block' : 'none';\n
+    if (facultyHeaderNotifOpen) await loadFacultyHeaderNotifications();\n
+}\n
+\n
+document.addEventListener('click', function (e) {\n
+    const bell = document.getElementById('topbar-notif-bell');\n
+    if (bell && !bell.contains(e.target)) {\n
+        facultyHeaderNotifOpen = false;\n
+        const dd = document.getElementById('notif-dropdown');\n
+        if (dd) dd.style.display = 'none';\n
+    }\n
+});\n
+\n
+async function facultyHeaderMarkRead(id, el) {\n
+    if (!id || !el || !el.classList.contains('unread')) return;\n
+    try {\n
+        const url = FACULTY_HEADER_NOTIFICATION_ENDPOINTS.read.replace('__notification_id__', encodeURIComponent(id));\n
+        await facultyHeaderRequest(url, {\n
+            method: 'PUT',\n
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },\n
+        });\n
+        el.classList.remove('unread');\n
+        el.removeAttribute('role');\n
+        el.removeAttribute('tabindex');\n
+        updateFacultyHeaderNotifCount();\n
+    } catch (error) {\n
+        facultyHeaderShowNotifMessage(error.message || 'Unable to mark this notification as read.');\n
+    }\n
+}\n
+\n
+async function facultyHeaderMarkAllRead() {\n
+    try {\n
+        await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.readAll, {\n
+            method: 'PUT',\n
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },\n
+        });\n
+        document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(el => {\n
+            el.classList.remove('unread');\n
+            el.removeAttribute('role');\n
+            el.removeAttribute('tabindex');\n
+        });\n
+        updateFacultyHeaderNotifCount();\n
+    } catch (error) {\n
+        facultyHeaderShowNotifMessage(error.message || 'Unable to mark notifications as read.');\n
+    }\n
+}\n
+\n
+async function updateFacultyHeaderNotifCount() {\n
+    try {\n
+        const result = await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.unreadCount);\n
+        const count = Number(result.count);\n
+        if (!Number.isInteger(count) || count < 0) throw new Error('The server returned an invalid notification count.');\n
+        const badge = document.getElementById('notif-count');\n
+        if (badge) {\n
+            badge.textContent = count;\n
+            badge.style.display = count > 0 ? 'inline' : 'none';\n
+        }\n
+    } catch (error) {\n
+        console.error('Unable to refresh faculty notification count:', error);\n
+    }\n
+}\n
+\n
+updateFacultyHeaderNotifCount();\n
+setInterval(updateFacultyHeaderNotifCount, 30000);\n
+</script>\n
+\n
+            <main class="page-content faculty-page-enter" id="page-faculty-schedule">\n
+                <div class="no-print mb-4 flex flex-wrap items-center justify-between gap-3">\n
+                    <div>\n
+                        <h1 class="text-xl font-extrabold text-slate-900">My Teaching Schedule</h1>\n
+                    </div>\n
+\n
+                    <div class="flex flex-wrap gap-2">\n
+                        <button type="button" id="schedule-summary-toggle" aria-expanded="false"\n
+                            aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()"\n
+                            class="btn btn-secondary inline-flex items-center gap-2">\n
+                            <span>Summary</span><span aria-hidden="true">▦</span>\n
+                        </button>\n
+                        <a href="http://localhost:8000/faculty/pbt-export?semester=ec833982-846e-47d2-8d89-9ace9346a1c9"\n
+                            class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">\n
+                            Download XLSX\n
+                        </a>\n
+                        <button type="button" onclick="window.print()" class="btn btn-secondary">\n
+                            Print Schedule\n
+                        </button>\n
+                    </div>\n
+                </div>\n
+\n
+                \n
+                <div id="schedule-summary-modal"\n
+                    class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/40 p-4 opacity-0 transition-opacity duration-200"\n
+                    role="dialog" aria-modal="true" aria-labelledby="schedule-summary-title"\n
+                    onclick="if(event.target === this) closeScheduleSummary()">\n
+                    <aside id="schedule-summary-panel"\n
+                        class="card !p-0 w-[min(1100px,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] overflow-y-auto self-center shadow-2xl scale-95 transition-transform duration-200">\n
+                        <div\n
+                            class="sticky top-0 z-10 flex items-center justify-between bg-blue-600 text-white px-4 py-3">\n
+                            <span id="schedule-summary-title" class="text-[12px] font-extrabold tracking-wide">\n
+                                Summary of Courses\n
+                            </span>\n
+                            <button type="button" onclick="closeScheduleSummary()"\n
+                                class="rounded-lg px-2 py-1 text-lg leading-none hover:bg-white/20"\n
+                                aria-label="Close summary">✕</button>\n
+                        </div>\n
+\n
+                        <div class="overflow-x-auto">\n
+                            <table class="w-full text-[10px] border-collapse">\n
+                                <thead>\n
+                                    <tr class="bg-slate-100 text-slate-600 uppercase font-bold">\n
+                                        <th class="px-1.5 py-1.5 text-left border-b border-slate-200">Course Code</th>\n
+                                        <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">\n
+                                            Descriptive Title</th>\n
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">Units\n
+                                        </th>\n
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">\n
+                                            Scheduled<br>Hours</th>\n
+                                        <th class="px-1.5 py-1.5 text-left border-b border-l border-slate-200">\n
+                                            Degree<br>Yr. &amp; Sec.</th>\n
+                                        <th class="px-1.5 py-1.5 text-center border-b border-l border-slate-200">\n
+                                            Total<br>No. of Students</th>\n
+                                    </tr>\n
+                                </thead>\n
+                                <tbody>\n
+                                                                                                                    <tr class="border-b border-slate-100 text-slate-700">\n
+                                            <td class="px-1.5 py-1.5 font-bold text-slate-800 whitespace-nowrap">\n
+                                                CS202</td>\n
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 leading-snug">\n
+                                                Second Semester Course</td>\n
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 text-center">\n
+                                                3</td>\n
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 text-center"\n
+                                                title="0 of 3 total hours scheduled">\n
+                                                0/3</td>\n
+                                            <td class="px-1.5 py-1.5 border-l border-slate-100 whitespace-nowrap">\n
+                                                BSIT-1A</td>\n
+                                            <td\n
+                                                class="px-1.5 py-1.5 border-l border-slate-100 text-center font-semibold">\n
+                                                —\n
+                                            </td>\n
+                                        </tr>\n
+                                                                    </tbody>\n
+                            </table>\n
+                        </div>\n
+\n
+                        <div class="border-t border-slate-200 p-3 text-[11px] text-slate-700 space-y-1">\n
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of\n
+                                    Preparations:</span><span>1</span></div>\n
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of\n
+                                    Units:</span><span>3</span></div>\n
+                            <div class="flex justify-between gap-2"><span class="font-bold">No. of\n
+                                    Hours/Week:</span><span>1</span></div>\n
+                            <div class="flex justify-between gap-2"><span class="font-bold">Teaching Load\n
+                                    Limit:</span><span>30h</span>\n
+                            </div>\n
+                            <div class="flex justify-between gap-2"><span class="font-bold">Administrative\n
+                                    Designation:</span><span\n
+                                    class="text-right">—</span></div>\n
+                            <div class="border-t border-slate-100 my-1.5"></div>\n
+                            <div class="flex justify-between gap-2"><span\n
+                                    class="font-bold">Production:</span><span>—</span>\n
+                            </div>\n
+                            <div class="flex justify-between gap-2"><span\n
+                                    class="font-bold">Extension:</span><span>—</span>\n
+                            </div>\n
+                            <div class="flex justify-between gap-2"><span\n
+                                    class="font-bold">Research:</span><span>—</span>\n
+                            </div>\n
+                        </div>\n
+                    </aside>\n
+                </div>\n
+\n
+                <section class="print-card card !p-0 overflow-hidden w-full">\n
+                    <div\n
+                        class="no-print flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2.5">\n
+                        <div\n
+                            class="inline-flex min-w-[220px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">\n
+                            <span\n
+                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">\n
+                                AL\n
+                            </span>\n
+                            <span class="min-w-0">\n
+                                <span\n
+                                    class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Viewing\n
+                                    my schedule</span>\n
+                                <span\n
+                                    class="block truncate text-[13px] font-semibold text-slate-800">Ada Lovelace</span>\n
+                            </span>\n
+                        </div>\n
+\n
+                        <form method="GET" action="http://localhost:8000/faculty/schedule">\n
+                            <input type="hidden" name="shift" value="day">\n
+                            <label for="faculty-semester" class="sr-only">Academic year and semester</label>\n
+                            <select id="faculty-semester" name="semester" onchange="this.form.submit()"\n
+                                class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">\n
+                                                                    <option value="e7c8ec8d-2b8e-406f-9d68-2877b4ed37a1"\n
+                                        >\n
+                                        1st Semester, AY 2025 - 2026 (Current)\n
+                                    </option>\n
+                                                            </select>\n
+                        </form>\n
+\n
+                        <div class="flex overflow-hidden rounded-lg border border-slate-300"\n
+                            aria-label="Schedule shift">\n
+                            <a href="http://localhost:8000/faculty/schedule?shift=day&amp;semester=ec833982-846e-47d2-8d89-9ace9346a1c9"\n
+                                class="px-3 py-2 text-[11px] font-bold uppercase bg-blue-600 text-white">Day</a>\n
+                            <a href="http://localhost:8000/faculty/schedule?shift=night&amp;semester=ec833982-846e-47d2-8d89-9ace9346a1c9"\n
+                                class="border-l border-slate-300 px-3 py-2 text-[11px] font-bold uppercase bg-white text-slate-600">Evening</a>\n
+                        </div>\n
+\n
+                        <span class="ml-auto text-[11px] italic text-slate-400">View only</span>\n
+                    </div>\n
+\n
+                    <div class="schedule-scroll overflow-x-auto">\n
+                        <div class="schedule-min-width min-w-[840px]">\n
+                            <div class="grid border-b border-slate-200 bg-slate-100"\n
+                                style="grid-template-columns:90px repeat(7,minmax(0,1fr));">\n
+                                <div\n
+                                    class="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">\n
+                                    Time</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Monday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Tuesday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Wednesday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Thursday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Friday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Saturday</div>\n
+                                                                    <div\n
+                                        class="border-l border-slate-200 px-2 py-2 text-center text-[11px] font-bold text-slate-700">\n
+                                        Sunday</div>\n
+                                                            </div>\n
+\n
+                            <div id="faculty-week-grid" class="relative grid bg-white"\n
+                                style="grid-template-columns:90px repeat(7,minmax(0,1fr)); grid-template-rows:repeat(18,26px);">\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:1 / span 2;">\n
+                                        7 AM–8 AM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:3 / span 2;">\n
+                                        8 AM–9 AM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:5 / span 2;">\n
+                                        9 AM–10 AM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:7 / span 2;">\n
+                                        10 AM–11 AM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:9 / span 2;">\n
+                                        11 AM–12 PM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:11 / span 2;">\n
+                                        12 PM–1 PM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:13 / span 2;">\n
+                                        1 PM–2 PM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:15 / span 2;">\n
+                                        2 PM–3 PM\n
+                                    </div>\n
+                                                                                                        <div class="flex items-center justify-end border-b border-slate-200 bg-slate-50 px-2 text-[10px] font-semibold text-slate-500"\n
+                                        style="grid-column:1;grid-row:17 / span 2;">\n
+                                        3 PM–4 PM\n
+                                    </div>\n
+                                \n
+                                                                                                                                                <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:1;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:1;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:2;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:2;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:3;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:3;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:4;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:4;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:5;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:5;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:6;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:6;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:7;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:7;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:8;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:8;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:9;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:9;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:10;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:10;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:11;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:11;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:12;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:12;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:13;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:13;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:14;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:14;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:15;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:15;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:16;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:16;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:2;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:3;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:4;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:5;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:6;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:7;grid-row:17;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 !border-b-slate-200"\n
+                                            style="grid-column:8;grid-row:17;">\n
+                                        </div>\n
+                                                                                                                                                                                    <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:2;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:3;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:4;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:5;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:6;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:7;grid-row:18;">\n
+                                        </div>\n
+                                                                            <div class="border-b border-l border-slate-100 "\n
+                                            style="grid-column:8;grid-row:18;">\n
+                                        </div>\n
+                                                                    \n
+                                                                    <div class="pointer-events-none z-10 flex items-center justify-center bg-slate-900 text-[11px] font-bold tracking-[3px] text-white"\n
+                                        style="grid-column:2 / span 7;grid-row:11 / span 2;">NOON\n
+                                        BREAK</div>\n
+                                \n
+                                                            </div>\n
+                        </div>\n
+                    </div>\n
+\n
+                                            <div class="border-t border-slate-100 px-4 py-3 text-center text-[12px] text-slate-500">\n
+                            No day-shift classes are assigned to you this semester.\n
+                        </div>\n
+                                    </section>\n
+\n
+                <section class="signature-card card mt-4 overflow-x-auto print-card">\n
+                    <table class="w-full min-w-[720px] border-collapse text-center text-[12px]">\n
+                        <thead>\n
+                            <tr class="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">\n
+                                <th class="w-1/3 border-b border-slate-300 px-4 py-2">Prepared by:</th>\n
+                                <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Reviewed, Certified True\n
+                                    and Correct:</th>\n
+                                <th class="w-1/3 border-b border-l border-slate-300 px-4 py-2">Approved by:</th>\n
+                            </tr>\n
+                        </thead>\n
+                        <tbody>\n
+                            <tr>\n
+                                <td class="px-4 pb-3 pt-8 align-bottom">\n
+                                    <div class="border-b border-slate-800 pb-1 font-bold uppercase">\n
+                                        —</div>\n
+                                    <div class="pt-1 text-slate-600">\n
+                                        Chair</div>\n
+                                </td>\n
+                                <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">\n
+                                    <div class="border-b border-slate-800 pb-1 font-bold uppercase">\n
+                                        —</div>\n
+                                    <div class="pt-1 text-slate-600">Dean\n
+                                    </div>\n
+                                </td>\n
+                                <td class="border-l border-slate-200 px-4 pb-3 pt-8 align-bottom">\n
+                                    <div class="border-b border-slate-800 pb-1 font-bold uppercase">\n
+                                        </div>\n
+                                    <div class="pt-1 text-slate-600">Campus Director</div>\n
+                                </td>\n
+                            </tr>\n
+                        </tbody>\n
+                    </table>\n
+                </section>\n
+            </main>\n
+        </div>\n
+    </div>\n
+    <script>\n
+        function toggleScheduleSummary() {\n
+            const modal = document.getElementById('schedule-summary-modal');\n
+            const panel = document.getElementById('schedule-summary-panel');\n
+            const button = document.getElementById('schedule-summary-toggle');\n
+            const open = modal.classList.contains('hidden');\n
+            modal.classList.toggle('hidden', !open);\n
+            modal.classList.toggle('flex', open);\n
+            requestAnimationFrame(() => {\n
+                modal.classList.toggle('opacity-0', !open);\n
+                panel.classList.toggle('scale-95', !open);\n
+                panel.classList.toggle('scale-100', open);\n
+            });\n
+            button.setAttribute('aria-expanded', String(open));\n
+        }\n
+\n
+        function closeScheduleSummary() {\n
+            const modal = document.getElementById('schedule-summary-modal');\n
+            const panel = document.getElementById('schedule-summary-panel');\n
+            const button = document.getElementById('schedule-summary-toggle');\n
+            modal.classList.add('opacity-0');\n
+            panel.classList.add('scale-95');\n
+            panel.classList.remove('scale-100');\n
+            button.setAttribute('aria-expanded', 'false');\n
+            setTimeout(() => {\n
+                modal.classList.add('hidden');\n
+                modal.classList.remove('flex');\n
+            }, 200);\n
+        }\n
+\n
+        document.addEventListener('keydown', event => {\n
+            if (event.key === 'Escape') closeScheduleSummary();\n
+        });\n
+    </script>\n
+</body>\n
+\n
+</html>\n
+' [UTF-8](length: 71028) contains "2nd Semester, AY 2025 - 2026" [ASCII](length: 28).
+
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\Skedyul\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:710
+C:\xampp\htdocs\Skedyul\tests\Feature\FacultyScheduleSemesterTest.php:197
+
+ERRORS!
+Tests: 53, Assertions: 233, Errors: 1, Failures: 5.

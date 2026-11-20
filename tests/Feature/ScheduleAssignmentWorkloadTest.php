@@ -106,7 +106,7 @@ class ScheduleAssignmentWorkloadTest extends TestCase
         );
     }
 
-    public function test_schedule_times_can_cross_the_day_evening_grid_boundary(): void
+    public function test_base_time_validator_accepts_cross_boundary_range_for_shift_specific_validation(): void
     {
         $validator = Validator::make([
             'start_time' => '13:00',
@@ -141,6 +141,62 @@ class ScheduleAssignmentWorkloadTest extends TestCase
             'end_time' => '22:00',
         ]);
         $this->assertTrue($validator->passes(), $validator->errors()->first());
+    }
+
+    public function test_weekday_day_and_evening_schedules_respect_the_four_pm_boundary(): void
+    {
+        $this->assertSame(
+            'For evening sections, 7:00 AM–4:00 PM schedules are allowed on Saturday or Sunday only. Monday–Friday evening schedules must start at or after 4:00 PM.',
+            ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Monday',
+            'shift' => 'evening',
+            'start_time' => '15:30',
+            'end_time' => '18:00',
+            ])
+        );
+
+        $this->assertNotNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Monday',
+            'shift' => 'day',
+            'start_time' => '13:00',
+            'end_time' => '18:00',
+        ]));
+
+        $this->assertNotNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Monday',
+            'shift' => 'day',
+            'start_time' => '13:00',
+            'end_time' => '16:00',
+        ], sectionIsEvening: true));
+
+        $this->assertNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Monday',
+            'shift' => 'day',
+            'start_time' => '13:00',
+            'end_time' => '16:00',
+        ]));
+
+        $this->assertNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Monday',
+            'shift' => 'evening',
+            'start_time' => '16:00',
+            'end_time' => '18:00',
+        ]));
+
+        // Evening sections can still use daytime slots on weekends.
+        $this->assertNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Saturday',
+            'shift' => 'day',
+            'start_time' => '07:00',
+            'end_time' => '10:00',
+        ], sectionIsEvening: true));
+
+        $this->assertNull(ScheduleAssignmentService::scheduleTimeMessage([
+            'day' => 'Sunday',
+            'shift' => 'day',
+            'start_time' => '07:00',
+            'end_time' => '10:00',
+        ], sectionIsEvening: true));
     }
 
     public function test_full_time_evening_capacity_remains_separate_from_day_hours(): void

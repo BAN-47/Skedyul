@@ -250,7 +250,7 @@ class PbtController extends Controller
             'allDepartments'   => $allDepartments,
             'selectedDeptId'   => $request->query('department', $deptId),
             'sections'         => Section::whereIn('sec_dept_id', $allDepartments->pluck('dept_id'))->orderBy('sec_name')->get(),
-            'categories'       => Course::where('course_is_active', true)
+            'categories'       => Course::query()
                 ->whereNotNull('course_category')
                 ->where('course_category', '!=', '')
                 ->distinct()
