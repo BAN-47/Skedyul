@@ -37,10 +37,6 @@
                             </div>
                         </div>
                     </div>
-                    <a href="{{ route('dean.pending_approvals') }}" class="btn btn-secondary flex items-center gap-1.5 no-underline">
-                        Approvals
-                        <span id="notif-badge" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{{ $pendingApprovalsCount ?? 0 }}</span>
-                    </a>
                     <button type="button" onclick="openModal('modal-notify')" class="btn btn-secondary flex items-center gap-1.5">
                         Send notification
                     </button>
@@ -181,7 +177,6 @@
 
             <script>
                 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-                const pendingCountUrl = "{{ route('dean.notifications.pending-count') }}";
                 const deanPendingApprovalsUrl = @json(route('dean.pending_approvals'));
                 const deanNotificationEndpoints = {
                     index: @json(route('notifications.index')),
@@ -190,37 +185,6 @@
                     readAll: @json(route('notifications.read-all')),
                     delete: @json(route('notifications.destroy', ['id' => '__notification_id__'])),
                 };
-                // The badge rendered by the server may use a different pending
-                // count than this endpoint. Establish a live baseline first so
-                // opening a Dean page never announces existing approvals as new.
-                let lastPendingCount = null;
-
-                async function pollPendingCount() {
-                    try {
-                        const res = await fetch(pendingCountUrl, {
-                            cache: 'no-store',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-                        if (!res.ok) throw new Error(`Pending count request failed (${res.status})`);
-                        const data = await res.json();
-                        const badge = document.getElementById('notif-badge');
-                        const count = Number(data.count);
-                        if (!Number.isFinite(count)) return;
-                        if (badge) badge.textContent = String(count);
-
-                        if (lastPendingCount !== null && count > lastPendingCount) {
-                            showToast('New pending approval received', '#2563eb');
-                        }
-                        lastPendingCount = count;
-                    } catch (err) {
-                        console.error('Poll failed:', err);
-                    }
-                }
-                pollPendingCount();
-                setInterval(pollPendingCount, 15000);
                 deanHeaderUpdateNotifCount();
                 setInterval(deanHeaderUpdateNotifCount, 30000);
 
