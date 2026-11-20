@@ -210,26 +210,45 @@
                   <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Plotted</div>
                   <div class="text-right text-sm font-extrabold text-slate-900">{{ $tf['total_plotted'] }}h <span class="text-slate-400 font-medium">/ {{ $totalMax }}h total cap</span>@if($tf['employment'] === 'part_time')<div class="text-[9px] font-semibold text-slate-400">{{ $rem }}h shared capacity left</div>@endif</div>
                 </div>
-                @foreach ([['label' => 'Day', 'load' => $tf['day'], 'percent' => $dayPct, 'tone' => 'emerald'], ['label' => 'Evening', 'load' => $tf['evening'], 'percent' => $eveningPct, 'tone' => 'indigo']] as $shiftLoad)
+                @if($tf['employment'] === 'part_time')
                   @php
-                    $shiftRemaining = $tf['employment'] === 'part_time' ? $rem : max(0, $shiftLoad['load']['max_hours'] - $shiftLoad['load']['hours']);
-                    $barTone = $shiftLoad['percent'] > 90 ? 'bg-red-500' : ($shiftLoad['percent'] > 70 ? 'bg-amber-500' : ($shiftLoad['tone'] === 'emerald' ? 'bg-emerald-500' : 'bg-indigo-500'));
-                    $textTone = $shiftLoad['percent'] > 90 ? 'text-red-600' : ($shiftLoad['tone'] === 'emerald' ? 'text-emerald-700' : 'text-indigo-700');
+                    $sharedBarTone = $pct > 90 ? 'bg-red-500' : ($pct > 70 ? 'bg-amber-500' : 'bg-emerald-500');
                   @endphp
                   <div>
                     <div class="mb-1 flex items-center justify-between gap-2 text-[10px]">
-                      <span class="font-bold uppercase tracking-wide {{ $textTone }}">{{ $shiftLoad['label'] }}</span>
-                      <span class="font-extrabold text-slate-700">{{ $shiftLoad['load']['hours'] }}h <span class="font-medium text-slate-400">/ {{ $shiftLoad['load']['max_hours'] }}h max</span></span>
+                      <span class="font-bold uppercase tracking-wide text-emerald-700">Shared Day + Evening</span>
+                      <span class="font-extrabold text-slate-700">{{ $tf['total_plotted'] }}h <span class="font-medium text-slate-400">/ {{ $totalMax }}h max</span></span>
                     </div>
                     <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div class="h-full rounded-full transition-all duration-700 {{ $barTone }}" style="width: {{ $shiftLoad['percent'] }}%"></div>
+                      <div class="h-full rounded-full transition-all duration-700 {{ $sharedBarTone }}" style="width: {{ $pct }}%"></div>
                     </div>
                     <div class="mt-1 flex justify-between text-[9px] font-semibold text-slate-400">
-                      <span>{{ $shiftLoad['percent'] }}% {{ $tf['employment'] === 'part_time' ? 'of shared cap' : 'of shift cap' }}</span>
-                      <span>{{ $tf['employment'] === 'part_time' ? 'Counts toward shared total' : $shiftRemaining . 'h left' }}</span>
+                      <span>{{ $pct }}% of shared cap</span>
+                      <span>{{ $rem }}h left</span>
                     </div>
                   </div>
-                @endforeach
+                @else
+                  @foreach ([['label' => 'Day', 'load' => $tf['day'], 'percent' => $dayPct, 'tone' => 'emerald'], ['label' => 'Evening', 'load' => $tf['evening'], 'percent' => $eveningPct, 'tone' => 'indigo']] as $shiftLoad)
+                    @php
+                      $shiftRemaining = max(0, $shiftLoad['load']['max_hours'] - $shiftLoad['load']['hours']);
+                      $barTone = $shiftLoad['percent'] > 90 ? 'bg-red-500' : ($shiftLoad['percent'] > 70 ? 'bg-amber-500' : ($shiftLoad['tone'] === 'emerald' ? 'bg-emerald-500' : 'bg-indigo-500'));
+                      $textTone = $shiftLoad['percent'] > 90 ? 'text-red-600' : ($shiftLoad['tone'] === 'emerald' ? 'text-emerald-700' : 'text-indigo-700');
+                    @endphp
+                    <div>
+                      <div class="mb-1 flex items-center justify-between gap-2 text-[10px]">
+                        <span class="font-bold uppercase tracking-wide {{ $textTone }}">{{ $shiftLoad['label'] }}</span>
+                        <span class="font-extrabold text-slate-700">{{ $shiftLoad['load']['hours'] }}h <span class="font-medium text-slate-400">/ {{ $shiftLoad['load']['max_hours'] }}h max</span></span>
+                      </div>
+                      <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div class="h-full rounded-full transition-all duration-700 {{ $barTone }}" style="width: {{ $shiftLoad['percent'] }}%"></div>
+                      </div>
+                      <div class="mt-1 flex justify-between text-[9px] font-semibold text-slate-400">
+                        <span>{{ $shiftLoad['percent'] }}% of shift cap</span>
+                        <span>{{ $shiftRemaining }}h left</span>
+                      </div>
+                    </div>
+                  @endforeach
+                @endif
               </div>
 
               <div class="grid grid-cols-3 gap-2 bg-slate-50 rounded-xl p-3 mb-4">
