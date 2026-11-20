@@ -257,6 +257,12 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
 
     Route::get('/reports', [ReportsController::class, 'index'])
         ->name('admin.reports');
+    Route::get('/reports/faculty/{facultyId}/schedule', [ReportsController::class, 'facultySchedule'])
+        ->name('admin.reports.faculty-schedule');
+    Route::get('/reports/sections/{sectionId}/schedule', [ReportsController::class, 'sectionSchedule'])
+        ->name('admin.reports.section-schedule');
+    Route::get('/reports/rooms/{roomId}/schedule', [ReportsController::class, 'roomSchedule'])
+        ->name('admin.reports.room-schedule');
 
 
     /*

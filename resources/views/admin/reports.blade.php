@@ -7,7 +7,7 @@
     <title>SKEDYUL — Reports</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
+<body data-active-tab="{{ request('reports_tab', '') }}" class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
 
 <div class="app-shell">
     @include('partials.admin_sidebar')
@@ -56,67 +56,40 @@
                  TAB: BY SECTION
             ═════════════════════════════════════════════ --}}
             <div id="panel-section" class="tab-panel">
+                <form method="GET" action="{{ route('admin.reports') }}" class="mb-4 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="reports_tab" value="section">
+                    <label class="sr-only" for="section-report-search">Search sections</label>
+                    <input id="section-report-search" name="section_search" value="{{ request('section_search') }}" type="search" placeholder="Search section, department, or year…" class="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                    <button class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
+                    @if(request('section_search'))<a class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'section']) }}">Clear</a>@endif
+                </form>
                 @if($bySection->isEmpty())
                     <div class="card text-center py-12 text-slate-400">
-                        No schedule data found for sections this semester.
+                        {{ request('section_search') ? 'No sections match your search.' : 'No sections found.' }}
                     </div>
                 @else
-                @foreach($bySection as $sectionName => $rows)
-                @php $first = $rows->first(); @endphp
-                <div class="card mb-4">
-                    {{-- Section Header --}}
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <div class="card-title">{{ $sectionName }}</div>
-                            <div class="card-sub">
-                                {{ $first->prog_code ?? 'N/A' }} · Year {{ $first->sec_year_level ?? '' }}
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="badge badge-blue">{{ $rows->whereNotNull('subj_code')->count() }} subjects</span>
-                        </div>
-                    </div>
-
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Subject Code</th>
-                                    <th>Subject Name</th>
-                                    <th>Faculty</th>
-                                    <th>Day</th>
-                                    <th>Time</th>
-                                    <th>Room</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($rows->whereNotNull('subj_code') as $row)
-                                <tr>
-                                    <td><span class="font-mono text-[12px] text-slate-600">{{ $row->subj_code }}</span></td>
-                                    <td class="font-semibold">{{ $row->subj_name }}</td>
-                                    <td>{{ $row->faculty_name ?? '—' }}</td>
-                                    <td>{{ $row->day ?? '—' }}</td>
-                                    <td class="font-mono text-[12px]">
-                                        @if($row->start_time && $row->end_time)
-                                            {{ \Carbon\Carbon::parse($row->start_time)->format('g:i A') }}
-                                            – {{ \Carbon\Carbon::parse($row->end_time)->format('g:i A') }}
-                                        @else —
-                                        @endif
-                                    </td>
-                                    <td>{{ $row->room_name ?? '—' }}</td>
-                                </tr>
-                                @endforeach
-
-                                @if($rows->whereNotNull('subj_code')->isEmpty())
-                                <tr>
-                                    <td colspan="6" class="text-center py-4 text-slate-400">No schedules plotted yet for this section.</td>
-                                </tr>
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
+                    <span>Click a section to view its current-semester timetable.</span>
+                    <span>{{ $bySection->total() }} sections</span>
                 </div>
+                <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                @foreach($bySection as $section)
+                <article class="card border border-slate-200 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <div class="card-title">{{ $section->sec_name }}</div>
+                            <div class="card-sub">{{ $section->program?->dept_code ?? 'N/A' }} · Year {{ $section->sec_year_level ?? '—' }}</div>
+                        </div>
+                        <span class="badge badge-blue">{{ $section->reportSchedules->pluck('subj_code')->filter()->unique()->count() }} subjects</span>
+                    </div>
+                    <div class="mt-3 text-sm text-slate-500">{{ $section->reportSchedules->count() }} scheduled class{{ $section->reportSchedules->count() === 1 ? '' : 'es' }} this semester</div>
+                    <button type="button" data-report-schedule-url="{{ route('admin.reports.section-schedule', $section->sec_id) }}" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100">
+                        <span aria-hidden="true">▦</span> View timetable
+                    </button>
+                </article>
                 @endforeach
+                </div>
+                <div class="mt-4">{{ $bySection->appends(request()->except('section_page', 'room_page'))->links() }}</div>
                 @endif
             </div>
 
@@ -124,96 +97,72 @@
                  TAB: BY TEACHER
             ═════════════════════════════════════════════ --}}
             <div id="panel-teacher" class="tab-panel hidden">
+                <form method="GET" action="{{ route('admin.reports') }}" class="mb-4 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="reports_tab" value="teacher">
+                    <label class="sr-only" for="teacher-report-search">Search faculty</label>
+                    <input id="teacher-report-search" name="teacher_search" value="{{ request('teacher_search') }}" type="search" placeholder="Search faculty, employee ID, college, or department…" class="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                    <button class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
+                    @if(request('teacher_search'))<a class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'teacher']) }}">Clear</a>@endif
+                </form>
                 @if($byTeacher->isEmpty())
                     <div class="card text-center py-12 text-slate-400">
-                        No faculty schedule data found for this semester.
+                        {{ request('teacher_search') ? 'No faculty match your search.' : 'No faculty records found.' }}
                     </div>
                 @else
-                @foreach($byTeacher as $facultyName => $rows)
-                @php
-                    $first = $rows->first();
-                    $totalHours = $first->total_hours ?? 0;
-                    $maxHours = 30;
-                    $pct = min(100, round(($totalHours / $maxHours) * 100));
-                    $barColor = $totalHours > 30 ? 'bg-red-600' : ($totalHours >= 24 ? 'bg-amber-500' : 'bg-green-600');
-                    $textColor = $totalHours > 30 ? 'text-red-600' : ($totalHours >= 24 ? 'text-amber-500' : 'text-green-600');
-                @endphp
-                <div class="card mb-4">
-                    {{-- Faculty Header --}}
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0">
-                                {{ strtoupper(substr($facultyName, 0, 1)) }}
-                            </div>
-                            <div>
-                                <div class="card-title">{{ $facultyName }}</div>
-                                <div class="card-sub">
-                                    {{ $first->dept_code ?? 'N/A' }} ·
-                                    <span class="badge {{ $first->fac_employment_type === 'full_time' ? 'badge-blue' : 'badge-grey' }}" style="font-size:10px;padding:2px 7px;">
-                                        {{ $first->fac_employment_type === 'full_time' ? 'Full-time' : 'Part-time' }}
-                                    </span>
+                <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
+                    <span>All active faculty records, including faculty with no plotted classes.</span>
+                    <span>{{ $byTeacher->count() }} faculty</span>
+                </div>
+                <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                @foreach($byTeacher as $facultyReport)
+                    @php
+                        $load = $facultyReport->load;
+                        $over = $load['status'] === 'Over limit';
+                        $badge = $over ? 'badge-red' : ($load['status'] === 'At limit' ? 'badge-amber' : 'badge-green');
+                        $dayPct = $load['day_cap'] > 0 ? min(100, round($load['day_hours'] / $load['day_cap'] * 100)) : 0;
+                        $eveningPct = $load['evening_cap'] > 0 ? min(100, round($load['evening_hours'] / $load['evening_cap'] * 100)) : 0;
+                        $combinedPct = ($load['part_time_cap'] ?? 0) > 0 ? min(100, round($load['total_hours'] / $load['part_time_cap'] * 100)) : 0;
+                    @endphp
+                    <article class="card border border-slate-200 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold text-blue-700">
+                                    {{ strtoupper(substr($facultyReport->name, 0, 1)) }}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="truncate font-bold text-slate-900">{{ $facultyReport->name }}</div>
+                                    <div class="mt-0.5 text-xs text-slate-500">{{ $facultyReport->college }} · {{ $facultyReport->department }}</div>
+                                    <div class="mt-1 text-[11px] text-slate-400">{{ $facultyReport->designation }} · {{ str_replace('_', ' ', ucfirst($facultyReport->employment)) }}</div>
                                 </div>
                             </div>
+                            <span class="badge {{ $badge }}">{{ $load['status'] }}</span>
                         </div>
-                        <div class="text-right">
-                            <div class="text-[11px] text-slate-400 mb-1">Total Load</div>
-                            <div class="text-[20px] font-extrabold {{ $textColor }}">
-                                {{ $totalHours }} <span class="text-[13px] font-normal text-slate-400">/ 30 hrs</span>
+
+                        <div class="mt-4 grid grid-cols-2 gap-3">
+                            <div class="rounded-xl bg-slate-50 p-3">
+                                <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Day workload</div>
+                                <div class="mt-1 font-bold text-slate-800">{{ $load['day_hours'] }} <span class="font-normal text-slate-400">/ {{ $load['day_cap'] }} hrs</span></div>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full {{ $load['day_hours'] > $load['day_cap'] ? 'bg-rose-500' : 'bg-emerald-500' }}" style="width:{{ $dayPct }}%"></div></div>
+                            </div>
+                            <div class="rounded-xl bg-slate-50 p-3">
+                                <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Evening workload</div>
+                                <div class="mt-1 font-bold text-slate-800">{{ $load['evening_hours'] }} <span class="font-normal text-slate-400">/ {{ $load['evening_cap'] }} hrs</span></div>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full {{ $load['evening_hours'] > $load['evening_cap'] ? 'bg-rose-500' : 'bg-indigo-500' }}" style="width:{{ $eveningPct }}%"></div></div>
                             </div>
                         </div>
-                    </div>
+                        @if($load['is_part_time'])
+                            <div class="mt-3 rounded-xl border border-cyan-100 bg-cyan-50/60 px-3 py-2 text-xs text-cyan-900">
+                                Part-time shared cap: <strong>{{ $load['total_hours'] }} / {{ $load['part_time_cap'] }} hrs</strong>
+                                <div class="mt-2 h-2 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full {{ $load['total_hours'] > $load['part_time_cap'] ? 'bg-rose-500' : 'bg-cyan-500' }}" style="width:{{ $combinedPct }}%"></div></div>
+                            </div>
+                        @endif
 
-                    {{-- Workload bar --}}
-                    <div class="workload-bar mb-4">
-                        <div class="workload-fill {{ $barColor }}" style="width:{{ $pct }}%"></div>
-                    </div>
-
-                    @if($totalHours > 30)
-                    <div class="mb-4 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-[12px] font-semibold">
-                        ⚠️ Overloaded — {{ $totalHours - 30 }} hour(s) over the 30-hour limit.
-                    </div>
-                    @endif
-
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Subject Code</th>
-                                    <th>Subject Name</th>
-                                    <th>Section</th>
-                                    <th>Day</th>
-                                    <th>Time</th>
-                                    <th>Room</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($rows->whereNotNull('subj_code') as $row)
-                                <tr>
-                                    <td><span class="font-mono text-[12px] text-slate-600">{{ $row->subj_code }}</span></td>
-                                    <td class="font-semibold">{{ $row->subj_name }}</td>
-                                    <td>{{ $row->sec_name ?? '—' }}</td>
-                                    <td>{{ $row->day ?? '—' }}</td>
-                                    <td class="font-mono text-[12px]">
-                                        @if($row->start_time && $row->end_time)
-                                            {{ \Carbon\Carbon::parse($row->start_time)->format('g:i A') }}
-                                            – {{ \Carbon\Carbon::parse($row->end_time)->format('g:i A') }}
-                                        @else —
-                                        @endif
-                                    </td>
-                                    <td>{{ $row->room_name ?? '—' }}</td>
-                                </tr>
-                                @endforeach
-
-                                @if($rows->whereNotNull('subj_code')->isEmpty())
-                                <tr>
-                                    <td colspan="6" class="text-center py-4 text-slate-400">No schedule assigned yet.</td>
-                                </tr>
-                                @endif
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                        <button type="button" data-faculty-schedule-url="{{ route('admin.reports.faculty-schedule', $facultyReport->fac_id) }}" data-faculty-name="{{ $facultyReport->name }}" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100">
+                            <span aria-hidden="true">▦</span> View timetable
+                        </button>
+                    </article>
                 @endforeach
+                </div>
                 @endif
             </div>
 
@@ -221,77 +170,75 @@
                  TAB: BY ROOM
             ═════════════════════════════════════════════ --}}
             <div id="panel-room" class="tab-panel hidden">
+                <form method="GET" action="{{ route('admin.reports') }}" class="mb-4 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="reports_tab" value="room">
+                    <label class="sr-only" for="room-report-search">Search rooms</label>
+                    <input id="room-report-search" name="room_search" value="{{ request('room_search') }}" type="search" placeholder="Search room, building, or type…" class="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                    <button class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
+                    @if(request('room_search'))<a class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'room']) }}">Clear</a>@endif
+                </form>
                 @if($byRoom->isEmpty())
                     <div class="card text-center py-12 text-slate-400">
-                        No rooms found in the system.
+                        {{ request('room_search') ? 'No rooms match your search.' : 'No rooms found in the system.' }}
                     </div>
                 @else
-                @foreach($byRoom as $roomName => $rows)
-                @php
-                    $first = $rows->first();
-                    $bookingCount = $rows->whereNotNull('day')->count();
-                    $isAvailable = $first->room_is_available;
-                @endphp
-                <div class="card mb-4">
-                    {{-- Room Header --}}
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <div class="card-title">{{ $roomName }}</div>
-                            <div class="card-sub flex items-center gap-2 mt-1">
-                                <span class="badge badge-grey">{{ ucfirst($first->room_type ?? 'N/A') }}</span>
-                                <span class="text-slate-400">Capacity: {{ $first->room_capacity ?? '—' }}</span>
+                <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
+                    <span>Click a room to view its current-semester timetable.</span>
+                    <span>{{ $byRoom->total() }} rooms</span>
+                </div>
+                <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                @foreach($byRoom as $room)
+                    <article class="card border border-slate-200 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <div class="card-title">{{ $room->room_name }}</div>
+                                <div class="card-sub mt-1 flex items-center gap-2">
+                                    <span class="badge badge-grey">{{ ucfirst($room->room_type ?? 'N/A') }}</span>
+                                    <span class="text-slate-400">Capacity: {{ $room->room_capacity ?? '—' }}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="badge {{ $room->room_is_available ? 'badge-green' : 'badge-red' }}">{{ $room->room_is_available ? 'Available' : 'Unavailable' }}</span>
+                                <span class="badge badge-blue">{{ $room->reportSchedules->count() }} booking{{ $room->reportSchedules->count() !== 1 ? 's' : '' }}</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="badge {{ $isAvailable ? 'badge-green' : 'badge-red' }}">
-                                {{ $isAvailable ? 'Available' : 'Unavailable' }}
-                            </span>
-                            <span class="badge badge-blue">{{ $bookingCount }} booking{{ $bookingCount !== 1 ? 's' : '' }}</span>
-                        </div>
-                    </div>
-
-                    @if($bookingCount > 0)
-                    <div class="overflow-x-auto">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Day</th>
-                                    <th>Time</th>
-                                    <th>Subject</th>
-                                    <th>Section</th>
-                                    <th>Faculty</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($rows->whereNotNull('day') as $row)
-                                <tr>
-                                    <td class="font-semibold">{{ $row->day }}</td>
-                                    <td class="font-mono text-[12px]">
-                                        {{ \Carbon\Carbon::parse($row->start_time)->format('g:i A') }}
-                                        – {{ \Carbon\Carbon::parse($row->end_time)->format('g:i A') }}
-                                    </td>
-                                    <td>
-                                        <span class="font-mono text-[12px] text-slate-500">{{ $row->subj_code }}</span>
-                                        <div class="text-[12px] text-slate-600">{{ $row->subj_name }}</div>
-                                    </td>
-                                    <td>{{ $row->sec_name ?? '—' }}</td>
-                                    <td>{{ $row->faculty_name ?? '—' }}</td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    @else
-                    <div class="text-center py-6 text-[13px] text-slate-400">No bookings for this room this semester.</div>
-                    @endif
-                </div>
+                        <button type="button" data-report-schedule-url="{{ route('admin.reports.room-schedule', $room->room_id) }}" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100">
+                            <span aria-hidden="true">▦</span> View timetable
+                        </button>
+                    </article>
                 @endforeach
+                </div>
+                <div class="mt-4">{{ $byRoom->appends(request()->except('section_page', 'room_page'))->links() }}</div>
                 @endif
             </div>
 
         </div>{{-- end page-content --}}
     </div>{{-- end app-main --}}
 </div>{{-- end app-shell --}}
+
+<div id="faculty-timetable-modal" class="fixed inset-0 z-[1500] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="faculty-timetable-title" onclick="if(event.target===this) closeFacultyTimetable()">
+    <section class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <header class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div class="min-w-0">
+                <h2 id="faculty-timetable-title" class="truncate text-lg font-bold text-slate-900">Timetable</h2>
+                <p id="faculty-timetable-term" class="mt-1 text-xs text-slate-500">Loading schedule…</p>
+            </div>
+            <button type="button" onclick="closeFacultyTimetable()" class="rounded-lg px-3 py-1 text-xl text-slate-400 hover:bg-slate-100" aria-label="Close timetable">×</button>
+        </header>
+        <div class="grid grid-cols-1 gap-3 border-b border-slate-100 bg-slate-50 p-4 sm:grid-cols-3">
+            <div class="rounded-xl bg-white p-3"><div id="timetable-stat-1-label" class="text-[10px] font-bold uppercase text-slate-400">Summary</div><div id="timetable-stat-1-value" class="mt-1 font-bold text-slate-800">—</div></div>
+            <div class="rounded-xl bg-white p-3"><div id="timetable-stat-2-label" class="text-[10px] font-bold uppercase text-slate-400">Summary</div><div id="timetable-stat-2-value" class="mt-1 font-bold text-slate-800">—</div></div>
+            <div class="rounded-xl bg-white p-3"><div id="timetable-stat-3-label" class="text-[10px] font-bold uppercase text-slate-400">Summary</div><div id="timetable-stat-3-value" class="mt-1 font-bold text-slate-800">—</div></div>
+        </div>
+        <p id="faculty-timetable-error" class="hidden m-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"></p>
+        <div class="min-h-0 flex-1 overflow-auto p-4">
+            <table class="data-table min-w-[760px]">
+                <thead><tr><th>Day</th><th>Time</th><th>Course</th><th>Section</th><th>Room</th><th>Faculty</th></tr></thead>
+                <tbody id="faculty-timetable-rows"><tr><td colspan="6" class="py-8 text-center text-slate-400">Loading timetable…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+</div>
 
 <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
@@ -315,8 +262,9 @@ function switchTab(active) {
 }
 
 // Restore last active tab
+const requestedTab = document.body.dataset.activeTab;
 const savedTab = localStorage.getItem('reports_tab') || 'section';
-switchTab(savedTab);
+switchTab(TABS.includes(requestedTab) ? requestedTab : savedTab);
 
 // ── TOAST ──────────────────────────────────────────────────────────────────
 function showToast(msg) {
@@ -328,6 +276,107 @@ function showToast(msg) {
 
 // ── PRINT ──────────────────────────────────────────────────────────────────
 function printReport() { window.print(); }
+
+// Load one faculty member's schedule only when the admin opens it.
+const facultyTimetableModal = document.getElementById('faculty-timetable-modal');
+const facultyTimetableRows = document.getElementById('faculty-timetable-rows');
+const facultyTimetableError = document.getElementById('faculty-timetable-error');
+
+function closeFacultyTimetable() {
+    facultyTimetableModal.classList.add('hidden');
+    facultyTimetableModal.classList.remove('flex');
+}
+
+function addTimetableCell(row, value, className = '') {
+    const cell = document.createElement('td');
+    cell.textContent = value || '—';
+    if (className) cell.className = className;
+    row.appendChild(cell);
+}
+
+async function openReportTimetable(url, fallbackTitle = 'Timetable', facultyName = null) {
+    facultyTimetableModal.classList.remove('hidden');
+    facultyTimetableModal.classList.add('flex');
+    document.getElementById('faculty-timetable-title').textContent = fallbackTitle;
+    document.getElementById('faculty-timetable-term').textContent = 'Loading current semester…';
+    facultyTimetableError.classList.add('hidden');
+    facultyTimetableRows.replaceChildren();
+    const loadingRow = document.createElement('tr');
+    const loadingCell = document.createElement('td');
+    loadingCell.colSpan = 6;
+    loadingCell.className = 'py-8 text-center text-slate-400';
+    loadingCell.textContent = 'Loading timetable…';
+    loadingRow.appendChild(loadingCell);
+    facultyTimetableRows.appendChild(loadingRow);
+
+    try {
+        const response = await fetch(url, { headers: { Accept: 'application/json' } });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not load this timetable.');
+
+        document.getElementById('faculty-timetable-title').textContent = result.title || (facultyName ? facultyName + ' — Timetable' : fallbackTitle);
+        document.getElementById('faculty-timetable-term').textContent = (result.department ? result.department + ' · ' : '') + (result.subtitle || result.semester || 'Current semester');
+        let stats = result.stats;
+        if (!stats && result.load) {
+            stats = [
+                { label: 'Day workload', value: `${result.load.day_hours} / ${result.load.day_cap} hrs` },
+                { label: 'Evening workload', value: `${result.load.evening_hours} / ${result.load.evening_cap} hrs` },
+                { label: 'Total workload', value: result.load.is_part_time ? `${result.load.total_hours} / ${result.load.part_time_cap} shared hrs` : `${result.load.total_hours} hrs total` },
+            ];
+        }
+        (stats || []).forEach((stat, index) => {
+            const n = index + 1;
+            document.getElementById(`timetable-stat-${n}-label`).textContent = stat.label;
+            document.getElementById(`timetable-stat-${n}-value`).textContent = stat.value;
+        });
+        facultyTimetableRows.replaceChildren();
+
+        if (!result.schedules?.length) {
+            const row = document.createElement('tr');
+            const cell = document.createElement('td');
+            cell.colSpan = 6;
+            cell.className = 'py-8 text-center text-slate-400';
+            cell.textContent = 'No active classes for this item in the current semester.';
+            row.appendChild(cell);
+            facultyTimetableRows.appendChild(row);
+            return;
+        }
+
+        result.schedules.forEach(schedule => {
+            const row = document.createElement('tr');
+            addTimetableCell(row, schedule.day, 'font-semibold');
+            addTimetableCell(row, schedule.time, 'whitespace-nowrap font-mono text-xs');
+            const courseCell = document.createElement('td');
+            const code = document.createElement('div');
+            code.className = 'font-mono text-xs text-slate-500';
+            code.textContent = schedule.course_code;
+            const name = document.createElement('div');
+            name.className = 'font-semibold';
+            name.textContent = schedule.course_name;
+            courseCell.append(code, name);
+            row.appendChild(courseCell);
+            addTimetableCell(row, schedule.section);
+            addTimetableCell(row, schedule.room);
+            addTimetableCell(row, schedule.faculty || facultyName || '—');
+            facultyTimetableRows.appendChild(row);
+        });
+    } catch (error) {
+        facultyTimetableRows.replaceChildren();
+        facultyTimetableError.textContent = error.message;
+        facultyTimetableError.classList.remove('hidden');
+        document.getElementById('faculty-timetable-term').textContent = 'Unable to load timetable';
+    }
+}
+
+document.querySelectorAll('[data-faculty-schedule-url]').forEach(button => {
+    button.addEventListener('click', async () => {
+        await openReportTimetable(button.dataset.facultyScheduleUrl, 'Faculty timetable', button.dataset.facultyName);
+    });
+});
+
+document.querySelectorAll('[data-report-schedule-url]').forEach(button => {
+    button.addEventListener('click', () => openReportTimetable(button.dataset.reportScheduleUrl));
+});
 
 // ── EXPORT CSV ────────────────────────────────────────────────────────────
 function exportCSV() {
