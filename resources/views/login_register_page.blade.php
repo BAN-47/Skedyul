@@ -475,7 +475,7 @@
         <label class="block text-sm font-semibold text-slate-700">Account email
           <input id="forgot-support-email" type="email" autocomplete="email" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Email used for your SKEDYUL account">
         </label>
-        <p class="text-xs leading-relaxed text-slate-500">This opens a Gmail draft addressed to <strong>skedyul.official@gmail.com</strong>. Attach a clear photo of your ID so support can verify your account and help reset your password.</p>
+        <p class="text-xs leading-relaxed text-slate-500">This opens a Gmail draft addressed to <strong>skedyul.official@gmail.com</strong>. <strong class="text-red-700">REQUIRED: Attach a clear photo of your ID</strong> so support can verify your account and help reset your password.</p>
         <div class="flex justify-end gap-2 pt-1">
           <button type="button" onclick="closeForgotPasswordSupport()" class="rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancel</button>
           <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Open Gmail</button>
@@ -514,7 +514,7 @@
         'Employee ID: ' + employeeId,
         'SKEDYUL account email: ' + email, '',
         'Please verify my account and let me know the next steps.', '',
-        'I have attached a clear photo of my ID for verification.'
+        '*** REQUIRED: ATTACH A CLEAR PHOTO OF YOUR ID FOR VERIFICATION ***'
       ].join('\n');
       const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent('skedyul.official@gmail.com') + '&su=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
       window.open(gmailUrl, '_blank', 'noopener,noreferrer');
