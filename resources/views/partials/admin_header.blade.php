@@ -88,7 +88,7 @@
 <script>
 let notifOpen = false;
 const adminAnnouncementUrl = @json(route('admin.notifications.announcement'));
-const adminAnnouncementCsrf = @json(csrf_token());
+const adminCsrfToken = @json(csrf_token());
 
 function openAdminAnnouncementModal() {
     document.getElementById('notif-dropdown').style.display = 'none';
@@ -125,7 +125,7 @@ async function sendAdminAnnouncement() {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': adminAnnouncementCsrf,
+                'X-CSRF-TOKEN': adminCsrfToken,
                 'X-Requested-With': 'XMLHttpRequest',
             },
             body: JSON.stringify({
@@ -215,7 +215,7 @@ function openAdminNotification(id, type) {
         method: 'PUT',
         headers: {
             'Accept': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            'X-CSRF-TOKEN': adminCsrfToken,
         },
     }).catch(() => null);
 
@@ -245,40 +245,52 @@ function formatNotifTime(isoString) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
 }
 
-function markRead(id, el) {
+async function markRead(id, el) {
     if (!el.classList.contains('unread')) return;
 
-    fetch(`/notifications/${id}/read`, {
-        method: 'PUT',
-        headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-        },
-    })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                el.classList.remove('unread');
-                updateNotifCount();
-            }
+    try {
+        const response = await fetch(`/notifications/${encodeURIComponent(id)}/read`, {
+            method: 'PUT',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': adminCsrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
         });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.message || 'Could not mark this notification as read.');
+        el.classList.remove('unread');
+        updateNotifCount();
+    } catch (error) {
+        console.error('Unable to mark notification as read:', error);
+    }
 }
 
-function markAllRead() {
-    fetch('{{ route("notifications.read-all") }}', {
-        method: 'PUT',
-        headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-        },
-    })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                document.querySelectorAll('.notif-drop-item.unread').forEach(el => el.classList.remove('unread'));
-                updateNotifCount();
-            }
+async function markAllRead() {
+    try {
+        const response = await fetch('{{ route("notifications.read-all") }}', {
+            method: 'PUT',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': adminCsrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
         });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.message || 'Could not mark notifications as read.');
+
+        document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(item => item.classList.remove('unread'));
+        updateNotifCount();
+    } catch (error) {
+        console.error('Unable to mark all notifications as read:', error);
+        const list = document.getElementById('notif-list');
+        if (list) {
+            const notice = document.createElement('div');
+            notice.className = 'px-4 py-2 text-xs text-red-600';
+            notice.textContent = error.message || 'Could not mark notifications as read. Try again.';
+            list.prepend(notice);
+        }
+    }
 }
 
 function updateNotifCount() {
