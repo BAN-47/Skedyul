@@ -21,16 +21,18 @@
         @endif
         <div id="topbar-notif-bell" class="relative">
             <button type="button" onclick="facultyHeaderToggleNotifDropdown()"
-                class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
-                <span class="faculty-notification-label">Notifications</span>
-                <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                aria-label="Open inbox notifications" title="Inbox notifications"
+                class="relative inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+                <svg class="h-5 w-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="faculty-notification-label">Inbox</span>
+                <span id="notif-count" aria-live="polite" class="hidden absolute -right-1.5 -top-1.5 min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-rose-600 px-1 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
                     0
                 </span>
             </button>
             <div id="notif-dropdown" style="display:none;"
-                class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
-                <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>
-                <div id="notif-list" class="max-h-80 overflow-y-auto"></div>
+                class="absolute right-0 top-12 z-[100] w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_48px_rgba(15,23,42,.18)]">
+                <div class="border-b border-slate-100 bg-slate-50/80 px-4 py-3.5"><div class="text-sm font-bold text-slate-900">Inbox</div><div class="mt-0.5 text-[11px] text-slate-500">Schedule suggestions and system messages</div></div>
+                <div id="notif-list" class="max-h-[min(65vh,440px)] overflow-y-auto"></div>
                 <div class="px-3 py-2 border-t border-slate-200">
                     <button type="button" onclick="facultyHeaderOpenSuggestion()"
                         class="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700">
@@ -381,7 +383,7 @@ async function updateFacultyHeaderNotifCount() {
         const badge = document.getElementById('notif-count');
         if (badge) {
             badge.textContent = count;
-            badge.style.display = count > 0 ? 'inline' : 'none';
+            badge.style.display = count > 0 ? 'inline-flex' : 'none';
         }
     } catch (error) {
         console.error('Unable to refresh faculty notification count:', error);

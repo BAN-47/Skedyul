@@ -21,16 +21,18 @@
         @endif
     <div id="topbar-notif-bell" class="relative">
         <button type="button" onclick="toggleNotifDropdown()"
-            class="admin-notification-button flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
-            Notifications
-            <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            aria-label="Open inbox notifications" title="Inbox notifications"
+            class="admin-notification-button relative inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+            <svg class="h-5 w-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Inbox</span>
+            <span id="notif-count" aria-live="polite" class="{{ ($notifCount ?? 0) > 0 ? 'inline-flex' : 'hidden' }} absolute -right-1.5 -top-1.5 min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-rose-600 px-1 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
                 {{ $notifCount ?? 0 }}
             </span>
         </button>
         <div id="notif-dropdown" style="display:none;"
             class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
-            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-                <span class="text-sm font-bold text-slate-900">Notifications</span>
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+                <div><div class="text-sm font-bold text-slate-900">Inbox</div><div class="mt-0.5 text-[11px] text-slate-500">System updates and account alerts</div></div>
                 <button type="button" onclick="openAdminAnnouncementModal()" class="rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-blue-700">Send announcement</button>
             </div>
             <div id="notif-list" class="max-h-80 overflow-y-auto"></div>
@@ -449,7 +451,7 @@ function updateNotifCount() {
             const badge = document.getElementById('notif-count');
             if (badge) {
                 badge.textContent = data.count;
-                badge.style.display = data.count > 0 ? 'inline' : 'none';
+            badge.style.display = data.count > 0 ? 'inline-flex' : 'none';
             }
         });
 }

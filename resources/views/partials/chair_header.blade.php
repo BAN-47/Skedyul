@@ -28,22 +28,21 @@
         </button>
         <div id="topbar-notif-bell" class="relative">
             <button type="button" onclick="chairHeaderToggleNotifDropdown()"
-                class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
-                Notifications
-                <span id="notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                aria-label="Open inbox notifications" title="Inbox notifications"
+                class="relative inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50">
+                <svg class="h-5 w-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Inbox</span>
+                <span id="notif-count" aria-live="polite" class="{{ ($notifCount ?? 0) > 0 ? 'inline-flex' : 'hidden' }} absolute -right-1.5 -top-1.5 min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-rose-600 px-1 py-0.5 text-[10px] font-bold leading-none text-white shadow-sm">
                     {{ $notifCount ?? 0 }}
                 </span>
             </button>
             <div id="notif-dropdown" style="display:none;"
-                class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
-                <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>
-                <div id="notif-list" class="max-h-80 overflow-y-auto"></div>
-                <div class="px-4 py-2.5 border-t border-slate-200 text-center">
-                    <button type="button" onclick="chairHeaderMarkAllRead()"
-                        class="text-[12px] text-blue-600 font-semibold bg-transparent border-none cursor-pointer">
-                        Mark all as read
-                    </button>
+                class="absolute right-0 top-12 z-[100] w-[380px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_16px_48px_rgba(15,23,42,.18)]">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/80 px-4 py-3.5">
+                    <div><div class="text-sm font-bold text-slate-900">Inbox</div><div class="mt-0.5 text-[11px] text-slate-500">Schedule updates and system messages</div></div>
+                    <button type="button" onclick="chairHeaderMarkAllRead()" class="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-50">Mark all read</button>
                 </div>
+                <div id="notif-list" class="max-h-[min(65vh,440px)] overflow-y-auto"></div>
             </div>
         </div>
     </div>
@@ -403,7 +402,7 @@
             const badge = document.getElementById('notif-count');
             if (badge) {
                 badge.textContent = unread;
-                badge.style.display = unread > 0 ? 'inline' : 'none';
+                badge.style.display = unread > 0 ? 'inline-flex' : 'none';
             }
         } catch (error) {
             console.error('Unable to refresh chair notification count:', error);
