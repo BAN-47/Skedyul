@@ -28,18 +28,19 @@
                     </div>
                 </div>
 
-                <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <input id="activity-search" type="search" placeholder="Search user, action, details, or IP..." aria-label="Search activity logs" class="field-input w-full sm:max-w-sm">
-                    <input id="activity-date-filter" type="date" aria-label="Filter activity by date" class="field-input w-full sm:w-44">
-                    <select id="activity-role-filter" aria-label="Filter by role" class="field-input w-full sm:w-52">
+                <form method="GET" action="{{ route('admin.activity-logs') }}" class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <input name="search" type="search" value="{{ request('search') }}" placeholder="Search user, action, details, or IP..." aria-label="Search activity logs" class="field-input w-full sm:max-w-sm">
+                    <input name="date" type="date" value="{{ request('date') }}" aria-label="Filter activity by date" class="field-input w-full sm:w-44">
+                    <select name="role" aria-label="Filter by role" class="field-input w-full sm:w-52">
                         <option value="">All roles</option>
-                        <option value="system_admin">Admin</option>
-                        <option value="department_chair">Department Chair</option>
-                        <option value="dean">Dean</option>
-                        <option value="faculty">Faculty</option>
+                        <option value="system_admin" @selected(request('role') === 'system_admin')>Admin</option>
+                        <option value="department_chair" @selected(request('role') === 'department_chair')>Department Chair</option>
+                        <option value="dean" @selected(request('role') === 'dean')>Dean</option>
+                        <option value="faculty" @selected(request('role') === 'faculty')>Faculty</option>
                     </select>
-                    <button type="button" id="activity-clear-filters" class="btn btn-secondary">Clear</button>
-                </div>
+                    <button type="submit" class="btn btn-primary">Filter</button>
+                    <a href="{{ route('admin.activity-logs') }}" class="btn btn-secondary text-center">Clear</a>
+                </form>
 
                 <div class="overflow-x-auto">
                     <table class="data-table">
@@ -49,7 +50,7 @@
                             @endforeach
                         </tr></thead>
                         <tbody>
-                        @foreach($activityLogs as $log)
+                        @forelse($activityLogs as $log)
                             @php
                                 $actor = $log->user;
                                 $roleLabels = [
@@ -64,18 +65,8 @@
                             @endphp
                             @php
                                 $localDate = \Illuminate\Support\Carbon::parse($log->al_created_at)->timezone(config('app.timezone'));
-                                $searchable = strtolower(implode(' ', array_filter([
-                                    $actor?->usr_name,
-                                    $actor?->usr_email,
-                                    $roleLabels[$actor?->usr_role ?? ''] ?? 'User',
-                                    $log->al_action,
-                                    $description,
-                                    $log->al_target_table,
-                                    $log->al_target_id,
-                                    $log->al_ip_address,
-                                ])));
                             @endphp
-                            <tr data-activity-row data-role="{{ $actor?->usr_role ?? '' }}" data-date="{{ $localDate->format('Y-m-d') }}" data-search="{{ $searchable }}">
+                            <tr>
                                 <td class="whitespace-nowrap font-mono text-[11px] text-slate-500">{{ $localDate->format('M j, Y g:i A') }}</td>
                                 <td class="font-semibold">{{ $actor?->usr_name ?? 'Deleted user' }}<div class="text-[11px] font-normal text-slate-400">{{ $actor?->usr_email ?? '' }}</div></td>
                                 <td><span class="badge badge-grey">{{ $roleLabels[$actor?->usr_role ?? ''] ?? 'User' }}</span></td>
@@ -87,101 +78,26 @@
                                 <td class="font-mono text-xs text-slate-500">{{ $log->al_ip_address ?: '—' }}</td>
                                 <td><span class="badge {{ $isFailed ? 'badge-red' : 'badge-green' }}">{{ $isFailed ? 'Warning' : 'Success' }}</span></td>
                             </tr>
-                        @endforeach
-                        <tr id="activity-no-results" hidden><td colspan="7" class="py-8 text-center text-slate-400">No activity matches these filters.</td></tr>
+                        @empty
+                            <tr><td colspan="7" class="py-8 text-center text-slate-400">No activity matches these filters.</td></tr>
+                        @endforelse
                         </tbody>
                     </table>
                 </div>
 
                 <div class="mt-4 flex min-w-0 flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div id="activity-page-info" class="shrink-0 text-xs text-slate-400" aria-live="polite"></div>
-                    <nav class="flex min-w-0 max-w-full items-center gap-1" aria-label="Activity log pagination">
-                        <button type="button" id="activity-prev" class="h-10 shrink-0 rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">← Prev</button>
-                        <div id="activity-page-numbers" class="flex min-w-0 items-center gap-1 overflow-x-auto py-1"></div>
-                        <button type="button" id="activity-next" class="h-10 shrink-0 rounded-lg bg-slate-50 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">Next →</button>
-                    </nav>
+                    <div class="shrink-0 text-xs text-slate-400" aria-live="polite">
+                        @if ($activityLogs->total())
+                            Showing {{ number_format($activityLogs->firstItem()) }}–{{ number_format($activityLogs->lastItem()) }} of {{ number_format($activityLogs->total()) }} activities
+                        @else
+                            Showing 0 of 0 activities
+                        @endif
+                    </div>
+                    <div class="min-w-0">{{ $activityLogs->links() }}</div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-<script>
-(() => {
-    const rows = [...document.querySelectorAll('[data-activity-row]')];
-    const search = document.getElementById('activity-search');
-    const roleFilter = document.getElementById('activity-role-filter');
-    const dateFilter = document.getElementById('activity-date-filter');
-    const clearFilters = document.getElementById('activity-clear-filters');
-    const pageInfo = document.getElementById('activity-page-info');
-    const pageNumbers = document.getElementById('activity-page-numbers');
-    const previous = document.getElementById('activity-prev');
-    const next = document.getElementById('activity-next');
-    const noResults = document.getElementById('activity-no-results');
-    const pageSize = 10;
-    let currentPage = 1;
-    const pageButton = 'h-10 min-w-[40px] shrink-0 rounded-lg px-2 text-sm font-semibold transition';
-
-    function renderPage() {
-        const query = search.value.trim().toLowerCase();
-        const selectedRole = roleFilter.value;
-        const selectedDate = dateFilter.value;
-        const matches = rows.filter(row =>
-            (!query || row.dataset.search.includes(query)) &&
-            (!selectedRole || row.dataset.role === selectedRole) &&
-            (!selectedDate || row.dataset.date === selectedDate)
-        );
-        const totalPages = Math.max(1, Math.ceil(matches.length / pageSize));
-        currentPage = Math.min(Math.max(currentPage, 1), totalPages);
-        const start = (currentPage - 1) * pageSize;
-        rows.forEach(row => { row.hidden = true; });
-        matches.slice(start, start + pageSize).forEach(row => { row.hidden = false; });
-        noResults.hidden = matches.length > 0;
-
-        pageInfo.textContent = matches.length
-            ? `Showing ${start + 1}–${Math.min(start + pageSize, matches.length)} of ${matches.length} activities`
-            : 'Showing 0 of 0 activities';
-        previous.disabled = currentPage === 1;
-        next.disabled = currentPage === totalPages || matches.length === 0;
-        pageNumbers.replaceChildren();
-
-        const visiblePages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-        const pages = [...visiblePages].filter(page => page >= 1 && page <= totalPages).sort((a, b) => a - b);
-        let previousPage = 0;
-        for (const page of pages) {
-            if (previousPage && page - previousPage > 1) {
-                const ellipsis = document.createElement('span');
-                ellipsis.textContent = '…';
-                ellipsis.setAttribute('aria-hidden', 'true');
-                ellipsis.className = 'shrink-0 px-1 text-slate-400';
-                pageNumbers.appendChild(ellipsis);
-            }
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = String(page);
-            button.setAttribute('aria-label', `Page ${page}`);
-            button.setAttribute('aria-current', page === currentPage ? 'page' : 'false');
-            button.className = `${pageButton} ${page === currentPage ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
-            button.addEventListener('click', () => { currentPage = page; renderPage(); });
-            pageNumbers.appendChild(button);
-            previousPage = page;
-        }
-    }
-
-    search.addEventListener('input', () => { currentPage = 1; renderPage(); });
-    roleFilter.addEventListener('change', () => { currentPage = 1; renderPage(); });
-    dateFilter.addEventListener('change', () => { currentPage = 1; renderPage(); });
-    clearFilters.addEventListener('click', () => {
-        search.value = '';
-        roleFilter.value = '';
-        dateFilter.value = '';
-        currentPage = 1;
-        renderPage();
-        search.focus();
-    });
-    previous.addEventListener('click', () => { currentPage--; renderPage(); });
-    next.addEventListener('click', () => { currentPage++; renderPage(); });
-    renderPage();
-})();
-</script>
 </body>
 </html>
