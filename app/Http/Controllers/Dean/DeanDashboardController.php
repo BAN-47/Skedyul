@@ -152,13 +152,17 @@ class DeanDashboardController extends Controller
                     $query->whereRaw('1 = 0');
                 }
             })
-            ->with(['faculty.program', 'section', 'course', 'room', 'studyLoad.faculty.program', 'studyLoad.section', 'studyLoad.subject'])
+            ->with(['faculty.program', 'section', 'course', 'subject', 'room', 'studyLoad.faculty.program', 'studyLoad.section', 'studyLoad.subject'])
             ->get()
             ->map(function (Schedule $schedule) {
                 $load = $schedule->studyLoad;
                 $section = $schedule->section ?? $load?->section;
                 $facultyMember = $schedule->faculty ?? $load?->faculty;
-                $day = strtolower(substr(trim((string) $schedule->sch_day), 0, 3));
+                $course = $schedule->course ?? $schedule->subject ?? $load?->subject;
+                $rawDay = trim((string) $schedule->sch_day);
+                $day = strtolower(substr($rawDay, 0, 3));
+                $dayName = collect(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])
+                    ->first(fn ($candidate) => strtolower(substr($candidate, 0, 3)) === $day) ?? $rawDay;
                 $shiftValue = strtolower((string) ($schedule->sch_shift ?? $load?->sl_shift ?? ''));
                 $shift = str_contains($shiftValue, 'even') || $shiftValue === 'night' || ($shiftValue === '' && (bool) $section?->sec_is_evening)
                     ? 'evening'
@@ -172,12 +176,20 @@ class DeanDashboardController extends Controller
 
                 return [
                     'day_key' => $day,
+                    'day' => $dayName,
                     'shift' => $shift,
                     'hours' => $hours,
+                    'start' => $schedule->sch_start_time ? \Illuminate\Support\Carbon::parse($schedule->sch_start_time)->format('g:i A') : '',
+                    'end' => $schedule->sch_end_time ? \Illuminate\Support\Carbon::parse($schedule->sch_end_time)->format('g:i A') : '',
+                    'course_code' => (string) ($course?->course_code ?? 'Course'),
+                    'course_name' => (string) ($course?->course_name ?? ''),
                     'faculty_id' => (string) ($schedule->sch_fac_id ?? $load?->sl_fac_id ?? $facultyMember?->fac_id ?? ''),
                     'faculty' => $facultyMember,
                     'section_id' => (string) ($schedule->sch_sec_id ?? $load?->sl_sec_id ?? ''),
+                    'section' => (string) ($section?->sec_name ?? 'Section not set'),
+                    'department_id' => (string) ($section?->sec_dept_id ?? ''),
                     'room_id' => (string) ($schedule->sch_room_id ?? ''),
+                    'room' => (string) ($schedule->room?->room_name ?? 'Room not set'),
                     'room_name' => (string) ($schedule->room?->room_name ?? ''),
                 ];
             });
@@ -207,8 +219,14 @@ class DeanDashboardController extends Controller
             ];
         });
 
+        $collegeFacultyIds = $faculty->pluck('fac_id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
         $topFaculty = $collegeSchedules
-            ->filter(fn($item) => $item['faculty_id'] !== '' && $item['faculty'])
+            ->filter(fn($item) => $item['faculty_id'] !== ''
+                && $item['faculty']
+                && in_array((string) $item['faculty_id'], $collegeFacultyIds, true))
             ->groupBy('faculty_id')
             ->map(function ($schedules, $facultyId) {
                 $facultyMember = $schedules->first()['faculty'];
@@ -229,6 +247,18 @@ class DeanDashboardController extends Controller
             ->sortByDesc('total_plotted')
             ->take(3)
             ->values();
+
+        $topFacultyIds = $topFaculty->pluck('id')->map(fn ($id) => (string) $id)->all();
+        $topFacultySchedules = $collegeSchedules
+            ->filter(fn ($item) => in_array((string) $item['faculty_id'], $topFacultyIds, true))
+            ->groupBy('faculty_id')
+            ->map(fn ($schedules) => $schedules->map(fn ($item) => collect($item)
+                ->except(['faculty', 'day_key', 'hours', 'faculty_id'])
+                ->all())->values());
+        $timetableTerm = trim(collect([
+            $semester?->sem_name,
+            $academicYear?->ay_academic_year ? 'AY ' . $academicYear->ay_academic_year : null,
+        ])->filter()->implode(' · '));
 
         $pendingQuery = Schedule_Submission::with([
             'department',
@@ -298,6 +328,8 @@ class DeanDashboardController extends Controller
             'subjectsPlotted',
             'weeklyScheduleCounts',
             'topFaculty',
+            'topFacultySchedules',
+            'timetableTerm',
             'pendingApprovals',
             'scheduledApprovedCount',
             'pendingDeptCount',

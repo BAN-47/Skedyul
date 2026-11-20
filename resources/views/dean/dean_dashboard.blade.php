@@ -8,6 +8,18 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SKEDYUL — Dean Dashboard</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        .dean-timetable-day { min-height: 10rem; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 1rem; background: #fff; }
+        .dean-timetable-event { border: 1px solid #a7f3d0; border-left: 3px solid #10b981; border-radius: .75rem; background: linear-gradient(135deg,#ecfdf5,#f0fdfa); padding: .65rem; }
+        .dean-timetable-event.evening { border-color: #c4b5fd; border-left-color: #7c3aed; background: linear-gradient(135deg,#f5f3ff,#faf5ff); }
+        @media print {
+            body.dean-printing * { visibility: hidden !important; }
+            body.dean-printing #dean-timetable-modal, body.dean-printing #dean-timetable-modal * { visibility: visible !important; }
+            body.dean-printing #dean-timetable-modal { position: absolute !important; inset: 0 !important; display: block !important; overflow: visible !important; padding: 0 !important; background: #fff !important; }
+            body.dean-printing #dean-timetable-modal > section { width: 100% !important; max-width: none !important; max-height: none !important; overflow: visible !important; border: 0 !important; box-shadow: none !important; }
+            body.dean-printing #dean-timetable-modal [data-dean-print-hide] { display: none !important; }
+        }
+    </style>
 </head>
 
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
@@ -135,6 +147,9 @@
                                 </div>
                                 <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-500" style="width:{{ min(100, round(($leader['total_plotted'] / $leaderMax) * 100)) }}%"></div></div>
                                 <div class="mt-2 flex justify-between text-[10px] font-semibold"><span class="text-emerald-700">Day {{ $leader['day_hours'] }}h</span><span class="text-indigo-700">Evening {{ $leader['evening_hours'] }}h</span></div>
+                                <button type="button" data-faculty-id="{{ $leader['id'] }}" data-faculty-name="{{ $leader['name'] }}" data-faculty-role="{{ $leader['rank'] }} · {{ $leader['department'] }}" data-day-hours="{{ $leader['day_hours'] }}" data-evening-hours="{{ $leader['evening_hours'] }}" onclick="openDeanTimetable(this)" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100">
+                                    <span aria-hidden="true">▦</span> View Timetable
+                                </button>
                             </div>
                         @empty
                             <div class="py-6 text-center text-sm text-slate-400 md:col-span-3">No active plotted schedules in this college for the selected semester.</div>
@@ -363,9 +378,152 @@
         </div>
     </div>
 
+    <div id="dean-timetable-modal" class="fixed inset-0 z-[160] hidden items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[2px]" role="presentation" onclick="if(event.target===this) closeDeanTimetable()">
+        <section class="w-full max-w-6xl overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl" style="max-height:min(92vh,900px)" role="dialog" aria-modal="true" aria-labelledby="dean-timetable-title">
+            <div class="h-1 bg-gradient-to-r from-blue-600 via-cyan-500 to-emerald-400"></div>
+            <header class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50/70 px-5 py-4 sm:px-7">
+                <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <div id="dean-timetable-avatar" class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-100 text-lg font-black text-blue-700">--</div>
+                    <div class="min-w-0">
+                        <h2 id="dean-timetable-title" class="truncate text-lg font-extrabold text-slate-900 sm:text-xl">Faculty timetable</h2>
+                        <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-slate-500"><span id="dean-timetable-role"></span><span id="dean-timetable-day" class="rounded-full bg-emerald-100 px-2 py-1 font-bold text-emerald-700"></span><span id="dean-timetable-evening" class="rounded-full bg-indigo-100 px-2 py-1 font-bold text-indigo-700"></span><span id="dean-timetable-term" class="text-slate-400"></span></div>
+                    </div>
+                </div>
+                <div class="flex shrink-0 items-center gap-2" data-dean-print-hide>
+                    <button type="button" onclick="printDeanTimetable()" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-[10px] font-bold text-slate-600">Print</button>
+                    <button type="button" onclick="closeDeanTimetable()" aria-label="Close timetable" class="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600">&times;</button>
+                </div>
+            </header>
+            <div class="max-h-[calc(92vh-90px)] overflow-auto p-4 sm:p-6">
+                <div id="dean-timetable-stats" class="mb-4 flex flex-wrap gap-2"></div>
+                <div id="dean-timetable-grid" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"></div>
+                <div id="dean-timetable-empty" class="hidden rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center"><div class="text-3xl" aria-hidden="true">🗓️</div><p class="mt-2 font-bold text-slate-700">No active timetable found</p><p class="mt-1 text-xs text-slate-500">No classes are plotted for this faculty in the selected semester.</p></div>
+                <div class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Faculty load summary">
+                    <div class="rounded-xl border border-slate-200 bg-white p-3"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Total Plotted</div><div id="dean-timetable-total" class="mt-1 text-lg font-black text-slate-900"></div><div class="text-[9px] text-slate-400">Weekly hours</div></div>
+                    <div class="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Day Class</div><div id="dean-timetable-day-total" class="mt-1 text-lg font-black text-emerald-600"></div><div class="text-[9px] text-slate-400">Teaching hours</div></div>
+                    <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Evening Class</div><div id="dean-timetable-evening-total" class="mt-1 text-lg font-black text-indigo-600"></div><div class="text-[9px] text-slate-400">Teaching hours</div></div>
+                    <div class="rounded-xl border border-blue-100 bg-blue-50/60 p-3"><div class="text-[9px] font-bold uppercase tracking-wide text-slate-400">Sections &amp; Rooms</div><div id="dean-timetable-sections-rooms" class="mt-1 text-lg font-black text-blue-700"></div><div class="text-[9px] text-slate-400">In this timetable</div></div>
+                </div>
+            </div>
+            <footer class="border-t border-slate-200 bg-slate-50 px-5 py-3.5 text-[11px] text-slate-500">Read-only college timetable · {{ $college?->college_code ?? 'College' }}</footer>
+        </section>
+    </div>
+
     <div class="toast" id="toast"><span id="toast-msg"></span></div>
 
     <script>
+        const DEAN_DASHBOARD_TIMETABLES = @js($topFacultySchedules);
+        const DEAN_DASHBOARD_TERM = @js($timetableTerm);
+        let deanTimetableReturnFocus = null;
+
+        function openDeanTimetable(button) {
+            const modal = document.getElementById('dean-timetable-modal');
+            const facultyId = button.dataset.facultyId;
+            const schedules = DEAN_DASHBOARD_TIMETABLES[facultyId] || [];
+            const facultyName = button.dataset.facultyName || 'Faculty timetable';
+            const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            deanTimetableReturnFocus = button;
+            document.getElementById('dean-timetable-title').textContent = facultyName;
+            document.getElementById('dean-timetable-avatar').textContent = facultyName.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'FC';
+            document.getElementById('dean-timetable-role').textContent = button.dataset.facultyRole || 'Faculty';
+            const dayHours = Number(button.dataset.dayHours || 0);
+            const eveningHours = Number(button.dataset.eveningHours || 0);
+            document.getElementById('dean-timetable-day').textContent = `Day Class (${dayHours}h)`;
+            document.getElementById('dean-timetable-evening').textContent = `Evening Class (${eveningHours}h)`;
+            document.getElementById('dean-timetable-term').textContent = DEAN_DASHBOARD_TERM;
+            document.getElementById('dean-timetable-total').textContent = `${dayHours + eveningHours}h`;
+            document.getElementById('dean-timetable-day-total').textContent = `${dayHours}h`;
+            document.getElementById('dean-timetable-evening-total').textContent = `${eveningHours}h`;
+            const sectionCount = new Set(schedules.map(item => item.section_id).filter(Boolean)).size;
+            const roomCount = new Set(schedules.map(item => item.room_id || item.room).filter(value => value && value !== 'Room not set')).size;
+            document.getElementById('dean-timetable-sections-rooms').textContent = `${sectionCount} Sec · ${roomCount} Rooms`;
+
+            const stats = document.getElementById('dean-timetable-stats');
+            stats.replaceChildren();
+            [[`${schedules.length} scheduled classes`, 'bg-blue-50 text-blue-700'], [`${schedules.filter(item => String(item.shift).toLowerCase().includes('even')).length} evening`, 'bg-violet-50 text-violet-700'], [`${schedules.filter(item => !String(item.shift).toLowerCase().includes('even')).length} day`, 'bg-emerald-50 text-emerald-700']].forEach(([label, tone]) => {
+                const chip = document.createElement('span');
+                chip.className = `rounded-full px-3 py-1.5 text-[11px] font-extrabold ${tone}`;
+                chip.textContent = label;
+                stats.appendChild(chip);
+            });
+
+            const grid = document.getElementById('dean-timetable-grid');
+            grid.replaceChildren();
+            const hasSchedules = schedules.length > 0;
+            document.getElementById('dean-timetable-empty').classList.toggle('hidden', hasSchedules);
+            grid.classList.toggle('hidden', !hasSchedules);
+            if (hasSchedules) weekDays.forEach(day => {
+                const daySchedules = schedules.filter(item => String(item.day).toLowerCase() === day.toLowerCase());
+                const column = document.createElement('section');
+                column.className = 'dean-timetable-day';
+                const heading = document.createElement('h3');
+                heading.className = 'flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-extrabold uppercase text-slate-600';
+                const name = document.createElement('span');
+                name.textContent = day;
+                const count = document.createElement('span');
+                count.className = 'rounded-full bg-white px-2 py-0.5 text-[10px] text-slate-500';
+                count.textContent = String(daySchedules.length);
+                heading.append(name, count);
+                column.appendChild(heading);
+                const events = document.createElement('div');
+                events.className = 'space-y-2 p-2';
+                if (!daySchedules.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'py-6 text-center text-[11px] italic text-slate-400';
+                    empty.textContent = 'No classes';
+                    events.appendChild(empty);
+                }
+                daySchedules.forEach(schedule => {
+                    const evening = String(schedule.shift).toLowerCase().includes('even');
+                    const event = document.createElement('article');
+                    event.className = `dean-timetable-event ${evening ? 'evening' : ''}`;
+                    const time = document.createElement('div');
+                    time.className = `mb-1 text-[10px] font-extrabold ${evening ? 'text-violet-700' : 'text-emerald-700'}`;
+                    time.textContent = `${schedule.start || 'Time not set'}${schedule.end ? ` – ${schedule.end}` : ''}`;
+                    const course = document.createElement('div');
+                    course.className = 'text-sm font-extrabold text-slate-800';
+                    course.textContent = schedule.course_code || 'Course';
+                    const title = document.createElement('div');
+                    title.className = 'mt-0.5 text-[11px] text-slate-600';
+                    title.textContent = schedule.course_name || '';
+                    const meta = document.createElement('div');
+                    meta.className = 'mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-500';
+                    const section = document.createElement('span');
+                    section.textContent = `▦ ${schedule.section || 'Section not set'}`;
+                    const room = document.createElement('span');
+                    room.textContent = `⌂ ${schedule.room || 'Room not set'}`;
+                    meta.append(section, room);
+                    event.append(time, course, title, meta);
+                    events.appendChild(event);
+                });
+                column.appendChild(events);
+                grid.appendChild(column);
+            });
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+            modal.querySelector('[aria-label="Close timetable"]').focus();
+        }
+
+        function closeDeanTimetable() {
+            const modal = document.getElementById('dean-timetable-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+            deanTimetableReturnFocus?.focus();
+        }
+
+        function printDeanTimetable() {
+            document.body.classList.add('dean-printing');
+            window.print();
+            window.setTimeout(() => document.body.classList.remove('dean-printing'), 300);
+        }
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('dean-timetable-modal')?.classList.contains('hidden')) closeDeanTimetable();
+        });
+
         const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 
         (() => {
