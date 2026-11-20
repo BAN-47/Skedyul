@@ -9,6 +9,7 @@ use App\Models\Schedule_Submission;
 use App\Models\Section;
 use App\Models\Semester;
 use App\Services\FacultyNameFormatter;
+use App\Services\DeanApprovalNotifier;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 
 class PbsSubmissionController extends Controller
 {
-    public function store(Request $request, ScheduleAssignmentService $scheduler)
+    public function store(Request $request, ScheduleAssignmentService $scheduler, DeanApprovalNotifier $approvalNotifier)
     {
         $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
         abort_if(!$chair || !$chair->dc_dept_id, 403, 'Your account is not assigned to a department.');
@@ -122,6 +123,8 @@ class PbsSubmissionController extends Controller
         } catch (\DomainException $exception) {
             return $returnToPbs()->with('error', $exception->getMessage());
         }
+
+        $approvalNotifier->submitted($chair->dc_dept_id, 'pbs', $semester->sem_name ?? 'the selected semester');
 
         return $returnToPbs()->with('success', $section->sec_name . ' PBS was submitted to the dean for review.');
     }

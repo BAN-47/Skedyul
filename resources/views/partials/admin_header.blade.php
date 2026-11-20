@@ -13,10 +13,6 @@
         <span class="admin-topbar-subtitle">{{ request()->routeIs('admin.dashboard') ? 'Academic Scheduling & Resource Analytics' : 'SKEDYUL Academic Core' }}</span>
     </div>
     <div class="admin-topbar-actions">
-        <button type="button" onclick="openAdminAnnouncementModal()"
-            class="admin-notification-button flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold">
-            Send announcement
-        </button>
         @if(isset($semester) || isset($academicYear))
             <div class="admin-term-pill">
                 <span class="admin-term-dot"></span>
@@ -33,7 +29,10 @@
         </button>
         <div id="notif-dropdown" style="display:none;"
             class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
-            <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>
+            <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <span class="text-sm font-bold text-slate-900">Notifications</span>
+                <button type="button" onclick="openAdminAnnouncementModal()" class="rounded-lg bg-blue-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-blue-700">Send announcement</button>
+            </div>
             <div id="notif-list" class="max-h-80 overflow-y-auto"></div>
             <div class="px-4 py-2.5 border-t border-slate-200 text-center">
                 <button type="button" onclick="markAllRead()"
@@ -119,6 +118,7 @@ const adminNotificationRecords = new Map();
 const adminAnnouncementUrl = @json(route('admin.notifications.announcement'));
 const adminCsrfToken = @json(csrf_token());
 const adminNotificationDeleteUrl = @json(route('notifications.destroy', ['id' => '__notification_id__']));
+const adminNotificationReadUrl = @json(route('notifications.read', ['id' => '__notification_id__']));
 
 function openAdminAnnouncementModal() {
     document.getElementById('notif-dropdown').style.display = 'none';
@@ -264,16 +264,19 @@ function formatAdminNotificationMessage(value) {
 
 function openAdminNotification(id, type) {
     const notification = adminNotificationRecords.get(String(id));
-    if (type === 'new_user') {
-        fetch(`/notifications/${encodeURIComponent(id)}/read`, {
+    const isApproval = ['new_user', 'approval'].includes(type) || /pending.*approv|approv.*pending/i.test(notification?.notif_title || '');
+    if (isApproval) {
+        const readUrl = adminNotificationReadUrl.replace('__notification_id__', encodeURIComponent(id));
+        fetch(readUrl, {
             method: 'PUT',
             headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': adminCsrfToken },
-        }).finally(() => window.location.assign('{{ route("admin.pending-accounts") }}'));
+        }).finally(() => window.location.assign(@json(route('admin.pending-accounts'))));
         return;
     }
 
     if (notification) showAdminNotificationViewer(notification);
-    const request = fetch(`/notifications/${id}/read`, {
+    const readUrl = adminNotificationReadUrl.replace('__notification_id__', encodeURIComponent(id));
+    const request = fetch(readUrl, {
         method: 'PUT',
         headers: {
             'Accept': 'application/json',

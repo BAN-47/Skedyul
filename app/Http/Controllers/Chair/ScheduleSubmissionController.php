@@ -8,6 +8,7 @@ use App\Models\Faculty;
 use App\Models\Schedule;
 use App\Models\Schedule_Submission;
 use App\Models\Semester;
+use App\Services\DeanApprovalNotifier;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -59,7 +60,7 @@ class ScheduleSubmissionController extends Controller
 
         return view('chair.submit_dean', compact('semester', 'submissions'));
     }
-    public function store(Request $request)
+    public function store(Request $request, DeanApprovalNotifier $approvalNotifier)
     {
         $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
 
@@ -189,6 +190,8 @@ class ScheduleSubmissionController extends Controller
                 Schedule_Submission::create($values);
             }
         });
+
+        $approvalNotifier->submitted($departmentId, 'pbt', $semester->sem_name ?? 'the selected semester');
 
         if ($request->boolean('return_to_pbt')) {
             $shift = $request->input('shift') === 'night' ? 'night' : 'day';

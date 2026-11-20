@@ -182,6 +182,7 @@
             <script>
                 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
                 const pendingCountUrl = "{{ route('dean.notifications.pending-count') }}";
+                const deanPendingApprovalsUrl = @json(route('dean.pending_approvals'));
                 const deanNotificationEndpoints = {
                     index: @json(route('notifications.index')),
                     unread: @json(route('notifications.unread-count')),
@@ -301,7 +302,8 @@
                         time.className = 'notif-drop-time';
                         time.textContent = new Date(notification.notif_created_at).toLocaleString();
                         content.append(text, time);
-                        content.addEventListener('click', () => deanHeaderMarkRead(notification, item));
+                        content.classList.add('cursor-pointer');
+                        content.addEventListener('click', () => deanHeaderOpenNotification(notification, item));
 
                         const remove = document.createElement('button');
                         remove.type = 'button';
@@ -314,6 +316,13 @@
                         fragment.appendChild(item);
                     });
                     list.replaceChildren(fragment);
+                }
+
+                async function deanHeaderOpenNotification(notification, item) {
+                    const isApproval = notification.notif_type === 'approval'
+                        || /schedule awaiting approval|pending approval/i.test(notification.notif_title || '');
+                    await deanHeaderMarkRead(notification, item);
+                    if (isApproval) window.location.assign(deanPendingApprovalsUrl);
                 }
 
                 async function deanHeaderMarkRead(notification, item) {
