@@ -179,6 +179,9 @@ Route::middleware(['auth', 'audit.activity'])->group(function () {
     Route::put('/notifications/{id}/read', [NotifController::class, 'markAsRead'])
         ->name('notifications.read');
 
+    Route::delete('/notifications/{id}', [NotifController::class, 'destroy'])
+        ->name('notifications.destroy');
+
     Route::put('/notifications/read-all', [NotifController::class, 'markAllRead'])
         ->name('notifications.read-all');
 });

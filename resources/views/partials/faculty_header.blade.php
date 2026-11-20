@@ -118,6 +118,7 @@ document.getElementById('faculty-sidebar')?.querySelectorAll('a').forEach(link =
         'unreadCount' => route('notifications.unread-count'),
         'read' => route('notifications.read', ['id' => '__notification_id__']),
         'readAll' => route('notifications.read-all'),
+        'delete' => route('notifications.destroy', ['id' => '__notification_id__']),
         'sendSuggestion' => route('faculty.notifications.chair-suggestion'),
     ];
 @endphp
@@ -273,8 +274,21 @@ function renderFacultyHeaderNotifList(notifications) {
         time.className = 'notif-drop-time';
         time.textContent = facultyHeaderFormatNotifTime(notification.notif_created_at);
 
+        content.classList.add('min-w-0', 'flex-1');
         content.append(text, time);
-        item.append(dot, content);
+
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'ml-auto shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600';
+        deleteButton.setAttribute('aria-label', 'Delete notification');
+        deleteButton.title = 'Delete notification';
+        deleteButton.textContent = '×';
+        deleteButton.addEventListener('click', event => {
+            event.stopPropagation();
+            facultyHeaderDeleteNotification(notification.notif_id, item, deleteButton);
+        });
+
+        item.append(dot, content, deleteButton);
         fragment.appendChild(item);
     });
     list.replaceChildren(fragment);
@@ -339,6 +353,23 @@ async function facultyHeaderMarkAllRead() {
         updateFacultyHeaderNotifCount();
     } catch (error) {
         facultyHeaderShowNotifMessage(error.message || 'Unable to mark notifications as read.');
+    }
+}
+
+async function facultyHeaderDeleteNotification(id, item, button) {
+    button.disabled = true;
+    try {
+        const url = FACULTY_HEADER_NOTIFICATION_ENDPOINTS.delete.replace('__notification_id__', encodeURIComponent(id));
+        await facultyHeaderRequest(url, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        });
+        item.remove();
+        if (!document.querySelector('#notif-list .notif-drop-item')) facultyHeaderShowNotifMessage('No notifications yet.');
+        updateFacultyHeaderNotifCount();
+    } catch (error) {
+        button.disabled = false;
+        facultyHeaderShowNotifMessage(error.message || 'Unable to delete this notification.');
     }
 }
 

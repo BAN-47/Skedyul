@@ -24,12 +24,25 @@
             <div class="topbar">
                 <div class="topbar-title">{{ $title ?? 'Dean Dashboard' }}</div>
                 <div class="flex items-center gap-2">
-                    <button onclick="openModal('modal-notify')" class="btn btn-secondary flex items-center gap-1.5">
-                        Notifications
-                        <span id="notif-badge"
-                            class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                            {{ $pendingApprovalsCount ?? 0 }}
-                        </span>
+                    <div id="dean-notif-bell" class="relative">
+                        <button type="button" onclick="deanHeaderToggleNotifications()" class="btn btn-secondary flex items-center gap-1.5">
+                            Inbox
+                            <span id="dean-notif-count" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
+                        </button>
+                        <div id="dean-notif-dropdown" style="display:none;" class="absolute top-11 right-0 w-[360px] max-w-[calc(100vw-24px)] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
+                            <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>
+                            <div id="dean-notif-list" class="max-h-80 overflow-y-auto"></div>
+                            <div class="px-4 py-2.5 border-t border-slate-200 text-center">
+                                <button type="button" onclick="deanHeaderMarkAllRead()" class="text-[12px] text-blue-600 font-semibold bg-transparent border-none cursor-pointer">Mark all as read</button>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="{{ route('dean.pending_approvals') }}" class="btn btn-secondary flex items-center gap-1.5 no-underline">
+                        Approvals
+                        <span id="notif-badge" class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{{ $pendingApprovalsCount ?? 0 }}</span>
+                    </a>
+                    <button type="button" onclick="openModal('modal-notify')" class="btn btn-secondary flex items-center gap-1.5">
+                        Send notification
                     </button>
                 </div>
             </div>
@@ -164,6 +177,13 @@
             <script>
                 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
                 const pendingCountUrl = "{{ route('dean.notifications.pending-count') }}";
+                const deanNotificationEndpoints = {
+                    index: @json(route('notifications.index')),
+                    unread: @json(route('notifications.unread-count')),
+                    read: @json(route('notifications.read', ['id' => '__notification_id__'])),
+                    readAll: @json(route('notifications.read-all')),
+                    delete: @json(route('notifications.destroy', ['id' => '__notification_id__'])),
+                };
                 // The badge rendered by the server may use a different pending
                 // count than this endpoint. Establish a live baseline first so
                 // opening a Dean page never announces existing approvals as new.
@@ -195,6 +215,8 @@
                 }
                 pollPendingCount();
                 setInterval(pollPendingCount, 15000);
+                deanHeaderUpdateNotifCount();
+                setInterval(deanHeaderUpdateNotifCount, 30000);
 
                 // ── MODALS ────────────────────────────────────────────────────────
                 function openModal(id) {
@@ -203,6 +225,140 @@
 
                 function closeModal(id) {
                     document.getElementById(id).classList.remove('open');
+                }
+
+                let deanHeaderNotificationsOpen = false;
+
+                async function deanHeaderRequest(url, options = {}) {
+                    const response = await fetch(url, {
+                        ...options,
+                        headers: { 'Accept': 'application/json', ...(options.headers || {}) },
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.message || 'Unable to update notifications.');
+                    return data;
+                }
+
+                function deanHeaderShowMessage(message) {
+                    const list = document.getElementById('dean-notif-list');
+                    if (!list) return;
+                    const empty = document.createElement('div');
+                    empty.className = 'px-4 py-6 text-center text-xs text-slate-400';
+                    empty.textContent = message;
+                    list.replaceChildren(empty);
+                }
+
+                async function deanHeaderToggleNotifications() {
+                    deanHeaderNotificationsOpen = !deanHeaderNotificationsOpen;
+                    const dropdown = document.getElementById('dean-notif-dropdown');
+                    if (!dropdown) return;
+                    dropdown.style.display = deanHeaderNotificationsOpen ? 'block' : 'none';
+                    if (deanHeaderNotificationsOpen) await deanHeaderLoadNotifications();
+                }
+
+                document.addEventListener('click', event => {
+                    const bell = document.getElementById('dean-notif-bell');
+                    if (bell && !bell.contains(event.target)) {
+                        deanHeaderNotificationsOpen = false;
+                        document.getElementById('dean-notif-dropdown').style.display = 'none';
+                    }
+                });
+
+                async function deanHeaderLoadNotifications() {
+                    deanHeaderShowMessage('Loading notifications…');
+                    try {
+                        const notifications = await deanHeaderRequest(deanNotificationEndpoints.index);
+                        if (!Array.isArray(notifications)) throw new Error('The notification list was invalid.');
+                        deanHeaderRenderNotifications(notifications);
+                    } catch (error) {
+                        deanHeaderShowMessage(error.message || 'Failed to load notifications.');
+                    }
+                }
+
+                function deanHeaderRenderNotifications(notifications) {
+                    const list = document.getElementById('dean-notif-list');
+                    if (!notifications.length) return deanHeaderShowMessage('No notifications yet.');
+                    const fragment = document.createDocumentFragment();
+                    notifications.forEach(notification => {
+                        const item = document.createElement('div');
+                        item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;
+                        const dot = document.createElement('div');
+                        dot.className = 'notif-drop-dot';
+                        dot.style.backgroundColor = notification.notif_type === 'urgent' ? '#dc2626' : '#2563eb';
+                        const content = document.createElement('div');
+                        content.className = 'min-w-0 flex-1';
+                        const text = document.createElement('div');
+                        text.className = 'notif-drop-text';
+                        const title = document.createElement('b');
+                        title.textContent = notification.notif_title || 'Notification';
+                        text.append(title, document.createTextNode(` — ${notification.notif_message || ''}`));
+                        const time = document.createElement('div');
+                        time.className = 'notif-drop-time';
+                        time.textContent = new Date(notification.notif_created_at).toLocaleString();
+                        content.append(text, time);
+                        content.addEventListener('click', () => deanHeaderMarkRead(notification, item));
+
+                        const remove = document.createElement('button');
+                        remove.type = 'button';
+                        remove.className = 'ml-auto shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600';
+                        remove.textContent = '×';
+                        remove.title = 'Delete notification';
+                        remove.setAttribute('aria-label', 'Delete notification');
+                        remove.addEventListener('click', () => deanHeaderDeleteNotification(notification.notif_id, item, remove));
+                        item.append(dot, content, remove);
+                        fragment.appendChild(item);
+                    });
+                    list.replaceChildren(fragment);
+                }
+
+                async function deanHeaderMarkRead(notification, item) {
+                    if (notification.notif_is_read) return;
+                    try {
+                        const url = deanNotificationEndpoints.read.replace('__notification_id__', encodeURIComponent(notification.notif_id));
+                        await deanHeaderRequest(url, { method: 'PUT', headers: { 'X-CSRF-TOKEN': CSRF } });
+                        notification.notif_is_read = true;
+                        item.classList.remove('unread');
+                        deanHeaderUpdateNotifCount();
+                    } catch (error) {
+                        console.error('Unable to mark Dean notification read:', error);
+                    }
+                }
+
+                async function deanHeaderDeleteNotification(id, item, button) {
+                    button.disabled = true;
+                    try {
+                        const url = deanNotificationEndpoints.delete.replace('__notification_id__', encodeURIComponent(id));
+                        await deanHeaderRequest(url, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': CSRF } });
+                        item.remove();
+                        if (!document.querySelector('#dean-notif-list .notif-drop-item')) deanHeaderShowMessage('No notifications yet.');
+                        deanHeaderUpdateNotifCount();
+                    } catch (error) {
+                        button.disabled = false;
+                        console.error('Unable to delete Dean notification:', error);
+                    }
+                }
+
+                async function deanHeaderMarkAllRead() {
+                    try {
+                        await deanHeaderRequest(deanNotificationEndpoints.readAll, { method: 'PUT', headers: { 'X-CSRF-TOKEN': CSRF } });
+                        document.querySelectorAll('#dean-notif-list .notif-drop-item.unread').forEach(item => item.classList.remove('unread'));
+                        deanHeaderUpdateNotifCount();
+                    } catch (error) {
+                        deanHeaderShowMessage(error.message || 'Unable to mark notifications as read.');
+                    }
+                }
+
+                async function deanHeaderUpdateNotifCount() {
+                    try {
+                        const result = await deanHeaderRequest(deanNotificationEndpoints.unread);
+                        const badge = document.getElementById('dean-notif-count');
+                        if (badge) {
+                            badge.textContent = String(result.count ?? 0);
+                            badge.style.display = Number(result.count) > 0 ? 'inline' : 'none';
+                        }
+                    } catch (error) {
+                        console.error('Unable to refresh Dean notification count:', error);
+                    }
                 }
                 document.querySelectorAll('.modal-overlay').forEach(m => {
                     m.addEventListener('click', e => {

@@ -69,6 +69,7 @@
         'unreadCount' => route('chair.notifications.unread-count'),
         'read' => route('chair.notifications.read', ['notification' => '__notification_id__']),
         'readAll' => route('chair.notifications.read-all'),
+        'delete' => route('notifications.destroy', ['id' => '__notification_id__']),
     ];
 @endphp
 <script>
@@ -203,8 +204,21 @@
             const time = document.createElement('div');
             time.className = 'notif-drop-time';
             time.textContent = chairHeaderFormatTime(notification.notif_created_at);
+            content.classList.add('min-w-0', 'flex-1');
             content.append(text, time);
-            item.append(dot, content);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'ml-auto shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600';
+            deleteButton.setAttribute('aria-label', 'Delete notification');
+            deleteButton.title = 'Delete notification';
+            deleteButton.textContent = '×';
+            deleteButton.addEventListener('click', event => {
+                event.stopPropagation();
+                chairHeaderDeleteNotification(notification.notif_id, item, deleteButton);
+            });
+
+            item.append(dot, content, deleteButton);
             fragment.appendChild(item);
         });
         list.replaceChildren(fragment);
@@ -268,6 +282,25 @@
             updateChairHeaderNotifCount();
         } catch (error) {
             chairHeaderShowMessage(error.message || 'Unable to mark notifications as read.');
+        }
+    }
+
+    async function chairHeaderDeleteNotification(id, item, button) {
+        button.disabled = true;
+        try {
+            const url = CHAIR_HEADER_NOTIFICATION_ENDPOINTS.delete.replace('__notification_id__', encodeURIComponent(id));
+            await chairHeaderRequest(url, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                },
+            });
+            item.remove();
+            if (!document.querySelector('#notif-list .notif-drop-item')) chairHeaderShowMessage('No notifications yet.');
+            updateChairHeaderNotifCount();
+        } catch (error) {
+            button.disabled = false;
+            console.error('Unable to delete chair notification:', error);
         }
     }
 

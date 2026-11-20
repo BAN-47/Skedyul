@@ -89,6 +89,7 @@
 let notifOpen = false;
 const adminAnnouncementUrl = @json(route('admin.notifications.announcement'));
 const adminCsrfToken = @json(csrf_token());
+const adminNotificationDeleteUrl = @json(route('notifications.destroy', ['id' => '__notification_id__']));
 
 function openAdminAnnouncementModal() {
     document.getElementById('notif-dropdown').style.display = 'none';
@@ -200,7 +201,8 @@ function renderNotifList(notifications) {
     list.innerHTML = notifications.map(n => `
         <div class="notif-drop-item ${!n.notif_is_read ? 'unread' : ''}" role="button" tabindex="0" onclick="openAdminNotification('${escapeNotificationHtml(n.notif_id)}', '${escapeNotificationHtml(n.notif_type)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAdminNotification('${escapeNotificationHtml(n.notif_id)}', '${escapeNotificationHtml(n.notif_type)}')}" style="cursor:pointer">
             <div class="notif-drop-dot" style="background:${dotColors[n.notif_type] || '#94a3b8'};"></div>
-            <div><div class="notif-drop-text"><b>${escapeNotificationHtml(n.notif_title)}</b> — ${escapeNotificationHtml(n.notif_message)}</div><div class="notif-drop-time">${formatNotifTime(n.notif_created_at)}</div></div>
+            <div class="min-w-0 flex-1"><div class="notif-drop-text"><b>${escapeNotificationHtml(n.notif_title)}</b> — ${escapeNotificationHtml(n.notif_message)}</div><div class="notif-drop-time">${formatNotifTime(n.notif_created_at)}</div></div>
+            <button type="button" class="ml-auto shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Delete notification" title="Delete notification" onclick="event.stopPropagation();deleteAdminNotification('${escapeNotificationHtml(n.notif_id)}', this)">×</button>
         </div>`).join('');
 }
 
@@ -228,6 +230,31 @@ function openAdminNotification(id, type) {
         loadNotifications();
         updateNotifCount();
     });
+}
+
+async function deleteAdminNotification(id, button) {
+    button.disabled = true;
+    const url = adminNotificationDeleteUrl.replace('__notification_id__', encodeURIComponent(id));
+    try {
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': adminCsrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) throw new Error(data.message || 'Could not delete this notification.');
+        button.closest('.notif-drop-item')?.remove();
+        if (!document.querySelector('#notif-list .notif-drop-item')) {
+            document.getElementById('notif-list').innerHTML = '<div class="p-4 text-sm text-slate-400 text-center">No notifications yet.</div>';
+        }
+        updateNotifCount();
+    } catch (error) {
+        button.disabled = false;
+        console.error('Unable to delete admin notification:', error);
+    }
 }
 
 function formatNotifTime(isoString) {

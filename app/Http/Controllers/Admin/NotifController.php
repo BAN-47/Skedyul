@@ -53,6 +53,22 @@ class NotifController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function destroy(string $id)
+    {
+        $deleted = Notification::where('notif_id', $id)
+            ->where('notif_usr_id', Auth::id())
+            ->delete();
+
+        if (!$deleted) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Notification not found.',
+            ], 404);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     public function sendAnnouncement(Request $request)
     {
         $validated = $request->validate([
