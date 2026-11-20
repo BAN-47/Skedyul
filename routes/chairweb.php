@@ -22,6 +22,7 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     Route::get('/notifications/unread-count', [ChairSettingsController::class, 'unreadNotificationsCount'])->name('chair.notifications.unread-count');
     Route::post('/notifications/read-all', [ChairController::class, 'markAllNotificationsRead'])->name('chair.notifications.read-all');
     Route::post('/notifications/{notification}/read', [ChairController::class, 'markNotificationRead'])->name('chair.notifications.read');
+    Route::post('/notifications/report-admin', [ChairSettingsController::class, 'reportAdminIssue'])->name('chair.notifications.report-admin');
 
     // Chair faculty load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');

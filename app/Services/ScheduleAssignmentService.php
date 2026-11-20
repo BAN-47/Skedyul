@@ -441,16 +441,7 @@ class ScheduleAssignmentService
                 $isSameLoad = $targetLoad && $targetLoad->sl_id === $schedule->sch_load_id;
                 $targetLoadNeedsShiftMove = $targetLoad && $targetLoad->sl_shift !== $workloadShift;
                 $sourceLoadToDelete = null;
-                if ($isSameFacultySectionChange && $sourceLoadHasOtherSchedules) {
-                    $sourceWorkloadShift = (bool) Section::whereKey($sourceLoad->sl_sec_id)->value('sec_is_evening')
-                        ? 'evening'
-                        : ($sourceLoad->sl_shift ?? 'day');
-                    if ($sourceLoad->sl_shift !== $sourceWorkloadShift) {
-                        $sourceLoad->sl_shift = $sourceWorkloadShift;
-                        $sourceLoad->save();
-                    }
-                    $schedule->sch_load_id = $sourceLoad->sl_id;
-                } elseif ($isSameFacultySectionChange) {
+                if ($isSameFacultySectionChange && !$sourceLoadHasOtherSchedules) {
                     $sourceWorkloadShift = (bool) Section::whereKey($sourceLoad->sl_sec_id)->value('sec_is_evening')
                         ? 'evening'
                         : ($sourceLoad->sl_shift ?? 'day');

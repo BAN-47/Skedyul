@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
 use App\Models\Notification;
+use App\Models\User;
 use App\Services\ProfileImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -211,5 +213,67 @@ class ChairSettingsController extends Controller
             ->count();
 
         return response()->json(['count' => $count]);
+    }
+
+    public function reportAdminIssue(Request $request)
+    {
+        $validated = $request->validate([
+            'category' => 'required|in:bug,system_issue,feature_request,other',
+            'title' => 'required|string|max:175',
+            'message' => 'required|string|max:1700',
+        ]);
+
+        abort_unless(Auth::user()?->usr_role === 'department_chair', 403);
+
+        $admins = User::query()
+            ->where('usr_role', 'system_admin')
+            ->where('usr_is_active', true)
+            ->pluck('usr_id');
+
+        if ($admins->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active system administrators can receive this message right now.',
+            ], 422);
+        }
+
+        $chair = Dept_Chair::with('program')->where('dc_usr_id', Auth::id())->first();
+        $user = Auth::user();
+        $senderName = trim(strip_tags((string) ($user->usr_name ?: implode(' ', array_filter([
+            $chair?->dc_first_name,
+            $chair?->dc_last_name,
+        ])))));
+        $categoryLabels = [
+            'bug' => 'Bug report',
+            'system_issue' => 'System issue',
+            'feature_request' => 'Feature request',
+            'other' => 'Other feedback',
+        ];
+        $safeTitle = trim(strip_tags($validated['title']));
+        $safeMessage = trim(strip_tags($validated['message']));
+        $department = trim((string) ($chair?->program?->dept_code ?? 'Department not set'));
+        $sender = $senderName ?: 'Department Chair';
+        $email = trim(strip_tags((string) $user->usr_email));
+        $now = now();
+        $urgent = in_array($validated['category'], ['bug', 'system_issue'], true);
+
+        $rows = $admins->map(fn ($adminId) => [
+            'notif_id' => (string) Str::uuid(),
+            'notif_usr_id' => $adminId,
+            'notif_title' => '[Chair ' . $categoryLabels[$validated['category']] . '] ' . $safeTitle,
+            'notif_message' => "From: {$sender} ({$email})\nDepartment: {$department}\n\n{$safeMessage}",
+            'notif_type' => $urgent ? 'urgent' : 'info',
+            'notif_is_read' => false,
+            'notif_created_at' => $now,
+            'notif_updated_at' => $now,
+        ])->all();
+
+        DB::table('notification')->insert($rows);
+
+        return response()->json([
+            'success' => true,
+            'sent' => count($rows),
+            'message' => 'Your message was sent to the system administrators.',
+        ]);
     }
 }

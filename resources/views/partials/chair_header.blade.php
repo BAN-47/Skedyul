@@ -22,6 +22,10 @@
         @elseif(!empty($badgeText))
             <span class="badge badge-blue text-[11px]">{{ $badgeText }}</span>
         @endif
+        <button type="button" onclick="chairHeaderOpenAdminReport()"
+            class="inline-flex shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-2 py-2 text-[10px] font-semibold text-blue-700 transition hover:bg-blue-100 sm:px-3 sm:text-[12px]">
+            Contact Admin
+        </button>
         <div id="topbar-notif-bell" class="relative">
             <button type="button" onclick="chairHeaderToggleNotifDropdown()"
                 class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-100 text-slate-500 text-[13px] font-semibold">
@@ -63,6 +67,42 @@
     </div>
 </div>
 
+<div id="chair-admin-report-modal" class="fixed inset-0 z-[1350] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="chair-admin-report-title" onclick="if(event.target===this) chairHeaderCloseAdminReport()">
+    <form id="chair-admin-report-form" class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onsubmit="chairHeaderSubmitAdminReport(event)">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div>
+                <h2 id="chair-admin-report-title" class="text-base font-bold text-slate-900">Contact System Admin</h2>
+                <p class="mt-1 text-xs text-slate-500">Report a bug, system issue, or feature idea.</p>
+            </div>
+            <button type="button" onclick="chairHeaderCloseAdminReport()" class="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100" aria-label="Close">×</button>
+        </div>
+        <div class="space-y-4 px-5 py-5">
+            <label class="block">
+                <span class="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Message type</span>
+                <select name="category" required class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
+                    <option value="bug">Bug report</option>
+                    <option value="system_issue">System issue</option>
+                    <option value="feature_request">Feature request</option>
+                    <option value="other">Other feedback</option>
+                </select>
+            </label>
+            <label class="block">
+                <span class="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Title</span>
+                <input name="title" required maxlength="175" placeholder="Briefly describe what you need" class="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100">
+            </label>
+            <label class="block">
+                <span class="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Details</span>
+                <textarea name="message" required maxlength="1700" rows="5" placeholder="Include what happened, where you saw it, or what feature would help." class="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"></textarea>
+            </label>
+            <p id="chair-admin-report-feedback" class="hidden rounded-lg px-3 py-2 text-xs" role="status" aria-live="polite"></p>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
+            <button type="button" onclick="chairHeaderCloseAdminReport()" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200">Cancel</button>
+            <button id="chair-admin-report-submit" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Send to Admin</button>
+        </div>
+    </form>
+</div>
+
 @php
     $chairHeaderNotificationEndpoints = [
         'index' => route('chair.notifications.index'),
@@ -70,11 +110,56 @@
         'read' => route('chair.notifications.read', ['notification' => '__notification_id__']),
         'readAll' => route('chair.notifications.read-all'),
         'delete' => route('notifications.destroy', ['id' => '__notification_id__']),
+        'reportAdmin' => route('chair.notifications.report-admin'),
     ];
 @endphp
 <script>
     let chairHeaderNotifOpen = false;
     const CHAIR_HEADER_NOTIFICATION_ENDPOINTS = @json($chairHeaderNotificationEndpoints);
+
+    function chairHeaderOpenAdminReport() {
+        const modal = document.getElementById('chair-admin-report-modal');
+        if (!modal) return;
+        document.getElementById('chair-admin-report-feedback')?.classList.add('hidden');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal.querySelector('select')?.focus();
+    }
+
+    function chairHeaderCloseAdminReport() {
+        const modal = document.getElementById('chair-admin-report-modal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function chairHeaderSubmitAdminReport(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const button = document.getElementById('chair-admin-report-submit');
+        const feedback = document.getElementById('chair-admin-report-feedback');
+        const payload = Object.fromEntries(new FormData(form).entries());
+        button.disabled = true;
+        button.textContent = 'Sending…';
+        feedback.classList.add('hidden');
+        try {
+            const result = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.reportAdmin, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                body: JSON.stringify(payload),
+            });
+            feedback.textContent = result.message || 'Message sent to the system administrators.';
+            feedback.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700';
+            form.reset();
+            window.setTimeout(chairHeaderCloseAdminReport, 1000);
+        } catch (error) {
+            feedback.textContent = error.message || 'Could not send your message. Please try again.';
+            feedback.className = 'rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700';
+        } finally {
+            button.disabled = false;
+            button.textContent = 'Send to Admin';
+        }
+    }
 
     function chairHeaderToggleNotifDropdown() {
         chairHeaderNotifOpen = !chairHeaderNotifOpen;
