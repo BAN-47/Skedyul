@@ -31,6 +31,12 @@
                 class="absolute top-11 right-0 w-[340px] bg-white border border-slate-200 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,.12)] z-[100] overflow-hidden">
                 <div class="px-4 py-3.5 border-b border-slate-200 text-sm font-bold text-slate-900">Notifications</div>
                 <div id="notif-list" class="max-h-80 overflow-y-auto"></div>
+                <div class="px-3 py-2 border-t border-slate-200">
+                    <button type="button" onclick="facultyHeaderOpenSuggestion()"
+                        class="w-full rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white hover:bg-blue-700">
+                        Suggest a course or schedule
+                    </button>
+                </div>
                 <div class="px-4 py-2.5 border-t border-slate-200 text-center">
                     <button type="button" onclick="facultyHeaderMarkAllRead()"
                         class="text-[12px] text-blue-600 font-semibold bg-transparent border-none cursor-pointer">
@@ -40,6 +46,40 @@
             </div>
         </div>
     </div>
+</div>
+
+<div id="faculty-chair-suggestion-modal" class="fixed inset-0 z-[1200] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="faculty-chair-suggestion-title">
+    <form id="faculty-chair-suggestion-form" class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onsubmit="facultyHeaderSubmitSuggestion(event)">
+        <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+                <h2 id="faculty-chair-suggestion-title" class="text-base font-extrabold text-slate-900">Send a suggestion to your chair</h2>
+                <p class="mt-1 text-xs text-slate-500">Only the chair assigned to your department will receive it.</p>
+            </div>
+            <button type="button" onclick="facultyHeaderCloseSuggestion()" class="rounded-lg px-2 py-1 text-xl text-slate-400 hover:bg-slate-100" aria-label="Close">×</button>
+        </div>
+        <div class="space-y-3">
+            <label class="block text-xs font-bold text-slate-600">Suggestion type
+                <select name="suggestion_type" required class="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+                    <option value="course">Course I would like to teach</option>
+                    <option value="schedule">Preferred schedule</option>
+                </select>
+            </label>
+            <label class="block text-xs font-bold text-slate-600">Course or subject
+                <input name="course" required maxlength="180" placeholder="e.g. IT 311 — Web Systems" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800">
+            </label>
+            <label class="block text-xs font-bold text-slate-600">Preferred days and times <span class="font-normal text-slate-400">(optional)</span>
+                <input name="schedule_details" maxlength="600" placeholder="e.g. Tuesday/Thursday, morning" class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800">
+            </label>
+            <label class="block text-xs font-bold text-slate-600">Note to your chair
+                <textarea name="message" required maxlength="2000" rows="4" placeholder="Add context for your suggestion..." class="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"></textarea>
+            </label>
+            <p id="faculty-chair-suggestion-feedback" class="hidden rounded-lg px-3 py-2 text-xs" role="status" aria-live="polite"></p>
+        </div>
+        <div class="mt-5 flex justify-end gap-2">
+            <button type="button" onclick="facultyHeaderCloseSuggestion()" class="rounded-lg bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700">Cancel</button>
+            <button id="faculty-chair-suggestion-submit" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Send to my chair</button>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -78,11 +118,69 @@ document.getElementById('faculty-sidebar')?.querySelectorAll('a').forEach(link =
         'unreadCount' => route('notifications.unread-count'),
         'read' => route('notifications.read', ['id' => '__notification_id__']),
         'readAll' => route('notifications.read-all'),
+        'sendSuggestion' => route('faculty.notifications.chair-suggestion'),
     ];
 @endphp
 <script>
 const FACULTY_HEADER_NOTIFICATION_ENDPOINTS = @json($facultyHeaderNotificationEndpoints);
 let facultyHeaderNotifOpen = false;
+
+function facultyHeaderOpenSuggestion() {
+    const modal = document.getElementById('faculty-chair-suggestion-modal');
+    const dropdown = document.getElementById('notif-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    facultyHeaderNotifOpen = false;
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    modal.querySelector('[name="course"]')?.focus();
+}
+
+function facultyHeaderCloseSuggestion() {
+    const modal = document.getElementById('faculty-chair-suggestion-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    const feedback = document.getElementById('faculty-chair-suggestion-feedback');
+    feedback?.classList.add('hidden');
+}
+
+async function facultyHeaderSubmitSuggestion(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = document.getElementById('faculty-chair-suggestion-submit');
+    const feedback = document.getElementById('faculty-chair-suggestion-feedback');
+    if (!form || !button || !feedback) return;
+
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    feedback.className = 'rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700';
+    feedback.textContent = 'Sending your suggestion to your department chair…';
+    feedback.classList.remove('hidden');
+
+    try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!csrf) throw new Error('Could not verify this request. Refresh the page and try again.');
+        const result = await facultyHeaderRequest(FACULTY_HEADER_NOTIFICATION_ENDPOINTS.sendSuggestion, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrf,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
+        });
+        feedback.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700';
+        feedback.textContent = result.message || 'Your suggestion was sent to your department chair.';
+        form.reset();
+        window.setTimeout(facultyHeaderCloseSuggestion, 1200);
+    } catch (error) {
+        feedback.className = 'rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700';
+        feedback.textContent = error.message || 'Unable to send your suggestion. Please try again.';
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Send to my chair';
+    }
+}
 
 async function facultyHeaderRequest(url, options = {}) {
     const response = await fetch(url, {

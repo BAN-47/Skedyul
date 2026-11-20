@@ -179,27 +179,49 @@
 
                 // ── LOAD CHAIRS ───────────────────────────────────────────────────
                 let chairsLoaded = false;
+                let chairsLoading = false;
                 const chairsUrl = "{{ route('dean.notifications') }}";
                 const sendNotificationUrl = "{{ route('dean.notifications.send') }}";
 
                 async function loadChairs() {
-                    if (chairsLoaded) return;
+                    if (chairsLoaded || chairsLoading) return;
+                    chairsLoading = true;
+                    const list = document.getElementById('chair-list');
+                    list.innerHTML = '<div class="text-center py-4 text-slate-400 text-[13px]">Loading department chairs…</div>';
+                    const controller = new AbortController();
+                    const timeout = window.setTimeout(() => controller.abort(), 15000);
                     try {
                         const res = await fetch(chairsUrl, {
+                            signal: controller.signal,
                             headers: {
+                                'Accept': 'application/json',
                                 'X-CSRF-TOKEN': CSRF,
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });
                         if (!res.ok) throw new Error(`Chair request failed (${res.status})`);
                         const data = await res.json();
+                        if (!Array.isArray(data.chairs)) throw new Error('The chair list response was invalid.');
                         renderChairs(data.chairs);
                         chairsLoaded = true;
                     } catch (err) {
                         console.error('Unable to load department chairs:', err);
-                        document.getElementById('chair-list').innerHTML =
-                            '<div class="text-red-500 text-[12px] text-center py-2">Failed to load chairs. Please try again.</div>';
+                        const message = err.name === 'AbortError'
+                            ? 'Loading chairs timed out. Check your connection and try again.'
+                            : (err.message || 'Failed to load chairs. Please try again.');
+                        list.innerHTML = `<div class="py-3 text-center">
+                            <p class="text-red-500 text-[12px]">${message}</p>
+                            <button type="button" onclick="retryLoadChairs()" class="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Retry</button>
+                        </div>`;
+                    } finally {
+                        window.clearTimeout(timeout);
+                        chairsLoading = false;
                     }
+                }
+
+                function retryLoadChairs() {
+                    chairsLoaded = false;
+                    loadChairs();
                 }
 
                 function renderChairs(chairs) {

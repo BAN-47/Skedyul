@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Dean;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,12 +12,18 @@ class NotificationController extends Controller
     // GET /dean/notifications
     public function index()
     {
-        // Return only the fields used by the picker, in one database query.
+        $dean = auth()->user()?->dean;
+        abort_unless(auth()->user()?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+
+        // Only fetch active chairs in this dean's college. Keeping this scoped
+        // avoids loading every college's chairs into the picker.
         $chairs = DB::table('department_chair as dc')
-            ->leftJoin(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
-            ->leftJoin('college as c', 'c.college_id', '=', 'dc.dc_college_id')
+            ->join(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
+            ->join('college as c', 'c.college_id', '=', 'dc.dc_college_id')
+            ->where('dc.dc_college_id', $dean->dean_college_id)
+            ->where('u.usr_role', 'department_chair')
+            ->where('u.usr_is_active', true)
             ->select([
-                'dc.dc_id',
                 'dc.dc_usr_id',
                 'dc.dc_first_name',
                 'dc.dc_last_name',
@@ -26,12 +31,12 @@ class NotificationController extends Controller
                 'c.college_code as dept_code',
             ])
             ->orderBy('c.college_code')
+            ->distinct()
             ->get()
             ->values()
             ->map(function ($chair) {
                 $name = $chair->usr_name ?: trim(($chair->dc_first_name ?? '') . ' ' . ($chair->dc_last_name ?? ''));
                 return [
-                    'dc_id'     => $chair->dc_id,
                     'dc_usr_id' => $chair->dc_usr_id,
                     'chair_name' => $name ?: 'Unnamed Chair',
                     'initials'   => strtoupper(substr($chair->dc_first_name ?? '', 0, 1) . substr($chair->dc_last_name ?? '', 0, 1)),
@@ -53,10 +58,19 @@ class NotificationController extends Controller
             'type'        => 'required|in:info,reminder,urgent,deadline',
         ]);
 
-        $chairIds = User::query()
-            ->whereIn('usr_id', $request->input('chair_ids'))
-            ->where('usr_role', 'department_chair')
-            ->pluck('usr_id');
+        $dean = auth()->user()?->dean;
+        abort_unless(auth()->user()?->usr_role === 'dean' && $dean?->dean_college_id, 403, 'Your account is not assigned to a college.');
+
+        // Recheck recipients on submit so a crafted request cannot message
+        // chairs outside the dean's college.
+        $chairIds = DB::table('department_chair as dc')
+            ->join(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
+            ->where('dc.dc_college_id', $dean->dean_college_id)
+            ->whereIn('dc.dc_usr_id', $request->input('chair_ids'))
+            ->where('u.usr_role', 'department_chair')
+            ->where('u.usr_is_active', true)
+            ->distinct()
+            ->pluck('dc.dc_usr_id');
 
         if ($chairIds->count() !== count($request->input('chair_ids'))) {
             return response()->json([

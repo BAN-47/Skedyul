@@ -45,6 +45,24 @@
     </div>
 </div>
 
+<div id="chair-notification-viewer" class="fixed inset-0 z-[1300] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="chair-notification-viewer-title">
+    <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div class="min-w-0">
+                <p id="chair-notification-viewer-type" class="mb-1 text-[10px] font-bold uppercase tracking-wide text-blue-600"></p>
+                <h2 id="chair-notification-viewer-title" class="text-base font-bold text-slate-900">Notification</h2>
+                <p id="chair-notification-viewer-time" class="mt-1 text-xs text-slate-400"></p>
+            </div>
+            <button type="button" onclick="chairHeaderCloseNotification()" class="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100" aria-label="Close notification">×</button>
+        </div>
+        <div id="chair-notification-viewer-message" class="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words px-5 py-5 text-sm leading-6 text-slate-700"></div>
+        <p id="chair-notification-viewer-error" class="hidden mx-5 mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="status"></p>
+        <div class="flex justify-end border-t border-slate-100 px-5 py-3">
+            <button type="button" onclick="chairHeaderCloseNotification()" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Done</button>
+        </div>
+    </div>
+</div>
+
 @php
     $chairHeaderNotificationEndpoints = [
         'index' => route('chair.notifications.index'),
@@ -63,6 +81,34 @@
         if (dd) dd.style.display = chairHeaderNotifOpen ? 'block' : 'none';
         if (chairHeaderNotifOpen) loadChairHeaderNotifications();
     }
+
+    function chairHeaderOpenNotification(notification, item) {
+        const modal = document.getElementById('chair-notification-viewer');
+        if (!modal) return;
+        document.getElementById('chair-notification-viewer-title').textContent = notification.notif_title || 'Notification';
+        document.getElementById('chair-notification-viewer-type').textContent = (notification.notif_type || 'info').replaceAll('_', ' ');
+        document.getElementById('chair-notification-viewer-time').textContent = chairHeaderFormatTime(notification.notif_created_at);
+        document.getElementById('chair-notification-viewer-message').textContent = notification.notif_message || 'No message was included.';
+        document.getElementById('chair-notification-viewer-error').classList.add('hidden');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal.querySelector('button')?.focus();
+        if (!notification.notif_is_read) chairHeaderMarkRead(notification.notif_id, item);
+    }
+
+    function chairHeaderCloseNotification() {
+        const modal = document.getElementById('chair-notification-viewer');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    document.getElementById('chair-notification-viewer')?.addEventListener('click', event => {
+        if (event.target.id === 'chair-notification-viewer') chairHeaderCloseNotification();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') chairHeaderCloseNotification();
+    });
 
     document.addEventListener('click', function(e) {
         const bell = document.getElementById('topbar-notif-bell');
@@ -133,17 +179,16 @@
         notifications.forEach(notification => {
             const item = document.createElement('div');
             item.className = `notif-drop-item${notification.notif_is_read ? '' : ' unread'}`;
-            if (!notification.notif_is_read) {
-                item.setAttribute('role', 'button');
-                item.tabIndex = 0;
-                item.addEventListener('click', () => chairHeaderMarkRead(notification.notif_id, item));
-                item.addEventListener('keydown', event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        chairHeaderMarkRead(notification.notif_id, item);
-                    }
-                });
-            }
+            item.setAttribute('role', 'button');
+            item.tabIndex = 0;
+            item.setAttribute('aria-label', `Open notification: ${notification.notif_title || 'Notification'}`);
+            item.addEventListener('click', () => chairHeaderOpenNotification(notification, item));
+            item.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    chairHeaderOpenNotification(notification, item);
+                }
+            });
 
             const dot = document.createElement('div');
             dot.className = 'notif-drop-dot';
@@ -199,11 +244,13 @@
                 },
             });
             el.classList.remove('unread');
-            el.removeAttribute('role');
-            el.removeAttribute('tabindex');
             updateChairHeaderNotifCount();
         } catch (error) {
-            chairHeaderShowMessage(error.message || 'Unable to mark this notification as read.');
+            const feedback = document.getElementById('chair-notification-viewer-error');
+            if (feedback) {
+                feedback.textContent = error.message || 'Unable to mark this notification as read.';
+                feedback.classList.remove('hidden');
+            }
         }
     }
 
@@ -217,8 +264,6 @@
             });
             document.querySelectorAll('#notif-list .notif-drop-item.unread').forEach(el => {
                 el.classList.remove('unread');
-                el.removeAttribute('role');
-                el.removeAttribute('tabindex');
             });
             updateChairHeaderNotifCount();
         } catch (error) {
