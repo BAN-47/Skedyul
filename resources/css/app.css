@@ -943,6 +943,59 @@
         @apply text-blue-200;
     }
 
+    /* Dean sidebar: distinct active states and visible navigation icons. */
+    .dean-sidebar {
+        background: linear-gradient(180deg, #14294f 0%, #1a2f5b 58%, #10223f 100%);
+        @apply shadow-[8px_0_28px_rgba(15,23,42,.12)];
+    }
+    .dean-sidebar .sidebar-logo {
+        @apply border-white/10 px-5 py-5 text-left;
+    }
+    .dean-sidebar .sidebar-logo-text {
+        @apply text-[25px] font-black tracking-tight;
+    }
+    .dean-sidebar-caption {
+        @apply mt-1 text-[9px] font-semibold uppercase tracking-[.14em] text-blue-100/45;
+    }
+    .dean-sidebar .sidebar-user {
+        @apply gap-3 px-4 py-4;
+    }
+    .dean-sidebar .sidebar-avatar {
+        @apply h-10 w-10 border border-blue-200/20 bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-950/20;
+    }
+    .dean-sidebar .sidebar-user-role {
+        @apply text-[10px] text-blue-100/60;
+    }
+    .dean-sidebar .sidebar-nav {
+        @apply py-2;
+    }
+    .dean-sidebar .nav-section-label {
+        @apply px-4 pt-4 pb-2 text-[9px] tracking-[.14em] text-blue-100/40;
+    }
+    .dean-sidebar .nav-item {
+        @apply mx-2 my-0.5 min-h-10 rounded-xl border-l-0 px-3 py-2.5 text-[12px] text-blue-100/70;
+    }
+    .dean-sidebar .nav-item:hover {
+        @apply translate-x-0.5 bg-white/[.07] text-white;
+    }
+    .dean-sidebar .nav-item.active {
+        @apply bg-blue-500/20 font-bold text-white shadow-sm;
+        box-shadow: inset 3px 0 #60a5fa, 0 5px 14px rgba(2, 15, 42, .12);
+    }
+    .dean-sidebar .nav-icon {
+        @apply flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[.06] text-[15px] text-blue-100/75;
+    }
+    .dean-sidebar .nav-item.active .nav-icon,
+    .dean-sidebar .nav-item:hover .nav-icon {
+        @apply bg-blue-500/25 text-blue-100;
+    }
+    .dean-sidebar .sidebar-bottom {
+        @apply border-white/10 px-3 py-3;
+    }
+    .dean-sidebar .btn-logout {
+        @apply rounded-xl border-white/10 py-2.5 text-blue-100/70 hover:bg-red-600/15 hover:text-red-200;
+    }
+
     /* ── QUOTE BANNER ────────────────────────────────────────────────────── */
     /* Dark gradient banner used on dashboard pages */
     .quote-banner {

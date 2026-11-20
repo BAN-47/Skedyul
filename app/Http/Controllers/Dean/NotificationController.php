@@ -19,8 +19,8 @@ class NotificationController extends Controller
         // avoids loading every college's chairs into the picker.
         $chairs = DB::table('department_chair as dc')
             ->join(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
-            ->join('college as c', 'c.college_id', '=', 'dc.dc_college_id')
-            ->where('dc.dc_college_id', $dean->dean_college_id)
+            ->join('department as d', 'd.dept_id', '=', 'dc.dc_dept_id')
+            ->where('d.dept_college_id', $dean->dean_college_id)
             ->where('u.usr_role', 'department_chair')
             ->where('u.usr_is_active', true)
             ->select([
@@ -28,11 +28,12 @@ class NotificationController extends Controller
                 'dc.dc_first_name',
                 'dc.dc_last_name',
                 'u.usr_name',
-                'c.college_code as dept_code',
+                'd.dept_code',
             ])
-            ->orderBy('c.college_code')
-            ->distinct()
+            ->orderBy('d.dept_code')
+            ->orderBy('dc.dc_last_name')
             ->get()
+            ->unique('dc_usr_id')
             ->values()
             ->map(function ($chair) {
                 $name = $chair->usr_name ?: trim(($chair->dc_first_name ?? '') . ' ' . ($chair->dc_last_name ?? ''));
@@ -65,7 +66,8 @@ class NotificationController extends Controller
         // chairs outside the dean's college.
         $chairIds = DB::table('department_chair as dc')
             ->join(DB::raw('"USER" as u'), 'u.usr_id', '=', 'dc.dc_usr_id')
-            ->where('dc.dc_college_id', $dean->dean_college_id)
+            ->join('department as d', 'd.dept_id', '=', 'dc.dc_dept_id')
+            ->where('d.dept_college_id', $dean->dean_college_id)
             ->whereIn('dc.dc_usr_id', $request->input('chair_ids'))
             ->where('u.usr_role', 'department_chair')
             ->where('u.usr_is_active', true)

@@ -10,6 +10,7 @@ use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\Schedule_Submission;
 use App\Models\Schedule;
+use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\User;
@@ -36,16 +37,24 @@ class DeanDashboardController extends Controller
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester = Semester::where('sem_is_active', true)->first();
 
-        $faculty = Faculty::with('user', 'department')
-            ->where('fac_college_id', $collegeId)
+        $programs = Departments::where('dept_college_id', $collegeId)
+            ->orderBy('dept_code')
+            ->get();
+        $departmentIds = $programs->pluck('dept_id');
+
+        // Count faculty whose home department belongs to this college.
+        $faculty = Faculty::with(['user', 'program'])
+            ->whereIn('fac_dept_id', $departmentIds)
             ->get();
         $totalFaculty = $faculty->count();
 
-        $studyLoadsByFaculty = Study_Load::with('subject')
-            ->whereIn('sl_fac_id', $faculty->pluck('fac_id'))
-            ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id))
+        $collegeStudyLoads = Study_Load::with(['subject', 'faculty.program'])
+            ->whereHas('section', fn($query) => $query->whereIn('sec_dept_id', $departmentIds))
+            ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id), fn($query) => $query->whereRaw('1 = 0'))
             ->get()
+            ->toBase()
             ->groupBy('sl_fac_id');
+        $studyLoadsByFaculty = $collegeStudyLoads->only($faculty->pluck('fac_id')->all());
 
         $facultyLoads = $faculty->map(function ($member) use ($studyLoadsByFaculty) {
             $loads = $studyLoadsByFaculty->get($member->fac_id, collect());
@@ -76,22 +85,8 @@ class DeanDashboardController extends Controller
             ];
         });
 
-        $avgFacultyLoad = $totalFaculty > 0
-            ? round($facultyLoads->avg('hours'))
-            : 0;
-
         $overloadFaculty = $facultyLoads->where('status', 'Overload')->values();
         $overloadCount = $overloadFaculty->count();
-
-        $facultyAlerts = $facultyLoads
-            ->whereIn('status', ['Overload', 'Near Max', 'Available'])
-            ->sortByDesc('hours')
-            ->take(10)
-            ->values();
-
-        $programs = Departments::where('dept_college_id', $collegeId)
-            ->orderBy('dept_code')
-            ->get();
 
         $deptSummary = $programs->map(function ($program) use ($facultyLoads) {
             $programFacultyLoads = $facultyLoads->filter(
@@ -123,26 +118,117 @@ class DeanDashboardController extends Controller
             ];
         })->values();
 
-        $departmentIds = $programs->pluck('dept_id');
-        $subjectsTotal = Course::whereIn('course_dept_id', $departmentIds)->count();
+        $semesterNumber = $semester
+            ? (str_contains(strtolower((string) $semester->sem_name), '2') ? 2 : (str_contains(strtolower((string) $semester->sem_name), '1') ? 1 : null))
+            : null;
+        $subjectsTotal = Course::whereIn('course_dept_id', $departmentIds)
+            ->when($semesterNumber, fn($query) => $query->where('course_semester', $semesterNumber))
+            ->count();
         $subjectsPlotted = Course::whereIn('course_dept_id', $departmentIds)
-            ->whereHas('studyLoads')
+            ->when($semesterNumber, fn($query) => $query->where('course_semester', $semesterNumber))
+            ->whereHas('studyLoads', function ($query) use ($semester, $departmentIds) {
+                $query->when($semester, fn($loadQuery) => $loadQuery->where('sl_sem_id', $semester->sem_id), fn($loadQuery) => $loadQuery->whereRaw('1 = 0'))
+                    ->whereHas('section', fn($sectionQuery) => $sectionQuery->whereIn('sec_dept_id', $departmentIds));
+            })
+            ->count();
+
+        $totalSections = Section::whereIn('sec_dept_id', $departmentIds)
+            ->get(['sec_dept_id', 'sec_name'])
+            ->unique(fn($section) => (string) $section->sec_dept_id . '|' . strtolower(trim((string) $section->sec_name)))
             ->count();
 
         $weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        $scheduleCountsByShift = Schedule::query()
+        $collegeSchedules = Schedule::query()
             ->where('sch_is_active', true)
-            ->whereHas('section.program', fn($query) => $query->where('dept_college_id', $collegeId))
-            ->when($semester, fn($query) => $query->where('sch_sem_id', $semester->sem_id))
-            ->select('sch_day', 'sch_shift', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total'))
-            ->groupBy('sch_day', 'sch_shift')
+            ->where(function ($query) use ($departmentIds) {
+                $query->whereHas('section', fn($sectionQuery) => $sectionQuery->whereIn('sec_dept_id', $departmentIds))
+                    ->orWhereHas('studyLoad.section', fn($sectionQuery) => $sectionQuery->whereIn('sec_dept_id', $departmentIds));
+            })
+            ->where(function ($query) use ($semester) {
+                if ($semester) {
+                    $query->where('sch_sem_id', $semester->sem_id)
+                        ->orWhereHas('studyLoad', fn($loadQuery) => $loadQuery->where('sl_sem_id', $semester->sem_id));
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            })
+            ->with(['faculty.program', 'section', 'course', 'room', 'studyLoad.faculty.program', 'studyLoad.section', 'studyLoad.subject'])
             ->get()
-            ->groupBy('sch_day');
-        $weeklyScheduleCounts = collect($weekDays)->map(fn($day) => [
-            'day' => substr($day, 0, 3),
-            'day_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'day')->total ?? 0),
-            'evening_count' => (int) ($scheduleCountsByShift->get($day, collect())->firstWhere('sch_shift', 'evening')->total ?? 0),
-        ]);
+            ->map(function (Schedule $schedule) {
+                $load = $schedule->studyLoad;
+                $section = $schedule->section ?? $load?->section;
+                $facultyMember = $schedule->faculty ?? $load?->faculty;
+                $day = strtolower(substr(trim((string) $schedule->sch_day), 0, 3));
+                $shiftValue = strtolower((string) ($schedule->sch_shift ?? $load?->sl_shift ?? ''));
+                $shift = str_contains($shiftValue, 'even') || $shiftValue === 'night' || ($shiftValue === '' && (bool) $section?->sec_is_evening)
+                    ? 'evening'
+                    : 'day';
+                $hours = 0.0;
+                if ($schedule->sch_start_time && $schedule->sch_end_time) {
+                    $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
+                    $end = \Illuminate\Support\Carbon::parse($schedule->sch_end_time);
+                    $hours = max(0, $start->diffInMinutes($end)) / 60;
+                }
+
+                return [
+                    'day_key' => $day,
+                    'shift' => $shift,
+                    'hours' => $hours,
+                    'faculty_id' => (string) ($schedule->sch_fac_id ?? $load?->sl_fac_id ?? $facultyMember?->fac_id ?? ''),
+                    'faculty' => $facultyMember,
+                    'section_id' => (string) ($schedule->sch_sec_id ?? $load?->sl_sec_id ?? ''),
+                    'room_id' => (string) ($schedule->sch_room_id ?? ''),
+                    'room_name' => (string) ($schedule->room?->room_name ?? ''),
+                ];
+            });
+
+        $weeklyCounts = $collegeSchedules->groupBy('day_key');
+        $weeklyScheduleCounts = collect($weekDays)->map(function ($day) use ($weeklyCounts) {
+            $items = $weeklyCounts->get(strtolower(substr($day, 0, 3)), collect());
+            $roomUsage = $items->filter(fn($item) => $item['room_id'] !== '' || $item['room_name'] !== '')
+                ->groupBy(fn($item) => $item['room_id'] !== '' ? $item['room_id'] : $item['room_name'])
+                ->map(function ($bookings) {
+                    return [
+                        'name' => $bookings->first()['room_name'] ?: 'Room',
+                        'bookings' => $bookings->count(),
+                        'sections' => $bookings->pluck('section_id')->filter()->unique()->count(),
+                    ];
+                })
+                ->sortByDesc('bookings');
+            $peakRoom = $roomUsage->first();
+            return [
+                'day' => substr($day, 0, 3),
+                'day_count' => $items->where('shift', 'day')->count(),
+                'evening_count' => $items->where('shift', 'evening')->count(),
+                'peak_room' => $peakRoom['name'] ?? null,
+                'peak_room_bookings' => $peakRoom['bookings'] ?? 0,
+                'peak_room_sections' => $peakRoom['sections'] ?? 0,
+                'rooms_active' => $roomUsage->count(),
+            ];
+        });
+
+        $topFaculty = $collegeSchedules
+            ->filter(fn($item) => $item['faculty_id'] !== '' && $item['faculty'])
+            ->groupBy('faculty_id')
+            ->map(function ($schedules, $facultyId) {
+                $facultyMember = $schedules->first()['faculty'];
+                $dayHours = round($schedules->where('shift', 'day')->sum('hours'), 1);
+                $eveningHours = round($schedules->where('shift', 'evening')->sum('hours'), 1);
+                return [
+                    'id' => $facultyId,
+                    'name' => trim(implode(' ', array_filter([$facultyMember->fac_first_name, $facultyMember->fac_last_name]))) ?: 'Faculty member',
+                    'department' => $facultyMember->program?->dept_code ?? 'College Faculty',
+                    'rank' => $facultyMember->fac_rank ?? 'Faculty',
+                    'day_hours' => $dayHours,
+                    'evening_hours' => $eveningHours,
+                    'total_plotted' => round($dayHours + $eveningHours, 1),
+                    'class_count' => $schedules->count(),
+                    'section_count' => $schedules->pluck('section_id')->filter()->unique()->count(),
+                ];
+            })
+            ->sortByDesc('total_plotted')
+            ->take(3)
+            ->values();
 
         $pendingQuery = Schedule_Submission::with([
             'department',
@@ -155,14 +241,14 @@ class DeanDashboardController extends Controller
             ->orderByDesc('schsub_submitted_at');
 
         $pendingDeptCount = (clone $pendingQuery)->count();
-        $pendingApprovals = $pendingQuery->take(5)->get();
+        $pendingApprovals = $pendingQuery->paginate(5, ['*'], 'pending_page')->withQueryString();
 
-        $submitterIds = $pendingApprovals->pluck('schsub_submitted_by')->filter();
+        $submitterIds = $pendingApprovals->getCollection()->pluck('schsub_submitted_by')->filter();
         $submittersById = User::whereIn('usr_id', $submitterIds)
             ->get()
             ->keyBy('usr_id');
 
-        $pendingApprovals = $pendingApprovals->map(function ($submission) use ($submittersById) {
+        $pendingApprovals->setCollection($pendingApprovals->getCollection()->map(function ($submission) use ($submittersById) {
             $submitter = $submittersById->get($submission->schsub_submitted_by);
             $submitterName = $submitter->usr_name ?? 'Unknown Chair';
             $isPbs = ($submission->schsub_type ?? 'pbt') === 'pbs';
@@ -187,7 +273,7 @@ class DeanDashboardController extends Controller
                 'initials' => $initials ?: ($isPbs ? 'PB' : 'FA'),
                 'color' => $isPbs ? '#059669' : '#2563eb',
             ];
-        });
+        }));
 
         $scheduledApprovedCount = Schedule_Submission::query()
             ->whereHas('department', fn($query) => $query->where('dept_college_id', $collegeId))
@@ -205,13 +291,13 @@ class DeanDashboardController extends Controller
             'semester',
             'college',
             'totalFaculty',
-            'avgFacultyLoad',
+            'totalSections',
             'overloadCount',
-            'facultyAlerts',
             'deptSummary',
             'subjectsTotal',
             'subjectsPlotted',
             'weeklyScheduleCounts',
+            'topFaculty',
             'pendingApprovals',
             'scheduledApprovedCount',
             'pendingDeptCount',
