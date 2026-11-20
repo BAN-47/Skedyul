@@ -112,6 +112,9 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
         Route::post('/notifications/send', [NotificationController::class, 'send'])
             ->name('notifications.send');
 
+        Route::post('/notifications/report-issue', [NotificationController::class, 'reportIssue'])
+            ->name('notifications.report-issue');
+
         Route::get('/notifications/unread', [NotificationController::class, 'unreadCount'])
             ->name('notifications.unread');
 

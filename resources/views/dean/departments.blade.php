@@ -264,7 +264,6 @@
 
             function openModal(id) {
                 document.getElementById(id).classList.add('open');
-                if (id === 'modal-notify' && typeof loadChairs === 'function') loadChairs();
             }
 
             function closeModal(id) {

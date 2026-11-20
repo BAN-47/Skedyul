@@ -192,6 +192,9 @@ Route::middleware(['auth', 'audit.activity'])->group(function () {
 
 Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity'])->group(function () {
 
+    Route::post('/notifications/announcement', [NotifController::class, 'sendAnnouncement'])
+        ->name('admin.notifications.announcement');
+
     Route::get('/schedule-archives', [ScheduleArchiveController::class, 'index'])
         ->name('admin.schedule-archives');
 

@@ -38,12 +38,20 @@
             <div class="modal-overlay" id="modal-notify">
                 <div class="modal-box" style="width:520px;">
                     <div class="modal-header">
-                        <div class="modal-title">Send Notification to Chairs</div>
+                        <div class="modal-title" id="notification-modal-title">Send Notification</div>
                         <button class="modal-close" onclick="closeModal('modal-notify')">✕</button>
                     </div>
 
-                    {{-- RECIPIENTS --}}
                     <div class="mb-4">
+                        <label class="field-label">Send to</label>
+                        <select class="field-input" id="notif-audience" onchange="changeNotificationAudience()">
+                            <option value="chairs">Department chairs</option>
+                            <option value="system_admin">System administrators — report an issue or bug</option>
+                        </select>
+                    </div>
+
+                    {{-- RECIPIENTS --}}
+                    <div class="mb-4" id="chair-recipient-options">
                         <div class="field-label mb-2">Recipients</div>
                         <label
                             class="flex items-center gap-3 px-3 py-2.5 border border-slate-200 rounded-xl mb-2 cursor-pointer hover:bg-slate-50 transition">
@@ -52,8 +60,30 @@
                             <span class="text-[13px] font-semibold text-slate-700">All Department Chairs</span>
                         </label>
                         <div id="chair-list" class="flex flex-col gap-2">
-                            <div class="text-center py-4 text-slate-400 text-[13px]">Loading chairs...</div>
+                            @forelse(($notificationChairs ?? collect()) as $index => $chair)
+                                @php
+                                    $chairColors = ['#f97316', '#7c3aed', '#0891b2', '#16a34a', '#ef4444'];
+                                    $chairColor = $chairColors[$index % count($chairColors)];
+                                @endphp
+                                <label class="flex items-center gap-3 px-3 py-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
+                                    <input type="checkbox" class="chair-checkbox w-4 h-4 accent-blue-600"
+                                        value="{{ $chair['dc_usr_id'] }}" checked onchange="syncSelectAll()">
+                                    <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0"
+                                        style="background-color: {{ $chairColor }}">
+                                        {{ $chair['initials'] }}
+                                    </div>
+                                    <div>
+                                        <div class="text-[13px] font-semibold text-slate-900">{{ $chair['chair_name'] }}</div>
+                                        <div class="text-[11px] text-slate-400">Chair · {{ $chair['dept_code'] }}</div>
+                                    </div>
+                                </label>
+                            @empty
+                                <div class="text-slate-400 text-[13px] text-center py-2">No active department chairs found in your college.</div>
+                            @endforelse
                         </div>
+                    </div>
+                    <div id="issue-recipient-note" class="mb-4 hidden rounded-xl border border-blue-100 bg-blue-50 px-3 py-3 text-[13px] text-blue-800">
+                        Your report will be sent to all active system administrators.
                     </div>
 
                     {{-- TYPE --}}
@@ -134,29 +164,41 @@
             <script>
                 const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
                 const pendingCountUrl = "{{ route('dean.notifications.pending-count') }}";
+                // The badge rendered by the server may use a different pending
+                // count than this endpoint. Establish a live baseline first so
+                // opening a Dean page never announces existing approvals as new.
+                let lastPendingCount = null;
 
                 async function pollPendingCount() {
                     try {
                         const res = await fetch(pendingCountUrl, {
+                            cache: 'no-store',
                             headers: {
+                                'Accept': 'application/json',
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
                         });
+                        if (!res.ok) throw new Error(`Pending count request failed (${res.status})`);
                         const data = await res.json();
                         const badge = document.getElementById('notif-badge');
-                        const prev = parseInt(badge.textContent.trim(), 10) || 0;
-                        badge.textContent = data.count;
-                        if (data.count > prev) showToast('New pending approval received', '#2563eb');
+                        const count = Number(data.count);
+                        if (!Number.isFinite(count)) return;
+                        if (badge) badge.textContent = String(count);
+
+                        if (lastPendingCount !== null && count > lastPendingCount) {
+                            showToast('New pending approval received', '#2563eb');
+                        }
+                        lastPendingCount = count;
                     } catch (err) {
                         console.error('Poll failed:', err);
                     }
                 }
+                pollPendingCount();
                 setInterval(pollPendingCount, 15000);
 
                 // ── MODALS ────────────────────────────────────────────────────────
                 function openModal(id) {
                     document.getElementById(id).classList.add('open');
-                    if (id === 'modal-notify') loadChairs();
                 }
 
                 function closeModal(id) {
@@ -177,83 +219,37 @@
                     setTimeout(() => t.classList.remove('show'), 3500);
                 }
 
-                // ── LOAD CHAIRS ───────────────────────────────────────────────────
-                let chairsLoaded = false;
-                let chairsLoading = false;
-                const chairsUrl = "{{ route('dean.notifications') }}";
+                function escapeNotificationText(value) {
+                    return String(value).replace(/[&<>"']/g, character => ({
+                        '&': '&amp;',
+                        '<': '&lt;',
+                        '>': '&gt;',
+                        '"': '&quot;',
+                        "'": '&#39;'
+                    })[character]);
+                }
+
                 const sendNotificationUrl = "{{ route('dean.notifications.send') }}";
+                const reportIssueUrl = "{{ route('dean.notifications.report-issue') }}";
 
-                async function loadChairs() {
-                    if (chairsLoaded || chairsLoading) return;
-                    chairsLoading = true;
-                    const list = document.getElementById('chair-list');
-                    list.innerHTML = '<div class="text-center py-4 text-slate-400 text-[13px]">Loading department chairs…</div>';
-                    const controller = new AbortController();
-                    const timeout = window.setTimeout(() => controller.abort(), 15000);
-                    try {
-                        const res = await fetch(chairsUrl, {
-                            signal: controller.signal,
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': CSRF,
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-                        if (!res.ok) throw new Error(`Chair request failed (${res.status})`);
-                        const data = await res.json();
-                        if (!Array.isArray(data.chairs)) throw new Error('The chair list response was invalid.');
-                        renderChairs(data.chairs);
-                        chairsLoaded = true;
-                    } catch (err) {
-                        console.error('Unable to load department chairs:', err);
-                        const message = err.name === 'AbortError'
-                            ? 'Loading chairs timed out. Check your connection and try again.'
-                            : (err.message || 'Failed to load chairs. Please try again.');
-                        list.innerHTML = `<div class="py-3 text-center">
-                            <p class="text-red-500 text-[12px]">${message}</p>
-                            <button type="button" onclick="retryLoadChairs()" class="mt-2 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Retry</button>
-                        </div>`;
-                    } finally {
-                        window.clearTimeout(timeout);
-                        chairsLoading = false;
-                    }
+                function changeNotificationAudience() {
+                    const reportMode = document.getElementById('notif-audience').value === 'system_admin';
+                    const typeSelect = document.getElementById('notif-type');
+                    document.getElementById('chair-recipient-options').classList.toggle('hidden', reportMode);
+                    document.getElementById('issue-recipient-note').classList.toggle('hidden', !reportMode);
+                    document.getElementById('notification-modal-title').textContent = reportMode
+                        ? 'Report a System Issue'
+                        : 'Send Notification to Chairs';
+                    document.getElementById('notif-title').placeholder = reportMode
+                        ? 'e.g. Schedule page returns a server error'
+                        : 'e.g. Schedule Submission Reminder';
+                    document.getElementById('send-notification-button').textContent = reportMode
+                        ? 'Send Issue Report'
+                        : 'Send Notification';
+                    typeSelect.innerHTML = reportMode
+                        ? '<option value="bug">Bug or broken feature</option><option value="system_error">System outage or error</option><option value="access">Access or account issue</option><option value="other">Other system issue</option>'
+                        : '<option value="info">General Info</option><option value="reminder">Reminder</option><option value="urgent">Urgent</option><option value="deadline">Deadline Notice</option>';
                 }
-
-                function retryLoadChairs() {
-                    chairsLoaded = false;
-                    loadChairs();
-                }
-
-                function renderChairs(chairs) {
-                    const list = document.getElementById('chair-list');
-                    if (!chairs || !chairs.length) {
-                        list.innerHTML =
-                            '<div class="text-slate-400 text-[13px] text-center py-2">No chairs found in database.</div>';
-                        return;
-                    }
-                    const colors = ['bg-orange-500', 'bg-violet-600', 'bg-cyan-600', 'bg-green-600', 'bg-red-500'];
-                    list.innerHTML = chairs.map(chair => {
-                        const name = chair.chair_name || 'Unnamed Chair';
-                        const color = colors[Math.abs(name.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % colors
-                            .length];
-                        return `
-                <label class="flex items-center gap-3 px-3 py-2.5 border border-slate-200
-                               rounded-xl cursor-pointer hover:bg-slate-50 transition">
-                    <input type="checkbox" class="chair-checkbox w-4 h-4 accent-blue-600"
-                           value="${chair.dc_usr_id}" checked onchange="syncSelectAll()">
-                    <div class="w-9 h-9 rounded-full ${color} flex items-center justify-center
-                                text-white text-[12px] font-bold flex-shrink-0">
-                        ${chair.initials}
-                    </div>
-                    <div>
-                        <div class="text-[13px] font-semibold text-slate-900">${name}</div>
-                        <div class="text-[11px] text-slate-400">Chair · ${chair.dept_code}</div>
-                    </div>
-                </label>`;
-                    }).join('');
-                    syncSelectAll();
-                }
-
                 // ── SELECT ALL ────────────────────────────────────────────────────
                 function toggleAll(master) {
                     document.querySelectorAll('.chair-checkbox').forEach(cb => cb.checked = master.checked);
@@ -272,6 +268,7 @@
                     const title = document.getElementById('notif-title').value.trim();
                     const message = document.getElementById('notif-message').value.trim();
                     const type = document.getElementById('notif-type').value;
+                    const reportMode = document.getElementById('notif-audience').value === 'system_admin';
                     const selected = [...document.querySelectorAll('.chair-checkbox:checked')].map(cb => cb.value);
 
                     if (!title) {
@@ -282,7 +279,7 @@
                         showToast('Please enter a message.', '#dc2626');
                         return;
                     }
-                    if (!selected.length) {
+                    if (!reportMode && !selected.length) {
                         showToast('Select at least one chair.', '#dc2626');
                         return;
                     }
@@ -294,7 +291,7 @@
                     sendButton.classList.add('opacity-70', 'cursor-wait');
 
                     try {
-                        const res = await fetch(sendNotificationUrl, {
+                        const res = await fetch(reportMode ? reportIssueUrl : sendNotificationUrl, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -302,12 +299,9 @@
                                 'X-CSRF-TOKEN': CSRF,
                                 'X-Requested-With': 'XMLHttpRequest',
                             },
-                            body: JSON.stringify({
-                                chair_ids: selected,
-                                title,
-                                message,
-                                type
-                            }),
+                            body: JSON.stringify(reportMode
+                                ? { title, message, type }
+                                : { chair_ids: selected, title, message, type }),
                         });
                         const data = await res.json();
 
@@ -318,11 +312,14 @@
                         addToRecentlySent({
                             title,
                             type,
-                            count: data.sent
+                            count: data.sent,
+                            target: reportMode ? 'system admin(s)' : 'chair(s)',
                         });
                         document.getElementById('notif-title').value = '';
                         document.getElementById('notif-message').value = '';
-                        showToast('✅ Sent to ' + data.sent + ' chair(s)!', '#16a34a');
+                        showToast(reportMode
+                            ? 'Issue report sent to system administrators.'
+                            : '✅ Sent to ' + data.sent + ' chair(s)!', '#16a34a');
                         closeModal('modal-notify');
                     } catch (error) {
                         showToast(error.message || 'Network error. Try again.', '#dc2626');
@@ -337,7 +334,8 @@
                 function addToRecentlySent({
                     title,
                     type,
-                    count
+                    count,
+                    target = 'chair(s)'
                 }) {
                     const container = document.getElementById('recently-sent');
                     const empty = container.querySelector('.text-slate-400');
@@ -367,9 +365,9 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
                     <div style="display:flex;align-items:center;gap:6px;">
                         <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;" class="${colors[type]}">${labels[type]}</span>
-                        <span style="font-size:13px;font-weight:600;color:#0f172a;">${title}</span>
+                        <span style="font-size:13px;font-weight:600;color:#0f172a;">${escapeNotificationText(title)}</span>
                     </div>
-                    <span style="font-size:11px;color:#94a3b8;">Sent ${time} · ${count} chair(s)</span>
+                    <span style="font-size:11px;color:#94a3b8;">Sent ${time} · ${count} ${target}</span>
                 </div>`;
                     container.prepend(item);
                 }
