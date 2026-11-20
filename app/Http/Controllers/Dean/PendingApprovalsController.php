@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\Faculty;
+use App\Models\Notification;
 use App\Models\Schedule;
 use App\Models\Schedule_Submission;
 use App\Services\FacultyNameFormatter;
@@ -217,6 +218,10 @@ class PendingApprovalsController extends Controller
 
     public function approve(Request $request, string $id)
     {
+        $request->validate([
+            'remarks' => ['required', 'string', 'min:5', 'max:1000'],
+        ]);
+
         $scope = $this->getUserScope();
 
         if ($scope === false) {
@@ -243,12 +248,25 @@ class PendingApprovalsController extends Controller
         }
 
         try {
-            $submission->update([
-                'schsub_status' => 'approved',
-                'schsub_reviewed_by' => Auth::id(),
-                'schsub_reviewed_at' => now(),
-                'schsub_remarks' => $request->input('remarks'),
-            ]);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($submission, $request): void {
+                $submission->update([
+                    'schsub_status' => 'approved',
+                    'schsub_reviewed_by' => Auth::id(),
+                    'schsub_reviewed_at' => now(),
+                    'schsub_remarks' => $request->input('remarks'),
+                ]);
+
+                if ($submission->schsub_submitted_by) {
+                    $submissionType = $submission->schsub_type === 'pbs' ? 'PBS' : 'PBT';
+                    Notification::create([
+                        'notif_usr_id' => $submission->schsub_submitted_by,
+                        'notif_title' => "{$submissionType} approved by the Dean",
+                        'notif_message' => "Your {$submissionType} schedule was successfully approved by the Dean. You can now view the approved schedule.",
+                        'notif_type' => 'approval',
+                        'notif_is_read' => false,
+                    ]);
+                }
+            });
         } catch (\Throwable $exception) {
             return back()->with('error', 'Unable to approve this PBT due to a database error.');
         }

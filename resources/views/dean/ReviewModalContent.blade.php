@@ -144,7 +144,7 @@
             action="{{ route('dean.pending_approvals.approve', $submission->schsub_id) }}" class="hidden">
             @csrf
             <input type="hidden" name="_action" value="approve">
-            <textarea name="remarks" class="hidden"></textarea>
+            <textarea name="remarks" id="approve-remarks" class="hidden"></textarea>
         </form>
 
         <form id="form-return" method="POST"
@@ -152,9 +152,9 @@
             @csrf
             <div class="modal-body pt-0">
                 <div class="field-group mt-3">
-                    <label class="field-label">Return Note <span class="text-red-600">*</span></label>
-                    <textarea class="field-input resize-y" name="remarks" id="return-note" rows="3"
-                        placeholder="Explain what the Chair needs to fix before resubmitting…"></textarea>
+                    <label class="field-label" for="review-remarks">Remarks <span class="text-red-600">*</span></label>
+                    <textarea class="field-input resize-y" name="remarks" id="review-remarks" rows="3" required minlength="5" maxlength="1000"
+                        placeholder="Add a remark for the Chair. Required for approval or return."></textarea>
                 </div>
             </div>
 

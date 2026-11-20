@@ -412,6 +412,13 @@
                     setupSchedulePagination();
 
                     document.getElementById('btn-approve').onclick = () => {
+                        const remarks = document.getElementById('review-remarks').value.trim();
+                        if (remarks.length < 5) {
+                            document.getElementById('review-remarks').focus();
+                            showToast('Add remarks (at least 5 characters) before approving.');
+                            return;
+                        }
+
                         if (conflictCount > 0) {
                             showToast('Cannot approve — resolve ' + conflictCount + ' conflict(s) first.');
                             return;
@@ -421,11 +428,12 @@
                             return;
                         }
 
+                        document.getElementById('approve-remarks').value = remarks;
                         document.getElementById('form-approve').submit();
                     };
 
                     document.getElementById('btn-return').onclick = () => {
-                        const note = document.getElementById('return-note').value.trim();
+                        const note = document.getElementById('review-remarks').value.trim();
 
                         if (!note) {
                             showToast('Please enter a return note before sending.');
