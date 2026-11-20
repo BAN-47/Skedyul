@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\AdminIssueAttachmentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,11 @@ use Illuminate\Support\Str;
 
 class NotifController extends Controller
 {
+    public function viewIssueAttachment(string $filename, AdminIssueAttachmentStorage $storage)
+    {
+        return $storage->response($filename);
+    }
+
     // dropdown list (latest, e.g. 10)
     public function index()
     {

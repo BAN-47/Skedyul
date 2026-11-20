@@ -197,6 +197,8 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
 
     Route::post('/notifications/announcement', [NotifController::class, 'sendAnnouncement'])
         ->name('admin.notifications.announcement');
+    Route::get('/notifications/attachments/{filename}', [NotifController::class, 'viewIssueAttachment'])
+        ->name('admin.notifications.attachment');
 
     Route::get('/schedule-archives', [ScheduleArchiveController::class, 'index'])
         ->name('admin.schedule-archives');

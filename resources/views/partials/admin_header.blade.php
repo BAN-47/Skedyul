@@ -85,8 +85,37 @@
     </div>
 </div>
 
+<div id="admin-notification-viewer" class="fixed inset-0 z-[1200] hidden items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="admin-notification-viewer-title" onclick="if(event.target===this) closeAdminNotificationViewer()">
+    <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+            <div class="min-w-0">
+                <p id="admin-notification-viewer-type" class="mb-1 text-[10px] font-bold uppercase tracking-wide text-blue-600"></p>
+                <h2 id="admin-notification-viewer-title" class="text-base font-bold text-slate-900">Notification</h2>
+                <p id="admin-notification-viewer-time" class="mt-1 text-xs text-slate-400"></p>
+            </div>
+            <button type="button" onclick="closeAdminNotificationViewer()" class="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100" aria-label="Close notification">×</button>
+        </div>
+        <div id="admin-notification-viewer-message" class="max-h-[45vh] overflow-y-auto whitespace-pre-wrap break-words px-5 py-5 text-sm leading-6 text-slate-700"></div>
+        <div id="admin-notification-attachment-wrap" class="hidden border-t border-slate-100 px-5 py-4">
+            <p class="mb-2 text-xs font-semibold text-slate-500">Attached screenshot <span class="font-normal">· click to zoom</span></p>
+            <button type="button" onclick="openAdminNotificationImage()" class="block max-h-72 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <img id="admin-notification-attachment" alt="Screenshot attached to this notification" class="max-h-72 max-w-full object-contain">
+            </button>
+        </div>
+        <div class="flex justify-end border-t border-slate-100 px-5 py-3">
+            <button type="button" onclick="closeAdminNotificationViewer()" class="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700">Done</button>
+        </div>
+    </div>
+</div>
+
+<div id="admin-notification-image-zoom" class="fixed inset-0 z-[1210] hidden items-center justify-center bg-slate-950/90 p-4" role="dialog" aria-modal="true" aria-label="Zoomed notification screenshot" onclick="if(event.target===this) closeAdminNotificationImage()">
+    <button type="button" onclick="closeAdminNotificationImage()" class="absolute right-5 top-4 rounded-full bg-white/15 px-3 py-1 text-2xl text-white hover:bg-white/25" aria-label="Close image">×</button>
+    <img id="admin-notification-zoom-image" alt="Zoomed screenshot attached to notification" class="max-h-[92vh] max-w-[96vw] rounded-lg object-contain shadow-2xl">
+</div>
+
 <script>
 let notifOpen = false;
+const adminNotificationRecords = new Map();
 const adminAnnouncementUrl = @json(route('admin.notifications.announcement'));
 const adminCsrfToken = @json(csrf_token());
 const adminNotificationDeleteUrl = @json(route('notifications.destroy', ['id' => '__notification_id__']));
@@ -184,6 +213,8 @@ function loadNotifications() {
 function renderNotifList(notifications) {
     const list = document.getElementById('notif-list');
     if (!list) return;
+    adminNotificationRecords.clear();
+    notifications.forEach(notification => adminNotificationRecords.set(String(notification.notif_id), notification));
 
     if (!notifications.length) {
         list.innerHTML = '<div class="p-4 text-sm text-slate-400 text-center">No notifications yet.</div>';
@@ -201,7 +232,7 @@ function renderNotifList(notifications) {
     list.innerHTML = notifications.map(n => `
         <div class="notif-drop-item ${!n.notif_is_read ? 'unread' : ''}" role="button" tabindex="0" onclick="openAdminNotification('${escapeNotificationHtml(n.notif_id)}', '${escapeNotificationHtml(n.notif_type)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openAdminNotification('${escapeNotificationHtml(n.notif_id)}', '${escapeNotificationHtml(n.notif_type)}')}" style="cursor:pointer">
             <div class="notif-drop-dot" style="background:${dotColors[n.notif_type] || '#94a3b8'};"></div>
-            <div class="min-w-0 flex-1"><div class="notif-drop-text"><b>${escapeNotificationHtml(n.notif_title)}</b> — ${escapeNotificationHtml(n.notif_message)}</div><div class="notif-drop-time">${formatNotifTime(n.notif_created_at)}</div></div>
+            <div class="min-w-0 flex-1"><div class="notif-drop-text"><b>${escapeNotificationHtml(n.notif_title)}</b> — ${formatAdminNotificationMessage(n.notif_message)}</div><div class="notif-drop-time">${formatNotifTime(n.notif_created_at)}</div></div>
             <button type="button" class="ml-auto shrink-0 rounded-md px-2 py-1 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Delete notification" title="Delete notification" onclick="event.stopPropagation();deleteAdminNotification('${escapeNotificationHtml(n.notif_id)}', this)">×</button>
         </div>`).join('');
 }
@@ -212,7 +243,36 @@ function escapeNotificationHtml(value) {
     })[character]);
 }
 
+function formatAdminNotificationMessage(value) {
+    const message = String(value ?? '');
+    const match = message.match(/(?:\r?\n)?Screenshot:\s*(https?:\/\/[^\s]+|\/admin\/notifications\/attachments\/[^\s]+)/i);
+    if (!match) return escapeNotificationHtml(message);
+
+    let attachmentPath = '';
+    try {
+        const parsed = new URL(match[1], window.location.origin);
+        if (parsed.origin === window.location.origin && /^\/admin\/notifications\/attachments\/[0-9a-f-]{36}\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)) {
+            attachmentPath = parsed.pathname;
+        }
+    } catch {}
+    const messageText = message.replace(match[0], '').trimEnd();
+    const link = attachmentPath
+        ? `<a href="${escapeNotificationHtml(attachmentPath)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="mt-1 inline-block font-semibold text-blue-600 underline">View attached screenshot</a>`
+        : '';
+    return `${escapeNotificationHtml(messageText).replace(/\n/g, '<br>')}${link ? `<br>${link}` : ''}`;
+}
+
 function openAdminNotification(id, type) {
+    const notification = adminNotificationRecords.get(String(id));
+    if (type === 'new_user') {
+        fetch(`/notifications/${encodeURIComponent(id)}/read`, {
+            method: 'PUT',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': adminCsrfToken },
+        }).finally(() => window.location.assign('{{ route("admin.pending-accounts") }}'));
+        return;
+    }
+
+    if (notification) showAdminNotificationViewer(notification);
     const request = fetch(`/notifications/${id}/read`, {
         method: 'PUT',
         headers: {
@@ -221,16 +281,73 @@ function openAdminNotification(id, type) {
         },
     }).catch(() => null);
 
-    if (type === 'new_user') {
-        request.finally(() => window.location.assign('{{ route("admin.pending-accounts") }}'));
-        return;
-    }
-
     request.finally(() => {
         loadNotifications();
         updateNotifCount();
     });
 }
+
+function adminNotificationAttachment(message) {
+    const match = String(message ?? '').match(/(?:\r?\n)?Screenshot:\s*(https?:\/\/[^\s]+|\/admin\/notifications\/attachments\/[^\s]+)/i);
+    if (!match) return { message: String(message ?? ''), url: '' };
+    try {
+        const parsed = new URL(match[1], window.location.origin);
+        if (parsed.origin !== window.location.origin || !/^\/admin\/notifications\/attachments\/[0-9a-f-]{36}\.(?:jpe?g|png|webp)$/i.test(parsed.pathname)) {
+            return { message: String(message ?? '').replace(match[0], '').trimEnd(), url: '' };
+        }
+        return { message: String(message ?? '').replace(match[0], '').trimEnd(), url: parsed.pathname };
+    } catch {
+        return { message: String(message ?? '').replace(match[0], '').trimEnd(), url: '' };
+    }
+}
+
+function showAdminNotificationViewer(notification) {
+    const modal = document.getElementById('admin-notification-viewer');
+    const attachment = adminNotificationAttachment(notification.notif_message);
+    document.getElementById('admin-notification-viewer-title').textContent = notification.notif_title || 'Notification';
+    document.getElementById('admin-notification-viewer-type').textContent = String(notification.notif_type || 'info').replaceAll('_', ' ');
+    document.getElementById('admin-notification-viewer-time').textContent = formatNotifTime(notification.notif_created_at);
+    document.getElementById('admin-notification-viewer-message').textContent = attachment.message || 'No message was included.';
+    const wrap = document.getElementById('admin-notification-attachment-wrap');
+    const image = document.getElementById('admin-notification-attachment');
+    if (attachment.url) {
+        image.src = attachment.url;
+        wrap.classList.remove('hidden');
+    } else {
+        image.removeAttribute('src');
+        wrap.classList.add('hidden');
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeAdminNotificationViewer() {
+    const modal = document.getElementById('admin-notification-viewer');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function openAdminNotificationImage() {
+    const source = document.getElementById('admin-notification-attachment').src;
+    if (!source) return;
+    document.getElementById('admin-notification-zoom-image').src = source;
+    const zoom = document.getElementById('admin-notification-image-zoom');
+    zoom.classList.remove('hidden');
+    zoom.classList.add('flex');
+}
+
+function closeAdminNotificationImage() {
+    const zoom = document.getElementById('admin-notification-image-zoom');
+    zoom.classList.add('hidden');
+    zoom.classList.remove('flex');
+}
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        closeAdminNotificationImage();
+        closeAdminNotificationViewer();
+    }
+});
 
 async function deleteAdminNotification(id, button) {
     button.disabled = true;

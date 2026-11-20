@@ -94,6 +94,11 @@
                 <span class="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Details</span>
                 <textarea name="message" required maxlength="1700" rows="5" placeholder="Include what happened, where you saw it, or what feature would help." class="w-full resize-y rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"></textarea>
             </label>
+            <label class="block">
+                <span class="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-500">Screenshot (optional)</span>
+                <input name="attachment" type="file" accept="image/jpeg,image/png,image/webp" class="block w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:font-semibold file:text-blue-700">
+                <span class="mt-1 block text-[10px] text-slate-400">PNG, JPG, or WEBP · up to 5 MB</span>
+            </label>
             <p id="chair-admin-report-feedback" class="hidden rounded-lg px-3 py-2 text-xs" role="status" aria-live="polite"></p>
         </div>
         <div class="flex justify-end gap-2 border-t border-slate-100 px-5 py-3">
@@ -138,15 +143,15 @@
         const form = event.currentTarget;
         const button = document.getElementById('chair-admin-report-submit');
         const feedback = document.getElementById('chair-admin-report-feedback');
-        const payload = Object.fromEntries(new FormData(form).entries());
+        const payload = new FormData(form);
         button.disabled = true;
         button.textContent = 'Sending…';
         feedback.classList.add('hidden');
         try {
             const result = await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.reportAdmin, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
-                body: JSON.stringify(payload),
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                body: payload,
             });
             feedback.textContent = result.message || 'Message sent to the system administrators.';
             feedback.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700';

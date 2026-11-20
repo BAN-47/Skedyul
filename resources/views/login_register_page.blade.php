@@ -191,6 +191,9 @@
             @error('password')
             <div class="mt-1 text-xs text-red-500">{{ $message }}</div>
             @enderror
+            <div class="mt-2 text-right">
+              <button type="button" onclick="openForgotPasswordSupport()" class="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline">Forgot password?</button>
+            </div>
           </div>
 
           <div class="mb-5">
@@ -452,6 +455,76 @@
     </div>
 
   </div>
+
+  <div id="forgot-password-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="forgot-password-title" onclick="if(event.target === this) closeForgotPasswordSupport()">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <div class="mb-2 flex items-start justify-between gap-4">
+        <div>
+          <h2 id="forgot-password-title" class="text-xl font-bold text-slate-900">Password reset help</h2>
+          <p class="mt-1 text-sm text-slate-500">Send your details to SKEDYUL support for account verification.</p>
+        </div>
+        <button type="button" onclick="closeForgotPasswordSupport()" class="rounded-lg px-2 text-xl text-slate-400 hover:bg-slate-100" aria-label="Close">&times;</button>
+      </div>
+      <form id="forgot-password-support-form" class="mt-5 space-y-4" onsubmit="sendForgotPasswordSupport(event)">
+        <label class="block text-sm font-semibold text-slate-700">Full name
+          <input id="forgot-support-name" type="text" autocomplete="name" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Your full name">
+        </label>
+        <label class="block text-sm font-semibold text-slate-700">Employee ID
+          <input id="forgot-support-employee-id" type="text" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Your Employee ID">
+        </label>
+        <label class="block text-sm font-semibold text-slate-700">Account email
+          <input id="forgot-support-email" type="email" autocomplete="email" required class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Email used for your SKEDYUL account">
+        </label>
+        <p class="text-xs leading-relaxed text-slate-500">This opens a Gmail draft addressed to <strong>skedyul.official@gmail.com</strong>. Attach a clear photo of your ID so support can verify your account and help reset your password.</p>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeForgotPasswordSupport()" class="rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">Cancel</button>
+          <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700">Open Gmail</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openForgotPasswordSupport() {
+      const modal = document.getElementById('forgot-password-modal');
+      const loginEmail = document.querySelector('#login-view input[name="email"]');
+      const supportEmail = document.getElementById('forgot-support-email');
+      if (loginEmail && loginEmail.value && !supportEmail.value) supportEmail.value = loginEmail.value;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('forgot-support-name').focus();
+    }
+
+    function closeForgotPasswordSupport() {
+      const modal = document.getElementById('forgot-password-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function sendForgotPasswordSupport(event) {
+      event.preventDefault();
+      const name = document.getElementById('forgot-support-name').value.trim();
+      const employeeId = document.getElementById('forgot-support-employee-id').value.trim();
+      const email = document.getElementById('forgot-support-email').value.trim();
+      const subject = 'SKEDYUL password reset help';
+      const body = [
+        'Hello SKEDYUL Support,', '',
+        'I need help resetting my SKEDYUL password.', '',
+        'Full name: ' + name,
+        'Employee ID: ' + employeeId,
+        'SKEDYUL account email: ' + email, '',
+        'Please verify my account and let me know the next steps.', '',
+        'I have attached a clear photo of my ID for verification.'
+      ].join('\n');
+      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent('skedyul.official@gmail.com') + '&su=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+      closeForgotPasswordSupport();
+    }
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeForgotPasswordSupport();
+    });
+  </script>
 
   {{-- Fade-up animation --}}
   <style>

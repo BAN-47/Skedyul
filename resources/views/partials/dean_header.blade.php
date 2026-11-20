@@ -122,6 +122,11 @@
                         <textarea class="field-input" id="notif-message" rows="4" style="resize:vertical;"
                             placeholder="Write your message to the chairs..."></textarea>
                     </div>
+                    <div id="issue-attachment-field" class="mb-4 hidden">
+                        <label class="field-label" for="notif-attachment">Screenshot (optional)</label>
+                        <input class="field-input" id="notif-attachment" type="file" accept="image/jpeg,image/png,image/webp">
+                        <div class="mt-1 text-[10px] text-slate-400">PNG, JPG, or WEBP · up to 5 MB</div>
+                    </div>
 
                     {{-- RECENTLY SENT --}}
                     <div>
@@ -393,6 +398,7 @@
                     const typeSelect = document.getElementById('notif-type');
                     document.getElementById('chair-recipient-options').classList.toggle('hidden', reportMode);
                     document.getElementById('issue-recipient-note').classList.toggle('hidden', !reportMode);
+                    document.getElementById('issue-attachment-field').classList.toggle('hidden', !reportMode);
                     document.getElementById('notification-modal-title').textContent = reportMode
                         ? 'Report a System Issue'
                         : 'Send Notification to Chairs';
@@ -403,7 +409,7 @@
                         ? 'Send Issue Report'
                         : 'Send Notification';
                     typeSelect.innerHTML = reportMode
-                        ? '<option value="bug">Bug or broken feature</option><option value="system_error">System outage or error</option><option value="access">Access or account issue</option><option value="other">Other system issue</option>'
+                        ? '<option value="bug">Bug or broken feature</option><option value="system_error">System outage or error</option><option value="feature_request">Feature request</option><option value="access">Access or account issue</option><option value="other">Other system issue</option>'
                         : '<option value="info">General Info</option><option value="reminder">Reminder</option><option value="urgent">Urgent</option><option value="deadline">Deadline Notice</option>';
                 }
                 // ── SELECT ALL ────────────────────────────────────────────────────
@@ -447,17 +453,27 @@
                     sendButton.classList.add('opacity-70', 'cursor-wait');
 
                     try {
+                        const headers = {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': CSRF,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        };
+                        let body;
+                        if (reportMode) {
+                            body = new FormData();
+                            body.append('title', title);
+                            body.append('message', message);
+                            body.append('type', type);
+                            const attachment = document.getElementById('notif-attachment').files[0];
+                            if (attachment) body.append('attachment', attachment);
+                        } else {
+                            headers['Content-Type'] = 'application/json';
+                            body = JSON.stringify({ chair_ids: selected, title, message, type });
+                        }
                         const res = await fetch(reportMode ? reportIssueUrl : sendNotificationUrl, {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': CSRF,
-                                'X-Requested-With': 'XMLHttpRequest',
-                            },
-                            body: JSON.stringify(reportMode
-                                ? { title, message, type }
-                                : { chair_ids: selected, title, message, type }),
+                            headers,
+                            body,
                         });
                         const data = await res.json();
 
@@ -473,6 +489,7 @@
                         });
                         document.getElementById('notif-title').value = '';
                         document.getElementById('notif-message').value = '';
+                        document.getElementById('notif-attachment').value = '';
                         showToast(reportMode
                             ? 'Issue report sent to system administrators.'
                             : '✅ Sent to ' + data.sent + ' chair(s)!', '#16a34a');

@@ -7,6 +7,7 @@ use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\Departments;
 use App\Models\User;
+use App\Services\AdminIssueAttachmentStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -109,7 +110,8 @@ class NotificationController extends Controller
         $validated = $request->validate([
             'title'   => 'required|string|max:175',
             'message' => 'required|string|max:1700',
-            'type'    => 'required|in:bug,system_error,access,other',
+            'type'    => 'required|in:bug,system_error,feature_request,access,other',
+            'attachment' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         abort_unless(auth()->user()?->usr_role === 'dean', 403);
@@ -136,19 +138,39 @@ class NotificationController extends Controller
         $safeMessage = trim(strip_tags($validated['message']));
         $notificationType = in_array($validated['type'], ['bug', 'system_error'], true) ? 'urgent' : 'info';
         $now = now();
+        $attachmentStorage = app(AdminIssueAttachmentStorage::class);
+        $attachmentFilename = null;
+        if ($request->hasFile('attachment')) {
+            try {
+                $attachmentFilename = $attachmentStorage->store($request->file('attachment'));
+            } catch (\Throwable $exception) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'The screenshot could not be saved. Please try again.',
+                ], 422);
+            }
+        }
+        $attachmentLine = $attachmentFilename
+            ? "\n\nScreenshot: " . route('admin.notifications.attachment', ['filename' => $attachmentFilename])
+            : '';
 
         $rows = $admins->map(fn ($adminId) => [
             'notif_id'         => (string) Str::uuid(),
             'notif_usr_id'     => $adminId,
             'notif_title'      => '[Dean Issue Report] ' . $safeTitle,
-            'notif_message'    => "Reported by {$reporterName} (" . strip_tags((string) $reporter->usr_email) . ")\n\nIssue category: {$validated['type']}\n\n{$safeMessage}",
+            'notif_message'    => "Reported by {$reporterName} (" . strip_tags((string) $reporter->usr_email) . ")\n\nIssue category: {$validated['type']}\n\n{$safeMessage}{$attachmentLine}",
             'notif_type'       => $notificationType,
             'notif_is_read'    => false,
             'notif_created_at' => $now,
             'notif_updated_at' => $now,
         ])->all();
 
-        DB::table('notification')->insert($rows);
+        try {
+            DB::transaction(fn () => DB::table('notification')->insert($rows));
+        } catch (\Throwable $exception) {
+            $attachmentStorage->delete($attachmentFilename);
+            throw $exception;
+        }
 
         return response()->json([
             'success' => true,
