@@ -119,13 +119,13 @@
                             class="btn btn-secondary inline-flex items-center gap-2">
                             <span>Summary</span><span aria-hidden="true">▦</span>
                         </button>
-                        <a href="{{ route('faculty.pbt_export', ['semester' => $activeSemester?->sem_id]) }}"
+                        <a href="{{ route('faculty.pbt_export.preview', ['semester' => $activeSemester?->sem_id]) }}"
+                            data-export-preview
                             class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                            Download XLSX
+                            Preview PBT Export
                         </a>
-                        <button type="button" onclick="window.print()" class="btn btn-secondary">
-                            Print Schedule
-                        </button>
+
+
                     </div>
                 </div>
 
@@ -257,8 +257,7 @@
                             <select id="faculty-semester" name="semester" onchange="this.form.submit()"
                                 class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700">
                                 @foreach ($semesters as $semester)
-                                    <option value="{{ $semester->sem_id }}"
-                                        @selected(($activeSemester?->sem_id ?? '') === $semester->sem_id)>
+                                    <option value="{{ $semester->sem_id }}" @selected(($activeSemester?->sem_id ?? '') === $semester->sem_id)>
                                         {{ $semester->label }}
                                     </option>
                                 @endforeach
@@ -396,6 +395,7 @@
             </main>
         </div>
     </div>
+    @include('chair.partials.export_preview_dialog')
     <script>
         function toggleScheduleSummary() {
             const modal = document.getElementById('schedule-summary-modal');

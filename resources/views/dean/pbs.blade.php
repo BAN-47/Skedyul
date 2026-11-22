@@ -127,18 +127,126 @@
                             class="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                             <input type="hidden" name="program_id" value="{{ $selectedProgramId }}">
                             <input type="hidden" name="shift" value="{{ $shift }}">
-                            <label class="sr-only" for="section_id">Choose a section</label>
-                            <select id="section_id" name="section_id" required @disabled(!$selectedProgramId)
-                                onchange="if (this.value) this.form.requestSubmit()"
-                                class="min-w-[230px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                                aria-label="Select a section">
-                                <option value="">
-                                    {{ $selectedProgramId ? 'Choose a section' : 'Choose a program first' }}</option>
-                                @foreach ($programSections as $section)
-                                    <option value="{{ $section->sec_id }}" @selected(($selectedSection?->sec_id ?? request('section_id')) === $section->sec_id)>
-                                        {{ $section->sec_name }}</option>
-                                @endforeach
-                            </select>
+                            <div id="dean-pbs-section-picker" class="relative min-w-[210px]">
+                                <input type="hidden" id="section_id" name="section_id"
+                                    value="{{ $selectedSection?->sec_id ?? '' }}">
+                                <button type="button" id="dean-pbs-section-trigger" aria-haspopup="dialog"
+                                    aria-expanded="false" aria-controls="dean-pbs-section-menu"
+                                    @disabled(!$selectedProgramId)
+                                    class="flex w-full items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-left text-xs shadow-sm transition hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100">
+                                    <span
+                                        class="h-2 w-2 shrink-0 rounded-full {{ $selectedSection ? ($selectedSection->sec_is_evening ? 'bg-violet-500' : 'bg-amber-500') : 'bg-slate-300' }}"></span>
+                                    <span id="dean-pbs-section-label"
+                                        class="max-w-[150px] truncate font-bold text-slate-800">
+                                        {{ $selectedSection?->sec_name ?? ($selectedProgramId ? 'Select section' : 'Choose a program first') }}
+                                    </span>
+                                    <span
+                                        class="ml-auto rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+                                        {{ $selectedSection ? ($selectedSection->sec_is_evening ? 'Evening' : 'Day') : 'Browse' }}
+                                    </span>
+                                    <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" viewBox="0 0 20 20"
+                                        fill="currentColor" aria-hidden="true">
+                                        <path fill-rule="evenodd"
+                                            d="M5.22 7.22a.75.75 0 0 1 1.06 0L10 10.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.28a.75.75 0 0 1 0-1.06Z"
+                                            clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <div id="dean-pbs-section-menu" role="dialog" aria-label="Choose a section"
+                                    class="absolute left-0 top-full z-[120] mt-2 hidden max-h-[min(80vh,620px)] w-[min(92vw,440px)] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                    <div class="border-b border-slate-100 p-3">
+                                        <label for="dean-pbs-section-search" class="sr-only">Search section name</label>
+                                        <input id="dean-pbs-section-search" type="search"
+                                            placeholder="Search section name..." autocomplete="off"
+                                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                    </div>
+                                    <div class="border-b border-slate-100 px-3 py-2">
+                                        <div class="flex rounded-lg bg-slate-100 p-1" role="group"
+                                            aria-label="Filter sections by schedule">
+                                            <button type="button" data-dean-section-shift="all"
+                                                class="flex-1 rounded-md bg-white px-2 py-1.5 text-[10px] font-semibold text-slate-700 shadow-sm">All
+                                                Sections <span data-dean-shift-count="all"
+                                                    class="ml-0.5 text-[9px] opacity-70"></span></button>
+                                            <button type="button" data-dean-section-shift="day"
+                                                class="flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold text-slate-500">☀
+                                                Day <span data-dean-shift-count="day"
+                                                    class="ml-0.5 text-[9px] opacity-70"></span></button>
+                                            <button type="button" data-dean-section-shift="evening"
+                                                class="flex-1 rounded-md px-2 py-1.5 text-[10px] font-semibold text-slate-500">☾
+                                                Evening <span data-dean-shift-count="evening"
+                                                    class="ml-0.5 text-[9px] opacity-70"></span></button>
+                                        </div>
+                                        <div class="mt-2 flex flex-wrap gap-1" role="group"
+                                            aria-label="Filter sections by year">
+                                            @foreach ([['all', 'All Years'], ['1', '1st Year'], ['2', '2nd Year'], ['3', '3rd Year'], ['4', '4th Year'], ['5', '5th Year']] as [$yearValue, $yearText])
+                                                <button type="button" data-dean-section-year="{{ $yearValue }}"
+                                                    class="rounded-full border border-slate-200 px-2 py-1 text-[9px] font-semibold text-slate-500 transition {{ $yearValue === 'all' ? 'border-blue-200 bg-blue-50 text-blue-700' : '' }}">{{ $yearText }}
+                                                    <span data-dean-year-count="{{ $yearValue }}"
+                                                        class="opacity-70"></span></button>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <div id="dean-pbs-section-list" class="max-h-[min(42vh,340px)] overflow-y-auto p-2">
+                                        @foreach ([['day', 'Day Sections'], ['evening', 'Evening Sections']] as [$groupShift, $groupTitle])
+                                            @php
+                                                $groupSections = $programSections->filter(
+                                                    fn($section) => ($section->sec_is_evening ? 'evening' : 'day') ===
+                                                        $groupShift,
+                                                );
+                                            @endphp
+                                            <section data-dean-section-group="{{ $groupShift }}"
+                                                class="mb-2 last:mb-0">
+                                                <div
+                                                    class="sticky top-0 z-10 flex items-center justify-between bg-white px-2 py-1.5 text-[9px] font-extrabold uppercase tracking-wide {{ $groupShift === 'day' ? 'text-amber-700' : 'text-violet-700' }}">
+                                                    <span>{{ $groupShift === 'day' ? '☀' : '☾' }}
+                                                        {{ $groupTitle }}</span>
+                                                    <span data-dean-group-count="{{ $groupShift }}"
+                                                        class="rounded bg-slate-100 px-1.5 py-0.5 text-slate-500">{{ $groupSections->count() }}</span>
+                                                </div>
+                                                @foreach ($groupSections as $section)
+                                                    @php
+                                                        $yearNumber = (int) ($section->sec_year_level ?? 0);
+                                                        $yearLabel = match ($yearNumber) {
+                                                            1 => '1st Year',
+                                                            2 => '2nd Year',
+                                                            3 => '3rd Year',
+                                                            4 => '4th Year',
+                                                            5 => '5th Year',
+                                                            default => 'Year not set',
+                                                        };
+                                                    @endphp
+                                                    <button type="button" data-dean-section-option
+                                                        data-section-id="{{ $section->sec_id }}"
+                                                        data-shift="{{ $groupShift }}"
+                                                        data-year="{{ $yearNumber }}"
+                                                        data-search="{{ strtolower($section->sec_name . ' ' . $yearLabel) }}"
+                                                        class="mb-1 flex w-full items-center gap-2 rounded-lg border border-transparent px-2.5 py-2 text-left text-slate-700 transition hover:border-blue-100 hover:bg-blue-50">
+                                                        <span
+                                                            class="h-2 w-2 shrink-0 rounded-full {{ $groupShift === 'day' ? 'bg-amber-500' : 'bg-violet-500' }}"></span>
+                                                        <span class="min-w-0 flex-1">
+                                                            <span
+                                                                class="block truncate text-[11px] font-bold">{{ $section->sec_name }}</span>
+                                                            <span
+                                                                class="mt-0.5 block text-[9px] text-slate-400">{{ $yearLabel }}
+                                                                ·
+                                                                {{ $section->sec_no_of_student !== null ? $section->sec_no_of_student . ' students' : 'Student count not set' }}</span>
+                                                        </span>
+                                                        <span
+                                                            class="shrink-0 text-[9px] font-semibold text-slate-400">{{ $groupShift === 'day' ? 'Day' : 'Evening' }}</span>
+                                                    </button>
+                                                @endforeach
+                                            </section>
+                                        @endforeach
+                                        <div id="dean-pbs-section-empty"
+                                            class="hidden px-3 py-8 text-center text-xs text-slate-400">No sections
+                                            match that search.</div>
+                                    </div>
+                                    <div
+                                        class="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-3 py-2 text-[9px] text-slate-500">
+                                        <span>Choose a section to open its timetable</span><span>Day / Evening ·
+                                            Year</span>
+                                    </div>
+                                </div>
+                            </div>
                             <span
                                 class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
                                 {{ $semester?->sem_name ?? 'No active semester' }}
@@ -176,9 +284,10 @@
                                         {{ $visibleSchedules->count() === 1 ? 'class' : 'classes' }} · View only</p>
                                 </div>
                                 @if ($schedules->isNotEmpty())
-                                    <a href="{{ route('dean.pbs.export', ['section_id' => $selectedSection->sec_id]) }}"
-                                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Download
-                                        XLSX</a>
+                                    <a data-export-preview
+                                        href="{{ route('dean.pbs.export.preview', ['section' => $selectedSection->sec_id, 'semester' => $semester->sem_id, 'shift' => $shift]) }}"
+                                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Preview
+                                        Export</a>
                                 @endif
                             </div>
                         @endif
@@ -315,6 +424,109 @@
             </div>
         </main>
     </div>
+    @include('chair.partials.export_preview_dialog')
+    <script>
+        (() => {
+            const root = document.getElementById('dean-pbs-section-picker');
+            const trigger = document.getElementById('dean-pbs-section-trigger');
+            const menu = document.getElementById('dean-pbs-section-menu');
+            const search = document.getElementById('dean-pbs-section-search');
+            const list = document.getElementById('dean-pbs-section-list');
+            const sectionInput = document.getElementById('section_id');
+            const form = sectionInput?.form;
+            if (!root || !trigger || !menu || !search || !list || !sectionInput || !form) return;
+
+            let shiftFilter = 'all';
+            let yearFilter = 'all';
+            const options = () => Array.from(list.querySelectorAll('[data-dean-section-option]'));
+
+            const render = () => {
+                const query = search.value.trim().toLocaleLowerCase();
+                const allOptions = options();
+                let visibleCount = 0;
+                allOptions.forEach((option) => {
+                    const matches = option.dataset.search.includes(query) &&
+                        (shiftFilter === 'all' || option.dataset.shift === shiftFilter) &&
+                        (yearFilter === 'all' || option.dataset.year === yearFilter);
+                    option.classList.toggle('hidden', !matches);
+                    if (matches) visibleCount++;
+                });
+
+                list.querySelectorAll('[data-dean-section-group]').forEach((group) => {
+                    const visible = group.querySelectorAll('[data-dean-section-option]:not(.hidden)')
+                    .length;
+                    group.classList.toggle('hidden', visible === 0);
+                    group.querySelector('[data-dean-group-count]')?.replaceChildren(String(visible));
+                });
+                document.getElementById('dean-pbs-section-empty')?.classList.toggle('hidden', visibleCount > 0);
+
+                ['all', 'day', 'evening'].forEach((filter) => {
+                    const count = allOptions.filter((option) => filter === 'all' || option.dataset.shift ===
+                        filter).length;
+                    document.querySelector('[data-dean-shift-count="' + filter + '"]')?.replaceChildren(
+                        String(count));
+                });
+                ['all', '1', '2', '3', '4', '5'].forEach((filter) => {
+                    const count = allOptions.filter((option) => filter === 'all' || option.dataset.year ===
+                        filter).length;
+                    document.querySelector('[data-dean-year-count="' + filter + '"]')?.replaceChildren(
+                        String(count));
+                });
+            };
+
+            const setOpen = (open) => {
+                menu.classList.toggle('hidden', !open);
+                trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) {
+                    render();
+                    search.focus();
+                }
+            };
+
+            trigger.addEventListener('click', () => setOpen(menu.classList.contains('hidden')));
+            search.addEventListener('input', render);
+            menu.querySelectorAll('[data-dean-section-shift]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    shiftFilter = button.dataset.deanSectionShift;
+                    menu.querySelectorAll('[data-dean-section-shift]').forEach((item) => {
+                        const active = item === button;
+                        item.classList.toggle('bg-white', active);
+                        item.classList.toggle('shadow-sm', active);
+                        item.classList.toggle('text-slate-700', active);
+                        item.classList.toggle('text-slate-500', !active);
+                    });
+                    render();
+                });
+            });
+            menu.querySelectorAll('[data-dean-section-year]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    yearFilter = button.dataset.deanSectionYear;
+                    menu.querySelectorAll('[data-dean-section-year]').forEach((item) => {
+                        const active = item === button;
+                        item.classList.toggle('border-blue-200', active);
+                        item.classList.toggle('bg-blue-50', active);
+                        item.classList.toggle('text-blue-700', active);
+                        item.classList.toggle('border-slate-200', !active);
+                        item.classList.toggle('text-slate-500', !active);
+                    });
+                    render();
+                });
+            });
+            list.addEventListener('click', (event) => {
+                const option = event.target.closest('[data-dean-section-option]');
+                if (!option) return;
+                sectionInput.value = option.dataset.sectionId;
+                form.requestSubmit();
+            });
+            document.addEventListener('click', (event) => {
+                if (!root.contains(event.target)) setOpen(false);
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !menu.classList.contains('hidden')) setOpen(false);
+            });
+            render();
+        })();
+    </script>
 </body>
 
 </html>

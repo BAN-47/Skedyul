@@ -6,6 +6,7 @@ use App\Http\Controllers\Faculty\FacultySubjectsController;
 use App\Http\Controllers\Faculty\FacultyScheduleController;
 use App\Http\Controllers\Faculty\FacultySettingsController;
 use App\Http\Controllers\Faculty\PbtExportController;
+use App\Http\Controllers\Chair\ExportPreviewController as ChairExportPreviewController;
 use App\Http\Controllers\Faculty\FacultyChairSuggestionController;
 
 Route::middleware(['auth', 'role:faculty'])
@@ -24,6 +25,9 @@ Route::middleware(['auth', 'role:faculty'])
 
         Route::post('/notifications/chair-suggestion', [FacultyChairSuggestionController::class, 'send'])
             ->name('notifications.chair-suggestion');
+
+        Route::get('/pbt-export/preview', [ChairExportPreviewController::class, 'pbt'])
+            ->name('pbt_export.preview');
 
         Route::get('/pbt-export', [PbtExportController::class, 'download'])
             ->name('pbt_export');

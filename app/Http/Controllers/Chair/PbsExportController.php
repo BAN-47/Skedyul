@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
-use App\Models\College;
 use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\Schedule;
 use App\Models\Section;
 use App\Models\Semester;
-use App\Models\SystemSetting;
 use App\Services\CampusDirectorSignature;
-use App\Services\ScheduleSignatoryFormatter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -75,20 +72,6 @@ class PbsExportController extends Controller
             ->filter(fn(Schedule $schedule) => $this->scheduleFitsExportGrid($schedule, $isEvening))
             ->values();
 
-        $college = $section->program?->department;
-        $collegeDean = $college
-            ? Dean::where('dean_college_id', $college->college_id)->with('user.faculty')->first()
-            : null;
-        $casCollege = College::whereRaw('UPPER(TRIM(college_code)) = ?', ['CAS'])->first();
-        $casDean = $casCollege
-            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user.faculty')->first()
-            : null;
-        $signatoryFormatter = app(ScheduleSignatoryFormatter::class);
-        $chairName = $signatoryFormatter->formatRoleName($chair, 'dc_');
-        $collegeDeanName = $signatoryFormatter->formatRoleName($collegeDean, 'dean_');
-        $casDeanName = $signatoryFormatter->formatRoleName($casDean, 'dean_');
-        $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
-
         $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
         $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath($templateName);
         abort_unless($templatePath, 500, 'The PBS export template is missing: ' . $templateName);
@@ -131,15 +114,7 @@ class PbsExportController extends Controller
 
         $this->clearCourseSummary($sheet);
         $this->writeCourseSummary($sheet, $schedules, (int) ($section->sec_no_of_student ?? 0));
-        $this->writeSignatures(
-            $sheet,
-            $chairName,
-            $collegeDeanName,
-            $college?->college_code ?: $college?->college_name,
-            $campusDirectorName,
-            $this->shouldIncludeCasDean($section, $semester) ? $casDeanName : '',
-            $isEvening
-        );
+        $this->writeSignatures($sheet);
 
         $this->drawSchedule($sheet, $schedules, $isEvening);
 
@@ -200,21 +175,6 @@ class PbsExportController extends Controller
             ->orderBy('sch_start_time')
             ->get();
 
-        $chair = Dept_Chair::with('user.faculty')->where('dc_dept_id', $section->sec_dept_id)->first();
-        $college = $section->program?->department;
-        $collegeDean = $college
-            ? Dean::where('dean_college_id', $college->college_id)->with('user.faculty')->first()
-            : null;
-        $casCollege = College::whereRaw('UPPER(TRIM(college_code)) = ?', ['CAS'])->first();
-        $casDean = $casCollege
-            ? Dean::where('dean_college_id', $casCollege->college_id)->with('user.faculty')->first()
-            : null;
-        $signatoryFormatter = app(ScheduleSignatoryFormatter::class);
-        $chairName = $signatoryFormatter->formatRoleName($chair, 'dc_');
-        $collegeDeanName = $signatoryFormatter->formatRoleName($collegeDean, 'dean_');
-        $casDeanName = $signatoryFormatter->formatRoleName($casDean, 'dean_');
-        $campusDirectorName = trim((string) SystemSetting::get('campus_director_name', ''));
-
         $isEvening = (bool) $section->sec_is_evening;
         $templateName = $isEvening ? 'PBS_Evening_Template.xlsx' : 'PBS_Day_Template.xlsx';
         $templatePath = app(\App\Services\ExportTemplateStorage::class)->localPath($templateName);
@@ -253,15 +213,7 @@ class PbsExportController extends Controller
 
         $this->clearCourseSummary($sheet);
         $this->writeCourseSummary($sheet, $schedules, (int) ($section->sec_no_of_student ?? 0));
-        $this->writeSignatures(
-            $sheet,
-            $chairName,
-            $collegeDeanName,
-            $college?->college_code ?: $college?->college_name,
-            $campusDirectorName,
-            $this->shouldIncludeCasDean($section, $semester) ? $casDeanName : '',
-            $isEvening
-        );
+        $this->writeSignatures($sheet);
         $this->drawSchedule($sheet, $schedules, $isEvening);
 
         $sheet->setSelectedCell('A1');
@@ -359,6 +311,7 @@ class PbsExportController extends Controller
             $sheet->setCellValue('B' . $row, null);
             $sheet->setCellValue('C' . $row, null);
             $sheet->setCellValue('D' . $row, null);
+            $sheet->getRowDimension($row)->setRowHeight(12);
         }
         $sheet->setCellValue('D15', null);
     }
@@ -375,38 +328,108 @@ class PbsExportController extends Controller
 
         $sheet->setCellValue('D15', $students);
 
-        // Loop through all assigned courses (limit to template capacity: rows 16-30)
+        // Keep the full descriptive-title area merged through column C so long
+        // titles wrap before the student-count column instead of hitting its border.
+        foreach (range(16, 30) as $row) {
+            $descriptionRange = 'B' . $row . ':C' . $row;
+            if (!isset($sheet->getMergeCells()[$descriptionRange])) {
+                $sheet->mergeCells($descriptionRange);
+            }
+
+            // The template has a vertical border on column C; remove that seam
+            // inside the merged title area while preserving its outside border.
+            $sheet->getStyle('C' . $row)->getBorders()->getLeft()->setBorderStyle(Border::BORDER_NONE);
+            $sheet->getStyle($descriptionRange)->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_LEFT)
+                ->setVertical(Alignment::VERTICAL_CENTER)
+                ->setWrapText(true)
+                ->setShrinkToFit(false);
+        }
+
         foreach ($courses->take(15) as $index => $schedule) {
             $row = 16 + $index;
             $course = $schedule->subject;
-
-            // Clear merging logic: just use standard cells
             $descriptionRange = 'B' . $row . ':C' . $row;
-            if (isset($sheet->getMergeCells()[$descriptionRange])) {
-                $sheet->unmergeCells($descriptionRange);
-            }
 
-            $sheet->getStyle('B' . $row)->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_LEFT)
-                ->setVertical(Alignment::VERTICAL_CENTER);
+            $title = trim((string) ($course->course_name ?? $course->subj_name ?? ''));
 
             $sheet->setCellValue('A' . $row, $course->course_code ?? $course->subj_code ?? '');
-            $sheet->setCellValue('B' . $row, $course->course_name ?? $course->subj_name ?? '');
+            $sheet->setCellValue('B' . $row, $title);
+
+            $defaultWidth = $sheet->getDefaultColumnDimension()->getWidth();
+            if ($defaultWidth <= 0) {
+                $defaultWidth = 8.43;
+            }
+            $descriptionWidth = 0.0;
+            foreach (['B', 'C'] as $column) {
+                $width = $sheet->getColumnDimension($column)->getWidth();
+                $descriptionWidth += $width > 0 ? $width : $defaultWidth;
+            }
+
+            $charactersPerLine = max(18, (int) floor($descriptionWidth * 1.25));
+            $lineCount = $this->estimateWrappedLines($title, $charactersPerLine);
+            $sheet->getRowDimension($row)->setRowHeight(max(12, $lineCount * 12));
         }
     }
 
-    private function writeSignatures($sheet, string $chairName, string $collegeDeanName, ?string $collegeLabel, string $directorName, string $casDeanName, bool $isEvening): void
+    private function estimateWrappedLines(string $text, int $charactersPerLine): int
     {
-        $sheet->setCellValue('A48', $chairName !== '' ? mb_strtoupper($chairName) : 'DEPARTMENT CHAIR');
+        $words = preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($words === []) {
+            return 1;
+        }
+
+        $lines = 1;
+        $lineLength = 0;
+        foreach ($words as $word) {
+            $wordLength = mb_strlen($word);
+            if ($wordLength > $charactersPerLine) {
+                if ($lineLength > 0) {
+                    $lines++;
+                    $lineLength = 0;
+                }
+
+                $fullLines = intdiv($wordLength, $charactersPerLine);
+                $remainder = $wordLength % $charactersPerLine;
+                $lines += $fullLines;
+                if ($remainder === 0) {
+                    $lines--;
+                    $lineLength = $charactersPerLine;
+                } else {
+                    $lineLength = $remainder;
+                }
+                continue;
+            }
+
+            if ($lineLength === 0) {
+                $lineLength = $wordLength;
+                continue;
+            }
+
+            if ($lineLength + 1 + $wordLength > $charactersPerLine) {
+                $lines++;
+                $lineLength = $wordLength;
+                continue;
+            }
+
+            $lineLength += 1 + $wordLength;
+        }
+
+        return max(1, $lines);
+    }
+
+    private function writeSignatures($sheet): void
+    {
+        $sheet->setCellValue('A48', 'NOREEN B. FUENTES, Ph.D., DIT');
         $sheet->setCellValue('A49', 'Program Chairperson');
 
-        $sheet->setCellValue('G48', $collegeDeanName !== '' ? mb_strtoupper($collegeDeanName) : '');
-        $sheet->setCellValue('G49', 'Dean' . ($collegeLabel ? ', ' . $collegeLabel : ''));
+        $sheet->setCellValue('G48', 'JOSE MARIA S. GARCIA II, Ph.D.');
+        $sheet->setCellValue('G49', 'Dean, CCICT');
 
         // Both PBS templates merge the Campus Director name across K48:M48.
         // Always write to that merged range's anchor and center it without an
         // indent so the name lines up with the other signatories.
-        $sheet->setCellValue('K48', mb_strtoupper(trim($directorName)));
+        $sheet->setCellValue('K48', 'GREGORIO P. PAJARON JR., D.M., J.D.');
         $sheet->getStyle('K48:M48')->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER)
@@ -416,30 +439,17 @@ class PbsExportController extends Controller
             ->setHorizontal(Alignment::HORIZONTAL_CENTER)
             ->setVertical(Alignment::VERTICAL_CENTER);
 
-        $sheet->setCellValue('G53', $casDeanName !== '' ? mb_strtoupper($casDeanName) : '');
-        $sheet->setCellValue('G54', $casDeanName !== '' ? 'Dean, CAS' : '');
+        $sheet->setCellValue('G53', 'RAAMAH C. ROSALES, JD, Ph.D.,');
+        $sheet->setCellValue('G54', 'Dean, CAS');
+        $sheet->getStyle('G53:I53')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setWrapText(true);
+        $sheet->getStyle('G54:I54')->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
     }
 
-    private function shouldIncludeCasDean(Section $section, Semester $semester): bool
-    {
-        $year = (int) $section->sec_year_level;
-        $semesterNumber = $this->semesterNumber((string) $semester->sem_name);
-
-        return ($year === 1 && in_array($semesterNumber, [1, 2], true))
-            || ($year === 2 && $semesterNumber === 1);
-    }
-
-    private function semesterNumber(string $semesterName): ?int
-    {
-        $name = mb_strtolower($semesterName);
-        if (preg_match('/(?:1st|first|semester\s*1)/', $name)) {
-            return 1;
-        }
-        if (preg_match('/(?:2nd|second|semester\s*2)/', $name)) {
-            return 2;
-        }
-        return null;
-    }
 
     private function drawSchedule($sheet, $schedules, bool $isEvening): void
     {
