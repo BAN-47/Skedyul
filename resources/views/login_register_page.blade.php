@@ -104,7 +104,7 @@
             </div>
             <div class="text-left">
               <div class="text-[13px] font-bold text-white">Reports & Export</div>
-              <div class="mt-0.5 text-[12px] text-white/40">Generate and download schedule reports in PDF or Excel</div>
+              <div class="mt-0.5 text-[12px] text-white/40">Generate and download schedule reports in Word and Excel</div>
             </div>
           </div>
 
@@ -521,7 +521,7 @@
       closeForgotPasswordSupport();
     }
 
-    document.addEventListener('keydown', function (event) {
+    document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape') closeForgotPasswordSupport();
     });
   </script>
