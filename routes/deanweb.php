@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use App\Http\Controllers\Dean\DeanDepartmentController;
+use App\Http\Controllers\Dean\DeanCourseController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
 use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
@@ -31,6 +32,10 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
 
         Route::get('/departments', [DeanDepartmentController::class, 'index'])
             ->name('departments');
+
+        // Read-only course catalog for Dean review.
+        Route::get('/courses', [DeanCourseController::class, 'index'])
+            ->name('courses');
 
         Route::get('/sections', [SectionController::class, 'deanIndex'])
             ->name('sections');
