@@ -5,8 +5,12 @@ namespace App\Http\Controllers\Chair;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use App\Models\Dept_Chair;
+use App\Models\Course;
+use App\Models\Departments;
+use App\Models\Faculty;
 use App\Models\Room;
 use App\Models\Schedule;
+use App\Models\Section;
 use App\Models\Semester;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,6 +36,15 @@ class RoomUtilizationController extends Controller
                 ? $semesters->firstWhere('sem_id', $currentSemester->sem_id)
                 : $semesters->first();
         }
+
+        $officialSemesterName = Semester::where('sem_is_active', true)->value('sem_name');
+        $canPlotSelectedSemester = $selectedSemester && (
+            ((bool) $selectedSemester->sem_is_active && (bool) $selectedYear?->ay_is_active)
+            || ((bool) $selectedYear?->ay_is_active
+                && $selectedSemester->sem_name === '2nd Semester'
+                && $officialSemesterName === '1st Semester'
+                && (bool) ($selectedSemester->sem_is_plotting_enabled ?? false))
+        );
 
         // Chairs only see rooms belonging to their own college.
         $roomQuery = Room::query();
@@ -62,6 +75,20 @@ class RoomUtilizationController extends Controller
         $selectedRoom = $visibleRooms->firstWhere('room_id', $selectedRoomId) ?? $visibleRooms->first();
         $shift = $request->query('shift', 'day') === 'night' ? 'night' : 'day';
 
+        $collegeDepartmentIds = Departments::where('dept_college_id', $chair->dc_college_id)->pluck('dept_id');
+        $sections = $selectedSemester
+            ? Section::query()->with('program')
+                ->where('sec_sem_id', $selectedSemester->sem_id)
+                ->whereIn('sec_dept_id', $collegeDepartmentIds)
+                ->orderBy('sec_name')->get()
+            : collect();
+        $courses = Course::query()->where('course_is_active', true)->orderBy('course_code')->get();
+        $categories = Course::query()->whereNotNull('course_category')->where('course_category', '<>', '')
+            ->distinct()->orderBy('course_category')->pluck('course_category');
+        $faculty = Faculty::query()
+            ->where(function ($query) { $query->whereHas('user')->orWhere('fac_is_placeholder', true); })
+            ->with('user')->orderBy('fac_last_name')->orderBy('fac_first_name')->get();
+
         $schedules = collect();
         if ($selectedRoom && $selectedSemester) {
             $schedules = Schedule::query()
@@ -90,7 +117,8 @@ class RoomUtilizationController extends Controller
 
         return view('chair.room_utilization', compact(
             'academicYears', 'selectedYear', 'selectedYearId', 'semesters', 'selectedSemester',
-            'floorFilter', 'visibleRooms', 'selectedRoom', 'schedulesByDay', 'scheduledHours', 'shift'
+            'floorFilter', 'visibleRooms', 'selectedRoom', 'schedulesByDay', 'scheduledHours', 'shift',
+            'sections', 'courses', 'categories', 'faculty', 'canPlotSelectedSemester'
         ));
     }
 }
