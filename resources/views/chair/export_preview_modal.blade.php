@@ -11,7 +11,7 @@
                 class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Back to edit
             </button>
-            @if ($kind === 'PBS')
+            @if ($kind === 'PBS' && ($studentCountEditable ?? true))
                 <button type="button" data-export-pbs-confirm
                     data-student-url="{{ route('chair.pbs.section.students') }}"
                     data-section-id="{{ request()->query('section') }}" data-download-url="{{ $downloadUrl }}"
@@ -27,7 +27,7 @@
         </div>
     </div>
 
-    @if ($kind === 'PBS')
+    @if ($kind === 'PBS' && ($studentCountEditable ?? true))
         <section class="rounded-2xl border border-blue-100 bg-blue-50 p-4">
             <label for="preview-student-count" class="block text-sm font-semibold text-slate-800">Number of
                 students</label>

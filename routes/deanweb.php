@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Dean\DeanDashboardController;
 use App\Http\Controllers\Dean\DeanDepartmentController;
+use App\Http\Controllers\Dean\DeanCourseController;
 use App\Http\Controllers\Dean\PendingApprovalsController;
 use App\Http\Controllers\Dean\FacultyDeploymentController;
 use App\Http\Controllers\Dean\FacultyWorkloadController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Dean\DeanSettingsController;
 use App\Http\Controllers\Dean\PbtExportController;
 use App\Http\Controllers\Dean\DeanScheduleViewerController;
 use App\Http\Controllers\Chair\PbsExportController;
+use App\Http\Controllers\Chair\ExportPreviewController;
 use App\Http\Controllers\Admin\AdminProfileController;
 use App\Http\Controllers\Admin\SectionController;
 
@@ -30,6 +32,10 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
 
         Route::get('/departments', [DeanDepartmentController::class, 'index'])
             ->name('departments');
+
+        // Read-only course catalog for Dean review.
+        Route::get('/courses', [DeanCourseController::class, 'index'])
+            ->name('courses');
 
         Route::get('/sections', [SectionController::class, 'deanIndex'])
             ->name('sections');
@@ -61,6 +67,9 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
         Route::get('/pbs', [DeanScheduleViewerController::class, 'pbs'])
             ->name('pbs');
 
+        Route::get('/pbs/export/preview', [ExportPreviewController::class, 'pbs'])
+            ->name('pbs.export.preview');
+
         Route::get('/pbs/export', [PbsExportController::class, 'downloadForDean'])
             ->name('pbs.export');
 
@@ -72,6 +81,9 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
 
         Route::get('/pbt-export', [PbtExportController::class, 'index'])
             ->name('pbt_export');
+
+        Route::get('/pbt-export/preview', [ExportPreviewController::class, 'pbt'])
+            ->name('pbt_export.preview');
 
         Route::get('/pbt-export/download', [PbtExportController::class, 'download'])
             ->name('pbt_export.download');

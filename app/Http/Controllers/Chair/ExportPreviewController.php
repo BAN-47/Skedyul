@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
+use App\Models\Dean;
 use App\Models\Dept_Chair;
 use App\Models\Departments;
 use App\Models\Faculty;
@@ -20,32 +21,61 @@ class ExportPreviewController extends Controller
 {
     public function pbt(Request $request)
     {
-        $chair = $this->chair();
-        $data = $request->validate([
-            'faculty_id' => ['required', 'uuid', 'exists:faculty,fac_id'],
-            'semester' => ['required', 'uuid', 'exists:semester,sem_id'],
-        ]);
+        $routeName = (string) $request->route()?->getName();
+        $forDean = str_starts_with($routeName, 'dean.');
+        $forFaculty = str_starts_with($routeName, 'faculty.');
+        $dean = $forDean ? $this->dean() : null;
+        $chair = (!$forDean && !$forFaculty) ? $this->chair() : null;
 
-        $faculty = Faculty::with(['user', 'program'])
+        $rules = [
+            'semester' => ['required', 'uuid', 'exists:semester,sem_id'],
+        ];
+        if (!$forFaculty) {
+            $rules['faculty_id'] = ['required', 'uuid', 'exists:faculty,fac_id'];
+        }
+        $data = $request->validate($rules);
+
+        $facultyQuery = Faculty::with(['user', 'program'])
             ->where('fac_is_placeholder', false)
-            ->where('fac_id', $data['faculty_id'])
-            ->whereHas('user')
-            ->firstOrFail();
-        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
-        abort_unless(
-            $collegeId && (
-                (string) $faculty->fac_college_id === (string) $collegeId
-                || (string) $faculty->program?->dept_college_id === (string) $collegeId
-            ),
-            403,
-            'You can only preview faculty schedules within your college.'
-        );
+            ->whereHas('user');
+        if ($forFaculty) {
+            $facultyQuery->where('fac_usr_id', Auth::id());
+        } else {
+            $facultyQuery->where('fac_id', $data['faculty_id']);
+        }
+        $faculty = $facultyQuery->firstOrFail();
+
+        $collegeId = $dean?->dean_college_id ?? $chair?->program?->dept_college_id ?? $chair?->dc_college_id;
+        if (!$forFaculty) {
+            abort_unless(
+                $collegeId && (
+                    (string) $faculty->fac_college_id === (string) $collegeId
+                    || (string) $faculty->program?->dept_college_id === (string) $collegeId
+                ),
+                403,
+                'You can only preview faculty schedules within your college.'
+            );
+        }
 
         $semester = Semester::with('academicYear')->findOrFail($data['semester']);
         $schedules = Schedule::with(['subject', 'section', 'room', 'studyLoad'])
-            ->where('sch_fac_id', $faculty->fac_id)
-            ->where('sch_sem_id', $semester->sem_id)
+            ->where(function ($query) use ($faculty, $forFaculty) {
+                $query->where('sch_fac_id', $faculty->fac_id);
+                if ($forFaculty) {
+                    $query->orWhereHas('studyLoad', fn($loadQuery) => $loadQuery->where('sl_fac_id', $faculty->fac_id));
+                }
+            })
+            ->where(function ($query) use ($semester, $forFaculty) {
+                $query->where('sch_sem_id', $semester->sem_id);
+                if ($forFaculty) {
+                    $query->orWhereHas('studyLoad', fn($loadQuery) => $loadQuery->where('sl_sem_id', $semester->sem_id));
+                }
+            })
             ->where('sch_is_active', true)
+            ->when($forDean, fn($query) => $query->whereHas(
+                'section.program',
+                fn($section) => $section->where('dept_college_id', $collegeId)
+            ))
             ->orderBy('sch_day')
             ->orderBy('sch_start_time')
             ->get();
@@ -63,22 +93,26 @@ class ExportPreviewController extends Controller
             'start_time' => $schedule->sch_start_time,
             'end_time' => $schedule->sch_end_time,
             'room' => $schedule->room?->room_name ?? '—',
-            'shift' => $this->scheduleShiftKey($schedule),
+            'shift' => $this->sectionShiftKey($schedule),
         ])->values();
         $rowsByShift = $this->groupRowsByShift($rows);
-        $displayShifts = ['day' => 'Day Program', 'evening' => 'Evening Program'];
+        $displayShifts = ['day' => 'Day', 'evening' => 'Evening'];
 
-        $coursesByShift = $this->courseSummaryByShift($schedules);
+        $coursesByShift = $this->courseSummaryByShift($schedules, null, true);
         $workloadByShift = [
             'day' => $this->pbtWorkloadSummary($faculty, $schedules, 'day'),
             'evening' => $this->pbtWorkloadSummary($faculty, $schedules, 'evening'),
         ];
 
         $semesterLabel = $this->semesterLabel($semester);
-        $downloadUrl = route('chair.export_reports.pbt', [
-            'faculty_id' => $faculty->fac_id,
-            'semester' => $semester->sem_id,
-        ]);
+        $downloadUrl = $forFaculty
+            ? route('faculty.pbt_export', ['semester' => $semester->sem_id])
+            : ($forDean
+                ? route('dean.pbt_export.download', ['faculty_id' => $faculty->fac_id])
+                : route('chair.export_reports.pbt', [
+                    'faculty_id' => $faculty->fac_id,
+                    'semester' => $semester->sem_id,
+                ]));
 
         return $this->previewResponse($request, [
             'kind' => 'PBT',
@@ -91,15 +125,21 @@ class ExportPreviewController extends Controller
             'coursesByShift' => $coursesByShift,
             'workloadByShift' => $workloadByShift,
             'downloadUrl' => $downloadUrl,
-            'backUrl' => route('chair.export_reports', ['semester' => $semester->sem_id]),
+            'backUrl' => $forFaculty
+                ? route('faculty.schedule', ['semester' => $semester->sem_id])
+                : ($forDean
+                    ? route('dean.pbt', ['faculty_id' => $faculty->fac_id, 'program_id' => $faculty->fac_dept_id])
+                    : route('chair.export_reports', ['semester' => $semester->sem_id])),
             'studentCount' => null,
             'sectionName' => null,
+            'studentCountEditable' => false,
         ]);
     }
-
     public function pbs(Request $request)
     {
-        $chair = $this->chair();
+        $forDean = str_starts_with((string) $request->route()?->getName(), 'dean.');
+        $dean = $forDean ? $this->dean() : null;
+        $chair = $forDean ? null : $this->chair();
         $data = $request->validate([
             'section' => ['required', 'uuid', 'exists:section,sec_id'],
             'semester' => ['required', 'uuid', 'exists:semester,sem_id'],
@@ -107,7 +147,7 @@ class ExportPreviewController extends Controller
             'student_count' => ['nullable', 'integer', 'min:0', 'max:500'],
         ]);
 
-        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        $collegeId = $dean?->dean_college_id ?? $chair?->program?->dept_college_id ?? $chair?->dc_college_id;
         $allowedDepartmentIds = $collegeId
             ? Departments::where('dept_college_id', $collegeId)->pluck('dept_id')
             : collect([$chair->dc_dept_id])->filter()->values();
@@ -126,11 +166,17 @@ class ExportPreviewController extends Controller
             ->where('sch_sec_id', $section->sec_id)
             ->where('sch_sem_id', $semester->sem_id)
             ->where('sch_is_active', true)
+            ->when($forDean, fn($query) => $query->whereHas(
+                'section.program',
+                fn($section) => $section->where('dept_college_id', $collegeId)
+            ))
             ->orderBy('sch_day')
             ->orderBy('sch_start_time')
             ->get();
 
-        $shiftSchedules = $allSchedules
+        $shiftSchedules = $forDean
+            ? $allSchedules->values()
+            : $allSchedules
             ->filter(fn($schedule) => $this->scheduleOverlapsShift($schedule, $isEvening))
             ->values();
 
@@ -145,15 +191,17 @@ class ExportPreviewController extends Controller
                 'start_time' => $schedule->sch_start_time,
                 'end_time' => $schedule->sch_end_time,
                 'room' => $schedule->room?->room_name ?? '—',
-                'shift' => $isEvening ? 'evening' : 'day',
+                'shift' => $forDean ? $this->scheduleShiftKey($schedule) : ($isEvening ? 'evening' : 'day'),
             ])->values();
         $activeShiftKey = $isEvening ? 'evening' : 'day';
         $rowsByShift = $this->groupRowsByShift($rows);
-        $displayShifts = [$activeShiftKey => ucfirst($activeShiftKey) . ' Program'];
+        $displayShifts = $forDean
+            ? ['day' => 'Day', 'evening' => 'Evening']
+            : [$activeShiftKey => ucfirst($activeShiftKey) . ' Program'];
 
         abort_if($rows->isEmpty(), 422, 'There are no active plotted classes for this section and semester.');
 
-        $coursesByShift = $this->courseSummaryByShift($shiftSchedules, $activeShiftKey);
+        $coursesByShift = $this->courseSummaryByShift($shiftSchedules, $forDean ? null : $activeShiftKey);
 
         $semesterLabel = $this->semesterLabel($semester);
         $studentCount = $data['student_count'] ?? $section->sec_no_of_student ?? 0;
@@ -167,19 +215,24 @@ class ExportPreviewController extends Controller
             'rowsByShift' => $rowsByShift,
             'displayShifts' => $displayShifts,
             'coursesByShift' => $coursesByShift,
-            'downloadUrl' => route('chair.pbs.export', [
-                'section' => $section->sec_id,
-                'semester' => $semester->sem_id,
-                'shift' => $shift,
-            ]),
-            'backUrl' => route('chair.pbs', [
-                'department' => $chair->dc_dept_id,
-                'section' => $section->sec_id,
-                'semester' => $semester->sem_id,
-                'shift' => $shift,
-            ]),
+            'downloadUrl' => $forDean
+                ? route('dean.pbs.export', ['section_id' => $section->sec_id])
+                : route('chair.pbs.export', [
+                    'section' => $section->sec_id,
+                    'semester' => $semester->sem_id,
+                    'shift' => $shift,
+                ]),
+            'backUrl' => $forDean
+                ? route('dean.pbs', ['program_id' => $section->sec_dept_id, 'section_id' => $section->sec_id, 'shift' => $shift])
+                : route('chair.pbs', [
+                    'department' => $chair->dc_dept_id,
+                    'section' => $section->sec_id,
+                    'semester' => $semester->sem_id,
+                    'shift' => $shift,
+                ]),
             'studentCount' => (int) $studentCount,
             'sectionName' => $section->sec_name,
+            'studentCountEditable' => !$forDean,
         ]);
     }
 
@@ -250,6 +303,14 @@ class ExportPreviewController extends Controller
         return $chair;
     }
 
+    private function dean(): Dean
+    {
+        $dean = Dean::where('dean_usr_id', Auth::id())->first();
+        abort_if(!$dean || !$dean->dean_college_id, 403, 'Your account is not assigned to a college.');
+
+        return $dean;
+    }
+
     private function semesterLabel(Semester $semester): string
     {
         $year = $semester->academicYear?->ay_year_label
@@ -305,24 +366,27 @@ class ExportPreviewController extends Controller
         }
     }
 
-    private function courseSummaryByShift($schedules, ?string $shiftOverride = null): array
+    private function courseSummaryByShift($schedules, ?string $shiftOverride = null, bool $useSectionType = false): array
     {
+        $shiftForSchedule = fn(Schedule $schedule): string => $shiftOverride
+            ?? ($useSectionType ? $this->sectionShiftKey($schedule) : $this->scheduleShiftKey($schedule));
+
         $rows = $schedules
             ->filter(fn($schedule) => $schedule->subject && $schedule->section)
-            ->groupBy(function ($schedule) use ($shiftOverride) {
-                $shift = $shiftOverride ?? $this->scheduleShiftKey($schedule);
+            ->groupBy(function ($schedule) use ($shiftForSchedule) {
+                $shift = $shiftForSchedule($schedule);
                 $courseId = $schedule->subject->course_id ?? $schedule->sch_course_id ?? '';
                 $sectionId = $schedule->section->sec_id ?? '';
 
                 return $shift . '|' . $courseId . '|' . $sectionId;
             })
-            ->map(function ($meetings) use ($shiftOverride) {
+            ->map(function ($meetings) use ($shiftForSchedule) {
                 $schedule = $meetings->first();
                 $course = $schedule->subject;
                 $section = $schedule->section;
 
                 return [
-                    'shift' => $shiftOverride ?? $this->scheduleShiftKey($schedule),
+                    'shift' => $shiftForSchedule($schedule),
                     'course_code' => $course->course_code ?? '—',
                     'course_name' => $course->course_name ?? '—',
                     'degree_section' => $section->sec_name ?? '—',
@@ -434,6 +498,11 @@ class ExportPreviewController extends Controller
     private function formatWorkloadNumber(float|int $value): int|float
     {
         return floor($value) === $value ? (int) $value : round($value, 2);
+    }
+
+    private function sectionShiftKey(Schedule $schedule): string
+    {
+        return (bool) $schedule->section?->sec_is_evening ? 'evening' : 'day';
     }
 
     private function scheduleShiftKey(Schedule $schedule): string

@@ -17,7 +17,9 @@
         <div class="overflow-hidden">
             <div class="sidebar-user-name">{{ Auth::user()->dean->dean_first_name ?? '' }}
                 {{ Auth::user()->dean->dean_middle_name ?? '' }} {{ Auth::user()->dean->dean_last_name ?? '' }}</div>
-            <div class="sidebar-user-role">Dean · {{ Auth::user()->dean?->department?->college_code ?? Auth::user()->dean?->department?->college_name ?? 'College' }}</div>
+            <div class="sidebar-user-role">Dean ·
+                {{ Auth::user()->dean?->department?->college_code ?? (Auth::user()->dean?->department?->college_name ?? 'College') }}
+            </div>
         </div>
     </div>
 
@@ -31,6 +33,10 @@
         <a href="{{ route('dean.departments') }}"
             class="nav-item {{ request()->routeIs('dean.departments') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-building-community" aria-hidden="true"></i></span> Departments
+        </a>
+        <a href="{{ route('dean.courses') }}"
+            class="nav-item {{ request()->routeIs('dean.courses') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="ti ti-book-2" aria-hidden="true"></i></span> Courses
         </a>
         <a href="{{ route('dean.sections') }}"
             class="nav-item {{ request()->routeIs('dean.sections*') ? 'active' : '' }}">
@@ -48,7 +54,8 @@
 
         <div class="nav-section-label">Schedule Views</div>
         <a href="{{ route('dean.pbs') }}" class="nav-item {{ request()->routeIs('dean.pbs*') ? 'active' : '' }}">
-            <span class="nav-icon"><i class="ti ti-calendar-event" aria-hidden="true"></i></span> Program by Section (PBS)
+            <span class="nav-icon"><i class="ti ti-calendar-event" aria-hidden="true"></i></span> Program by Section
+            (PBS)
         </a>
         <a href="{{ route('dean.pbt') }}" class="nav-item {{ request()->routeIs('dean.pbt') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span> Program by Teacher (PBT)
