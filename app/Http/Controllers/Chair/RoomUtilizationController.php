@@ -60,6 +60,7 @@ class RoomUtilizationController extends Controller
 
         $selectedRoomId = (string) $request->query('room_id', '');
         $selectedRoom = $visibleRooms->firstWhere('room_id', $selectedRoomId) ?? $visibleRooms->first();
+        $shift = $request->query('shift', 'day') === 'night' ? 'night' : 'day';
 
         $schedules = collect();
         if ($selectedRoom && $selectedSemester) {
@@ -70,6 +71,14 @@ class RoomUtilizationController extends Controller
                 ->with(['subject', 'section', 'faculty.user'])
                 ->orderBy('sch_start_time')
                 ->get();
+
+            // Keep the room grid consistent with the Day/Evening switch used by PBS and PBT.
+            $schedules = $schedules->filter(function (Schedule $schedule) use ($shift): bool {
+                $storedShift = strtolower((string) $schedule->sch_shift);
+                return $shift === 'night'
+                    ? (str_contains($storedShift, 'even') || str_contains($storedShift, 'night'))
+                    : (str_contains($storedShift, 'day') || $storedShift === '');
+            })->values();
         }
 
         $schedulesByDay = $schedules->groupBy('sch_day');
@@ -81,7 +90,7 @@ class RoomUtilizationController extends Controller
 
         return view('chair.room_utilization', compact(
             'academicYears', 'selectedYear', 'selectedYearId', 'semesters', 'selectedSemester',
-            'floorFilter', 'visibleRooms', 'selectedRoom', 'schedulesByDay', 'scheduledHours'
+            'floorFilter', 'visibleRooms', 'selectedRoom', 'schedulesByDay', 'scheduledHours', 'shift'
         ));
     }
 }

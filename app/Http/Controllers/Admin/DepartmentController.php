@@ -21,7 +21,6 @@ class DepartmentController extends Controller
         $filters = request()->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'college_id' => ['nullable', 'string', 'exists:college,college_id'],
-            'role' => ['nullable', 'in:chair,dean,faculty'],
             'designation' => ['nullable', 'string', 'max:150'],
         ]);
         $departmentQuery = Departments::query()
@@ -64,13 +63,6 @@ class DepartmentController extends Controller
             $departmentQuery->where(fn ($query) => $query->where('dept_name', $likeOperator, $term)
                 ->orWhere('dept_code', $likeOperator, $term)
                 ->orWhereHas('department', fn ($collegeQuery) => $collegeQuery->where('college_name', $likeOperator, $term)->orWhere('college_code', $likeOperator, $term)));
-        }
-        if (($filters['role'] ?? null) === 'chair') {
-            $departmentQuery->whereHas('chairs');
-        } elseif (($filters['role'] ?? null) === 'faculty') {
-            $departmentQuery->whereHas('faculty');
-        } elseif (($filters['role'] ?? null) === 'dean') {
-            $departmentQuery->whereHas('department', fn ($collegeQuery) => $collegeQuery->whereHas('deans'));
         }
         if ($filters['designation'] ?? null) {
             $departmentQuery->whereHas('faculty', fn ($facultyQuery) => $facultyQuery->where('fac_special_position', $filters['designation']));

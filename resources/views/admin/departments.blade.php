@@ -94,10 +94,9 @@
                         <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_code" value="{{ $selectedCollege->college_code }}" required maxlength="50" aria-label="College code">
                         <button class="btn btn-secondary shrink-0 px-3 py-2 text-sm" type="submit">Save college</button>
                     </form>
-                    <form method="GET" action="{{ route('admin.departments') }}" class="mt-4 grid gap-3 md:grid-cols-3">
+                    <form method="GET" action="{{ route('admin.departments') }}" class="mt-4 grid gap-3 md:grid-cols-2">
                         <input type="hidden" name="college_id" value="{{ $selectedCollege->college_id }}">
                         <input name="search" value="{{ $filters['search'] ?? '' }}" class="field-input" placeholder="Search departments">
-                        <select name="role" class="field-input"><option value="">Chair, Dean, or Faculty</option><option value="chair" @selected(($filters['role'] ?? '') === 'chair')>Has department chair</option><option value="dean" @selected(($filters['role'] ?? '') === 'dean')>College has Dean</option><option value="faculty" @selected(($filters['role'] ?? '') === 'faculty')>Has faculty</option></select>
                         <select name="designation" class="field-input"><option value="">All faculty designations</option>@foreach($designations as $designation)<option value="{{ $designation }}" @selected(($filters['designation'] ?? '') === $designation)>{{ $designation }}</option>@endforeach</select>
                         <div class="flex gap-2 md:col-span-3"><button class="btn btn-primary" type="submit">Filter departments</button><a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Clear filters</a></div>
                     </form>
