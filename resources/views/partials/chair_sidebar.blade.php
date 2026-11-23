@@ -49,6 +49,11 @@
             </span><span class="nav-label">Program by Teacher (PBT)</span>
         </a>
 
+        <a href="{{ route('chair.room_utilization') }}" class="nav-item {{ request()->routeIs('chair.room_utilization') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="ti ti-building-community" aria-hidden="true"></i></span>
+            <span class="nav-label">Room Utilization</span>
+        </a>
+
 
         <a href="{{ route('chair.mis') }}" class="nav-item {{ request()->routeIs('chair.mis') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-id-badge-2" aria-hidden="true"></i></span> MIS Code

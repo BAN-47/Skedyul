@@ -25,14 +25,11 @@
                 @if($errors->any())<div role="alert" class="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
                 <div id="selected-program-tools" class="hidden">
                 @if($selectedDepartment)
+                    <div class="mx-5 mt-5">
+                        <h2 class="text-lg font-bold">{{ $selectedDepartment->dept_code }} · {{ $selectedDepartment->dept_name }}</h2>
+                        <p class="mt-1 text-sm text-slate-500">Faculty roster and department chair · {{ $assignedCollege?->college_name }}</p>
+                    </div>
                     <section class="mx-5 mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                                <h2 class="text-lg font-bold">{{ $selectedDepartment->dept_code }} · {{ $selectedDepartment->dept_name }}</h2>
-                                <p class="mt-1 text-sm text-slate-500">Faculty roster and department chair · {{ $assignedCollege?->college_name }}</p>
-                            </div>
-                        </div>
-
                         <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Sections</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $sectionCount }}</p><p class="mt-1 text-xs text-slate-500">In this department, across academic years</p></article>
                             <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Assigned faculty</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $facultyTotal }}</p><p class="mt-1 text-xs text-slate-500">Faculty rostered in this department</p></article>

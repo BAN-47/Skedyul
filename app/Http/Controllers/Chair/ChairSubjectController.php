@@ -183,8 +183,9 @@ class ChairSubjectController extends Controller
                 'code'       => $s->subj_code,
                 'name'       => $s->subj_name,
                 'lec'        => (float) $s->subj_lecture_hours,
-                'lab'        => (float) $s->subj_lab_hours,
-                'total'      => (float) ($s->course_total_hours ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)),
+                // Database lab hours are stored as 3 hours per lab unit; the course list shows entered units.
+                'lab'        => (float) $s->subj_lab_hours / 3,
+                'total'      => (float) $s->subj_lecture_hours + ((float) $s->subj_lab_hours / 3),
                 'units'      => (float) ($s->subj_units ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)),
                 'faculty'    => $s->assignedFaculty,
                 'dept_id'    => $s->subj_dept_id,
@@ -208,18 +209,38 @@ class ChairSubjectController extends Controller
 
     public function store(Request $request)
     {
+        $deptChair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $collegeId = $deptChair->dc_college_id;
+        $programId = $deptChair->dc_dept_id ?? $deptChair->dc_prog_id;
+        abort_unless($collegeId && $programId, 403, 'Your chair account is not assigned to a department.');
+
+        $program = Departments::where('dept_id', $programId)
+            ->where('dept_college_id', $collegeId)
+            ->firstOrFail();
+
         $validated = $request->validate([
-            'subj_dept_id' => 'required|exists:college,college_id',
-            'subj_prog_id' => 'required|exists:department,dept_id',
-            'subj_code' => 'required|string|unique:course,course_code',
-            'subj_name' => 'required|string',
-            'subj_units' => 'required|numeric|min:0',
-            'subj_lecture_hours' => 'required|numeric|min:0',
-            'subj_lab_hours' => 'required|numeric|min:0',
+            'subj_code' => ['required', 'string', 'max:50', Rule::unique('course', 'course_code')],
+            'subj_name' => ['required', 'string', 'max:255'],
+            'subj_units' => ['required', 'numeric', 'min:0'],
+            'subj_lecture_units' => ['required', 'numeric', 'min:0', 'max:12'],
+            'subj_lab_units' => ['required', 'numeric', 'min:0', 'max:4'],
+            'subj_year_level' => ['nullable', 'integer', 'min:1', 'max:4'],
+            'subj_semester' => ['nullable', 'integer', 'in:1,2'],
         ]);
 
         try {
-            Course::create($validated);
+            Course::create([
+                'course_college_id' => $collegeId,
+                'course_dept_id' => $program->dept_id,
+                'course_code' => $validated['subj_code'],
+                'course_name' => $validated['subj_name'],
+                'course_units' => $validated['subj_units'],
+                'course_lecture_hours' => $validated['subj_lecture_units'],
+                'course_lab_hours' => $validated['subj_lab_units'] * 3,
+                'course_year_level' => $validated['subj_year_level'] ?? null,
+                'course_semester' => $validated['subj_semester'] ?? null,
+                'course_is_active' => true,
+            ]);
         } catch (\Throwable $e) {
             return $this->redirectWithDbError($e, 'Unable to add the subject right now. Please try again.');
         }

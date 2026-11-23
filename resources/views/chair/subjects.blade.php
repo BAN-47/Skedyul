@@ -28,10 +28,17 @@
             ])
 
             <div id="page-subjects" class="page-content min-h-0 flex-1 overflow-y-auto">
+                @if(session('success'))<div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{{ session('success') }}</div>@endif
+                @if(session('error'))<div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ session('error') }}</div>@endif
+                @if($errors->any())<div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ $errors->first() }}</div>@endif
                 <div class="mb-5 font-bold">
                     <div class="mt-1 text-[13px] text-slate-500">
                         {{ $programName ?? 'BSIS' }} Department — filter by year &amp; semester
                     </div>
+                </div>
+
+                <div class="mb-4 flex justify-end">
+                    <button type="button" onclick="openChairCourseModal()" class="btn btn-primary">+ Add Course</button>
                 </div>
 
                 {{-- Year + Semester filters --}}
@@ -82,13 +89,13 @@
                                         Units</th>
                                     <th
                                         class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">
-                                        Lec</th>
+                                        Lec Units</th>
                                     <th
                                         class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">
-                                        Lab</th>
+                                        Lab Units</th>
                                     <th
                                         class="border-b-2 border-slate-200 px-3 py-2 text-[11px] font-bold uppercase tracking-[0.6px] text-slate-400">
-                                        Total Hrs</th>
+                                        Total (Lec + Lab)</th>
                                 </tr>
                             </thead>
                             <tbody id="subjects-table">
@@ -105,8 +112,51 @@
         </main>
     </div>
 
+    <div id="chair-course-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="chair-course-modal-title" onclick="if(event.target===this)closeChairCourseModal()">
+        <form method="POST" action="{{ route('chair.subject.store') }}" class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">
+            @csrf
+            <div class="flex items-start justify-between gap-3">
+                <div><h2 id="chair-course-modal-title" class="text-lg font-bold">Add Course</h2><p class="mt-1 text-sm text-slate-500">This course will be added to {{ $programName ?? 'your department' }}.</p></div>
+                <button type="button" class="btn btn-secondary" onclick="closeChairCourseModal()">Close</button>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                <label class="text-sm font-medium">Course code<input name="subj_code" value="{{ old('subj_code') }}" maxlength="50" required class="field-input mt-1" placeholder="e.g. CC 111"></label>
+                <label class="text-sm font-medium">Course title<input name="subj_name" value="{{ old('subj_name') }}" maxlength="255" required class="field-input mt-1" placeholder="Course descriptive title"></label>
+                <label class="text-sm font-medium">Year level<select name="subj_year_level" class="field-input mt-1"><option value="">Select year</option>@foreach($yearLevels as $value => $label)<option value="{{ $value }}" @selected(old('subj_year_level') == $value)>{{ $label }}</option>@endforeach</select></label>
+                <label class="text-sm font-medium">Semester<select name="subj_semester" class="field-input mt-1"><option value="">Select semester</option><option value="1" @selected(old('subj_semester') == 1)>1st Semester</option><option value="2" @selected(old('subj_semester') == 2)>2nd Semester</option></select></label>
+                <label class="text-sm font-medium">Course units<input name="subj_units" value="{{ old('subj_units', 0) }}" type="number" min="0" step="0.5" required class="field-input mt-1"></label>
+                <label class="text-sm font-medium">Lecture units<input id="chair-course-lec" name="subj_lecture_units" value="{{ old('subj_lecture_units', 0) }}" type="number" min="0" max="12" step="0.5" required oninput="updateChairCourseTotals()" class="field-input mt-1"><span class="mt-1 block text-xs text-slate-400">1 lecture unit = 1 teaching hour</span></label>
+                <label class="text-sm font-medium">Lab units<input id="chair-course-lab" name="subj_lab_units" value="{{ old('subj_lab_units', 0) }}" type="number" min="0" max="4" step="0.5" required oninput="updateChairCourseTotals()" class="field-input mt-1"><span class="mt-1 block text-xs text-slate-400">Workload counts 1 lab unit as 3 teaching hours</span></label>
+                <label class="text-sm font-medium">Total (lecture + lab units)<input id="chair-course-total" type="number" value="0" readonly class="field-input mt-1 bg-slate-50"></label>
+            </div>
+            <div class="mt-5 flex justify-end gap-2"><button type="button" onclick="closeChairCourseModal()" class="btn btn-secondary">Cancel</button><button type="submit" class="btn btn-primary">Save Course</button></div>
+        </form>
+    </div>
+
     <script>
         const ALL_SUBJECTS = @json($subjectsForJs ?? []);
+
+        function updateChairCourseTotals() {
+            const lecture = Number(document.getElementById('chair-course-lec')?.value) || 0;
+            const lab = Number(document.getElementById('chair-course-lab')?.value) || 0;
+            document.getElementById('chair-course-total').value = lecture + lab;
+        }
+
+        function openChairCourseModal() {
+            const modal = document.getElementById('chair-course-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            updateChairCourseTotals();
+        }
+
+        function closeChairCourseModal() {
+            const modal = document.getElementById('chair-course-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        updateChairCourseTotals();
+        @if($errors->any()) openChairCourseModal(); @endif
 
         function escapeHtml(str) {
             if (str == null) return '';

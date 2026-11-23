@@ -15,6 +15,7 @@ use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
 use App\Http\Controllers\Chair\ExportPreviewController;
 use App\Http\Controllers\Chair\UnassignedFacultyController;
+use App\Http\Controllers\Chair\RoomUtilizationController;
 
 Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('chair')->group(function () {
     // Chair dashboard
@@ -51,6 +52,9 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
     Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
     Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
+
+    // Weekly room timetable for the selected academic term.
+    Route::get('/room-utilization', [RoomUtilizationController::class, 'index'])->name('chair.room_utilization');
 
     // MIS — Class Program for MIS
     Route::get('/mis', [MisController::class, 'index'])->name('chair.mis');
