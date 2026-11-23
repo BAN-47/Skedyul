@@ -25,7 +25,7 @@
                 @if($errors->any())<div role="alert" class="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
                 <div id="selected-program-tools" class="hidden">
                 @if($selectedDepartment)
-                    <section class="mx-5 mt-5">
+                    <section class="mx-5 mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <h2 class="text-lg font-bold">{{ $selectedDepartment->dept_code }} · {{ $selectedDepartment->dept_name }}</h2>
