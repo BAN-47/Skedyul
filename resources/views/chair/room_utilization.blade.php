@@ -41,38 +41,42 @@
 
         <main class="page-content space-y-4">
             <section class="card">
-                <form id="room-utilization-filters" method="GET" action="{{ route('chair.room_utilization') }}" class="flex flex-wrap items-center gap-2">
-                        <select aria-label="Academic year" name="academic_year" class="field-input min-w-[180px] flex-1" onchange="this.form.submit()">
+                <form id="room-utilization-filters" method="GET" action="{{ route('chair.room_utilization') }}" class="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
+                        <select aria-label="Academic year" name="academic_year" class="field-input w-[200px] max-w-full" onchange="this.form.submit()">
                             @foreach($academicYears as $year)
                                 <option value="{{ $year->ay_id }}" @selected((string) $selectedYearId === (string) $year->ay_id)>{{ $year->ay_academic_year ?? $year->ay_year_label }}{{ $year->ay_is_active ? ' · Current' : '' }}</option>
                             @endforeach
                         </select>
-                        <select aria-label="Semester" name="semester" class="field-input min-w-[180px] flex-1" onchange="this.form.submit()">
+                        <select aria-label="Semester" name="semester" class="field-input w-[260px] max-w-full" onchange="this.form.submit()">
                             @forelse($semesters as $semester)
                                 <option value="{{ $semester->sem_id }}" @selected((string) $selectedSemester?->sem_id === (string) $semester->sem_id)>{{ $semester->sem_name }}{{ $semester->sem_is_active ? ' · Current' : '' }}</option>
                             @empty
                                 <option value="">No semester in this year</option>
                             @endforelse
                         </select>
-                        <select aria-label="Department" name="department" class="field-input min-w-[160px] flex-1" onchange="this.form.submit()">
+                        <select aria-label="Department" name="department" class="field-input w-[170px] max-w-full" onchange="this.form.submit()">
                             <option value="all" @selected($selectedDepartmentId === 'all')>All departments</option>
                             @foreach($departments as $department)
                                 <option value="{{ $department->dept_id }}" @selected($selectedDepartmentId === (string) $department->dept_id)>{{ $department->dept_code }}</option>
                             @endforeach
                         </select>
-                        <select aria-label="Floor" name="floor" class="field-input min-w-[135px] flex-1" onchange="this.form.submit()">
-                            <option value="all" @selected($floorFilter === 'all')>All floors</option>
-                            @foreach(range(1, 10) as $floor)
-                                <option value="{{ $floor }}" @selected($floorFilter === (string) $floor)>{{ $floor }}{{ match ($floor % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', default => 'th' } }} floor</option>
-                            @endforeach
-                        </select>
-                    <div class="relative min-w-[240px] flex-[1.4]" id="room-picker">
+                    <div class="inline-flex rounded-xl bg-slate-100 p-1" aria-label="Select shift">
+                        <a class="rounded-lg px-4 py-2 text-sm font-bold {{ $shift === 'day' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white' }}" href="{{ route('chair.room_utilization', request()->except('shift') + ['shift' => 'day']) }}">Day</a>
+                        <a class="rounded-lg px-4 py-2 text-sm font-bold {{ $shift === 'night' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white' }}" href="{{ route('chair.room_utilization', request()->except('shift') + ['shift' => 'night']) }}">Evening</a>
+                    </div>
+                    <div class="relative w-[260px] max-w-full" id="room-picker">
                         <input type="hidden" name="room_id" id="room-id" value="{{ $selectedRoom?->room_id }}">
                         <button type="button" id="room-picker-toggle" class="field-input flex w-full items-center justify-between text-left">
                             <span id="room-picker-label" class="truncate">{{ $selectedRoom ? $selectedRoom->room_name.' · '.$selectedRoom->room_building : 'Select room' }}</span>
                             <span class="ml-2 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">Search⌄</span>
                         </button>
                         <div id="room-picker-panel" class="absolute z-30 mt-1 hidden w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                            <select aria-label="Filter rooms by floor" name="floor" class="field-input mb-2 w-full" onchange="this.form.submit()">
+                                <option value="all" @selected($floorFilter === 'all')>All floors</option>
+                                @foreach(range(1, 10) as $floor)
+                                    <option value="{{ $floor }}" @selected($floorFilter === (string) $floor)>{{ $floor }}{{ match ($floor % 10) { 1 => 'st', 2 => 'nd', 3 => 'rd', default => 'th' } }} floor</option>
+                                @endforeach
+                            </select>
                             <input id="room-picker-search" type="search" class="field-input mb-2 w-full" placeholder="Search room or building…" autocomplete="off">
                             <div id="room-picker-options" class="max-h-60 space-y-1 overflow-y-auto">
                                 @forelse($visibleRooms as $room)
@@ -85,11 +89,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="inline-flex rounded-xl bg-slate-100 p-1" aria-label="Select shift">
-                        <a class="rounded-lg px-4 py-2 text-sm font-bold {{ $shift === 'day' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white' }}" href="{{ route('chair.room_utilization', request()->except('shift') + ['shift' => 'day']) }}">Day</a>
-                        <a class="rounded-lg px-4 py-2 text-sm font-bold {{ $shift === 'night' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white' }}" href="{{ route('chair.room_utilization', request()->except('shift') + ['shift' => 'night']) }}">Evening</a>
-                    </div>
                     <input type="hidden" name="shift" value="{{ $shift }}">
+                    <span class="ml-auto hidden text-xs italic text-slate-400 2xl:inline">Click an empty time slot to add a schedule</span>
                 </form>
 
             @if($selectedRoom)
@@ -98,7 +99,7 @@
                         <div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-lg font-bold text-slate-900">{{ $selectedRoom->room_name }}</h2>
-                                <span class="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Room code</span>
+                                <span class="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Room code · {{ $selectedRoom->room_name }}</span>
                             </div>
                             <p class="mt-1 text-sm text-slate-500">{{ $selectedRoom->room_building }} · {{ $selectedRoom->room_type ?? 'Room' }}{{ $selectedRoom->room_capacity ? ' · Capacity '.$selectedRoom->room_capacity : '' }}</p>
                         </div>
