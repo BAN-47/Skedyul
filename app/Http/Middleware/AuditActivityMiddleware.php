@@ -12,9 +12,11 @@ class AuditActivityMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Remember who made this request before the controller handles it.
         $user = $request->user();
         $response = $next($request);
 
+        // Only record signed-in users changing data; page views are not written as activity logs.
         if (!$user || !in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
             return $response;
         }
@@ -38,6 +40,7 @@ class AuditActivityMiddleware
         };
         $status = $response->getStatusCode();
         $role = Str::headline($user->usr_role ?? 'user');
+        // Include the result so the log shows whether the requested change succeeded or failed.
         $description = "Role: {$role}; Route: {$target}; HTTP {$status}";
 
         AuditActivityLogger::record(

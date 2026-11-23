@@ -36,6 +36,8 @@ class UnassignedFacultyService
 
     public function syncDepartmentNotification(string $departmentId, string $semesterId): void
     {
+        // The schedule stores the department that must take over Professor X's classes.
+        // Use that ID together with the semester so only the right department's work is counted.
         $department = Departments::find($departmentId);
         $semester = Semester::find($semesterId);
         if (!$department || !$semester) {
@@ -50,6 +52,7 @@ class UnassignedFacultyService
             ->count();
         $title = $this->notificationTitle($department, $semester);
         $chairUserIds = Dept_Chair::query()
+            // Find the active chair account(s) linked to this department ID.
             ->where('dc_dept_id', $departmentId)
             ->whereHas('user', fn ($query) => $query->where('usr_is_active', true))
             ->pluck('dc_usr_id')
@@ -89,6 +92,7 @@ class UnassignedFacultyService
 
     public function ensureCurrentDepartmentNotification(Dept_Chair $chair): void
     {
+        // A chair's dc_dept_id is the boundary: rebuild a missing notice only for their department.
         if (!$chair->dc_dept_id) {
             return;
         }
@@ -99,6 +103,7 @@ class UnassignedFacultyService
         }
         $query = Schedule::query()
             ->where('sch_fac_id', self::FACULTY_ID)
+            // Match Professor X schedules assigned to this chair's department and active semester.
             ->where('sch_fac_assignment_dept_id', $chair->dc_dept_id)
             ->where('sch_is_active', true)
             ->when($semester, fn ($scheduleQuery) => $scheduleQuery->where('sch_sem_id', $semester->sem_id));

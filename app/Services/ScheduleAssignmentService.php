@@ -29,12 +29,13 @@ use RuntimeException;
  */
 class ScheduleAssignmentService
 {
+    // These are the weekly teaching-hour limits used by the schedule checks.
     public const TOTAL_MAX_HOURS = 30;
     public const EVENING_MAX_HOURS = 30;
     public const PART_TIME_MAX_HOURS = 30;
     private const FULL_TIME_MAX_HOURS = 30;
 
-    /** Fixed caps use the upper end of each policy range. */
+    /** Day-hour caps for staff with special positions; other full-time faculty use 30 hours. */
     public const SPECIAL_POSITION_MAX_HOURS = [
         'Vice-President' => 3,
         'University Director' => 6,
@@ -54,10 +55,12 @@ class ScheduleAssignmentService
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
+        // Evening workload has a fixed 30-hour cap for all designations.
         if ($shift === 'evening') {
             return (float) self::EVENING_MAX_HOURS;
         }
 
+        // Part-time staff share one 30-hour cap between Day and Evening.
         if ($faculty->fac_employment_type === 'part_time') {
             return (float) self::PART_TIME_MAX_HOURS;
         }
@@ -319,6 +322,8 @@ class ScheduleAssignmentService
                 $scheduleData = [
                     'sch_load_id'    => $studyLoad?->sl_id,
                     'sch_fac_id'     => $data['fac_id'],
+                    // Professor X has no real faculty workload, so remember which department must assign this class later.
+                    // The course's department ID is then used to route it to that department's chair.
                     'sch_fac_assignment_dept_id' => $placeholder ? $course->course_dept_id : null,
                     'sch_course_id'  => $data['subj_id'],
                     'sch_sec_id'     => $data['sec_id'],
@@ -348,6 +353,7 @@ class ScheduleAssignmentService
             });
             $schedule = $result['schedule'];
             if ($placeholder && $schedule->sch_fac_assignment_dept_id) {
+                // Refresh the notice for the department that now owns this unassigned class.
                 app(UnassignedFacultyService::class)->syncDepartmentNotification(
                     (string) $schedule->sch_fac_assignment_dept_id,
                     (string) $schedule->sch_sem_id
@@ -438,6 +444,7 @@ class ScheduleAssignmentService
                     $schedule->update([
                         'sch_load_id' => null,
                         'sch_fac_id' => $data['fac_id'],
+                        // Keep the destination department in sync if an edit changes the course while Professor X is selected.
                         'sch_fac_assignment_dept_id' => $placeholderCourse->course_dept_id,
                         'sch_course_id' => $data['subj_id'],
                         'sch_sec_id' => $data['sec_id'],
@@ -629,6 +636,7 @@ class ScheduleAssignmentService
             $this->syncWorkload($oldFacultyId, $oldSemesterId);
         }
         if ($placeholder && $schedule->sch_fac_assignment_dept_id) {
+            // Update the new department's notice after an edit involving Professor X.
             app(UnassignedFacultyService::class)->syncDepartmentNotification(
                 (string) $schedule->sch_fac_assignment_dept_id,
                 (string) $schedule->sch_sem_id
@@ -813,6 +821,7 @@ class ScheduleAssignmentService
         Course $course,
         ?string $excludeScheduleId = null
     ): void {
+        // A course's weekly allowance is its saved lecture hours plus lab hours.
         $allowedHours = self::courseHours($course);
         if ($allowedHours <= 0) {
             return;
@@ -827,6 +836,7 @@ class ScheduleAssignmentService
             $query->where('sch_id', '!=', $excludeScheduleId);
         }
 
+        // Add the length of this course's active meetings for this section and semester.
         $scheduledHours = (float) $query->get(['sch_start_time', 'sch_end_time'])
             ->sum(function ($schedule) {
                 $start = \Illuminate\Support\Carbon::parse($schedule->sch_start_time);
@@ -835,6 +845,7 @@ class ScheduleAssignmentService
             });
         $newHours = \Illuminate\Support\Carbon::parse($data['start_time'])
             ->diffInMinutes(\Illuminate\Support\Carbon::parse($data['end_time'])) / 60;
+        // Check the total after adding the proposed meeting (or moving the edited one).
         $projectedHours = $scheduledHours + $newHours;
 
         if ($projectedHours > $allowedHours) {
@@ -888,6 +899,8 @@ class ScheduleAssignmentService
     {
         $course = Course::find($data['subj_id'] ?? null);
         $isSharedOjt = self::isOjt($course);
+        // Find active classes in the same semester/day whose time overlaps the new class.
+        // The < and > checks allow classes to touch end-to-start without a conflict.
         $base = Schedule::query()
             ->where('sch_sem_id', $data['sem_id'])
             ->where('sch_day', $data['day'])
@@ -899,6 +912,7 @@ class ScheduleAssignmentService
             $base->where('sch_id', '!=', $excludeScheduleId);
         }
 
+        // Check the teacher first. Placeholder Unassigned Faculty do not conflict with themselves.
         $facultyClash = app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'] ?? null)
             ? null
             : (clone $base)->where('sch_fac_id', $data['fac_id'])
@@ -917,6 +931,7 @@ class ScheduleAssignmentService
             return "Professor {$professor} already has {$this->codeOf($facultyClash)} with {$section} on {$data['day']} ({$facultyClash->sch_start_time}–{$facultyClash->sch_end_time}), which overlaps this time.";
         }
 
+        // A room cannot host two overlapping classes; REC has no room/section requirement.
         if (!$isRec && !empty($data['room_id'])) {
             $roomClash = (clone $base)->where('sch_room_id', $data['room_id'])
                 ->with(['subject', 'section', 'faculty', 'room'])
@@ -927,6 +942,7 @@ class ScheduleAssignmentService
             }
         }
 
+        // A section cannot attend two overlapping classes at the same time.
         if (!$isRec && !empty($data['sec_id'])) {
             $sectionClash = (clone $base)->where('sch_sec_id', $data['sec_id'])
                 ->with(['subject', 'section', 'faculty'])

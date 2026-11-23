@@ -33,7 +33,7 @@ class LoginController extends Controller
         ]);
 
         $user = User::whereRaw('LOWER(usr_email) = ?', [strtolower(trim($request->email))])
-            ->first();
+            ->first();                                                      
 
         if (!$user) {
             return back()->with('error', 'Account not found.');
@@ -118,8 +118,10 @@ class LoginController extends Controller
 
         Auth::logout();
 
+        // Remove the signed-in session so the next Back/Forward request must pass login again.
         request()->session()->invalidate();
 
+        // Start the next guest session with a new CSRF token.
         request()->session()->regenerateToken();
 
 

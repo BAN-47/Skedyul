@@ -35,6 +35,7 @@ class AppServiceProvider extends ServiceProvider
                 $departmentId = Dept_Chair::where('dc_usr_id', $user->usr_id)->value('dc_dept_id');
                 if ($departmentId) {
                     $activeSemesterId = Semester::where('sem_is_active', true)->value('sem_id');
+                    // Show this chair only the count assigned to their department for the active semester.
                     $unassignedScheduleCount = Schedule::query()
                         ->where('sch_fac_id', UnassignedFacultyService::FACULTY_ID)
                         ->where('sch_fac_assignment_dept_id', $departmentId)

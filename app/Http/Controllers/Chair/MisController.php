@@ -465,6 +465,11 @@ class MisController extends Controller
     }
     private function misInstructorName(?object $faculty): string
     {
+        // In MIS paperwork, show the placeholder as Prof. XXX instead of the general UI label.
+        if ((bool) ($faculty->fac_is_placeholder ?? false)) {
+            return 'Prof. XXX';
+        }
+
         return FacultyNameFormatter::format($faculty) ?: '—';
     }
     private function replaceScheduleRows(

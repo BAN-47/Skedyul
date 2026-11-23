@@ -38,6 +38,8 @@
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+        // The schedule is drawn as a CSS Grid: one time column, followed by one column per day.
+        // Each half-hour is one row, so a one-hour class takes two rows.
         // Grid range depends on the Day/Evening shift toggle:
         //   Day   → 7:00 AM–4:00 PM, with a noon break
         //   Evening → 4:00 PM–10:00 PM
@@ -460,6 +462,7 @@
                         </div>
 
                         {{-- ══ WEEK GRID ══ --}}
+                        {{-- Grid layout: the first column is for times; the remaining columns are the days. --}}
                         <div class="overflow-x-auto">
                             <div class="min-w-[720px]">
 
@@ -476,7 +479,7 @@
                                     @endforeach
                                 </div>
 
-                                {{-- body --}}
+                                {{-- Body cells use the same row/column positions as the header above. --}}
                                 <div class="grid relative pbs-grid-body"
                                     style="grid-template-columns: 90px repeat({{ count($days) }}, minmax(0,1fr));
                           grid-template-rows: repeat({{ $slotCount }}, 26px);">
@@ -503,7 +506,7 @@
                                         </div>
                                     @endfor
 
-                                    {{-- clickable empty cells (one per 30-min sub-row per day) --}}
+                                    {{-- Make one cell for every half-hour and day. Empty cells open Add Schedule; occupied cells stay unavailable. --}}
                                     @for ($i = 0; $i < $slotCount; $i++)
                                         @php $mins = $gridStart + ($i * $slotMinutes); @endphp
                                         @for ($c = 0; $c < count($days); $c++)
@@ -547,6 +550,7 @@
                                     @endif
 
                                     {{-- SCHEDULE BLOCKS --}}
+                                    {{-- Put each saved class over its matching day and time rows. Its height follows the class duration. --}}
                                     @foreach ($schedules as $s)
                                         @php
                                             $dayIndex = array_search($s->sch_day, $days, true);

@@ -64,7 +64,7 @@
                         </div>
                         <div>
                             <label for="archive-faculty" class="field-label">Faculty</label>
-                            <select class="field-input" name="faculty" id="archive-faculty">
+                            <select class="sr-only" name="faculty" id="archive-faculty" tabindex="-1" aria-hidden="true">
                                 <option value="">Choose a faculty member</option>
                                 @foreach ($facultyMembers as $facultyMember)
                                     <option value="{{ $facultyMember->fac_id }}" @selected($selectedFaculty === $facultyMember->fac_id)>
@@ -72,6 +72,35 @@
                                     </option>
                                 @endforeach
                             </select>
+                            <div class="relative" id="archive-faculty-picker">
+                                <button type="button" id="archive-faculty-trigger" aria-haspopup="listbox"
+                                    aria-expanded="false" aria-controls="archive-faculty-options"
+                                    class="field-input flex w-full items-center justify-between gap-3 text-left">
+                                    <span id="archive-faculty-label" class="truncate">
+                                        {{ $facultyMembers->firstWhere('fac_id', $selectedFaculty)->faculty_name ?? 'Choose a faculty member' }}
+                                    </span>
+                                    <span aria-hidden="true" class="shrink-0 text-slate-400">⌄</span>
+                                </button>
+                                <div id="archive-faculty-panel" class="absolute left-0 top-[calc(100%+6px)] z-50 hidden w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                                    <div class="border-b border-slate-100 bg-slate-50 p-2">
+                                        <input type="search" id="archive-faculty-search" autocomplete="off"
+                                            placeholder="Search faculty by name..." aria-label="Search faculty"
+                                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                                    </div>
+                                    <div id="archive-faculty-options" role="listbox" aria-label="Faculty members" class="max-h-56 overflow-y-auto p-1">
+                                        @foreach ($facultyMembers as $facultyMember)
+                                            @php $archiveFacultyName = $facultyMember->faculty_name ?: 'Faculty name unavailable'; @endphp
+                                            <button type="button" role="option"
+                                                data-faculty-id="{{ $facultyMember->fac_id }}"
+                                                data-faculty-name="{{ $archiveFacultyName }}"
+                                                class="archive-faculty-option w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none">
+                                                {{ $archiveFacultyName }}
+                                            </button>
+                                        @endforeach
+                                        <p id="archive-faculty-empty" class="hidden px-3 py-5 text-center text-sm text-slate-500">No faculty match that search.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div>
                             <label for="archive-shift" class="field-label">Schedule</label>
@@ -211,6 +240,61 @@
             </main>
         </div>
     </div>
+    <script>
+        (() => {
+            const picker = document.getElementById('archive-faculty-picker');
+            const select = document.getElementById('archive-faculty');
+            const trigger = document.getElementById('archive-faculty-trigger');
+            const label = document.getElementById('archive-faculty-label');
+            const panel = document.getElementById('archive-faculty-panel');
+            const search = document.getElementById('archive-faculty-search');
+            const options = [...document.querySelectorAll('.archive-faculty-option')];
+            const empty = document.getElementById('archive-faculty-empty');
+
+            if (!picker || !select || !trigger || !panel || !search) return;
+
+            const closePicker = () => {
+                panel.classList.add('hidden');
+                trigger.setAttribute('aria-expanded', 'false');
+            };
+
+            trigger.addEventListener('click', () => {
+                const isOpen = !panel.classList.contains('hidden');
+                panel.classList.toggle('hidden', isOpen);
+                trigger.setAttribute('aria-expanded', String(!isOpen));
+                if (!isOpen) {
+                    search.value = '';
+                    options.forEach(option => option.classList.remove('hidden'));
+                    empty.classList.toggle('hidden', options.length > 0);
+                    search.focus();
+                }
+            });
+
+            search.addEventListener('input', () => {
+                const query = search.value.trim().toLocaleLowerCase();
+                let visibleCount = 0;
+                options.forEach(option => {
+                    const matches = option.dataset.facultyName.toLocaleLowerCase().includes(query);
+                    option.classList.toggle('hidden', !matches);
+                    if (matches) visibleCount++;
+                });
+                empty.classList.toggle('hidden', visibleCount > 0);
+            });
+
+            options.forEach(option => option.addEventListener('click', () => {
+                select.value = option.dataset.facultyId;
+                label.textContent = option.dataset.facultyName;
+                closePicker();
+            }));
+
+            document.addEventListener('click', event => {
+                if (!picker.contains(event.target)) closePicker();
+            });
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') closePicker();
+            });
+        })();
+    </script>
 </body>
 
 </html>

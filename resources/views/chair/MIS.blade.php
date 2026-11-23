@@ -154,7 +154,9 @@
                                             }
                                             $day = $s->sch_day ?? '—';
                                             $room = optional($s->room)->room_name ?? '—';
-                                            $inst = \App\Services\FacultyNameFormatter::format($s->faculty) ?: '—';
+                                            $inst = ($s->faculty?->fac_is_placeholder ?? false)
+                                                ? 'Prof. XXX'
+                                                : (\App\Services\FacultyNameFormatter::format($s->faculty) ?: '—');
                                         @endphp
                                         <tr class="border-b border-slate-100 hover:bg-slate-50/80">
                                             <td class="px-2 py-1.5 align-top">

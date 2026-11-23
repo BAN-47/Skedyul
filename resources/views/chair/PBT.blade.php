@@ -52,6 +52,8 @@
 
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+        // The schedule is drawn as a CSS Grid: one time column, followed by one column per day.
+        // Each half-hour is one row, so a one-hour class takes two rows.
         // Same Day/Evening shift mechanics as PBS.
         $shift = request()->query('shift', 'day') === 'night' ? 'night' : 'day';
 
@@ -489,6 +491,7 @@
                         </div>
 
                         {{-- ══ WEEK GRID (identical mechanics to PBS) ══ --}}
+                        {{-- The first column labels time; each remaining column represents one day. --}}
                         <div class="overflow-x-auto">
                             <div class="min-w-[840px]">
 
@@ -529,6 +532,7 @@
                                         </div>
                                     @endfor
 
+                                    {{-- Build each half-hour cell. Empty cells open Add Schedule; occupied cells cannot be booked again. --}}
                                     @for ($i = 0; $i < $slotCount; $i++)
                                         @php $mins = $gridStart + ($i * $slotMinutes); @endphp
                                         @for ($c = 0; $c < count($days); $c++)
@@ -571,6 +575,7 @@
                                     @endif
 
                                     {{-- SCHEDULE BLOCKS — Subject / Section / Room (professor is implied: it's the selected teacher) --}}
+                                    {{-- Place each saved class over the rows and day column that match its time and day. --}}
                                     @foreach ($schedules as $s)
                                         @php
                                             $dayIndex = array_search($s->sch_day, $days, true);

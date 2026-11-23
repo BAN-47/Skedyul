@@ -27,6 +27,7 @@ class UnassignedFacultyController extends Controller
         $semester = Semester::with('academicYear')->where('sem_is_active', true)->first();
         $schedules = Schedule::with(['subject', 'section', 'room', 'semester.academicYear'])
             ->where('sch_fac_id', UnassignedFacultyService::FACULTY_ID)
+            // Do not show other departments' Professor X schedules to this chair.
             ->where('sch_fac_assignment_dept_id', $chair->dc_dept_id)
             ->where('sch_is_active', true)
             ->when($semester, fn ($query) => $query->where('sch_sem_id', $semester->sem_id))
@@ -62,6 +63,7 @@ class UnassignedFacultyController extends Controller
         $schedule = Schedule::with(['subject', 'section', 'room'])
             ->whereKey($id)
             ->where('sch_fac_id', UnassignedFacultyService::FACULTY_ID)
+            // Confirm ownership again when assigning, so a chair cannot assign another department's schedule.
             ->where('sch_fac_assignment_dept_id', $chair->dc_dept_id)
             ->where('sch_is_active', true)
             ->firstOrFail();
