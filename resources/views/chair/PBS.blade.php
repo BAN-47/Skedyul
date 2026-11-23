@@ -518,7 +518,11 @@
                                                 )->format('H:i');
                                                 $isTaken = isset($occupied[$c . '-' . $i]);
                                             @endphp
-                                            @if ($isTaken)
+                                            @if (!$selectedSection?->sec_is_evening && $cellDay === 'Sunday')
+                                                <div class="pbs-cell border-l border-b border-slate-200 bg-slate-200/70 cursor-not-allowed"
+                                                    style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};"
+                                                    title="Day sections cannot be scheduled on Sunday"></div>
+                                            @elseif ($isTaken)
                                                 <div class="border-l border-b border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}"
                                                     style="grid-column: {{ $c + 2 }}; grid-row: {{ $i + 1 }};">
                                                 </div>
@@ -544,7 +548,7 @@
                                             $noonSpan = intdiv($noonEnd - $noonStart, $slotMinutes);
                                         @endphp
                                         <div class="z-10 flex items-center justify-center bg-slate-900 text-white text-[12px] font-bold tracking-[3px] pointer-events-none"
-                                            style="grid-column: 2 / span {{ count($days) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
+                                            style="grid-column: 2 / span {{ min(6, count($days)) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
                                             NOON BREAK
                                         </div>
                                     @endif

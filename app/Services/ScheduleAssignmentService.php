@@ -97,8 +97,21 @@ class ScheduleAssignmentService
     {
         $day = $data['day'] ?? '';
         $shift = $sectionIsEvening ? 'evening' : ($data['shift'] ?? 'day');
-        $start = $data['start_time'] ?? '';
-        $end = $data['end_time'] ?? '';
+        $start = substr((string) ($data['start_time'] ?? ''), 0, 5);
+        $end = substr((string) ($data['end_time'] ?? ''), 0, 5);
+
+        // Day sections cannot meet on Sunday. Block this in the shared
+        // assignment service so both PBS and PBT enforce the same rule.
+        if (!$sectionIsEvening && $day === 'Sunday') {
+            return 'Day sections cannot be scheduled on Sunday.';
+        }
+
+        // Monday through Saturday have a protected lunch break from 12:00–1:00.
+        // Any class that touches this time range is rejected; Sunday has no noon block.
+        if (in_array($day, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], true)
+            && $start < '13:00' && $end > '12:00') {
+            return 'Schedules cannot overlap the 12:00 PM–1:00 PM noon break.';
+        }
 
         if (!in_array($day, ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], true)) {
             return null;

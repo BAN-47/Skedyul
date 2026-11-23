@@ -569,7 +569,7 @@
                                             $noonSpan = intdiv($noonEnd - $noonStart, $slotMinutes);
                                         @endphp
                                         <div class="z-10 flex items-center justify-center bg-slate-900 text-white text-[12px] font-bold tracking-[3px] pointer-events-none"
-                                            style="grid-column: 2 / span {{ count($days) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
+                                            style="grid-column: 2 / span {{ min(6, count($days)) }}; grid-row: {{ $noonRow }} / span {{ $noonSpan }};">
                                             NOON BREAK
                                         </div>
                                     @endif

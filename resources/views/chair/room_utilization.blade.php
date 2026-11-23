@@ -130,9 +130,14 @@
                                     @for($row=0;$row<$slotCount;$row++)
                                         @php $mins=$gridStart+$row*$slotMinutes; @endphp
                                         @foreach($days as $dayIndex=>$day)
-                                            <div class="border-b border-l border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }}" style="grid-column:{{ $dayIndex+2 }};grid-row:{{ $row+1 }}"></div>
+                                            <div class="border-b border-l border-slate-100 {{ $mins % 60 === 0 ? '!border-b-slate-200' : '' }} {{ $shift === 'day' && $dayIndex === 6 ? 'bg-slate-100/80' : '' }}" style="grid-column:{{ $dayIndex+2 }};grid-row:{{ $row+1 }}"></div>
                                         @endforeach
                                     @endfor
+                                    @if($shift === 'day')
+                                        <div class="z-10 flex items-center justify-center border border-slate-300 bg-slate-200/90 px-2 text-center text-[11px] font-bold text-slate-500" style="grid-column:8;grid-row:1/span {{ $slotCount }}">No Day Classes Sunday</div>
+                                        @php $noonRow = intdiv(12 * 60 - $gridStart, $slotMinutes) + 1; @endphp
+                                        <div class="z-20 flex items-center justify-center bg-slate-900 text-xs font-bold tracking-[3px] text-white" style="grid-column:2/span 6;grid-row:{{ $noonRow }}/span 2">NOON BREAK</div>
+                                    @endif
                                     @foreach($gridSchedules as $block)
                                         @php $schedule=$block['schedule']; @endphp
                                         <article class="z-10 m-0.5 overflow-hidden rounded-lg border border-blue-200 bg-blue-50 p-2 shadow-sm" style="grid-column:{{ $block['day']+2 }};grid-row:{{ $block['row']+1 }}/span {{ $block['span'] }}">
