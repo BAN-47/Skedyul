@@ -11,6 +11,7 @@ use App\Models\College;
 use App\Models\Departments;
 use App\Services\ScheduleAssignmentService;
 use App\Services\MiddleInitialFormatter;
+use App\Services\AuditActivityLogger;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -401,6 +402,15 @@ class UserController extends Controller
             throw $e;
         }
 
+        $createdUser = User::where('usr_email', $data['usr_email'])->first();
+        if ($createdUser) {
+            $departmentLabel = $request->filled('dept_id') ? Departments::where('dept_id', $request->dept_id)->value('dept_code') : null;
+            $collegeLabel = $request->filled('college_id') ? College::where('college_id', $request->college_id)->value('college_code') : null;
+            AuditActivityLogger::record($request->user(), 'Created user assignment', match ($data['usr_role']) {
+                'department_chair' => 'department_chair', 'dean' => 'dean', 'faculty' => 'faculty', default => 'USER',
+            }, 'Created ' . $data['usr_role'] . ' account for ' . $createdUser->usr_name . ($collegeLabel ? ' in ' . $collegeLabel : '') . ($departmentLabel ? ' / ' . $departmentLabel : '') . '.', $request->ip(), $request->dept_id ?? $request->college_id ?? $createdUser->usr_id);
+        }
+
         return redirect()->route('admin.users')
             ->with('success', 'User created successfully.');
     }
@@ -717,6 +727,12 @@ class UserController extends Controller
 
             throw $e;
         }
+
+        $departmentLabel = $request->filled('dept_id') ? Departments::where('dept_id', $request->dept_id)->value('dept_code') : null;
+        $collegeLabel = $request->filled('college_id') ? College::where('college_id', $request->college_id)->value('college_code') : null;
+        AuditActivityLogger::record($request->user(), 'Updated user assignment', match ($data['usr_role']) {
+            'department_chair' => 'department_chair', 'dean' => 'dean', 'faculty' => 'faculty', default => 'USER',
+        }, 'Updated ' . $data['usr_role'] . ' account for ' . $user->usr_name . ($collegeLabel ? ' in ' . $collegeLabel : '') . ($departmentLabel ? ' / ' . $departmentLabel : '') . '.', $request->ip(), $request->dept_id ?? $request->college_id ?? $user->usr_id);
 
         return redirect()->route('admin.users')
             ->with('success', 'User updated successfully.');

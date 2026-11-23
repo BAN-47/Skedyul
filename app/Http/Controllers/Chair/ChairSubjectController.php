@@ -9,6 +9,7 @@ use App\Models\Faculty;
 use App\Models\Study_Load;
 use App\Models\Course;
 use App\Models\Departments;
+use App\Services\CourseDeletionService;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -254,17 +255,19 @@ class ChairSubjectController extends Controller
             ->with('success', 'Subject updated successfully.');
     }
 
-    public function destroy(string $id)
+    public function destroy(string $id, CourseDeletionService $courseDeletion)
     {
         $subject = Course::findOrFail($id);
 
         try {
-            $subject->update(['subj_is_active' => false]);
+            if (!$courseDeletion->deleteIfUnused($subject)) {
+                return back()->with('error', 'This course is used by schedules, study loads, or archives, so it cannot be permanently deleted.');
+            }
         } catch (\Throwable $e) {
-            return $this->redirectWithDbError($e, 'Unable to deactivate the subject right now. Please try again.');
+            return $this->redirectWithDbError($e, 'Unable to permanently delete the course right now. Please try again.');
         }
 
         return redirect()->route('chair.subjects')
-            ->with('success', 'Subject deactivated successfully.');
+            ->with('success', 'Course permanently deleted.');
     }
 }

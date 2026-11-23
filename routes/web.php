@@ -418,4 +418,24 @@ Route::get('/departments', [DepartmentController::class, 'index'])
     ->middleware(['auth', 'role:system_admin', 'audit.activity'])
     ->name('admin.departments');
 
+Route::post('/colleges', [DepartmentController::class, 'store'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.colleges.store');
+Route::put('/colleges/{id}', [DepartmentController::class, 'update'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.colleges.update');
+Route::delete('/colleges/{id}', [DepartmentController::class, 'destroy'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.colleges.destroy');
+
+Route::post('/departments', [DepartmentController::class, 'storeDepartment'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.departments.store');
+Route::put('/departments/{id}', [DepartmentController::class, 'updateDepartment'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.departments.update');
+Route::delete('/departments/{id}', [DepartmentController::class, 'destroyDepartment'])
+    ->middleware(['auth', 'role:system_admin', 'audit.activity'])
+    ->name('admin.departments.destroy');
+
 /* Settings routes are inside admin+auth group above. */

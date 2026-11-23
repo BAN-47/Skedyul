@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+    @include('partials.favicon')
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SKEDYUL — Colleges & Departments</title>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body class="h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
+<div class="app-shell">
+    @include('partials.admin_sidebar')
+    <div class="app-main">
+        @include('partials.admin_header', ['title' => 'Colleges & Departments'])
+        <main class="page-content space-y-4">
+            @if(session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif
+            @if(session('error'))<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ session('error') }}</div>@endif
+            @if($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
+
+            @if(!$selectedCollege)
+                <section class="card">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div><h1 class="text-lg font-bold">Colleges</h1><p class="mt-1 text-sm text-slate-500">Choose a college to see its departments.</p></div>
+                        <div class="flex flex-wrap gap-2"><a class="btn btn-secondary" href="{{ route('admin.departments', ['modal' => 'activity', 'history_page' => 1]) }}">Department and role activity</a><a class="btn btn-primary" href="{{ route('admin.departments', ['modal' => 'add-college']) }}">+ Add college</a></div>
+                    </div>
+                    <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        @forelse($colleges as $college)
+                            <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md">
+                                <a href="{{ route('admin.departments', ['college_id' => $college->college_id]) }}" class="block rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <div class="flex items-center justify-between gap-3"><span class="text-lg font-bold text-slate-900">{{ $college->college_code }}</span><span class="text-xs font-semibold text-blue-700">View departments →</span></div>
+                                    <p class="mt-1 min-h-10 text-sm text-slate-600">{{ $college->college_name }}</p>
+                                    <div class="mt-3 grid grid-cols-3 gap-2 text-center text-xs"><div class="rounded-lg bg-slate-50 p-2"><b class="block text-base text-slate-900">{{ $college->programs_count }}</b>Departments</div><div class="rounded-lg bg-slate-50 p-2"><b class="block text-base text-slate-900">{{ $college->faculty_count }}</b>Faculty</div><div class="rounded-lg bg-slate-50 p-2"><b class="block text-base text-slate-900">{{ $college->subjects_count }}</b>Courses</div></div>
+                                </a>
+                                <form method="POST" action="{{ route('admin.colleges.update', $college->college_id) }}" class="mt-4 grid grid-cols-[minmax(0,1fr)_82px_auto] gap-2">@csrf @method('PUT')
+                                    <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_name" value="{{ $college->college_name }}" required maxlength="255" aria-label="College name">
+                                    <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_code" value="{{ $college->college_code }}" required maxlength="50" aria-label="College code">
+                                    <button class="btn btn-secondary shrink-0 px-3 py-2 text-sm" type="submit">Save</button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.colleges.destroy', $college->college_id) }}" class="mt-2" onsubmit="return confirm('Permanently delete {{ addslashes($college->college_name) }}? This is allowed only when no records use it.');">@csrf @method('DELETE')<button class="btn btn-danger w-full" type="submit">Delete college</button></form>
+                            </article>
+                        @empty
+                            <p class="text-sm text-slate-500">No colleges have been added yet.</p>
+                        @endforelse
+                    </div>
+                </section>
+            @else
+                <section class="card">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div class="flex items-center gap-3"><a class="btn btn-secondary" href="{{ route('admin.departments') }}">← Colleges</a><div><h1 class="text-lg font-bold">{{ $selectedCollege->college_code }}</h1><p class="text-sm text-slate-500">{{ $selectedCollege->college_name }}</p></div></div>
+                        <div class="flex flex-wrap gap-2"><a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id, 'modal' => 'activity', 'history_page' => 1]) }}">Department and role activity</a><a class="btn btn-primary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id, 'modal' => 'add-department']) }}">+ Add department</a></div>
+                    </div>
+                    <form method="POST" action="{{ route('admin.colleges.update', $selectedCollege->college_id) }}" class="mt-4 grid max-w-2xl grid-cols-[minmax(0,1fr)_82px_auto] gap-2">@csrf @method('PUT')
+                        <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_name" value="{{ $selectedCollege->college_name }}" required maxlength="255" aria-label="College name">
+                        <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_code" value="{{ $selectedCollege->college_code }}" required maxlength="50" aria-label="College code">
+                        <button class="btn btn-secondary shrink-0 px-3 py-2 text-sm" type="submit">Save college</button>
+                    </form>
+                    <form method="GET" action="{{ route('admin.departments') }}" class="mt-4 grid gap-3 md:grid-cols-3">
+                        <input type="hidden" name="college_id" value="{{ $selectedCollege->college_id }}">
+                        <input name="search" value="{{ $filters['search'] ?? '' }}" class="field-input" placeholder="Search departments">
+                        <select name="role" class="field-input"><option value="">Chair, Dean, or Faculty</option><option value="chair" @selected(($filters['role'] ?? '') === 'chair')>Has department chair</option><option value="dean" @selected(($filters['role'] ?? '') === 'dean')>College has Dean</option><option value="faculty" @selected(($filters['role'] ?? '') === 'faculty')>Has faculty</option></select>
+                        <select name="designation" class="field-input"><option value="">All faculty designations</option>@foreach($designations as $designation)<option value="{{ $designation }}" @selected(($filters['designation'] ?? '') === $designation)>{{ $designation }}</option>@endforeach</select>
+                        <div class="flex gap-2 md:col-span-3"><button class="btn btn-primary" type="submit">Filter departments</button><a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Clear filters</a></div>
+                    </form>
+                    <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        @forelse($departmentRows as $department)
+                            @php($dean = $department->department?->deans?->first())
+                            <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div class="flex items-start justify-between gap-3"><div><h2 class="font-bold">{{ $department->dept_code }}</h2><p class="mt-1 text-sm text-slate-600">{{ $department->dept_name }}</p></div><span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $department->faculty_count }} faculty</span></div>
+                                <div class="mt-4 space-y-2 border-t border-slate-100 pt-3 text-sm"><p><span class="text-slate-400">Chair:</span> {{ $department->chairs->first()?->user?->usr_name ?? 'Not assigned' }}</p><p><span class="text-slate-400">Dean:</span> {{ $dean?->user?->usr_name ?? 'Not assigned' }}</p><p class="text-xs text-slate-500">{{ $department->faculty->pluck('fac_special_position')->filter()->unique()->implode(', ') ?: 'No special designations recorded' }}</p></div>
+                                <details class="mt-3 rounded-lg bg-slate-50 px-3 py-2">
+                                    <summary class="cursor-pointer text-sm font-semibold text-blue-700">View faculty ({{ $department->faculty_count }})</summary>
+                                    <ul class="mt-2 divide-y divide-slate-200">
+                                        @forelse($department->faculty->sortBy(fn ($member) => $member->full_name) as $member)
+                                            <li class="py-2">
+                                                @if($member->user)
+                                                    <a class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-blue-700" href="{{ route('admin.users', ['search' => $member->user->usr_email]) }}">
+                                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700">@if($member->fac_profile_image)<img src="{{ \App\Services\ProfileImageStorage::url($member->fac_profile_image, 'faculty_profile') }}" alt="" class="h-full w-full object-cover">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}@endif</span>
+                                                        <span>{{ $member->full_name }}<span class="block text-xs font-normal text-slate-500">{{ $member->user->usr_email }}</span></span>
+                                                        <span class="ml-auto text-xs text-blue-600">Open account →</span>
+                                                    </a>
+                                                @else
+                                                    <span class="text-sm text-slate-600">{{ $member->full_name }} <span class="text-xs text-slate-400">No linked user account</span></span>
+                                                @endif
+                                            </li>
+                                        @empty
+                                            <li class="py-2 text-sm text-slate-500">No faculty assigned to this department.</li>
+                                        @endforelse
+                                    </ul>
+                                </details>
+                                <form method="POST" action="{{ route('admin.departments.update', $department->dept_id) }}" class="mt-4 grid grid-cols-[minmax(0,1fr)_82px_auto] gap-2">@csrf @method('PUT')
+                                    <input type="hidden" name="dept_college_id" value="{{ $selectedCollege->college_id }}">
+                                    <input name="dept_name" value="{{ $department->dept_name }}" class="field-input min-w-0 px-2 py-2 text-sm" required maxlength="255" aria-label="Department name">
+                                    <input name="dept_code" value="{{ $department->dept_code }}" class="field-input min-w-0 px-2 py-2 text-sm" required maxlength="50" aria-label="Department code">
+                                    <button class="btn btn-secondary shrink-0 px-3 py-2 text-sm" type="submit">Save</button>
+                                </form>
+                                <form method="POST" action="{{ route('admin.departments.destroy', $department->dept_id) }}" class="mt-2" onsubmit="return confirm('Permanently delete {{ addslashes($department->dept_code) }}? This is allowed only when no faculty, courses, sections, or chair uses it.');">@csrf @method('DELETE')<button class="btn btn-danger w-full" type="submit">Delete department</button></form>
+                            </article>
+                        @empty
+                            <p class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">No departments match these filters.</p>
+                        @endforelse
+                    </div>
+                    <div class="mt-4">{{ $departmentRows->links() }}</div>
+                </section>
+            @endif
+        </main>
+    </div>
+</div>
+
+@if(request('modal') === 'add-college')
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="college-add-title">
+    <form method="POST" action="{{ route('admin.colleges.store') }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl">@csrf
+        <div class="flex items-center justify-between"><div><h2 id="college-add-title" class="text-lg font-bold">Add college</h2><p class="text-sm text-slate-500">Create a college for departments and faculty.</p></div><a class="btn btn-secondary" href="{{ route('admin.departments') }}">Close</a></div>
+        <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input class="field-input" name="college_name" required maxlength="255" placeholder="College name"><input class="field-input" name="college_code" required maxlength="50" placeholder="Code (e.g. CCICT)"></div>
+        <div class="mt-5 flex justify-end gap-2"><a class="btn btn-secondary" href="{{ route('admin.departments') }}">Cancel</a><button class="btn btn-primary" type="submit">Add college</button></div>
+    </form>
+</div>
+@endif
+
+@if(request('modal') === 'add-department' && $selectedCollege)
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="department-add-title">
+    <form method="POST" action="{{ route('admin.departments.store') }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl">@csrf
+        <div class="flex items-center justify-between"><div><h2 id="department-add-title" class="text-lg font-bold">Add department</h2><p class="text-sm text-slate-500">Adding to {{ $selectedCollege->college_code }} · {{ $selectedCollege->college_name }}</p></div><a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Close</a></div>
+        <input type="hidden" name="dept_college_id" value="{{ $selectedCollege->college_id }}"><div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input name="dept_name" class="field-input" required maxlength="255" placeholder="Department name"><input name="dept_code" class="field-input" required maxlength="50" placeholder="Code (e.g. BSIS)"></div>
+        <div class="mt-5 flex justify-end gap-2"><a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Cancel</a><button class="btn btn-primary" type="submit">Add department</button></div>
+    </form>
+</div>
+@endif
+
+@if(request('modal') === 'activity' || request()->has('history_page'))
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="department-activity-title">
+    <section class="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+        <div class="flex items-center justify-between"><div><h2 id="department-activity-title" class="text-lg font-bold">Department and role activity</h2><p class="text-sm text-slate-500">Recent actions by Admins, Deans, Chairs, and Faculty.</p></div><a class="btn btn-secondary" href="{{ $selectedCollege ? route('admin.departments', ['college_id' => $selectedCollege->college_id]) : route('admin.departments') }}">Close</a></div>
+        <div class="mt-3 divide-y divide-slate-100">
+            @forelse($departmentHistory as $activity)
+                <article class="py-3"><div class="font-semibold">{{ $activity->user?->usr_name ?? 'System' }} <span class="font-normal text-slate-500">· {{ $activity->user?->usr_role ?? 'system' }}</span></div><div class="text-sm">{{ $activity->al_action }} · {{ $activity->al_description }}</div><div class="text-xs text-slate-500">{{ $activity->al_target_table }} · {{ $activity->al_created_at }}</div></article>
+            @empty
+                <p class="py-4 text-sm text-slate-500">No department or role activity recorded yet.</p>
+            @endforelse
+        </div>
+        <div class="mt-4">{{ $departmentHistory->links() }}</div>
+    </section>
+</div>
+@endif
+</body>
+</html>

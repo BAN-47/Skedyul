@@ -63,7 +63,7 @@
             </div>
 
             <div class="flex gap-2 items-center">
-              <input id="user-search" placeholder="Search users..."
+              <input id="user-search" value="{{ $search }}" placeholder="Search users..."
                 oninput="filterUsers(this.value)" class="field-input w-[200px]">
 
               <button type="button" onclick="openAddModal()" class="btn btn-primary">
@@ -1493,7 +1493,7 @@ function togglePasswordVisibility(inputId, btn) {
     // ── Client-side pagination (10 per page) ──
     const USERS_PER_PAGE = 10;
     let currentPage = 1;
-    let filterQuery = '';
+    let filterQuery = @json(mb_strtolower($search));
 
     function getUserRows() {
       return Array.from(document.querySelectorAll('#users-table tbody tr.user-row'));

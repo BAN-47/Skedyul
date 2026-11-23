@@ -480,7 +480,7 @@
             data-action="${UPDATE_URL}/${s.id}"
           >Edit</button>
           <form action="${DESTROY_URL}/${s.id}" method="POST" class="inline"
-            onsubmit="return confirm('Delete: ${escapeAttr(s.code)}?\\nThis will deactivate the subject.');">
+            onsubmit="return confirm('Permanently delete: ${escapeAttr(s.code)}?\\nThis cannot be undone. A course used by schedules or archives cannot be deleted.');">
             <input type="hidden" name="_token" value="${CSRF_TOKEN}">
             <input type="hidden" name="_method" value="DELETE">
             <button type="submit" class="btn btn-danger text-[11px] px-3 py-1.5">Delete</button>

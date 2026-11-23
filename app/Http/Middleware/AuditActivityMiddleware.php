@@ -6,6 +6,8 @@ use App\Services\AuditActivityLogger;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuditActivityMiddleware
@@ -14,44 +16,61 @@ class AuditActivityMiddleware
     {
         // Remember who made this request before the controller handles it.
         $user = $request->user();
-        $response = $next($request);
+        $tagDatabaseWrites = in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+            && DB::connection()->getDriverName() === 'pgsql';
 
-        // Only record signed-in users changing data; page views are not written as activity logs.
-        if (!$user || !in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-            return $response;
+        if ($tagDatabaseWrites) {
+            DB::select("select set_config('skedyul.audit_source', ?, false)", ['laravel']);
         }
 
-        $route = $request->route();
-        $target = $route?->getName() ?: trim($request->path(), '/');
-        $targetId = null;
-        foreach ($route?->parameters() ?? [] as $parameter) {
-            $candidate = is_object($parameter) && method_exists($parameter, 'getRouteKey')
-                ? (string) $parameter->getRouteKey()
-                : (string) $parameter;
-            if (Str::isUuid($candidate)) {
-                $targetId = $candidate;
-                break;
+        try {
+            $response = $next($request);
+
+            // Only record signed-in users changing data; page views are not written as activity logs.
+            if (!$user || !in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+                return $response;
+            }
+
+            $route = $request->route();
+            $target = $route?->getName() ?: trim($request->path(), '/');
+            $targetId = null;
+            foreach ($route?->parameters() ?? [] as $parameter) {
+                $candidate = is_object($parameter) && method_exists($parameter, 'getRouteKey')
+                    ? (string) $parameter->getRouteKey()
+                    : (string) $parameter;
+                if (Str::isUuid($candidate)) {
+                    $targetId = $candidate;
+                    break;
+                }
+            }
+            $action = match ($request->method()) {
+                'POST' => 'Created / Submitted',
+                'PUT', 'PATCH' => 'Updated',
+                'DELETE' => 'Deleted',
+            };
+            $status = $response->getStatusCode();
+            $role = Str::headline($user->usr_role ?? 'user');
+            // Include the result so the log shows whether the requested change succeeded or failed.
+            $description = "Role: {$role}; Route: {$target}; HTTP {$status}";
+
+            AuditActivityLogger::record(
+                $user,
+                $status >= 400 ? "Failed {$action}" : $action,
+                $target,
+                $description,
+                $request->ip(),
+                $targetId
+            );
+
+            return $response;
+        } finally {
+            if ($tagDatabaseWrites) {
+                try {
+                    DB::select("select set_config('skedyul.audit_source', ?, false)", ['']);
+                } catch (\Throwable $exception) {
+                    Log::warning('Unable to clear the audit source marker.', ['message' => $exception->getMessage()]);
+                }
             }
         }
-        $action = match ($request->method()) {
-            'POST' => 'Created / Submitted',
-            'PUT', 'PATCH' => 'Updated',
-            'DELETE' => 'Deleted',
-        };
-        $status = $response->getStatusCode();
-        $role = Str::headline($user->usr_role ?? 'user');
-        // Include the result so the log shows whether the requested change succeeded or failed.
-        $description = "Role: {$role}; Route: {$target}; HTTP {$status}";
-
-        AuditActivityLogger::record(
-            $user,
-            $status >= 400 ? "Failed {$action}" : $action,
-            $target,
-            $description,
-            $request->ip(),
-            $targetId
-        );
-
-        return $response;
     }
 }

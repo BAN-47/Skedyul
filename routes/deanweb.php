@@ -32,6 +32,22 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
 
         Route::get('/departments', [DeanDepartmentController::class, 'index'])
             ->name('departments');
+        Route::post('/departments', [DeanDepartmentController::class, 'storeDepartment'])
+            ->name('departments.store');
+        Route::put('/departments/{id}', [DeanDepartmentController::class, 'updateDepartment'])
+            ->name('departments.update');
+        Route::delete('/departments/{id}', [DeanDepartmentController::class, 'destroyDepartment'])
+            ->name('departments.destroy');
+        Route::post('/departments/{id}/chair', [DeanDepartmentController::class, 'assignChair'])
+            ->name('departments.chair.assign');
+        Route::delete('/departments/{id}/chair', [DeanDepartmentController::class, 'unassignChair'])
+            ->name('departments.chair.unassign');
+        Route::post('/departments/{id}/faculty', [DeanDepartmentController::class, 'moveFaculty'])
+            ->name('departments.faculty.assign');
+        Route::post('/departments/{id}/faculty/create', [DeanDepartmentController::class, 'storeFaculty'])
+            ->name('departments.faculty.store');
+        Route::put('/departments/{id}/faculty/{faculty}', [DeanDepartmentController::class, 'updateFaculty'])
+            ->name('departments.faculty.update');
 
         // Read-only course catalog for Dean review.
         Route::get('/courses', [DeanCourseController::class, 'index'])

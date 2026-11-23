@@ -27,6 +27,8 @@
 
                 ['admin.sections', route('admin.sections'), '▤', 'Sections'],
 
+                ['admin.departments', route('admin.departments'), '▦', 'Colleges & Departments'],
+
                 ['admin.schedule-archives', route('admin.schedule-archives'), '▣', 'Schedule Archives'],
 
                 ['subject.index', route('subject.index'), '▱', 'Courses'],

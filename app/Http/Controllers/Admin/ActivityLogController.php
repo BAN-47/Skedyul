@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Audit_Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ActivityLogController extends Controller
 {
@@ -51,9 +53,41 @@ class ActivityLogController extends Controller
         // Fetch just one page from PostgreSQL; the full audit history stays in the database.
         $activityLogs = $query->paginate(25)->withQueryString();
 
-        $totalActivities = Audit_Log::count();
-        $todayActivities = Audit_Log::whereDate('al_created_at', today())->count();
+        $databaseActivityAvailable = Schema::hasTable('database_activity_log');
+        if ($databaseActivityAvailable) {
+            $databaseQuery = DB::table('database_activity_log')
+                ->when($filters['search'] ?? null, function ($query, string $search) use ($likeOperator): void {
+                    $like = '%' . addcslashes($search, '%_\\') . '%';
+                    $query->where(function ($query) use ($like, $likeOperator): void {
+                        $query->where('dal_operation', $likeOperator, $like)
+                            ->orWhere('dal_table_name', $likeOperator, $like)
+                            ->orWhere('dal_changed_columns', $likeOperator, $like)
+                            ->orWhere('dal_record_key', $likeOperator, $like)
+                            ->orWhere('dal_database_user', $likeOperator, $like);
+                    });
+                })
+                ->when($filters['date'] ?? null, function ($query, string $date): void {
+                    $start = Carbon::createFromFormat('Y-m-d', $date, config('app.timezone'))->startOfDay();
+                    $query->where('dal_created_at', '>=', $start)
+                        ->where('dal_created_at', '<', $start->copy()->addDay());
+                })
+                ->orderByDesc('dal_created_at')->orderByDesc('dal_id');
+            $databaseActivityLogs = $databaseQuery->paginate(25, ['*'], 'database_page')->withQueryString();
+            $databaseActivityCount = DB::table('database_activity_log')->count();
+            $databaseActivitiesToday = DB::table('database_activity_log')->whereDate('dal_created_at', today())->count();
+        } else {
+            $databaseActivityLogs = new LengthAwarePaginator([], 0, 25, LengthAwarePaginator::resolveCurrentPage('database_page'), [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+                'pageName' => 'database_page',
+                'query' => $request->query(),
+            ]);
+            $databaseActivityCount = 0;
+            $databaseActivitiesToday = 0;
+        }
+
+        $totalActivities = Audit_Log::count() + $databaseActivityCount;
+        $todayActivities = Audit_Log::whereDate('al_created_at', today())->count() + $databaseActivitiesToday;
         $loginActivities = Audit_Log::where('al_action', 'Logged in')->count();
-        return view('admin.activity_logs', compact('activityLogs', 'totalActivities', 'todayActivities', 'loginActivities'));
+        return view('admin.activity_logs', compact('activityLogs', 'databaseActivityLogs', 'databaseActivityAvailable', 'totalActivities', 'todayActivities', 'loginActivities'));
     }
 }

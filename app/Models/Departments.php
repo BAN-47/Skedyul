@@ -39,6 +39,11 @@ class Departments extends Model
         return $this->hasMany(Faculty::class, 'fac_dept_id', 'dept_id');
     }
 
+    public function chairs()
+    {
+        return $this->hasMany(Dept_Chair::class, 'dc_dept_id', 'dept_id');
+    }
+
     public function subjects()
     {
         return $this->hasMany(Course::class, 'course_dept_id', 'dept_id');

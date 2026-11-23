@@ -47,6 +47,11 @@ class College extends Model
         return $this->hasMany(Dept_Chair::class, 'dc_college_id', 'college_id');
     }
 
+    public function deans()
+    {
+        return $this->hasMany(Dean::class, 'dean_college_id', 'college_id');
+    }
+
     public function getAttribute($key)
     {
         return parent::getAttribute($this->legacyAttributeAliases[$key] ?? $key);

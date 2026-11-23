@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\College;
 use App\Models\Course;
 use App\Models\Departments;
+use App\Services\CourseDeletionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -175,12 +176,14 @@ class SubjectController extends Controller
             ->with('success', 'Subject updated successfully.');
     }
 
-    public function destroy(string $id)
+    public function destroy(string $id, CourseDeletionService $courseDeletion)
     {
         $subject = Course::findOrFail($id);
 
         try {
-            $subject->update(['course_is_active' => false]);
+            if (!$courseDeletion->deleteIfUnused($subject)) {
+                return back()->with('error', 'This course is used by schedules, study loads, or archives, so it cannot be permanently deleted.');
+            }
         } catch (\Throwable $e) {
             report($e);
             return redirect()->back()
@@ -188,6 +191,6 @@ class SubjectController extends Controller
         }
 
         return redirect()->route('subject.index')
-            ->with('success', 'Subject deleted successfully.');
+            ->with('success', 'Course permanently deleted.');
     }
 }
