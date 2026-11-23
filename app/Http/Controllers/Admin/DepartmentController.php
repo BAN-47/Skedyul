@@ -14,7 +14,7 @@ use Illuminate\Validation\Rule;
 
 class DepartmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $colleges = College::withCount(['programs', 'faculty', 'subjects', 'deptChairs'])
             ->orderBy('college_name')->get();
@@ -40,6 +40,21 @@ class DepartmentController extends Controller
         }
         $selectedCollege = ($filters['college_id'] ?? null)
             ? $colleges->firstWhere('college_id', $filters['college_id'])
+            : null;
+        $selectedDepartment = $selectedCollege && $request->filled('department_id')
+            ? Departments::where('dept_college_id', $selectedCollege->college_id)
+                ->with(['department', 'chairs.user'])
+                ->withCount(['faculty' => fn ($query) => $query->where('fac_is_placeholder', false)])
+                ->find($request->input('department_id'))
+            : null;
+        $departmentFaculty = $selectedDepartment
+            ? $selectedDepartment->faculty()
+                ->where('fac_is_placeholder', false)
+                ->with('user')
+                ->orderBy('fac_last_name')
+                ->orderBy('fac_first_name')
+                ->paginate(15, ['*'], 'faculty_page')
+                ->withQueryString()
             : null;
         $editingCollege = request()->filled('edit_college')
             ? $colleges->firstWhere('college_id', request('edit_college'))
@@ -73,7 +88,7 @@ class DepartmentController extends Controller
             })
             ->orderByDesc('al_created_at')->paginate(10, ['*'], 'history_page')->withQueryString();
 
-        return view('admin.departments', compact('colleges', 'selectedCollege', 'editingCollege', 'editingDepartment', 'departmentRows', 'designations', 'departmentHistory', 'filters'));
+        return view('admin.departments', compact('colleges', 'selectedCollege', 'selectedDepartment', 'departmentFaculty', 'editingCollege', 'editingDepartment', 'departmentRows', 'designations', 'departmentHistory', 'filters'));
     }
 
     public function storeDepartment(Request $request)

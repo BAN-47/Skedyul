@@ -89,26 +89,27 @@
                                                 <th class="px-5 py-3">Course code</th>
                                                 <th class="px-5 py-3">Descriptive title</th>
                                                 <th class="px-4 py-3 text-center">Units</th>
-                                                <th class="px-4 py-3 text-center">Lecture hours</th>
-                                                <th class="px-4 py-3 text-center">Lab hours</th>
-                                                <th class="px-4 py-3 text-center">Total hours</th>
+                                                <th class="px-4 py-3 text-center">Lecture units</th>
+                                                <th class="px-4 py-3 text-center">Lab units</th>
+                                                <th class="px-4 py-3 text-center">Total (lec + lab)</th>
                                                 <th class="px-5 py-3">Program</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 text-slate-700">
                                             @foreach ($courses as $course)
                                                 @php
-                                                    $lectureHours = (float) ($course->course_lecture_hours ?? 0);
-                                                    $labHours = (float) ($course->course_lab_hours ?? 0);
-                                                    $totalHours = $lectureHours + $labHours;
+                                                    // Lab teaching hours are stored at 3 per lab unit; show the entered units here.
+                                                    $lectureUnits = (float) ($course->course_lecture_hours ?? 0);
+                                                    $labUnits = (float) ($course->course_lab_hours ?? 0) / 3;
+                                                    $totalUnits = $lectureUnits + $labUnits;
                                                 @endphp
                                                 <tr class="hover:bg-slate-50/70">
                                                     <td class="whitespace-nowrap px-5 py-3 font-semibold text-slate-900">{{ $course->course_code }}</td>
                                                     <td class="min-w-[16rem] px-5 py-3">{{ $course->course_name }}</td>
                                                     <td class="px-4 py-3 text-center">{{ $course->course_units ?? '—' }}</td>
-                                                    <td class="px-4 py-3 text-center">{{ $lectureHours }}</td>
-                                                    <td class="px-4 py-3 text-center">{{ $labHours }}</td>
-                                                    <td class="px-4 py-3 text-center font-medium">{{ $totalHours }}</td>
+                                                    <td class="px-4 py-3 text-center">{{ $lectureUnits }}</td>
+                                                    <td class="px-4 py-3 text-center">{{ $labUnits }}</td>
+                                                    <td class="px-4 py-3 text-center font-medium">{{ $totalUnits }}</td>
                                                     <td class="whitespace-nowrap px-5 py-3">{{ $course->program?->dept_name ?? '—' }}</td>
                                                 </tr>
                                             @endforeach

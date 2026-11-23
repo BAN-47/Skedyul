@@ -42,6 +42,47 @@
                         @endforelse
                     </div>
                 </section>
+            @elseif($selectedDepartment)
+                <section class="card">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div class="flex items-center gap-3">
+                            <a class="btn btn-secondary" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">← Departments</a>
+                            <div><h1 class="text-lg font-bold">{{ $selectedDepartment->dept_code }} · {{ $selectedDepartment->dept_name }}</h1><p class="text-sm text-slate-500">Faculty roster · {{ $selectedCollege->college_name }}</p></div>
+                        </div>
+                    </div>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty in this department</p><p class="mt-2 text-2xl font-bold">{{ $selectedDepartment->faculty_count }}</p></article>
+                        <article class="rounded-xl border border-slate-200 bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Department chair</p><p class="mt-2 text-lg font-semibold">{{ $selectedDepartment->chairs->first()?->user?->usr_name ?? 'Not assigned' }}</p></article>
+                    </div>
+                    <div class="mt-5 overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="data-table min-w-[760px]">
+                            <thead><tr><th>Faculty</th><th>Rank</th><th>Employment</th><th>Account status</th><th>Action</th></tr></thead>
+                            <tbody>
+                                @forelse($departmentFaculty as $member)
+                                    <tr>
+                                        <td>
+                                            @if($member->user)
+                                                <a class="flex items-center gap-3 font-semibold text-slate-800 hover:text-blue-700" href="{{ route('admin.users', ['search' => $member->user->usr_email]) }}">
+                                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold text-blue-700">@if($member->fac_profile_image)<img src="{{ \App\Services\ProfileImageStorage::url($member->fac_profile_image, 'faculty_profile') }}" alt="" class="h-full w-full object-cover">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}@endif</span>
+                                                    <span>{{ $member->full_name }}<span class="block text-xs font-normal text-slate-500">{{ $member->user->usr_email }}</span></span>
+                                                </a>
+                                            @else
+                                                <span class="flex items-center gap-3 font-semibold text-slate-700"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-sm font-bold">{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}</span>{{ $member->full_name }}<span class="text-xs font-normal text-slate-400">No linked account</span></span>
+                                            @endif
+                                        </td>
+                                        <td>{{ $member->fac_rank ?: 'Faculty' }}@if($member->fac_special_position)<span class="mt-1 block text-xs text-slate-500">{{ $member->fac_special_position }}</span>@endif</td>
+                                        <td>{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}</td>
+                                        <td><span class="badge {{ $member->user?->usr_is_active ? 'badge-green' : 'badge-grey' }}">{{ $member->user ? ($member->user->usr_is_active ? 'Active' : 'Deactivated') : 'No account' }}</span></td>
+                                        <td>@if($member->user)<a class="btn btn-secondary !px-3 !py-1.5 !text-xs" href="{{ route('admin.users', ['search' => $member->user->usr_email]) }}">Open account</a>@else<span class="text-xs text-slate-400">—</span>@endif</td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="5" class="py-8 text-center text-slate-500">No faculty are assigned to this department.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                    @if($departmentFaculty->hasPages())<div class="mt-4">{{ $departmentFaculty->links() }}</div>@endif
+                </section>
             @else
                 <section class="card">
                     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
@@ -64,28 +105,8 @@
                         @forelse($departmentRows as $department)
                             @php($dean = $department->department?->deans?->first())
                             <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                                <div class="flex items-start justify-between gap-3"><div><h2 class="font-bold">{{ $department->dept_code }}</h2><p class="mt-1 text-sm text-slate-600">{{ $department->dept_name }}</p></div><span class="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $department->faculty_count }} faculty</span></div>
+                                <div class="flex items-start justify-between gap-3"><a class="min-w-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id, 'department_id' => $department->dept_id]) }}"><h2 class="font-bold text-blue-700 hover:text-blue-900">{{ $department->dept_code }}</h2><p class="mt-1 text-sm text-slate-600">{{ $department->dept_name }}</p><span class="mt-2 inline-block text-xs font-semibold text-blue-600">Open department →</span></a><span class="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{{ $department->faculty_count }} faculty</span></div>
                                 <div class="mt-4 space-y-2 border-t border-slate-100 pt-3 text-sm"><p><span class="text-slate-400">Chair:</span> {{ $department->chairs->first()?->user?->usr_name ?? 'Not assigned' }}</p><p><span class="text-slate-400">Dean:</span> {{ $dean?->user?->usr_name ?? 'Not assigned' }}</p><p class="text-xs text-slate-500">{{ $department->faculty->pluck('fac_special_position')->filter()->unique()->implode(', ') ?: 'No special designations recorded' }}</p></div>
-                                <details class="mt-3 rounded-lg bg-slate-50 px-3 py-2">
-                                    <summary class="cursor-pointer text-sm font-semibold text-blue-700">View faculty ({{ $department->faculty_count }})</summary>
-                                    <ul class="mt-2 divide-y divide-slate-200">
-                                        @forelse($department->faculty->sortBy(fn ($member) => $member->full_name) as $member)
-                                            <li class="py-2">
-                                                @if($member->user)
-                                                    <a class="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-blue-700" href="{{ route('admin.users', ['search' => $member->user->usr_email]) }}">
-                                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700">@if($member->fac_profile_image)<img src="{{ \App\Services\ProfileImageStorage::url($member->fac_profile_image, 'faculty_profile') }}" alt="" class="h-full w-full object-cover">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}@endif</span>
-                                                        <span>{{ $member->full_name }}<span class="block text-xs font-normal text-slate-500">{{ $member->user->usr_email }}</span></span>
-                                                        <span class="ml-auto text-xs text-blue-600">Open account →</span>
-                                                    </a>
-                                                @else
-                                                    <span class="text-sm text-slate-600">{{ $member->full_name }} <span class="text-xs text-slate-400">No linked user account</span></span>
-                                                @endif
-                                            </li>
-                                        @empty
-                                            <li class="py-2 text-sm text-slate-500">No faculty assigned to this department.</li>
-                                        @endforelse
-                                    </ul>
-                                </details>
                                 <form method="POST" action="{{ route('admin.departments.update', $department->dept_id) }}" class="mt-4 grid grid-cols-[minmax(0,1fr)_82px_auto] gap-2">@csrf @method('PUT')
                                     <input type="hidden" name="dept_college_id" value="{{ $selectedCollege->college_id }}">
                                     <input name="dept_name" value="{{ $department->dept_name }}" class="field-input min-w-0 px-2 py-2 text-sm" required maxlength="255" aria-label="Department name">

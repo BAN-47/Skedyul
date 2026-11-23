@@ -352,7 +352,10 @@ document.addEventListener("click", (event) => {
 function handleScheduleError(data, inlineBoxId) {
     let message;
     if (data.conflict) {
-        message = data.message || "Conflict: that slot is already taken.";
+        const detail = data.message || "That slot is already taken.";
+        message = /^overlapping schedule:/i.test(detail)
+            ? detail
+            : `Overlapping schedule: ${detail}`;
     } else if (data.errors) {
         message =
             Object.values(data.errors).flat()[0] ||
@@ -362,6 +365,9 @@ function handleScheduleError(data, inlineBoxId) {
         message = data.message;
     } else {
         message = "Something went wrong.";
+    }
+    if (/overextension/i.test(message) && !/^overextension:/i.test(message)) {
+        message = `Overextension: ${message}`;
     }
     showToast(message);
     showInlineError(inlineBoxId, message);

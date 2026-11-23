@@ -66,9 +66,10 @@ class SubjectController extends Controller
                 'code'       => $s->subj_code,
                 'name'       => $s->subj_name,
                 'lec'        => (float) $s->subj_lecture_hours,
-                'lab'        => (float) $s->subj_lab_hours,
+                // The database stores lab teaching hours, so convert them back to lab units for the course list.
+                'lab'        => (float) $s->subj_lab_hours / 3,
                 'units'      => (float) ($s->subj_units ?? 0),
-                'total'      => (float) ($s->course_total_hours ?? ((float) $s->subj_lecture_hours + (float) $s->subj_lab_hours)),
+                'total'      => (float) $s->subj_lecture_hours + ((float) $s->subj_lab_hours / 3),
                 'dept_id'    => $s->subj_dept_id,
                 'prog_id'    => $s->subj_prog_id,
                 'dept_name'  => optional($s->department)->college_name

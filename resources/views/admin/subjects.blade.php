@@ -118,9 +118,9 @@
                                     <th>Course Code</th>
                                     <th>Descriptive Title</th>
                                     <th>Units</th>
-                                    <th>Lec Hrs</th>
-                                    <th>Lab Hrs</th>
-                                    <th>Total Hrs</th>
+                                    <th>Lec Units</th>
+                                    <th>Lab Units</th>
+                                    <th>Total (Lec + Lab)</th>
                                     <th>Program</th>
                                     <th>Action</th>
                                 </tr>
@@ -237,7 +237,7 @@
                             oninput="updateSubjectTotalHours('add')" required>
                     </div>
                     <div>
-                        <label class="field-label">Total Teaching Hrs</label>
+                        <label class="field-label">Total (Lec + Lab)</label>
                         <input class="field-input bg-slate-50" id="add-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
@@ -334,7 +334,7 @@
                             required>
                     </div>
                     <div>
-                        <label class="field-label">Total Teaching Hrs</label>
+                        <label class="field-label">Total (Lec + Lab)</label>
                         <input class="field-input bg-slate-50" id="edit-subj-total" type="number" value="0" readonly>
                     </div>
                 </div>
@@ -385,7 +385,8 @@
         function updateSubjectTotalHours(prefix) {
             const lecture = Number(document.getElementById(`${prefix}-subj-lec`).value) || 0;
             const lab = Number(document.getElementById(`${prefix}-subj-lab`).value) || 0;
-            document.getElementById(`${prefix}-subj-total`).value = lecture + (lab * 3);
+            // This course summary adds the entered units. Workload rules apply the 3x lab conversion separately.
+            document.getElementById(`${prefix}-subj-total`).value = lecture + lab;
         }
 
         updateSubjectTotalHours('add');
@@ -470,7 +471,7 @@
             data-code="${escapeAttr(s.code)}"
             data-name="${escapeAttr(s.name)}"
             data-lec="${s.lec}"
-            data-lab-units="${s.lab / 3}"
+            data-lab-units="${s.lab}"
             data-units="${s.units}"
             data-total="${s.total}"
             data-dept="${s.dept_id || ''}"

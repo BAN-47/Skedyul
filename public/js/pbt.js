@@ -185,7 +185,10 @@ function setAddButtonsLoading(loading, keepOpen = false) {
 */
 function handleScheduleError(data, inlineBoxId) {
     if (data.conflict) {
-        const message = data.message || "Conflict: that slot is already taken.";
+        const detail = data.message || "That slot is already taken.";
+        const message = /^overlapping schedule:/i.test(detail)
+            ? detail
+            : `Overlapping schedule: ${detail}`;
         showToast(message);
         showInlineError(inlineBoxId, message);
         return;
@@ -193,8 +196,11 @@ function handleScheduleError(data, inlineBoxId) {
     const firstValidationError = data.errors
         ? Object.values(data.errors).flat()[0]
         : null;
-    const message =
+    let message =
         firstValidationError || data.message || "Something went wrong.";
+    if (/overextension/i.test(message) && !/^overextension:/i.test(message)) {
+        message = `Overextension: ${message}`;
+    }
     showToast(message);
     showInlineError(inlineBoxId, message);
 }
