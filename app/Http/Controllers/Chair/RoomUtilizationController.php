@@ -75,11 +75,15 @@ class RoomUtilizationController extends Controller
         $selectedRoom = $visibleRooms->firstWhere('room_id', $selectedRoomId) ?? $visibleRooms->first();
         $shift = $request->query('shift', 'day') === 'night' ? 'night' : 'day';
 
-        $collegeDepartmentIds = Departments::where('dept_college_id', $chair->dc_college_id)->pluck('dept_id');
+        $departments = Departments::where('dept_college_id', $chair->dc_college_id)->orderBy('dept_code')->get();
+        $selectedDepartmentId = (string) $request->query('department', $chair->dc_dept_id ?? 'all');
+        if ($selectedDepartmentId !== 'all' && !$departments->contains('dept_id', $selectedDepartmentId)) {
+            $selectedDepartmentId = (string) ($chair->dc_dept_id ?? 'all');
+        }
         $sections = $selectedSemester
             ? Section::query()->with('program')
                 ->where('sec_sem_id', $selectedSemester->sem_id)
-                ->whereIn('sec_dept_id', $collegeDepartmentIds)
+                ->whereIn('sec_dept_id', $selectedDepartmentId === 'all' ? $departments->pluck('dept_id') : [$selectedDepartmentId])
                 ->orderBy('sec_name')->get()
             : collect();
         $courses = Course::query()->where('course_is_active', true)->orderBy('course_code')->get();
@@ -118,7 +122,8 @@ class RoomUtilizationController extends Controller
         return view('chair.room_utilization', compact(
             'academicYears', 'selectedYear', 'selectedYearId', 'semesters', 'selectedSemester',
             'floorFilter', 'visibleRooms', 'selectedRoom', 'schedulesByDay', 'scheduledHours', 'shift',
-            'sections', 'courses', 'categories', 'faculty', 'canPlotSelectedSemester'
+            'sections', 'courses', 'categories', 'faculty', 'canPlotSelectedSemester',
+            'departments', 'selectedDepartmentId'
         ));
     }
 }

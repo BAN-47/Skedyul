@@ -54,6 +54,12 @@
                                 <option value="">No semester in this year</option>
                             @endforelse
                         </select>
+                        <select aria-label="Department" name="department" class="field-input min-w-[160px] flex-1" onchange="this.form.submit()">
+                            <option value="all" @selected($selectedDepartmentId === 'all')>All departments</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->dept_id }}" @selected($selectedDepartmentId === (string) $department->dept_id)>{{ $department->dept_code }}</option>
+                            @endforeach
+                        </select>
                         <select aria-label="Floor" name="floor" class="field-input min-w-[135px] flex-1" onchange="this.form.submit()">
                             <option value="all" @selected($floorFilter === 'all')>All floors</option>
                             @foreach(range(1, 10) as $floor)
@@ -90,7 +96,10 @@
                 <div class="mt-4 border-t border-slate-100 pt-4">
                     <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
                         <div>
-                            <h2 class="text-lg font-bold text-slate-900">{{ $selectedRoom->room_name }}</h2>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="text-lg font-bold text-slate-900">{{ $selectedRoom->room_name }}</h2>
+                                <span class="rounded bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Room code</span>
+                            </div>
                             <p class="mt-1 text-sm text-slate-500">{{ $selectedRoom->room_building }} · {{ $selectedRoom->room_type ?? 'Room' }}{{ $selectedRoom->room_capacity ? ' · Capacity '.$selectedRoom->room_capacity : '' }}</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
