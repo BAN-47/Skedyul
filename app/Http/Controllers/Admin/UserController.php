@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
+use App\Models\Designation;
 use App\Models\User;
 use App\Models\Faculty;
 use App\Models\Dean;
@@ -61,13 +61,15 @@ class UserController extends Controller
 
         $colleges    = College::orderBy('college_name')->get();
         $departments = Departments::orderBy('dept_name')->get();
+        $designations = Designation::orderBy('name')->get();
 
         return view('admin.user_accounts', compact(
             'users',
             'search',
             'stats',
             'colleges',
-            'departments'
+            'departments',
+            'designations'
         ));
     }
 
@@ -84,6 +86,21 @@ class UserController extends Controller
             $data['usr_last_name'] ?? null,
             $data['usr_suffix'] ?? null,
         ])));
+    }
+
+    /**
+     * Resolve the Day-hour cap for a designation from the editable
+     * designations list. Returns null when no designation is assigned.
+     */
+    private function designationDayCap(?string $position): ?int
+    {
+        if (!$position) {
+            return null;
+        }
+
+        $cap = Designation::where('name', $position)->value('day_cap');
+
+        return $cap === null ? null : (int) $cap;
     }
 
     private function specialPositionDatabaseError(QueryException $exception): ?string
@@ -103,8 +120,7 @@ class UserController extends Controller
     }
 
     private function roleSpecificRules(string $role, bool $requireDeanCollege = false): array
-    {
-        $rules = [];
+    {        $rules = [];
 
         if (in_array($role, ['faculty', 'dean', 'department_chair'])) {
             $rules['role_phone_number'] = ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'];
@@ -126,7 +142,7 @@ class UserController extends Controller
             $rules['employment_type'] = 'required|in:full_time,part_time';
             $rules['special_position'] = [
                 'nullable',
-                Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS)),
+                Rule::in(Designation::pluck('name')->toArray()),
             ];
         }
 
@@ -194,9 +210,7 @@ class UserController extends Controller
                         'fac_employment_type' => $request->employment_type,
                         'fac_rank' => $data['usr_rank_title'] ?? null,
                         'fac_special_position' => $data['special_position'] ?? null,
-                        'fac_special_position_max_hours' => isset($data['special_position'])
-                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
-                            : null,
+                        'fac_special_position_max_hours' => $this->designationDayCap($data['special_position'] ?? null),
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
@@ -242,9 +256,7 @@ class UserController extends Controller
                         'fac_employment_type' => $request->input('employment_type', 'full_time'),
                         'fac_rank' => $data['usr_rank_title'] ?? null,
                         'fac_special_position' => $data['special_position'] ?? null,
-                        'fac_special_position_max_hours' => isset($data['special_position'])
-                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
-                            : null,
+                        'fac_special_position_max_hours' => $this->designationDayCap($data['special_position'] ?? null),
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );
@@ -290,9 +302,7 @@ class UserController extends Controller
                         'fac_employment_type' => $request->input('employment_type', 'full_time'),
                         'fac_rank' => $data['usr_rank_title'] ?? null,
                         'fac_special_position' => $data['special_position'] ?? null,
-                        'fac_special_position_max_hours' => isset($data['special_position'])
-                            ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
-                            : null,
+                        'fac_special_position_max_hours' => $this->designationDayCap($data['special_position'] ?? null),
                         'fac_bio' => $data['usr_bio'] ?? null,
                     ]
                 );

@@ -141,8 +141,8 @@
                 <label for="designation-select" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Special designation</label>
                 <select id="designation-select" name="special_position" class="field-input mt-1 w-full">
                     <option value="">No special designation</option>
-                    @foreach (\App\Http\Controllers\Chair\ChairFacultyLoadController::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-                        <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+                    @foreach ($designations as $d)
+                        <option value="{{ $d->name }}" data-max-hours="{{ $d->day_cap }}">{{ $d->name }}</option>
                     @endforeach
                 </select>
                 <div id="designation-cap-note" class="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800"></div>

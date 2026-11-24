@@ -99,6 +99,11 @@ class Faculty extends Model
         return $this->hasMany(Schedule::class, 'sch_fac_id', 'fac_id');
     }
 
+    public function designation()
+    {
+        return $this->belongsTo(Designation::class, 'fac_special_position', 'name');
+    }
+
     public function getFullNameAttribute(): string
     {
         $parts = array_filter([

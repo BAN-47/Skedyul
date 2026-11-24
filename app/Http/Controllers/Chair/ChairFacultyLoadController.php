@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Chair;
 
 use App\Http\Controllers\Controller;
+use App\Models\Designation;
 use App\Models\Dept_Chair;
 use App\Models\College;
 use App\Models\Departments;
@@ -29,8 +30,6 @@ use App\Services\ScheduleAssignmentService;
 class ChairFacultyLoadController extends Controller
 {
     const NEAR_MAX_BUFFER     = 3;
-
-    public const SPECIAL_POSITION_MAX_HOURS = ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS;
 
     public function index(Request $request)
     {
@@ -199,7 +198,7 @@ class ChairFacultyLoadController extends Controller
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
                 'special_position_max_hours' => $f->fac_special_position
-                    ? self::SPECIAL_POSITION_MAX_HOURS[$f->fac_special_position] ?? null : null,
+                    ? Designation::where('name', $f->fac_special_position)->value('day_cap') : null,
                 'subjects' => collect([$day['subjects'], $evening['subjects']])->reject(fn ($codes) => $codes === '—')->unique()->implode(', ') ?: '—',
                 'total_units' => $day['total_units'] + $evening['total_units'],
                 'total_hours' => $totalHours,
@@ -226,6 +225,8 @@ class ChairFacultyLoadController extends Controller
             ->orderBy('sec_name')
             ->get();
 
+        $designations = Designation::orderBy('name')->get();
+
         return view('chair.faculty_load', compact(
             'deptChair',
             'department',
@@ -237,7 +238,8 @@ class ChairFacultyLoadController extends Controller
             'facultyStats',
             'faculty',
             'subjects',
-            'sections'
+            'sections',
+            'designations'
         ));
     }
 
@@ -366,11 +368,12 @@ class ChairFacultyLoadController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'special_position' => ['nullable', 'string', 'in:' . implode(',', array_keys(self::SPECIAL_POSITION_MAX_HOURS))],
+            'special_position' => ['nullable', 'string', 'exists:designations,name'],
         ]);
 
         $position = $data['special_position'] ?? null;
-        $hours = $position ? self::SPECIAL_POSITION_MAX_HOURS[$position] : null;
+        $designation = $position ? Designation::where('name', $position)->first() : null;
+        $hours = $designation ? $designation->day_cap : null;
 
         $faculty->fac_special_position = $position;
         $faculty->fac_special_position_max_hours = $hours;
@@ -400,5 +403,4 @@ class ChairFacultyLoadController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Subject unassigned.']);
     }
-
 }

@@ -55,21 +55,22 @@ class ScheduleAssignmentService
 
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
-        // Evening workload has a fixed 30-hour cap for all designations.
-        if ($shift === 'evening') {
-            return (float) self::EVENING_MAX_HOURS;
-        }
-
         // Part-time staff share one 30-hour cap between Day and Evening.
         if ($faculty->fac_employment_type === 'part_time') {
             return (float) self::PART_TIME_MAX_HOURS;
         }
 
-        if (
-            $faculty->fac_special_position
-            && isset(self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position])
-        ) {
-            return (float) self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position];
+        $designation = null;
+        if ($faculty->fac_special_position) {
+            $designation = \App\Models\Designation::where('name', $faculty->fac_special_position)->first();
+        }
+
+        if ($shift === 'evening') {
+            return (float) ($designation ? $designation->evening_cap : self::EVENING_MAX_HOURS);
+        }
+
+        if ($designation) {
+            return (float) $designation->day_cap;
         }
 
         return (float) self::FULL_TIME_MAX_HOURS;

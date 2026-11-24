@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\RegistrationReceivedMail;
+use App\Models\Designation;
 use App\Models\Departments;
 use App\Models\Faculty;
 use App\Models\FacultyAccountReview;
@@ -60,7 +61,7 @@ class RegistrationController extends Controller
             'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
             'special_position' => [
                 'nullable',
-                Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS)),
+                Rule::in(Designation::pluck('name')->toArray()),
             ],
             'faculty_id_photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], [
@@ -150,7 +151,7 @@ class RegistrationController extends Controller
                     'fac_rank' => $data['usr_rank_title'] ?? null,
                     'fac_special_position' => $data['special_position'] ?? null,
                     'fac_special_position_max_hours' => isset($data['special_position'])
-                        ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']]
+                        ? Designation::where('name', $data['special_position'])->value('day_cap')
                         : null,
                 ]);
 

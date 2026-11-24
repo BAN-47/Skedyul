@@ -385,8 +385,8 @@
               <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700">Designation (Optional)</label>
               <select id="register-special-position" name="special_position" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
                 <option value="">None</option>
-                @foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-                <option value="{{ $position }}" data-max-hours="{{ $maxHours }}" @selected(old('special_position')===$position)>{{ $position }}</option>
+                @foreach(\App\Models\Designation::orderBy('name')->get() as $d)
+                <option value="{{ $d->name }}" data-max-hours="{{ $d->day_cap }}" @selected(old('special_position')===$d->name)>{{ $d->name }}</option>
                 @endforeach
               </select>
               <p id="register-special-position-cap" class="mt-1 text-[10px] text-slate-500">Select a position only if it applies to you.</p>

@@ -345,6 +345,15 @@ Route::prefix('admin')->middleware(['auth', 'role:system_admin', 'audit.activity
     Route::put('/institution', [InstitutionController::class, 'update'])
         ->name('admin.institution.update');
 
+    Route::get('/designations', [\App\Http\Controllers\Admin\DesignationController::class, 'index'])
+        ->name('admin.designations.index');
+    Route::post('/designations', [\App\Http\Controllers\Admin\DesignationController::class, 'store'])
+        ->name('admin.designations.store');
+    Route::put('/designations/{designation}', [\App\Http\Controllers\Admin\DesignationController::class, 'update'])
+        ->name('admin.designations.update');
+    Route::delete('/designations/{designation}', [\App\Http\Controllers\Admin\DesignationController::class, 'destroy'])
+        ->name('admin.designations.destroy');
+
 });
 
 /*

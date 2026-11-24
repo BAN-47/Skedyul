@@ -17,6 +17,7 @@ use App\Models\Semester;
 use App\Models\User;
 use App\Models\Audit_Log;
 use App\Services\AuditActivityLogger;
+use App\Models\Designation;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
@@ -155,9 +156,10 @@ class DeanDepartmentController extends Controller
             $chair->save();
             $user->update(['usr_role' => 'department_chair']);
             // Becoming chair replaces any previous special position and applies the chair's 16-hour cap.
+            $designation = Designation::where('name', 'Department Chairperson')->first();
             Faculty::where('fac_id', $faculty->fac_id)->update([
                 'fac_special_position' => 'Department Chairperson',
-                'fac_special_position_max_hours' => ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS['Department Chairperson'],
+                'fac_special_position_max_hours' => $designation?->day_cap ?? 16,
             ]);
         });
 
@@ -229,7 +231,7 @@ class DeanDepartmentController extends Controller
             'role_phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
             'role_address' => ['nullable', 'string', 'max:255'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
-            'special_position' => ['nullable', Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS))],
+            'special_position' => ['nullable', Rule::in(Designation::pluck('name')->toArray())],
             'usr_gender' => ['nullable', 'string', 'max:255'],
             'usr_civil_status' => ['nullable', 'string', 'max:255'],
             'usr_dob' => ['nullable', 'date'],
@@ -272,7 +274,9 @@ class DeanDepartmentController extends Controller
                 'fac_employment_type' => $data['employment_type'],
                 'fac_rank' => $data['usr_rank_title'] ?? null,
                 'fac_special_position' => $data['special_position'] ?? null,
-                'fac_special_position_max_hours' => isset($data['special_position']) ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['special_position']] : null,
+                'fac_special_position_max_hours' => $data['special_position'] 
+                    ? Designation::where('name', $data['special_position'])->value('day_cap') 
+                    : null,
             ]);
             return $user;
         });
@@ -302,7 +306,7 @@ class DeanDepartmentController extends Controller
             'fac_employee_id' => ['nullable', 'string', 'max:255', Rule::unique('faculty', 'fac_employee_id')->ignore($faculty->fac_id, 'fac_id')],
             'fac_rank' => ['nullable', 'string', 'max:255'],
             'fac_employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
-            'fac_special_position' => ['nullable', Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS))],
+            'fac_special_position' => ['nullable', Rule::in(Designation::pluck('name')->toArray())],
             'fac_phone_number' => ['nullable', 'string', 'max:20', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
             'fac_address' => ['nullable', 'string', 'max:255'],
             'dept_id' => ['required', 'string', Rule::exists('department', 'dept_id')->where('dept_college_id', $college->college_id)],
@@ -325,8 +329,8 @@ class DeanDepartmentController extends Controller
                 'fac_rank' => $data['fac_rank'] ?? null,
                 'fac_employment_type' => $data['fac_employment_type'],
                 'fac_special_position' => $data['fac_special_position'] ?? null,
-                'fac_special_position_max_hours' => isset($data['fac_special_position'])
-                    ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$data['fac_special_position']]
+                'fac_special_position_max_hours' => $data['fac_special_position'] 
+                    ? Designation::where('name', $data['fac_special_position'])->value('day_cap') 
                     : null,
                 'fac_phone_number' => $data['fac_phone_number'] ?? null,
                 'fac_address' => $data['fac_address'] ?? null,

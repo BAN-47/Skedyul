@@ -9,6 +9,7 @@ use App\Models\Faculty;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Services\AuditActivityLogger;
+use App\Models\Designation;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -28,10 +29,10 @@ class FacultyWorkloadController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'special_position' => ['nullable', 'string', Rule::in(array_keys(ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS))],
+            'special_position' => ['nullable', 'string', Rule::in(Designation::pluck('name')->toArray())],
         ]);
         $position = $data['special_position'] ?? null;
-        $cap = $position ? ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS[$position] : null;
+        $cap = $position ? Designation::where('name', $position)->value('day_cap') : null;
         $faculty->update([
             'fac_special_position' => $position,
             'fac_special_position_max_hours' => $cap,

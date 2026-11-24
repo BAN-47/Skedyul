@@ -84,7 +84,7 @@
             @csrf @method('PUT')
             <div class="flex items-start justify-between gap-3"><div><h2 id="workload-designation-title" class="text-lg font-bold">Edit faculty designation</h2><p id="workload-designation-name" class="mt-1 text-sm text-slate-500"></p></div><button type="button" class="topbar-btn btn-secondary" onclick="closeWorkloadDesignation()">Close</button></div>
             <label for="workload-designation-select" class="mt-5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Special designation</label>
-            <select id="workload-designation-select" name="special_position" class="field-input mt-1 w-full"><option value="">No special designation</option>@foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)<option value="{{ $position }}" data-cap="{{ $maxHours }}">{{ $position }} ({{ $maxHours }}h Day cap)</option>@endforeach</select>
+            <select id="workload-designation-select" name="special_position" class="field-input mt-1 w-full"><option value="">No special designation</option>@foreach(\App\Models\Designation::orderBy('name')->get() as $d)<option value="{{ $d->name }}" data-cap="{{ $d->day_cap }}">{{ $d->name }} ({{ $d->day_cap }}h Day cap)</option>@endforeach</select>
             <p id="workload-designation-note" class="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800"></p>
             <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="closeWorkloadDesignation()">Cancel</button><button type="submit" class="topbar-btn btn-primary">Save designation</button></div>
         </form>
