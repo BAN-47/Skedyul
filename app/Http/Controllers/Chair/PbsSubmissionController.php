@@ -95,7 +95,11 @@ class PbsSubmissionController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if ($submission && $submission->schsub_status !== 'returned') {
+                if (
+                    $submission
+                    && $submission->schsub_status !== 'returned'
+                    && $this->scheduleSnapshotsMatch($submission->schsub_schedule_snapshot, $snapshot)
+                ) {
                     throw new \DomainException('This PBS has already been submitted and is ' . $submission->schsub_status . '.');
                 }
 
@@ -126,6 +130,38 @@ class PbsSubmissionController extends Controller
 
         $approvalNotifier->submitted($chair->dc_dept_id, 'pbs', $semester->sem_name ?? 'the selected semester');
 
-        return $returnToPbs()->with('success', $section->sec_name . ' PBS was submitted to the dean for review.');
+        return redirect()
+            ->route('chair.submit_dean')
+            ->with('success', $section->sec_name . ' PBS was submitted to the dean for review.');
+    }
+
+    private function scheduleSnapshotsMatch(mixed $submittedSnapshot, array $currentSnapshot): bool
+    {
+        $normalize = static function ($rows): array {
+            return collect(is_array($rows) ? $rows : [])
+                ->map(static function ($row): array {
+                    $row = (array) $row;
+
+                    return [
+                        'schedule_id' => trim((string) ($row['schedule_id'] ?? '')),
+                        'faculty' => trim((string) ($row['faculty'] ?? '')),
+                        'subject_code' => trim((string) ($row['subject_code'] ?? '')),
+                        'subject_name' => trim((string) ($row['subject_name'] ?? '')),
+                        'section' => trim((string) ($row['section'] ?? '')),
+                        'room' => trim((string) ($row['room'] ?? '')),
+                        'day' => trim((string) ($row['day'] ?? '')),
+                        'start_time' => substr(trim((string) ($row['start_time'] ?? '')), 0, 5),
+                        'end_time' => substr(trim((string) ($row['end_time'] ?? '')), 0, 5),
+                    ];
+                })
+                ->sortBy(static fn(array $row): string => json_encode(
+                    $row,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                ) ?: '')
+                ->values()
+                ->all();
+        };
+
+        return $normalize($submittedSnapshot) === $normalize($currentSnapshot);
     }
 }

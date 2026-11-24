@@ -12,6 +12,7 @@ use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Services\FacultyNameFormatter;
+use App\Services\FacultyPbtApproval;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -58,6 +59,17 @@ class ExportPreviewController extends Controller
         }
 
         $semester = Semester::with('academicYear')->findOrFail($data['semester']);
+        if ($forFaculty) {
+            abort_unless(
+                app(FacultyPbtApproval::class)->isApproved(
+                    (string) $faculty->fac_id,
+                    (string) $semester->sem_id
+                ),
+                403,
+                'Your PBT is available after the Dean approves the current schedule.'
+            );
+        }
+
         $schedules = Schedule::with(['subject', 'section', 'room', 'studyLoad'])
             ->where(function ($query) use ($faculty, $forFaculty) {
                 $query->where('sch_fac_id', $faculty->fac_id);

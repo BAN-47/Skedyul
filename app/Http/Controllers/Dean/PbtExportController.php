@@ -271,6 +271,27 @@ class PbtExportController extends Controller
 
         return $spreadsheet;
     }
+    private function fillDoctorateDegreeLine($sheet, int $targetRow, int $referenceRow, string $degree): void
+    {
+        $mergedRange = "A{$targetRow}:F{$targetRow}";
+        if (in_array($mergedRange, $sheet->getMergeCells(), true)) {
+            $sheet->unmergeCells($mergedRange);
+        }
+
+        foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $column) {
+            $sheet->duplicateStyle(
+                $sheet->getStyle($column . $referenceRow),
+                $column . $targetRow
+            );
+        }
+
+        $sheet->mergeCells("A{$targetRow}:B{$targetRow}");
+        $sheet->setCellValue("A{$targetRow}", 'Doctorate Degree:');
+        $sheet->setCellValue("C{$targetRow}", $degree);
+        $sheet->getRowDimension($targetRow)->setRowHeight(
+            $sheet->getRowDimension($referenceRow)->getRowHeight()
+        );
+    }
     private function fillDaySheet(
         $sheet,
         Faculty $faculty,
@@ -283,9 +304,9 @@ class PbtExportController extends Controller
         $sheet->setCellValue('A7', 'Day Program');
         $sheet->setCellValue('A8', $semesterLabel);
         $sheet->setCellValue('B10', $facultyName);
-        $sheet->setCellValue('C11', '');
-        $sheet->setCellValue('C12', '');
-        $sheet->setCellValue('A13', 'Doctorate Degree:');
+        $sheet->setCellValue('C11', $faculty->fac_bachelors_degree ?? '');
+        $sheet->setCellValue('C12', $faculty->fac_masters_degree ?? '');
+        $this->fillDoctorateDegreeLine($sheet, 13, 11, (string) ($faculty->fac_doctorate_degree ?? ''));
         $sheet->setCellValue('K11', '___ Permanent');
         $sheet->setCellValue('L11', '___ Temporary');
         $sheet->setCellValue('M11', '___ Contract of Service');
@@ -351,9 +372,9 @@ class PbtExportController extends Controller
         $sheet->setCellValue('A9', 'Evening Program');
         $sheet->setCellValue('A10', $semesterLabel);
         $sheet->setCellValue('B12', $facultyName);
-        $sheet->setCellValue('C13', '');
-        $sheet->setCellValue('C14', '');
-        $sheet->setCellValue('A15', 'Doctorate Degree:');
+        $sheet->setCellValue('C13', $faculty->fac_bachelors_degree ?? '');
+        $sheet->setCellValue('C14', $faculty->fac_masters_degree ?? '');
+        $this->fillDoctorateDegreeLine($sheet, 15, 13, (string) ($faculty->fac_doctorate_degree ?? ''));
         $sheet->setCellValue('K13', '___ Permanent');
         $sheet->setCellValue('L13', '___ Temporary');
         $sheet->setCellValue('M13', '___ Contract of Service');

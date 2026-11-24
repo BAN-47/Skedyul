@@ -113,17 +113,21 @@
                         <h1 class="text-xl font-extrabold text-slate-900">My Teaching Schedule</h1>
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" id="schedule-summary-toggle" aria-expanded="false"
-                            aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()"
-                            class="btn btn-secondary inline-flex items-center gap-2">
-                            <span>Summary</span><span aria-hidden="true">▦</span>
-                        </button>
-                        <a href="{{ route('faculty.pbt_export.preview', ['semester' => $activeSemester?->sem_id]) }}"
-                            data-export-preview
-                            class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                            Preview PBT Export
-                        </a>
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($pbtApproved)
+                            <button type="button" id="schedule-summary-toggle" aria-expanded="false"
+                                aria-controls="schedule-summary-modal" onclick="toggleScheduleSummary()"
+                                class="btn btn-secondary inline-flex items-center gap-2">
+                                <span>Summary</span><span aria-hidden="true">▦</span>
+                            </button>
+                            <a href="{{ route('faculty.pbt_export.preview', ['semester' => $activeSemester?->sem_id]) }}"
+                                data-export-preview
+                                class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                                Preview PBT Export
+                            </a>
+                        @else
+                            <span class="text-sm text-slate-500">Your PBT will appear after the Dean approves it.</span>
+                        @endif
 
 
                     </div>
@@ -354,7 +358,7 @@
 
                     @if ($schedules->isEmpty())
                         <div class="border-t border-slate-100 px-4 py-3 text-center text-[12px] text-slate-500">
-                            {{ $activeSemester ? 'No ' . $shift . '-shift classes are assigned to you this semester.' : 'There is no active semester.' }}
+                            {{ !$activeSemester ? 'There is no active semester.' : (!$pbtApproved ? 'Your PBT is hidden until the Dean approves the current schedule.' : 'No ' . $shift . '-shift classes are assigned to you this semester.') }}
                         </div>
                     @endif
                 </section>
