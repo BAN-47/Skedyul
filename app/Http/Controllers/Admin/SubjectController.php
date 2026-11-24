@@ -83,6 +83,15 @@ class SubjectController extends Controller
             ];
         })->values()->all();
 
+        // Include inactive/other-program courses too: course codes are unique globally.
+        $existingSubjectCodes = Course::query()
+            ->pluck('course_code')
+            ->filter()
+            ->map(fn($code) => mb_strtoupper(trim((string) $code)))
+            ->unique()
+            ->values()
+            ->all();
+
         // Keep $subject for any legacy references in the view
         $subject = $subjects;
 
@@ -90,6 +99,7 @@ class SubjectController extends Controller
             'subject',
             'subjects',
             'subjectsForJs',
+            'existingSubjectCodes',
             'departments',
             'programs',
             'yearLevels'

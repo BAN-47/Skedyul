@@ -16,17 +16,17 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use App\Models\Semester;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class PbtController extends Controller
 {
-    public function __construct(private ScheduleAssignmentService $scheduler)
-    {
-    }
+    public function __construct(private ScheduleAssignmentService $scheduler) {}
 
     private function chairCollegeId(): ?string
     {
         $chair = \App\Models\Dept_Chair::with('program')
-            ->where('dc_usr_id', auth()->user()?->usr_id)->first();
+            ->where('dc_usr_id', Auth::id())
+            ->first();
 
         return $chair?->program?->dept_college_id ?? $chair?->dc_college_id;
     }
@@ -36,8 +36,10 @@ class PbtController extends Controller
         $filters = $request->only(['program']);
 
         // Chairs can work across departments within their assigned college.
-        $deptId = \App\Models\Dept_Chair::where('dc_usr_id', auth()->user()?->usr_id)
-            ->value('dc_dept_id');
+        $deptId = \App\Models\Dept_Chair::where(
+            'dc_usr_id',
+            \Illuminate\Support\Facades\Auth::id()
+        )->value('dc_dept_id');
 
         $semesterQuery = DB::table('semester as s')
             ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
@@ -77,14 +79,18 @@ class PbtController extends Controller
                 $activeSem->label .= ' (Archived · View only)';
             } elseif ((bool) $activeSem->sem_is_active) {
                 $activeSem->label .= ' (Current)';
-            } elseif ((bool) ($activeSem->ay_is_active ?? false)
+            } elseif (
+                (bool) ($activeSem->ay_is_active ?? false)
                 && $activeSem->sem_name === '2nd Semester'
                 && $officialSemesterName === '1st Semester'
-                && (bool) ($activeSem->sem_is_plotting_enabled ?? false)) {
+                && (bool) ($activeSem->sem_is_plotting_enabled ?? false)
+            ) {
                 $activeSem->label .= ' (Advance plotting)';
-            } elseif ((bool) ($activeSem->ay_is_active ?? false)
+            } elseif (
+                (bool) ($activeSem->ay_is_active ?? false)
                 && $activeSem->sem_name === '2nd Semester'
-                && $officialSemesterName === '1st Semester') {
+                && $officialSemesterName === '1st Semester'
+            ) {
                 $activeSem->label .= ' (Upcoming · View only)';
             } else {
                 $activeSem->label .= ' (View only)';
@@ -110,11 +116,16 @@ class PbtController extends Controller
         $collegeId = $chairDepartment?->dept_college_id;
         $allDepartments = $collegeId ? Departments::where('dept_college_id', $collegeId)->orderBy('dept_code')->get() : collect();
 
-        // Build teacher groups from all faculty linked to user accounts, regardless
-        // of college. Assignment validation still enforces the active-account rule.
+        // Keep the picker inside the chair's college. Chairs can select faculty
+        // across departments in that college, but not outside their college.
         $allFaculty = Faculty::query()
             ->where('fac_is_placeholder', false)
             ->whereHas('user')
+            ->when(
+                $collegeId,
+                fn($query) => $query->whereHas('program', fn($program) => $program->where('dept_college_id', $collegeId)),
+                fn($query) => $query->whereRaw('1 = 0')
+            )
             ->select('faculty.*')
             ->addSelect([
                 'is_department_chair' => \App\Models\Dept_Chair::query()
@@ -139,14 +150,14 @@ class PbtController extends Controller
                 ->where('sch_fac_id', $selectedFaculty->fac_id)
                 ->when(
                     !empty($filters['semester']),
-                    fn ($q) => $q->where('sch_sem_id', $filters['semester']),
-                    fn ($q) => $q->whereRaw('1 = 0')
+                    fn($q) => $q->where('sch_sem_id', $filters['semester']),
+                    fn($q) => $q->whereRaw('1 = 0')
                 )
                 ->where('sch_is_active', true)
                 ->when(
                     $shiftKey === 'evening',
-                    fn ($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
-                    fn ($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
+                    fn($q) => $q->whereRaw("sch_start_time::time < TIME '22:00' AND sch_end_time::time > TIME '16:00'"),
+                    fn($q) => $q->whereRaw("sch_start_time::time < TIME '16:00' AND sch_end_time::time > TIME '07:00'")
                 )
                 ->with(['subject', 'section', 'room'])
                 ->get();
@@ -158,18 +169,18 @@ class PbtController extends Controller
                 ->where('sch_fac_id', $selectedFaculty->fac_id)
                 ->when(
                     !empty($filters['semester']),
-                    fn ($q) => $q->where('sch_sem_id', $filters['semester']),
-                    fn ($q) => $q->whereRaw('1 = 0')
+                    fn($q) => $q->where('sch_sem_id', $filters['semester']),
+                    fn($q) => $q->whereRaw('1 = 0')
                 )
                 ->where('sch_is_active', true)
-                ->whereHas('studyLoad', fn ($q) => $q->where('sl_fac_id', $selectedFaculty->fac_id))
+                ->whereHas('studyLoad', fn($q) => $q->where('sl_fac_id', $selectedFaculty->fac_id))
                 ->where(function ($query) use ($shiftKey) {
                     if ($shiftKey === 'evening') {
-                        $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'evening'))
-                            ->orWhereHas('section', fn ($section) => $section->where('sec_is_evening', true));
+                        $query->whereHas('studyLoad', fn($load) => $load->where('sl_shift', 'evening'))
+                            ->orWhereHas('section', fn($section) => $section->where('sec_is_evening', true));
                     } else {
-                        $query->whereHas('studyLoad', fn ($load) => $load->where('sl_shift', 'day'))
-                            ->whereDoesntHave('section', fn ($section) => $section->where('sec_is_evening', true));
+                        $query->whereHas('studyLoad', fn($load) => $load->where('sl_shift', 'day'))
+                            ->whereDoesntHave('section', fn($section) => $section->where('sec_is_evening', true));
                     }
                 })
                 ->with(['subject', 'section', 'room', 'studyLoad'])
@@ -181,14 +192,14 @@ class PbtController extends Controller
         // Every active department chair with a Faculty row can be selected.
         // Schedules store fac_id, so chairs/deans without a Faculty row cannot
         // be scheduled as teachers until that linked row exists.
-        $facultyChairs = $allFaculty->filter(fn ($f) => (bool) $f->is_department_chair)->values();
+        $facultyChairs = $allFaculty->filter(fn($f) => (bool) $f->is_department_chair)->values();
 
-        $deans = $allFaculty->filter(fn ($f) => (bool) $f->is_dean)->values();
+        $deans = $allFaculty->filter(fn($f) => (bool) $f->is_dean)->values();
 
         // Keep chairs and deans in their own groups so every eligible person
         // is visible without listing the same person in multiple groups.
         $otherChairIds = $allFaculty
-            ->filter(fn ($f) => (bool) $f->is_department_chair)
+            ->filter(fn($f) => (bool) $f->is_department_chair)
             ->pluck('fac_id')
             ->all();
 
@@ -228,7 +239,7 @@ class PbtController extends Controller
                                 $query->where('course_code', '!=', 'REC')
                                     ->orWhereNull('course_code');
                             })
-                            ->when($semNum !== null, fn ($q) => $q->where('course_semester', $semNum));
+                            ->when($semNum !== null, fn($q) => $q->where('course_semester', $semNum));
                     });
                 })
                 ->orderBy('course_code')
@@ -266,7 +277,7 @@ class PbtController extends Controller
             'selectedAcademicYearId' => $selectedAcademicYearId,
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
-                ->when($selectedAcademicYearId, fn ($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))
+                ->when($selectedAcademicYearId, fn($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))
                 ->where(function ($query) use ($officialSemesterName) {
                     $query->where('s.sem_is_active', true)
                         ->orWhereNull('s.sem_ay_id')
@@ -304,14 +315,18 @@ class PbtController extends Controller
                         $label .= ' (Archived · View only)';
                     } elseif ($sem->sem_name === '1st Semester' && $officialSemesterName === '2nd Semester') {
                         $label .= ' (Archived · View only)';
-                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                    } elseif (
+                        (bool) ($sem->ay_is_active ?? false)
                         && $sem->sem_name === '2nd Semester'
                         && $officialSemesterName === '1st Semester'
-                        && !empty($sem->sem_is_plotting_enabled)) {
+                        && !empty($sem->sem_is_plotting_enabled)
+                    ) {
                         $label .= ' (Advance plotting)';
-                    } elseif ((bool) ($sem->ay_is_active ?? false)
+                    } elseif (
+                        (bool) ($sem->ay_is_active ?? false)
                         && $sem->sem_name === '2nd Semester'
-                        && $officialSemesterName === '1st Semester') {
+                        && $officialSemesterName === '1st Semester'
+                    ) {
                         $label .= ' (Upcoming · View only)';
                     } else {
                         $label .= ' (View only)';
@@ -338,7 +353,7 @@ class PbtController extends Controller
     {
         $selectedDeptId = $request->query('department', $defaultDeptId);
         $sectionsQuery = DB::table('section')
-            ->when($selectedDeptId, fn ($q) => $q->where('sec_dept_id', $selectedDeptId))
+            ->when($selectedDeptId, fn($q) => $q->where('sec_dept_id', $selectedDeptId))
             ->orderBy('sec_name');
 
         if ($request->filled('section')) {
@@ -352,28 +367,34 @@ class PbtController extends Controller
     {
         if (!$faculty) {
             return [
-                'preparations' => null, 'units' => null, 'hours_week' => null,
-                'designation' => null, 'load_limit' => null, 'production' => null, 'extension' => null, 'research' => null,
+                'preparations' => null,
+                'units' => null,
+                'hours_week' => null,
+                'designation' => null,
+                'load_limit' => null,
+                'production' => null,
+                'extension' => null,
+                'research' => null,
             ];
         }
 
         $allLoads = Study_Load::where('sl_fac_id', $faculty->fac_id)
             ->when(
                 $semId,
-                fn ($q) => $q->where('sl_sem_id', $semId),
-                fn ($q) => $q->whereRaw('1 = 0')
+                fn($q) => $q->where('sl_sem_id', $semId),
+                fn($q) => $q->whereRaw('1 = 0')
             )
             ->with('subject', 'section', 'schedules')
             ->get();
 
-        $shiftForLoad = fn ($load) => $load->section?->sec_is_evening
+        $shiftForLoad = fn($load) => $load->section?->sec_is_evening
             ? 'evening'
             : ($load->sl_shift ?? 'day');
-        $loads = $allLoads->filter(fn ($load) => $shiftForLoad($load) === $shift)->values();
+        $loads = $allLoads->filter(fn($load) => $shiftForLoad($load) === $shift)->values();
 
         // Academic credit units and scheduled weekly contact hours are
         // different totals. Units come from each distinct Study Load course.
-        $units = $loads->sum(fn ($load) => (float) ($load->subject?->course_units ?? 0)); 
+        $units = $loads->sum(fn($load) => (float) ($load->subject?->course_units ?? 0));
 
         $hoursForLoads = function ($loads) {
             return $loads->sum(function ($load) {
@@ -388,9 +409,9 @@ class PbtController extends Controller
         $totalHoursPerWeek = $faculty->fac_employment_type === 'part_time'
             ? $hoursForLoads($allLoads)
             : null;
-        $workloadHours = $loads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
+        $workloadHours = $loads->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject));
         $totalWorkloadHours = $faculty->fac_employment_type === 'part_time'
-            ? $allLoads->sum(fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
+            ? $allLoads->sum(fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject))
             : null;
 
         return [
@@ -428,7 +449,7 @@ class PbtController extends Controller
 
         $collegeId = $this->chairCollegeId();
         $sectionInCollege = empty($data['sec_id']) || ($collegeId && Section::where('sec_id', $data['sec_id'])
-            ->whereHas('program', fn ($query) => $query->where('dept_college_id', $collegeId))->exists());
+            ->whereHas('program', fn($query) => $query->where('dept_college_id', $collegeId))->exists());
         if (!$sectionInCollege) {
             abort(403, 'PBT schedule sections must remain within your college.');
         }
@@ -528,7 +549,7 @@ class PbtController extends Controller
         $collegeId = $this->chairCollegeId();
         if (!$collegeId || !Faculty::where('fac_id', $facultyId)->where(function ($query) use ($collegeId) {
             $query->where('fac_college_id', $collegeId)
-                ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId));
+                ->orWhereHas('program', fn($program) => $program->where('dept_college_id', $collegeId));
         })->exists()) {
             return response()->json(['success' => false, 'message' => 'You can only clear schedules for faculty within your college.'], 403);
         }
@@ -536,15 +557,15 @@ class PbtController extends Controller
         $schedules = Schedule::where('sch_fac_id', $facultyId)
             ->where('sch_sem_id', $data['semester'])
             ->where(function ($query) use ($collegeId) {
-                $query->whereHas('section.program', fn ($section) => $section->where('dept_college_id', $collegeId))
+                $query->whereHas('section.program', fn($section) => $section->where('dept_college_id', $collegeId))
                     ->orWhereDoesntHave('section');
             })
             ->get(['sch_id', 'sch_load_id', 'sch_fac_id', 'sch_sem_id']);
 
         Schedule::whereIn('sch_id', $schedules->pluck('sch_id'))->delete();
         Study_Load::whereIn('sl_id', $schedules->pluck('sch_load_id'))->delete();
-        $schedules->unique(fn ($schedule) => $schedule->sch_fac_id.'|'.$schedule->sch_sem_id)
-            ->each(fn ($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
+        $schedules->unique(fn($schedule) => $schedule->sch_fac_id . '|' . $schedule->sch_sem_id)
+            ->each(fn($schedule) => $this->scheduler->syncWorkload($schedule->sch_fac_id, $schedule->sch_sem_id));
 
         return response()->json(['success' => true, 'message' => 'Cleared.']);
     }
@@ -552,12 +573,12 @@ class PbtController extends Controller
     private function scheduleIsInChairCollege(string $scheduleId, string $collegeId): bool
     {
         return Schedule::whereKey($scheduleId)->where(function ($query) use ($collegeId) {
-            $query->whereHas('section.program', fn ($section) => $section->where('dept_college_id', $collegeId))
+            $query->whereHas('section.program', fn($section) => $section->where('dept_college_id', $collegeId))
                 ->orWhere(function ($recSchedule) use ($collegeId) {
                     $recSchedule->whereDoesntHave('section')
-                        ->whereHas('faculty', fn ($faculty) => $faculty
+                        ->whereHas('faculty', fn($faculty) => $faculty
                             ->where('fac_college_id', $collegeId)
-                            ->orWhereHas('program', fn ($program) => $program->where('dept_college_id', $collegeId)));
+                            ->orWhereHas('program', fn($program) => $program->where('dept_college_id', $collegeId)));
                 });
         })->exists();
     }

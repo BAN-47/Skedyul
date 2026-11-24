@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -13,7 +13,7 @@
             position: fixed;
             bottom: 24px;
             right: 24px;
-            z-index: 100;
+            z-index: 12000;
             background: #0f172a;
             color: #fff;
             padding: 12px 18px;
@@ -142,7 +142,7 @@
     {{-- ADD SUBJECT MODAL --}}
     <div class="modal-overlay" id="modal-add-subject">
         <div class="modal-box w-[520px]">
-            <form action="{{ route('subject.store') }}" method="POST">
+            <form id="add-subj-form" action="{{ route('subject.store') }}" method="POST">
                 @csrf
                 <div class="modal-header">
                     <div class="modal-title">Add New Subject</div>
@@ -152,11 +152,11 @@
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
                         <label class="field-label">Course Code</label>
-                        <input class="field-input" name="subj_code" value="{{ old('subj_code') }}"
-                            placeholder="e.g. CC 111" required>
-                        @error('subj_code')
-                            <div class="text-red-600 text-[12px] mt-1">{{ $message }}</div>
-                        @enderror
+                        <input class="field-input" id="add-subj-code" name="subj_code" value="{{ old('subj_code') }}"
+                            placeholder="e.g. CC 111" autocomplete="off" oninput="validateAddSubjectCode()" required>
+                        <div id="add-subj-code-error"
+                            class="text-red-600 text-[12px] mt-1 {{ $errors->has('subj_code') ? '' : 'hidden' }}"
+                            role="alert" aria-live="polite">{{ $errors->first('subj_code') }}</div>
                     </div>
                     <div>
                         <label class="field-label">College / Department</label>
@@ -222,7 +222,8 @@
                 <div class="grid grid-cols-4 gap-3 mb-3">
                     <div>
                         <label class="field-label">Units</label>
-                        <input class="field-input" id="add-subj-units" name="subj_units" type="number" min="0" step="0.5" value="{{ old('subj_units', 0) }}" required>
+                        <input class="field-input" id="add-subj-units" name="subj_units" type="number"
+                            min="0" step="0.5" value="{{ old('subj_units', 0) }}" required>
                     </div>
                     <div>
                         <label class="field-label">Lecture Units (1 = 1 hr)</label>
@@ -238,14 +239,15 @@
                     </div>
                     <div>
                         <label class="field-label">Total (Lec + Lab)</label>
-                        <input class="field-input bg-slate-50" id="add-subj-total" type="number" value="0" readonly>
+                        <input class="field-input bg-slate-50" id="add-subj-total" type="number" value="0"
+                            readonly>
                     </div>
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" type="button"
                         onclick="closeModal('modal-add-subject')">Cancel</button>
-                    <button class="btn btn-primary" type="submit">Add Course</button>
+                    <button class="btn btn-primary" id="add-subj-submit" type="submit">Add Course</button>
                 </div>
             </form>
         </div>
@@ -319,7 +321,8 @@
                 <div class="grid grid-cols-4 gap-3 mb-3">
                     <div>
                         <label class="field-label">Units</label>
-                        <input class="field-input" id="edit-subj-units" name="subj_units" type="number" min="0" step="0.5" required>
+                        <input class="field-input" id="edit-subj-units" name="subj_units" type="number"
+                            min="0" step="0.5" required>
                     </div>
                     <div>
                         <label class="field-label">Lecture Units (1 = 1 hr)</label>
@@ -335,7 +338,8 @@
                     </div>
                     <div>
                         <label class="field-label">Total (Lec + Lab)</label>
-                        <input class="field-input bg-slate-50" id="edit-subj-total" type="number" value="0" readonly>
+                        <input class="field-input bg-slate-50" id="edit-subj-total" type="number" value="0"
+                            readonly>
                     </div>
                 </div>
 
@@ -361,6 +365,43 @@
         const UPDATE_URL = "{{ url('/subject') }}";
 
         const ALL_SUBJECTS = @json($subjectsForJs ?? []);
+        const EXISTING_SUBJECT_CODES = @json($existingSubjectCodes ?? []);
+
+        const addSubjectForm = document.getElementById('add-subj-form');
+        const addSubjectCode = document.getElementById('add-subj-code');
+        const addSubjectCodeError = document.getElementById('add-subj-code-error');
+        const addSubjectSubmit = document.getElementById('add-subj-submit');
+
+        function validateAddSubjectCode() {
+            const code = String(addSubjectCode?.value || '').trim().toLocaleUpperCase();
+            const isDuplicate = code !== '' && EXISTING_SUBJECT_CODES.includes(code);
+            const message = isDuplicate ? 'This subject code has already been taken.' : '';
+
+            if (addSubjectCodeError) {
+                addSubjectCodeError.textContent = message;
+                addSubjectCodeError.classList.toggle('hidden', !isDuplicate);
+            }
+
+            addSubjectCode?.setCustomValidity(message);
+
+            return !isDuplicate;
+        }
+
+        addSubjectCode?.addEventListener('input', validateAddSubjectCode);
+
+        function blockDuplicateSubjectSubmission(event) {
+            if (validateAddSubjectCode()) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            addSubjectCode?.focus();
+            showToast('Cannot proceed: This subject already exists. Enter a unique subject.');
+        }
+
+        addSubjectSubmit?.addEventListener('click', blockDuplicateSubjectSubmission);
+        addSubjectForm?.addEventListener('submit', blockDuplicateSubjectSubmission);
+
+        if (addSubjectCode?.value.trim()) validateAddSubjectCode();
 
         function openModal(id) {
             document.getElementById(id).classList.add('open');
