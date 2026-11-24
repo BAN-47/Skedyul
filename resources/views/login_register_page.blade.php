@@ -419,6 +419,7 @@
             <div>
               <label class="mb-1 block text-[10px] font-bold uppercase text-slate-700"> Address </label>
               <input name="role_address" value="{{ old('role_address') }}" placeholder="Cebu City" class="w-full rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+              @error('role_address')<p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>@enderror
             </div>
 
             <div>
