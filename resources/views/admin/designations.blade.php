@@ -174,12 +174,12 @@ async function deleteDesignation(id, name) {
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-      showToast(data.message || 'Failed to delete designation');
+      alert(data.message || 'Failed to delete designation. Check if faculty are assigned.');
       return;
     }
     window.location.reload();
   } catch (err) {
-    showToast('Network error deleting designation');
+    alert('Error: ' + err.message);
   }
 }
 </script>

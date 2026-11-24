@@ -35,24 +35,6 @@ class ScheduleAssignmentService
     public const PART_TIME_MAX_HOURS = 30;
     private const FULL_TIME_MAX_HOURS = 30;
 
-    /** Day-hour caps for staff with special positions; other full-time faculty use 30 hours. */
-    public const SPECIAL_POSITION_MAX_HOURS = [
-        'Vice-President' => 3,
-        'University Director' => 6,
-        'Campus Director' => 6,
-        'UD Data Protection Officer' => 6,
-        'Assistant Campus Director' => 9,
-        'Dean of Instruction' => 9,
-        'College Dean' => 9,
-        'Associate College Dean' => 12,
-        'Department Chairperson' => 16,
-        'PERG Chair' => 16,
-        'Campus Secretary' => 16,
-        'College Secretary' => 16,
-        'Research Chair' => 16,
-        'MIS Officer' => 30,
-    ];
-
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
         // Part-time staff share one 30-hour cap between Day and Evening.

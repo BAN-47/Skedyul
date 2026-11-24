@@ -372,6 +372,9 @@ class ChairFacultyLoadController extends Controller
         ]);
 
         $position = $data['special_position'] ?? null;
+        if ($position && Designation::isLimitReached($position, $faculty->fac_id)) {
+            return back()->withErrors(['special_position' => "The designation '{$position}' has reached its maximum faculty limit."]);
+        }
         $designation = $position ? Designation::where('name', $position)->first() : null;
         $hours = $designation ? $designation->day_cap : null;
 

@@ -32,6 +32,9 @@ class FacultyWorkloadController extends Controller
             'special_position' => ['nullable', 'string', Rule::in(Designation::pluck('name')->toArray())],
         ]);
         $position = $data['special_position'] ?? null;
+        if ($position && Designation::isLimitReached($position, $faculty->fac_id)) {
+            return back()->withErrors(['special_position' => "The designation '{$position}' has reached its maximum faculty limit."]);
+        }
         $cap = $position ? Designation::where('name', $position)->value('day_cap') : null;
         $faculty->update([
             'fac_special_position' => $position,

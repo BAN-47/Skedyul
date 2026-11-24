@@ -160,6 +160,14 @@ class UserController extends Controller
         Request $request,
         array $data
     ): void {
+        $faculty = Faculty::where('fac_usr_id', $user->usr_id)->first();
+        $specialPosition = $data['special_position'] ?? null;
+        if ($specialPosition && Designation::isLimitReached($specialPosition, $faculty?->fac_id)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'special_position' => "The designation '{$specialPosition}' has reached its maximum faculty limit."
+            ]);
+        }
+
         if ($oldRole && $oldRole !== $newRole) {
             // Keep the faculty row when changing faculty to a teaching-capable
             // leadership role. Schedules reference fac_id, so preserving this
