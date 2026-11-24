@@ -2,7 +2,7 @@
 <html lang="en">
 
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL — Dean Dashboard</title>
@@ -20,36 +20,62 @@
 
             <!-- DEPARTMENTS PAGE (now: straight to Programs, no department step) -->
             <div id="page-departments" class="page active">
+                @php
+                    $departmentValidationMessage = $errors->first('dept_name') ?: $errors->first('dept_code');
+                    $facultyValidationMessage = '';
+                    foreach (['usr_first_name', 'usr_middle_name', 'usr_last_name', 'usr_suffix', 'usr_email', 'password', 'usr_employee_id', 'usr_rank_title', 'role_phone_number', 'role_address', 'employment_type', 'special_position', 'usr_gender', 'usr_civil_status', 'usr_dob', 'usr_nationality', 'fac_employee_id', 'fac_rank', 'fac_employment_type', 'fac_special_position', 'fac_phone_number', 'fac_address', 'dept_id', 'usr_is_active'] as $facultyField) {
+                        if ($errors->has($facultyField)) {
+                            $facultyValidationMessage = $errors->first($facultyField);
+                            break;
+                        }
+                    }
+                @endphp
                 @if(session('success'))<div role="status" class="mx-5 mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif
                 @if(session('error'))<div role="alert" class="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ session('error') }}</div>@endif
                 @if($errors->any())<div role="alert" class="mx-5 mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
                 <div id="selected-program-tools" class="hidden">
-                @if($selectedDepartment)
+                    @if($selectedDepartment)
                     <div class="mx-5 mt-5">
                         <h2 class="text-lg font-bold">{{ $selectedDepartment->dept_code }} · {{ $selectedDepartment->dept_name }}</h2>
-                        <p class="mt-1 text-sm text-slate-500">Faculty roster and department chair · {{ $assignedCollege?->college_name }}</p>
+                        <p class="mt-1 text-sm text-slate-500">Faculty and Department Chairperson Roster · {{ $assignedCollege?->college_name }}</p>
                     </div>
                     <div class="mx-5 mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Sections</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $sectionCount }}</p><p class="mt-1 text-xs text-slate-500">In this department, across academic years</p></article>
-                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Assigned faculty</p><p class="mt-2 text-2xl font-bold text-slate-900">{{ $facultyTotal }}</p><p class="mt-1 text-xs text-slate-500">Faculty rostered in this department</p></article>
-                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pending dean review</p><p class="mt-2 text-2xl font-bold text-amber-600">{{ $pendingReviewCount }}</p><p class="mt-1 text-xs text-slate-500">PBS/PBT schedules awaiting your review this semester</p></article>
-                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty workload alerts</p><p class="mt-2 text-2xl font-bold {{ $workloadAttentionCount ? 'text-rose-600' : 'text-emerald-700' }}">{{ $workloadAttentionCount }}</p><p class="mt-1 text-xs text-slate-500">Faculty near their limit or over the workload cap</p></article>
+                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Sections</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-900">{{ $sectionCount }}</p>
+                            <p class="mt-1 text-xs text-slate-500">In this department, across academic years</p>
+                        </article>
+                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Assigned faculty</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-900">{{ $facultyTotal }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Faculty rostered in this department</p>
+                        </article>
+                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Pending dean review</p>
+                            <p class="mt-2 text-2xl font-bold text-amber-600">{{ $pendingReviewCount }}</p>
+                            <p class="mt-1 text-xs text-slate-500">PBS/PBT schedules awaiting your review this semester</p>
+                        </article>
+                        <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty workload alerts</p>
+                            <p class="mt-2 text-2xl font-bold {{ $workloadAttentionCount ? 'text-rose-600' : 'text-emerald-700' }}">{{ $workloadAttentionCount }}</p>
+                            <p class="mt-1 text-xs text-slate-500">Faculty near their limit or over the workload cap</p>
+                        </article>
                     </div>
                     <section class="mx-5 mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="mt-5 grid gap-4">
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div>
-                                        <h3 class="font-bold">Current department chair</h3>
-                                        <p class="mt-1 text-sm text-slate-600">{{ $currentChair?->user?->usr_name ?? 'No chair assigned' }}</p>
+                                        <h3 class="font-bold">Current Department Chairperson</h3>
+                                        <p class="mt-1 text-sm text-slate-600">{{ $currentChair?->user?->usr_name ?? 'No department chairperson is assigned' }}</p>
                                     </div>
                                     <div class="flex flex-wrap gap-2">
-                                      <button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('replace-chair-modal')">{{ $currentChair ? 'Replace chair' : 'Assign chair' }}</button>
-                                      @if($currentChair)
+                                        <button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('replace-chair-modal')">{{ $currentChair ? 'Designate' : 'Assign' }}</button>
+                                        @if($currentChair)
                                         <form method="POST" action="{{ route('dean.departments.chair.unassign', $selectedDepartment->dept_id) }}" onsubmit="return confirm('Unassign {{ addslashes($currentChair->user?->usr_name ?? 'this chair') }}? Their faculty account and schedules will stay.');">@csrf @method('DELETE')
-                                            <button class="topbar-btn btn-secondary" type="submit">Unassign chair</button>
+                                            <button class="topbar-btn btn-secondary" type="submit">Unassign</button>
                                         </form>
-                                      @endif
+                                        @endif
                                     </div>
                                 </div>
                                 @if($facultyMembers->isEmpty())<p class="mt-2 text-xs text-amber-700">There are no faculty members assigned to this department yet.</p>@endif
@@ -58,33 +84,49 @@
 
                         <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
                             <div class="min-w-0 flex-1">
-                                <h3 class="font-bold">Faculty members</h3>
+                                <h3 class="font-bold">Faculty Members</h3>
                                 <p class="text-sm text-slate-500">{{ $facultyTotal }} faculty assigned to this department’s sections</p>
-                                <input id="faculty-roster-search" type="search" class="field-input mt-3 w-full max-w-sm" placeholder="Search faculty..." aria-label="Search faculty">
+                                <input id="faculty-roster-search" type="search" class="field-input mt-3 w-full max-w-sm" placeholder="Search faculty member.." aria-label="Search faculty member">
                             </div>
-                            <div class="flex flex-wrap gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="showUtilityModal('replace-faculty-modal')">Assign / replace faculty</button><button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('add-faculty-modal')">Add user account</button></div>
+                            <div class="flex flex-wrap gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="showUtilityModal('replace-faculty-modal')">Assign / Designate Faculty Member</button><button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('add-faculty-modal')">Add User Account</button></div>
                         </div>
                         <div class="mt-3 overflow-x-auto rounded-xl border border-slate-200">
                             <table class="w-full min-w-[900px] text-left text-sm">
-                                <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Name</th><th class="p-3">Rank / department</th><th class="p-3">Email</th><th class="p-3">Employment</th><th class="p-3">Day load</th><th class="p-3">Evening load</th><th class="p-3">Account status</th><th class="p-3">Action</th></tr></thead>
+                                <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+                                    <tr>
+                                        <th class="p-3">Name</th>
+                                        <th class="p-3">Rank / Department</th>
+                                        <th class="p-3">Email</th>
+                                        <th class="p-3">Employment</th>
+                                        <th class="p-3">Day Load</th>
+                                        <th class="p-3">Evening Load</th>
+                                        <th class="p-3">Account Status</th>
+                                        <th class="p-3">Action</th>
+                                    </tr>
+                                </thead>
                                 <tbody class="divide-y divide-slate-100">
                                     @forelse($facultyMembers as $member)
-                                        <tr class="faculty-roster-row" data-faculty-search="{{ strtolower($member->full_name.' '.$member->fac_rank.' '.$member->user?->usr_email.' '.$member->program?->dept_code) }}">
-                                            <td class="p-3"><button type="button" class="flex items-center gap-3 text-left" onclick="showFacultyDetails(this)" data-name="{{ $member->full_name }}" data-rank="{{ $member->fac_rank ?? '—' }}" data-employment="{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}" data-email="{{ $member->user?->usr_email ?? '—' }}" data-employee="{{ $member->fac_employee_id ?? '—' }}" data-phone="{{ $member->fac_phone_number ?? '—' }}" data-position="{{ $member->fac_special_position ?? '—' }}" data-day="{{ number_format($member->day_load_hours, 1) }}h / {{ $member->day_load_cap }}h" data-evening="{{ number_format($member->evening_load_hours, 1) }}h / {{ $member->evening_load_cap }}h" data-load="{{ number_format($member->current_load_hours, 1) }}h"><span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">@if($member->fac_profile_image)<img class="h-full w-full object-cover" src="{{ asset('storage/'.$member->fac_profile_image) }}" alt="">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}@endif</span><span><span class="block font-semibold text-slate-900">{{ $member->full_name }}</span><span class="block text-xs text-slate-500">{{ $member->user?->usr_email ?? 'No email' }}</span></span></button></td>
-                                            <td class="p-3"><div>{{ $member->fac_rank ?? 'Faculty' }}</div><div class="text-xs text-slate-400">{{ $member->program?->dept_code ?? 'Other department' }}</div></td>
-                                            <td class="p-3 text-slate-600">{{ $member->user?->usr_email ?? '—' }}</td>
-                                            <td class="p-3">{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}</td>
-                                            <td class="p-3 font-semibold text-emerald-700">{{ number_format($member->day_load_hours, 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $member->day_load_cap }}h</span></td>
-                                            <td class="p-3 font-semibold text-indigo-700">{{ number_format($member->evening_load_hours, 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $member->evening_load_cap }}h</span></td>
-                                            <td class="p-3"><span class="badge {{ $member->user?->usr_is_active ? 'badge-green' : 'badge-grey' }}">{{ $member->user?->usr_is_active ? 'Active' : 'Inactive' }}</span></td>
-                                            <td class="p-3">
-                                                @if($member->fac_college_id === $assignedCollege->college_id && $member->fac_dept_id === $selectedDepartment->dept_id && $member->user)
-                                                    <button type="button" class="topbar-btn btn-secondary" onclick="showFacultyEdit(this)" data-faculty-id="{{ $member->fac_id }}" data-dept-id="{{ $member->fac_dept_id }}" data-first="{{ $member->fac_first_name }}" data-middle="{{ $member->fac_middle_name }}" data-last="{{ $member->fac_last_name }}" data-suffix="{{ $member->fac_suffix }}" data-email="{{ $member->user->usr_email }}" data-active="{{ $member->user->usr_is_active ? '1' : '0' }}" data-employee="{{ $member->fac_employee_id }}" data-rank="{{ $member->fac_rank }}" data-employment="{{ $member->fac_employment_type }}" data-position="{{ $member->fac_special_position }}" data-phone="{{ $member->fac_phone_number }}" data-address="{{ $member->fac_address }}">Edit</button>
-                                                @else<span class="text-xs text-slate-400">View only</span>@endif
-                                            </td>
-                                        </tr>
+                                    <tr class="faculty-roster-row" data-faculty-search="{{ strtolower($member->full_name.' '.$member->fac_rank.' '.$member->user?->usr_email.' '.$member->program?->dept_code) }}">
+                                        <td class="p-3"><button type="button" class="flex items-center gap-3 text-left" onclick="showFacultyDetails(this)" data-name="{{ $member->full_name }}" data-rank="{{ $member->fac_rank ?? '—' }}" data-employment="{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}" data-email="{{ $member->user?->usr_email ?? '—' }}" data-employee="{{ $member->fac_employee_id ?? '—' }}" data-phone="{{ $member->fac_phone_number ?? '—' }}" data-position="{{ $member->fac_special_position ?? '—' }}" data-day="{{ number_format($member->day_load_hours, 1) }}h / {{ $member->day_load_cap }}h" data-evening="{{ number_format($member->evening_load_hours, 1) }}h / {{ $member->evening_load_cap }}h" data-load="{{ number_format($member->current_load_hours, 1) }}h"><span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">@if($member->fac_profile_image)<img class="h-full w-full object-cover" src="{{ asset('storage/'.$member->fac_profile_image) }}" alt="">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}@endif</span><span><span class="block font-semibold text-slate-900">{{ $member->full_name }}</span><span class="block text-xs text-slate-500">{{ $member->user?->usr_email ?? 'No email' }}</span></span></button></td>
+                                        <td class="p-3">
+                                            <div>{{ $member->fac_rank ?? 'Faculty' }}</div>
+                                            <div class="text-xs text-slate-400">{{ $member->program?->dept_code ?? 'Other department' }}</div>
+                                        </td>
+                                        <td class="p-3 text-slate-600">{{ $member->user?->usr_email ?? '—' }}</td>
+                                        <td class="p-3">{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}</td>
+                                        <td class="p-3 font-semibold text-emerald-700">{{ number_format($member->day_load_hours, 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $member->day_load_cap }}h</span></td>
+                                        <td class="p-3 font-semibold text-indigo-700">{{ number_format($member->evening_load_hours, 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $member->evening_load_cap }}h</span></td>
+                                        <td class="p-3"><span class="badge {{ $member->user?->usr_is_active ? 'badge-green' : 'badge-grey' }}">{{ $member->user?->usr_is_active ? 'Active' : 'Inactive' }}</span></td>
+                                        <td class="p-3">
+                                            @if($member->fac_college_id === $assignedCollege->college_id && $member->fac_dept_id === $selectedDepartment->dept_id && $member->user)
+                                            <button type="button" class="topbar-btn btn-secondary" onclick="showFacultyEdit(this)" data-faculty-id="{{ $member->fac_id }}" data-dept-id="{{ $member->fac_dept_id }}" data-first="{{ $member->fac_first_name }}" data-middle="{{ $member->fac_middle_name }}" data-last="{{ $member->fac_last_name }}" data-suffix="{{ $member->fac_suffix }}" data-email="{{ $member->user->usr_email }}" data-active="{{ $member->user->usr_is_active ? '1' : '0' }}" data-employee="{{ $member->fac_employee_id }}" data-rank="{{ $member->fac_rank }}" data-employment="{{ $member->fac_employment_type }}" data-position="{{ $member->fac_special_position }}" data-phone="{{ $member->fac_phone_number }}" data-address="{{ $member->fac_address }}">Edit</button>
+                                            @else<span class="text-xs text-slate-400">View Only</span>@endif
+                                        </td>
+                                    </tr>
                                     @empty
-                                        <tr><td colspan="8" class="p-5 text-center text-slate-500">No faculty assigned to this department’s sections.</td></tr>
+                                    <tr>
+                                        <td colspan="8" class="p-5 text-center text-slate-500">No faculty assigned to this department’s sections.</td>
+                                    </tr>
                                     @endforelse
                                 </tbody>
                             </table>
@@ -94,62 +136,115 @@
                     </section>
                     <div id="faculty-details-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="faculty-details-title" onclick="if(event.target===this)this.classList.add('hidden')">
                         <div class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
-                            <div class="flex items-center justify-between"><h2 id="faculty-details-title" class="text-lg font-bold">Faculty details</h2><button type="button" class="topbar-btn btn-secondary" onclick="document.getElementById('faculty-details-modal').classList.add('hidden')" aria-label="Close">Close</button></div>
+                            <div class="flex items-center justify-between">
+                                <h2 id="faculty-details-title" class="text-lg font-bold">Faculty details</h2><button type="button" class="topbar-btn btn-secondary" onclick="document.getElementById('faculty-details-modal').classList.add('hidden')" aria-label="Close">Close</button>
+                            </div>
                             <dl id="faculty-details-list" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"></dl>
                         </div>
                     </div>
                     <div id="edit-department-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-department-title" onclick="if(event.target===this)this.classList.add('hidden')">
                         <div class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">
-                            <div class="flex items-center justify-between"><div><h2 id="edit-department-title" class="text-lg font-bold">Edit department</h2><p class="text-sm text-slate-500">Update this program’s name or code.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-department-modal')">Close</button></div>
-                            <form method="POST" action="{{ route('dean.departments.update', $selectedDepartment->dept_id) }}" class="mt-4 grid gap-3 sm:grid-cols-[1fr_160px]">@csrf @method('PUT')
-                                <input name="dept_name" required maxlength="255" value="{{ $selectedDepartment->dept_name }}" class="field-input" aria-label="Department name">
-                                <input name="dept_code" required maxlength="50" value="{{ $selectedDepartment->dept_code }}" class="field-input" aria-label="Department code">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 id="edit-department-title" class="text-lg font-bold">Edit department</h2>
+                                    <p class="text-sm text-slate-500">Update this program’s name or code.</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-department-modal')">Close</button>
+                            </div>
+                            <form id="edit-department-form" data-department-form="edit" method="POST" action="{{ route('dean.departments.update', $selectedDepartment->dept_id) }}" class="mt-4 grid gap-3 sm:grid-cols-[1fr_160px]">@csrf @method('PUT')
+                                <input type="hidden" name="_department_form" value="edit">
+                                <div class="{{ old('_department_form') === 'edit' && $departmentValidationMessage ? '' : 'hidden' }} rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2" data-department-validation-alert role="alert" aria-live="assertive">{{ old('_department_form') === 'edit' ? $departmentValidationMessage : '' }}</div>
+                                <input name="dept_name" required maxlength="255" value="{{ old('_department_form') === 'edit' ? old('dept_name', $selectedDepartment->dept_name) : $selectedDepartment->dept_name }}" class="field-input" aria-label="Department name">
+                                <input name="dept_code" required maxlength="50" value="{{ old('_department_form') === 'edit' ? old('dept_code', $selectedDepartment->dept_code) : $selectedDepartment->dept_code }}" class="field-input" aria-label="Department code">
                                 <div class="flex justify-end gap-2 sm:col-span-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-department-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">Save changes</button></div>
                             </form>
-                            <form method="POST" action="{{ route('dean.departments.destroy', $selectedDepartment->dept_id) }}" class="mt-4 border-t border-slate-100 pt-4" onsubmit="return confirm('Delete {{ addslashes($selectedDepartment->dept_code) }} permanently? This works only if the program has no linked faculty, courses, sections, Chair, or submissions.');">@csrf @method('DELETE')<button type="submit" class="topbar-btn btn-secondary text-rose-700">Delete department</button><p class="mt-1 text-xs text-slate-500">Deletion is blocked if records still depend on this department.</p></form>
+                            <form method="POST" action="{{ route('dean.departments.destroy', $selectedDepartment->dept_id) }}" class="mt-4 border-t border-slate-100 pt-4" onsubmit="return confirm('Delete {{ addslashes($selectedDepartment->dept_code) }} permanently? This works only if the program has no linked faculty, courses, sections, Chair, or submissions.');">@csrf @method('DELETE')<button type="submit" class="topbar-btn btn-secondary text-rose-700">Delete department</button>
+                                <p class="mt-1 text-xs text-slate-500">Deletion is blocked if records still depend on this department.</p>
+                            </form>
                         </div>
                     </div>
                     <div id="replace-chair-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="replace-chair-title" onclick="if(event.target===this)this.classList.add('hidden')">
                         <form method="POST" action="{{ route('dean.departments.chair.assign', $selectedDepartment->dept_id) }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()" onsubmit="return confirmChairAssignment(this, {{ $currentChair ? 'true' : 'false' }})">@csrf
-                            <div class="flex items-start justify-between gap-3"><div><h2 id="replace-chair-title" class="text-lg font-bold">{{ $currentChair ? 'Replace department chair' : 'Assign department chair' }}</h2><p class="text-sm text-slate-500">Choose a faculty member in {{ $selectedDepartment->dept_code }}.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-chair-modal')">Close</button></div>
-                            <label class="mt-4 block text-sm font-semibold text-slate-600" for="chair-faculty-id">Faculty member</label>
-                            <select id="chair-faculty-id" name="faculty_id" required class="field-input mt-1 w-full"><option value="">Choose faculty</option>@foreach($collegeFaculty->where('fac_dept_id', $selectedDepartment->dept_id) as $member)<option value="{{ $member->fac_id }}">{{ $member->full_name }}{{ $member->fac_rank ? ' · '.$member->fac_rank : '' }}</option>@endforeach</select>
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 id="replace-chair-title" class="text-lg font-bold">{{ $currentChair ? 'Designate Department Chairperson' : 'Assign Department Chairperson' }}</h2>
+                                    <p class="text-sm text-slate-500">Choose a faculty member in {{ $selectedDepartment->dept_code }}.</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-chair-modal')">Close</button>
+                            </div>
+                            <label class="mt-4 block text-sm font-semibold text-slate-600" for="chair-faculty-id">Faculty Member</label>
+                            <select id="chair-faculty-id" name="faculty_id" required class="field-input mt-1 w-full">
+                                <option value="">Choose faculty</option>@foreach($collegeFaculty->where('fac_dept_id', $selectedDepartment->dept_id) as $member)<option value="{{ $member->fac_id }}">{{ $member->full_name }}{{ $member->fac_rank ? ' · '.$member->fac_rank : '' }}</option>@endforeach
+                            </select>
                             <input type="hidden" name="confirm_replace" value="0">
                             <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-chair-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">{{ $currentChair ? 'Replace chair' : 'Assign chair' }}</button></div>
                         </form>
                     </div>
                     <div id="edit-faculty-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-faculty-title" onclick="if(event.target===this)hideUtilityModal('edit-faculty-modal')">
-                        <form id="edit-faculty-form" method="POST" data-update-base="{{ url('/dean/departments/'.$selectedDepartment->dept_id.'/faculty') }}" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf @method('PUT')
-                            <div class="flex items-start justify-between gap-3"><div><h2 id="edit-faculty-title" class="text-lg font-bold">Edit faculty details</h2><p class="text-sm text-slate-500">Update profile details. Account status and access are not changed here.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-faculty-modal')">Close</button></div>
+                        <form id="edit-faculty-form" data-faculty-form="edit" method="POST" data-update-base="{{ url('/dean/departments/'.$selectedDepartment->dept_id.'/faculty') }}" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf @method('PUT')
+                            <input type="hidden" name="_faculty_form" value="edit">
+                            <input type="hidden" name="_faculty_id" value="{{ old('_faculty_form') === 'edit' ? old('_faculty_id') : '' }}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 id="edit-faculty-title" class="text-lg font-bold">Edit faculty details</h2>
+                                    <p class="text-sm text-slate-500">Update profile details. Account status and access are not changed here.</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-faculty-modal')">Close</button>
+                            </div>
+                            <div class="{{ old('_faculty_form') === 'edit' && $facultyValidationMessage ? '' : 'hidden' }} mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-faculty-validation-alert role="alert" aria-live="assertive">{{ old('_faculty_form') === 'edit' ? $facultyValidationMessage : '' }}</div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                <label class="text-sm font-medium">First name<input name="usr_first_name" required maxlength="150" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Middle name<input name="usr_middle_name" maxlength="150" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Last name<input name="usr_last_name" required maxlength="150" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Suffix<input name="usr_suffix" maxlength="20" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium sm:col-span-2">Email<input name="usr_email" type="email" required maxlength="255" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Employee ID<input name="fac_employee_id" maxlength="255" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Rank / title<select name="fac_rank" class="field-input mt-1"><option value="">Select rank</option>@foreach(['Instructor I','Instructor II','Instructor III','Assistant Professor I','Assistant Professor II','Assistant Professor III','Assistant Professor IV','Associate Professor I','Associate Professor II','Associate Professor III','Associate Professor IV','Associate Professor V','Professor I','Professor II','Professor III','Professor IV','Professor V','Professor VI','University Professor'] as $rank)<option value="{{ $rank }}">{{ $rank }}</option>@endforeach</select></label>
-                                <label class="text-sm font-medium">Employment<select name="fac_employment_type" required class="field-input mt-1"><option value="full_time">Full-time</option><option value="part_time">Part-time</option></select></label>
-                                <label class="text-sm font-medium">Account status<select name="usr_is_active" class="field-input mt-1" required><option value="1">Active</option><option value="0">Deactivated</option></select></label>
-                                <label class="text-sm font-medium">Special position<select name="fac_special_position" class="field-input mt-1"><option value="">None</option>@foreach(\App\Models\Designation::orderBy('name')->get() as $d)<option value="{{ $d->name }}">{{ $d->name }}</option>@endforeach</select></label>
+                                <label class="text-sm font-medium">First Name<input name="usr_first_name" value="{{ old('_faculty_form') === 'edit' ? old('usr_first_name') : '' }}" required maxlength="150" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Middle Name<input name="usr_middle_name" value="{{ old('_faculty_form') === 'edit' ? old('usr_middle_name') : '' }}" maxlength="150" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Last Name<input name="usr_last_name" value="{{ old('_faculty_form') === 'edit' ? old('usr_last_name') : '' }}" required maxlength="150" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Suffix<input name="usr_suffix" value="{{ old('_faculty_form') === 'edit' ? old('usr_suffix') : '' }}" maxlength="20" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium sm:col-span-2">Email<input name="usr_email" value="{{ old('_faculty_form') === 'edit' ? old('usr_email') : '' }}" type="email" required maxlength="255" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Employee ID<input name="fac_employee_id" value="{{ old('_faculty_form') === 'edit' ? old('fac_employee_id') : '' }}" maxlength="255" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Rank / Title<select name="fac_rank" class="field-input mt-1">
+                                        <option value="">Select rank</option>@foreach(['Instructor I','Instructor II','Instructor III','Assistant Professor I','Assistant Professor II','Assistant Professor III','Assistant Professor IV','Associate Professor I','Associate Professor II','Associate Professor III','Associate Professor IV','Associate Professor V','Professor I','Professor II','Professor III','Professor IV','Professor V','Professor VI','University Professor'] as $rank)<option value="{{ $rank }}" @selected(old('_faculty_form') === 'edit' && old('fac_rank') === $rank)>{{ $rank }}</option>@endforeach
+                                    </select></label>
+                                <label class="text-sm font-medium">Employment<select name="fac_employment_type" required class="field-input mt-1">
+                                        <option value="full_time" @selected(old('_faculty_form') === 'edit' && old('fac_employment_type') === 'full_time')>Full-time</option>
+                                        <option value="part_time" @selected(old('_faculty_form') === 'edit' && old('fac_employment_type') === 'part_time')>Part-time</option>
+                                    </select></label>
+                                <label class="text-sm font-medium">Account Status<select name="usr_is_active" class="field-input mt-1" required>
+                                        <option value="1" @selected(old('_faculty_form') === 'edit' && old('usr_is_active') === '1')>Active</option>
+                                        <option value="0" @selected(old('_faculty_form') === 'edit' && old('usr_is_active') === '0')>Deactivated</option>
+                                    </select></label>
+                                <label class="text-sm font-medium">Special Position<select name="fac_special_position" class="field-input mt-1">
+                                        <option value="">None</option>@foreach(\App\Models\Designation::orderBy('name')->get() as $d)<option value="{{ $d->name }}" @selected(old('_faculty_form') === 'edit' && old('fac_special_position') === $d->name)>{{ $d->name }}</option>@endforeach
+                                    </select></label>
                                 <label class="text-sm font-medium">College<input class="field-input mt-1" value="{{ $assignedCollege?->college_name }}" readonly></label>
-                                <label class="text-sm font-medium">Department<select name="dept_id" class="field-input mt-1" required>@foreach($managedDepartments as $departmentOption)<option value="{{ $departmentOption->dept_id }}">{{ $departmentOption->dept_code }} · {{ $departmentOption->dept_name }}</option>@endforeach</select></label>
-                                <div class="sm:col-span-2 lg:col-span-3"><label class="text-sm font-medium">Phone number</label><div class="mt-1 flex gap-2"><select id="dean-edit-phone-code" class="field-input w-32"><option value="+63">PH +63</option><option value="+1">US +1</option><option value="+44">UK +44</option><option value="+81">JP +81</option><option value="+82">KR +82</option><option value="+65">SG +65</option><option value="+60">MY +60</option><option value="+62">ID +62</option></select><input id="dean-edit-phone-local" type="tel" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" class="field-input flex-1" placeholder="9123456789"><input id="dean-edit-phone-full" name="fac_phone_number" type="hidden"></div><p class="text-xs text-slate-400">Country code replaces the leading 0. Enter digits only.</p></div>
-                                <label class="text-sm font-medium sm:col-span-2 lg:col-span-3">Address<input name="fac_address" maxlength="255" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Department<select name="dept_id" class="field-input mt-1" required>@foreach($managedDepartments as $departmentOption)<option value="{{ $departmentOption->dept_id }}" @selected(old('_faculty_form') === 'edit' && old('dept_id') === $departmentOption->dept_id)>{{ $departmentOption->dept_code }} · {{ $departmentOption->dept_name }}</option>@endforeach</select></label>
+                                <div class="sm:col-span-2 lg:col-span-3"><label class="text-sm font-medium">Phone Number</label>
+                                    <div class="mt-1 flex gap-2"><select id="dean-edit-phone-code" class="field-input w-32">
+                                            <option value="+63">PH +63</option>
+                                            <option value="+1">US +1</option>
+                                            <option value="+44">UK +44</option>
+                                            <option value="+81">JP +81</option>
+                                            <option value="+82">KR +82</option>
+                                            <option value="+65">SG +65</option>
+                                            <option value="+60">MY +60</option>
+                                            <option value="+62">ID +62</option>
+                                        </select><input id="dean-edit-phone-local" type="tel" inputmode="numeric" maxlength="10" oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" class="field-input flex-1" placeholder="9123456789"><input id="dean-edit-phone-full" name="fac_phone_number" type="hidden" value="{{ old('_faculty_form') === 'edit' ? old('fac_phone_number') : '' }}"></div>
+                                    <p class="text-xs text-slate-400">Country code replaces the leading 0. Enter digits only.</p>
+                                </div>
+                                <label class="text-sm font-medium sm:col-span-2 lg:col-span-3">Address<input name="fac_address" value="{{ old('_faculty_form') === 'edit' ? old('fac_address') : '' }}" maxlength="255" class="field-input mt-1"></label>
                             </div>
                             <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('edit-faculty-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">Save faculty details</button></div>
                         </form>
                     </div>
                     <div id="replace-faculty-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="replace-faculty-title" onclick="if(event.target===this)this.classList.add('hidden')">
                         <form method="POST" action="{{ route('dean.departments.faculty.assign', $selectedDepartment->dept_id) }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
-                            <div class="flex items-start justify-between gap-3"><div><h2 id="replace-faculty-title" class="text-lg font-bold">Assign / replace faculty</h2><p class="text-sm text-slate-500">Choose a faculty member from your college to move into {{ $selectedDepartment->dept_code }}.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-faculty-modal')">Close</button></div>
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 id="replace-faculty-title" class="text-lg font-bold">Assign / replace faculty</h2>
+                                    <p class="text-sm text-slate-500">Choose a faculty member from your college to move into {{ $selectedDepartment->dept_code }}.</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-faculty-modal')">Close</button>
+                            </div>
                             <label class="mt-4 block text-sm font-semibold text-slate-600" for="replacement-faculty-search">Search faculty</label>
                             <input id="replacement-faculty-search" type="search" class="field-input mt-1 w-full" placeholder="Type a name or department..." oninput="filterFacultyOptions(this, 'replacement-faculty-id')">
                             <label class="mt-3 block text-sm font-semibold text-slate-600" for="replacement-faculty-id">Faculty member</label>
                             <select id="replacement-faculty-id" name="faculty_id" required class="field-input mt-1 w-full">
                                 <option value="">Select faculty</option>
                                 @foreach($collegeFaculty->where('fac_dept_id', '!=', $selectedDepartment->dept_id) as $member)
-                                    <option value="{{ $member->fac_id }}">{{ $member->full_name }} · {{ $managedDepartments->firstWhere('dept_id', $member->fac_dept_id)?->dept_code ?? 'Unassigned' }}</option>
+                                <option value="{{ $member->fac_id }}">{{ $member->full_name }} · {{ $managedDepartments->firstWhere('dept_id', $member->fac_dept_id)?->dept_code ?? 'Unassigned' }}</option>
                                 @endforeach
                             </select>
                             <p class="mt-2 text-xs text-slate-500">This changes their home department and keeps existing schedules intact.</p>
@@ -157,34 +252,80 @@
                         </form>
                     </div>
                     <div id="add-faculty-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="add-faculty-title" onclick="if(event.target===this)hideUtilityModal('add-faculty-modal')">
-                        <form method="POST" action="{{ route('dean.departments.faculty.store', $selectedDepartment->dept_id) }}" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
-                            <div class="flex items-center justify-between"><div><h2 id="add-faculty-title" class="text-lg font-bold">Add user account</h2><p class="text-sm text-slate-500">New faculty will be assigned to {{ $selectedDepartment->dept_code }} · {{ $assignedCollege?->college_code }}.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-faculty-modal')">Close</button></div>
+                        <form data-faculty-form="add" method="POST" action="{{ route('dean.departments.faculty.store', $selectedDepartment->dept_id) }}" class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
+                            <input type="hidden" name="_faculty_form" value="add">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 id="add-faculty-title" class="text-lg font-bold">Add User Account</h2>
+                                    <p class="text-sm text-slate-500">New faculty will be assigned to {{ $selectedDepartment->dept_code }} · {{ $assignedCollege?->college_code }}.</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-faculty-modal')">Close</button>
+                            </div>
+                            <div class="{{ old('_faculty_form') === 'add' && $facultyValidationMessage ? '' : 'hidden' }} mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-faculty-validation-alert role="alert" aria-live="assertive">{{ old('_faculty_form') === 'add' ? $facultyValidationMessage : '' }}</div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                                <label class="text-sm font-medium">First name<input name="usr_first_name" required maxlength="150" class="field-input mt-1"></label><label class="text-sm font-medium">Middle name<input name="usr_middle_name" maxlength="150" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Last name<input name="usr_last_name" required maxlength="150" class="field-input mt-1"></label><label class="text-sm font-medium">Suffix<input name="usr_suffix" maxlength="20" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Email<input name="usr_email" type="email" required maxlength="255" class="field-input mt-1"></label><label class="text-sm font-medium">Temporary password<div class="mt-1 flex gap-2"><input id="dean-add-password" name="password" type="password" required minlength="8" class="field-input flex-1"><button type="button" class="topbar-btn btn-secondary" onclick="toggleDeanPassword()" id="dean-add-password-toggle">Show</button></div></label>
-                                <label class="text-sm font-medium">Employee ID<input name="usr_employee_id" maxlength="255" class="field-input mt-1"></label>
-                                <label class="text-sm font-medium">Rank / title<select name="usr_rank_title" class="field-input mt-1"><option value="">Select rank</option>@foreach(['Instructor I','Instructor II','Instructor III','Assistant Professor I','Assistant Professor II','Assistant Professor III','Assistant Professor IV','Associate Professor I','Associate Professor II','Associate Professor III','Associate Professor IV','Associate Professor V','Professor I','Professor II','Professor III','Professor IV','Professor V','Professor VI','University Professor'] as $rank)<option value="{{ $rank }}">{{ $rank }}</option>@endforeach</select></label>
-                                <label class="text-sm font-medium">Employment<select name="employment_type" required class="field-input mt-1"><option value="full_time">Full-time</option><option value="part_time">Part-time</option></select></label>
-                                <label class="text-sm font-medium">Special position<select name="special_position" class="field-input mt-1"><option value="">None</option>@foreach(\App\Models\Designation::orderBy('name')->get() as $d)<option value="{{ $d->name }}">{{ $d->name }}</option>@endforeach</select></label>
-                                <div class="sm:col-span-2"><label class="text-sm font-medium">Phone number</label><div class="mt-1 flex gap-2"><select id="dean-add-phone-code" class="field-input w-32"><option value="+63" selected>PH +63</option><option value="+1">US +1</option><option value="+44">UK +44</option><option value="+81">JP +81</option><option value="+82">KR +82</option><option value="+65">SG +65</option><option value="+60">MY +60</option><option value="+62">ID +62</option></select><input id="dean-add-phone-local" type="tel" inputmode="numeric" maxlength="10" required oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" class="field-input flex-1" placeholder="9123456789"><input id="dean-add-phone-full" name="role_phone_number" type="hidden"></div><p class="text-xs text-slate-400">Country code replaces the leading 0. Enter digits only.</p></div>
-                                <label class="text-sm font-medium">Address<input name="role_address" maxlength="255" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">First Name<input name="usr_first_name" value="{{ old('_faculty_form') === 'add' ? old('usr_first_name') : '' }}" required maxlength="150" class="field-input mt-1"></label><label class="text-sm font-medium">Middle Name<input name="usr_middle_name" value="{{ old('_faculty_form') === 'add' ? old('usr_middle_name') : '' }}" maxlength="150" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Last Name<input name="usr_last_name" value="{{ old('_faculty_form') === 'add' ? old('usr_last_name') : '' }}" required maxlength="150" class="field-input mt-1"></label><label class="text-sm font-medium">Suffix<input name="usr_suffix" value="{{ old('_faculty_form') === 'add' ? old('usr_suffix') : '' }}" maxlength="20" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Email<input name="usr_email" value="{{ old('_faculty_form') === 'add' ? old('usr_email') : '' }}" type="email" required maxlength="255" class="field-input mt-1"></label><label class="text-sm font-medium">Temporary password<div class="mt-1 flex gap-2"><input id="dean-add-password" name="password" type="password" required minlength="8" class="field-input flex-1"><button type="button" class="topbar-btn btn-secondary" onclick="toggleDeanPassword()" id="dean-add-password-toggle">Show</button></div></label>
+                                <label class="text-sm font-medium">Employee ID<input name="usr_employee_id" value="{{ old('_faculty_form') === 'add' ? old('usr_employee_id') : '' }}" maxlength="255" class="field-input mt-1"></label>
+                                <label class="text-sm font-medium">Rank / Title<select name="usr_rank_title" class="field-input mt-1">
+                                        <option value="">Select rank</option>@foreach(['Instructor I','Instructor II','Instructor III','Assistant Professor I','Assistant Professor II','Assistant Professor III','Assistant Professor IV','Associate Professor I','Associate Professor II','Associate Professor III','Associate Professor IV','Associate Professor V','Professor I','Professor II','Professor III','Professor IV','Professor V','Professor VI','University Professor'] as $rank)<option value="{{ $rank }}">{{ $rank }}</option>@endforeach
+                                    </select></label>
+                                <label class="text-sm font-medium">Employment<select name="employment_type" required class="field-input mt-1">
+                                        <option value="full_time">Full-time</option>
+                                        <option value="part_time">Part-time</option>
+                                    </select></label>
+                                <label class="text-sm font-medium">Special Position<select name="special_position" class="field-input mt-1">
+                                        <option value="">None</option>@foreach(\App\Models\Designation::orderBy('name')->get() as $d)<option value="{{ $d->name }}">{{ $d->name }}</option>@endforeach
+                                    </select></label>
+                                <div class="sm:col-span-2"><label class="text-sm font-medium">Phone number</label>
+                                    <div class="mt-1 flex gap-2"><select id="dean-add-phone-code" class="field-input w-32">
+                                            <option value="+63" selected>PH +63</option>
+                                            <option value="+1">US +1</option>
+                                            <option value="+44">UK +44</option>
+                                            <option value="+81">JP +81</option>
+                                            <option value="+82">KR +82</option>
+                                            <option value="+65">SG +65</option>
+                                            <option value="+60">MY +60</option>
+                                            <option value="+62">ID +62</option>
+                                        </select><input id="dean-add-phone-local" type="tel" inputmode="numeric" maxlength="10" required oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)" class="field-input flex-1" placeholder="9123456789"><input id="dean-add-phone-full" name="role_phone_number" type="hidden" value="{{ old('_faculty_form') === 'add' ? old('role_phone_number') : '' }}"></div>
+                                    <p class="text-xs text-slate-400">Country code replaces the leading 0. Enter digits only.</p>
+                                </div>
+                                <label class="text-sm font-medium">Address<input name="role_address" value="{{ old('_faculty_form') === 'add' ? old('role_address') : '' }}" maxlength="255" class="field-input mt-1"></label>
                             </div>
                             <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-faculty-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">Create faculty account</button></div>
                         </form>
                     </div>
                     <div id="program-history-modal" class="fixed inset-0 z-50 {{ request()->has('chair_history_page') || request()->has('dean_history_page') || request()->has('activity_page') ? 'flex' : 'hidden' }} items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="program-history-title" onclick="if(event.target===this)this.classList.add('hidden')">
                         <div class="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">
-                            <div class="flex items-center justify-between"><div><h2 id="program-history-title" class="text-lg font-bold">History from past positions</h2><p class="text-sm text-slate-500">{{ $selectedDepartment->dept_code }} · {{ $assignedCollege?->college_name }}</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('program-history-modal')">Close</button></div>
-                            <section class="mt-4 rounded-xl border border-slate-200 p-4"><h3 class="font-bold">Past department chair positions</h3>
-                                <div class="mt-2 space-y-2">@forelse($chairHistory as $history)<div class="border-t border-slate-100 pt-2"><div class="font-semibold">{{ $chairHistoryAvailable ? ($history->pph_former_name ?? $history->pph_new_name ?? 'Chair assignment') : ($history->user?->usr_name ?? 'Chair assignment') }}</div><div class="text-sm text-slate-500">{{ $chairHistoryAvailable ? ucfirst($history->pph_action) : $history->al_action }} · {{ \Illuminate\Support\Carbon::parse($chairHistoryAvailable ? $history->pph_created_at : $history->al_created_at)->format('M j, Y g:i A') }} · {{ $chairHistoryAvailable ? 'changed by '.$history->pph_changed_by : ($history->user?->usr_name ?? 'System') }}</div><div class="text-sm text-slate-500">{{ $chairHistoryAvailable ? (($history->pph_action === 'replaced' && $history->pph_new_name) ? 'Replaced by '.$history->pph_new_name : '') : $history->al_description }}</div></div>@empty<p class="py-2 text-sm text-slate-500">No past Chair positions recorded yet.</p>@endforelse</div>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h2 id="program-history-title" class="text-lg font-bold">History from past positions</h2>
+                                    <p class="text-sm text-slate-500">{{ $selectedDepartment->dept_code }} · {{ $assignedCollege?->college_name }}</p>
+                                </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('program-history-modal')">Close</button>
+                            </div>
+                            <section class="mt-4 rounded-xl border border-slate-200 p-4">
+                                <h3 class="font-bold">Past Department Chairperson Positions</h3>
+                                <div class="mt-2 space-y-2">@forelse($chairHistory as $history)<div class="border-t border-slate-100 pt-2">
+                                        <div class="font-semibold">{{ $chairHistoryAvailable ? ($history->pph_former_name ?? $history->pph_new_name ?? 'Department Chairperson assignment') : ($history->user?->usr_name ?? 'Department Chairperson assignment') }}</div>
+                                        <div class="text-sm text-slate-500">{{ $chairHistoryAvailable ? ucfirst($history->pph_action) : $history->al_action }} · {{ \Illuminate\Support\Carbon::parse($chairHistoryAvailable ? $history->pph_created_at : $history->al_created_at)->format('M j, Y g:i A') }} · {{ $chairHistoryAvailable ? 'changed by '.$history->pph_changed_by : ($history->user?->usr_name ?? 'System') }}</div>
+                                        <div class="text-sm text-slate-500">{{ $chairHistoryAvailable ? (($history->pph_action === 'replaced' && $history->pph_new_name) ? 'Replaced by '.$history->pph_new_name : '') : $history->al_description }}</div>
+                                    </div>@empty<p class="py-2 text-sm text-slate-500">No past Department Chairperson positions recorded yet.</p>@endforelse</div>
                                 @if($chairHistory->hasPages())<div class="mt-3">{{ $chairHistory->links() }}</div>@endif
                             </section>
-                            <section class="mt-4 rounded-xl border border-slate-200 p-4"><h3 class="font-bold">Past Dean positions</h3><p class="mt-1 text-sm text-slate-700">Current Dean: {{ $currentDean?->user?->usr_name ?? 'No Dean account assigned' }}</p><p class="text-xs text-slate-500">Dean for {{ $assignedCollege?->college_code }} · {{ $assignedCollege?->college_name }}</p>
-                                <div class="mt-2 space-y-2">@forelse($deanHistory as $entry)<div class="border-t border-slate-100 pt-2 text-sm"><b>{{ $entry->user?->usr_name ?? 'Admin' }}</b> · {{ $entry->al_action }}<div class="text-xs text-slate-500">{{ $entry->al_description }} · {{ \Illuminate\Support\Carbon::parse($entry->al_created_at)->format('M j, Y g:i A') }}</div></div>@empty<p class="py-2 text-sm text-slate-500">No Dean assignment changes have been logged yet.</p>@endforelse</div>
+                            <section class="mt-4 rounded-xl border border-slate-200 p-4">
+                                <h3 class="font-bold">Past Dean Positions</h3>
+                                <p class="mt-1 text-sm text-slate-700">Current Dean: {{ $currentDean?->user?->usr_name ?? 'No Dean account assigned' }}</p>
+                                <p class="text-xs text-slate-500">Dean for {{ $assignedCollege?->college_code }} · {{ $assignedCollege?->college_name }}</p>
+                                <div class="mt-2 space-y-2">@forelse($deanHistory as $entry)<div class="border-t border-slate-100 pt-2 text-sm"><b>{{ $entry->user?->usr_name ?? 'Admin' }}</b> · {{ $entry->al_action }}
+                                        <div class="text-xs text-slate-500">{{ $entry->al_description }} · {{ \Illuminate\Support\Carbon::parse($entry->al_created_at)->format('M j, Y g:i A') }}</div>
+                                    </div>@empty<p class="py-2 text-sm text-slate-500">No Dean assignment changes have been logged yet.</p>@endforelse</div>
                                 @if($deanHistory->hasPages())<div class="mt-3">{{ $deanHistory->links() }}</div>@endif
                             </section>
-                            <section class="mt-4 rounded-xl border border-slate-200 p-4"><h3 class="font-bold">Department activity</h3><div class="mt-2 space-y-2">@forelse($departmentActivity as $activity)<div class="border-t border-slate-100 pt-2 text-sm"><b>{{ $activity->user?->usr_name ?? 'System' }}</b> · {{ $activity->al_action }}<div class="text-xs text-slate-500">{{ $activity->al_description }} · {{ \Illuminate\Support\Carbon::parse($activity->al_created_at)->format('M j, Y g:i A') }}</div></div>@empty<p class="py-2 text-sm text-slate-500">No activity recorded yet.</p>@endforelse</div></section>
+                            <section class="mt-4 rounded-xl border border-slate-200 p-4">
+                                <h3 class="font-bold">Department Activity</h3>
+                                <div class="mt-2 space-y-2">@forelse($departmentActivity as $activity)<div class="border-t border-slate-100 pt-2 text-sm"><b>{{ $activity->user?->usr_name ?? 'System' }}</b> · {{ $activity->al_action }}
+                                        <div class="text-xs text-slate-500">{{ $activity->al_description }} · {{ \Illuminate\Support\Carbon::parse($activity->al_created_at)->format('M j, Y g:i A') }}</div>
+                                    </div>@empty<p class="py-2 text-sm text-slate-500">No activity recorded yet.</p>@endforelse</div>
+                            </section>
                             @if($departmentActivity->hasPages())<div class="mt-3">{{ $departmentActivity->links() }}</div>@endif
                         </div>
                     </div>
@@ -199,6 +340,7 @@
                             const term = event.target.value.trim().toLowerCase();
                             document.querySelectorAll('.faculty-roster-row').forEach(row => row.classList.toggle('hidden', !row.dataset.facultySearch.includes(term)));
                         });
+
                         function filterFacultyOptions(input, selectId) {
                             const term = input.value.trim().toLowerCase();
                             document.querySelectorAll(`#${selectId} option`).forEach((option, index) => {
@@ -207,19 +349,60 @@
                             });
                         }
 
+                        function showFacultyValidationAlert(form, message) {
+                            const alert = form.querySelector('[data-faculty-validation-alert]');
+                            alert.textContent = message;
+                            alert.classList.toggle('hidden', !message);
+                        }
+
+                        document.querySelectorAll('form[data-faculty-form]').forEach(form => {
+                            const fields = form.querySelectorAll('input:not([type="hidden"]), textarea, select');
+                            fields.forEach(field => ['input', 'change'].forEach(eventName => field.addEventListener(eventName, () => {
+                                const invalidField = [...fields].find(candidate => /[<>]/.test(candidate.value));
+                                showFacultyValidationAlert(form, invalidField ? 'Angle brackets (< and >) are not allowed.' : '');
+                            })));
+                            form.addEventListener('submit', event => {
+                                const invalidField = [...fields].find(field => /[<>]/.test(field.value));
+                                if (!invalidField) return;
+                                event.preventDefault();
+                                showFacultyValidationAlert(form, 'Angle brackets (< and >) are not allowed.');
+                                invalidField.focus();
+                            });
+                        });
+
                         function showFacultyEdit(button) {
                             const form = document.getElementById('edit-faculty-form');
                             form.action = `${form.dataset.updateBase}/${encodeURIComponent(button.dataset.facultyId)}`;
-                            const fields = {usr_first_name:'first',usr_middle_name:'middle',usr_last_name:'last',usr_suffix:'suffix',usr_email:'email',fac_employee_id:'employee',fac_rank:'rank',fac_employment_type:'employment',fac_special_position:'position',fac_phone_number:'phone',fac_address:'address',usr_is_active:'active'};
-                            Object.entries(fields).forEach(([name,key]) => { form.elements[name].value = button.dataset[key] || ''; });
+                            form.elements._faculty_id.value = button.dataset.facultyId;
+                            showFacultyValidationAlert(form, '');
+                            const fields = {
+                                usr_first_name: 'first',
+                                usr_middle_name: 'middle',
+                                usr_last_name: 'last',
+                                usr_suffix: 'suffix',
+                                usr_email: 'email',
+                                fac_employee_id: 'employee',
+                                fac_rank: 'rank',
+                                fac_employment_type: 'employment',
+                                fac_special_position: 'position',
+                                fac_phone_number: 'phone',
+                                fac_address: 'address',
+                                usr_is_active: 'active'
+                            };
+                            Object.entries(fields).forEach(([name, key]) => {
+                                form.elements[name].value = button.dataset[key] || '';
+                            });
                             form.elements.dept_id.value = button.dataset.deptId || '';
                             const phone = button.dataset.phone || '';
                             const code = document.getElementById('dean-edit-phone-code');
-                            const matchedCode = [...code.options].map(option => option.value).sort((a,b) => b.length-a.length).find(value => phone.startsWith(value));
+                            const matchedCode = [...code.options].map(option => option.value).sort((a, b) => b.length - a.length).find(value => phone.startsWith(value));
                             code.value = matchedCode || '+63';
                             document.getElementById('dean-edit-phone-local').value = phone.startsWith(code.value) ? phone.slice(code.value.length).replace(/^0/, '') : phone;
-                            const modal = document.getElementById('edit-faculty-modal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+                            const modal = document.getElementById('edit-faculty-modal');
+                            modal.classList.remove('hidden');
+                            modal.classList.add('flex');
                         }
+
                         function toggleDeanPassword() {
                             const field = document.getElementById('dean-add-password');
                             const button = document.getElementById('dean-add-password-toggle');
@@ -230,34 +413,76 @@
                             const code = document.getElementById('dean-add-phone-code').value;
                             const local = document.getElementById('dean-add-phone-local').value.replace(/\D/g, '').replace(/^0/, '');
                             document.getElementById('dean-add-phone-full').value = `${code}${local}`;
-                        });                        document.getElementById('edit-faculty-form')?.addEventListener('submit', () => {
+                        });
+                        document.getElementById('edit-faculty-form')?.addEventListener('submit', () => {
                             const code = document.getElementById('dean-edit-phone-code').value;
                             const local = document.getElementById('dean-edit-phone-local').value.replace(/\D/g, '').replace(/^0/, '');
                             document.getElementById('dean-edit-phone-full').value = local ? `${code}${local}` : '';
                         });
+
+                        function restorePhoneNumber(fullNumber, codeSelect, localInput) {
+                            if (!fullNumber) return;
+                            const matchingCode = [...codeSelect.options]
+                                .map(option => option.value)
+                                .sort((a, b) => b.length - a.length)
+                                .find(code => fullNumber.startsWith(code));
+                            if (!matchingCode) return;
+                            codeSelect.value = matchingCode;
+                            localInput.value = fullNumber.slice(matchingCode.length).replace(/^0/, '');
+                        }
+
+                        @if($facultyValidationMessage && old('_faculty_form') === 'add')
+                            restorePhoneNumber(@json(old('role_phone_number')), document.getElementById('dean-add-phone-code'), document.getElementById('dean-add-phone-local'));
+                            showUtilityModal('add-faculty-modal');
+                        @elseif($facultyValidationMessage && old('_faculty_form') === 'edit' && old('_faculty_id'))
+                            const failedEditFacultyId = @json(old('_faculty_id'));
+                            const failedEditForm = document.getElementById('edit-faculty-form');
+                            failedEditForm.action = `${failedEditForm.dataset.updateBase}/${encodeURIComponent(failedEditFacultyId)}`;
+                            restorePhoneNumber(failedEditForm.elements.fac_phone_number.value, document.getElementById('dean-edit-phone-code'), document.getElementById('dean-edit-phone-local'));
+                            showUtilityModal('edit-faculty-modal');
+                        @endif
+
                         function showFacultyDetails(button) {
-                            const labels = {name:'Name',rank:'Rank',employment:'Employment',email:'Email',employee:'Employee ID',phone:'Phone',position:'Special position',day:'Day load',evening:'Evening load',load:'Total semester load'};
+                            const labels = {
+                                name: 'Name',
+                                rank: 'Rank',
+                                employment: 'Employment',
+                                email: 'Email',
+                                employee: 'Employee ID',
+                                phone: 'Phone',
+                                position: 'Special position',
+                                day: 'Day load',
+                                evening: 'Evening load',
+                                load: 'Total semester load'
+                            };
                             const list = document.getElementById('faculty-details-list');
                             list.replaceChildren();
-                            Object.entries(labels).forEach(([key,label]) => {
+                            Object.entries(labels).forEach(([key, label]) => {
                                 const wrap = document.createElement('div');
-                                const term = document.createElement('dt'); term.className='text-xs font-semibold uppercase text-slate-400'; term.textContent=label;
-                                const value = document.createElement('dd'); value.className='mt-1 font-medium text-slate-800'; value.textContent=button.dataset[key] || '—';
-                                wrap.append(term,value); list.append(wrap);
+                                const term = document.createElement('dt');
+                                term.className = 'text-xs font-semibold uppercase text-slate-400';
+                                term.textContent = label;
+                                const value = document.createElement('dd');
+                                value.className = 'mt-1 font-medium text-slate-800';
+                                value.textContent = button.dataset[key] || '—';
+                                wrap.append(term, value);
+                                list.append(wrap);
                             });
-                            const modal = document.getElementById('faculty-details-modal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+                            const modal = document.getElementById('faculty-details-modal');
+                            modal.classList.remove('hidden');
+                            modal.classList.add('flex');
                         }
                     </script>
-                @endif
+                    @endif
                 </div>
                 <div id="program-list-view" style="{{ $selectedDepartment ? 'display:none;' : '' }}">
                     <div class="mx-5 mt-5 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div style="font-size:20px;font-weight:800;">Program Overview</div>
-                        <div style="font-size:13px;color:var(--text3);margin-top:3px;">Select a program to view
-                            details and faculty</div>
-                      </div>
-                      @if($assignedCollege)<button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('add-department-modal')">+ Add Department</button>@endif
+                        <div>
+                            <div style="font-size:20px;font-weight:800;">Program Overview</div>
+                            <div style="font-size:13px;color:var(--text3);margin-top:3px;">Select a program to view
+                                details and faculty</div>
+                        </div>
+                        @if($assignedCollege)<button type="button" class="topbar-btn btn-primary" onclick="showUtilityModal('add-department-modal')">+ Add Department</button>@endif
                     </div>
                     <div class="three-col mx-5 mt-4" id="program-list-grid"></div>
                 </div>
@@ -271,9 +496,16 @@
         </div><!-- end #screen-app -->
 
         <div id="add-department-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="add-department-title" onclick="if(event.target===this)hideUtilityModal('add-department-modal')">
-            <form method="POST" action="{{ route('dean.departments.store') }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
-                <div class="flex items-center justify-between"><div><h2 id="add-department-title" class="text-lg font-bold">Add department</h2><p class="text-sm text-slate-500">This department will be added to {{ $assignedCollege?->college_name ?? 'your assigned college' }}.</p></div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-department-modal')">Close</button></div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input name="dept_name" required maxlength="255" class="field-input" placeholder="Department name"><input name="dept_code" required maxlength="50" class="field-input" placeholder="Code (e.g. BSIS)"></div>
+            <form id="add-department-form" data-department-form="add" method="POST" action="{{ route('dean.departments.store') }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
+                <input type="hidden" name="_department_form" value="add">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="add-department-title" class="text-lg font-bold">Add department</h2>
+                        <p class="text-sm text-slate-500">This department will be added to {{ $assignedCollege?->college_name ?? 'your assigned college' }}.</p>
+                    </div><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-department-modal')">Close</button>
+                </div>
+                <div class="{{ old('_department_form') === 'add' && $departmentValidationMessage ? '' : 'hidden' }} mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" data-department-validation-alert role="alert" aria-live="assertive">{{ old('_department_form') === 'add' ? $departmentValidationMessage : '' }}</div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input name="dept_name" required maxlength="255" value="{{ old('_department_form') === 'add' ? old('dept_name') : '' }}" class="field-input" placeholder="Department name"><input name="dept_code" required maxlength="50" value="{{ old('_department_form') === 'add' ? old('dept_code') : '' }}" class="field-input" placeholder="Code (e.g. BSIS)"></div>
                 <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('add-department-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">Add Department</button></div>
             </form>
         </div>
@@ -297,7 +529,7 @@
                             class="field-label">Department</label><select class="field-select">
                             <option>All Departments</option>
                             @foreach ($deptData as $d)
-                                <option>{{ $d['code'] }}</option>
+                            <option>{{ $d['code'] }}</option>
                             @endforeach
                         </select></div>
                     <div class="field-group"><label class="field-label">Format</label><select class="field-select">
@@ -336,25 +568,28 @@
                                      own chair), so this list loops over every program across all departments
                                      the dean oversees, rather than one row per department. --}}
                                 @foreach ($deptData as $d)
-                                    @foreach ($d['programs'] as $p)
-                                        <label
-                                            style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
-                                            <input type="checkbox" class="chair-check" checked
-                                                onchange="syncAllChairs()"
-                                                style="width:14px;height:14px;accent-color:var(--blue);">
-                                            <div style="display:flex;align-items:center;gap:8px;">
-                                                <div
-                                                    style="width:28px;height:28px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
-                                                    {{ strtoupper(substr($p['chair'], 0, 2)) }}</div>
-                                                <div>
-                                                    <div style="font-size:13px;font-weight:600;color:var(--text);">
-                                                        {{ $p['chair'] }}</div>
-                                                    <div style="font-size:11px;color:var(--text3);">Chair ·
-                                                        {{ $p['code'] }}</div>
-                                                </div>
+                                @foreach ($d['programs'] as $p)
+                                <label
+                                    style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--grey);border-radius:8px;cursor:pointer;border:1px solid var(--border);">
+                                    <input type="checkbox" class="chair-check" checked
+                                        onchange="syncAllChairs()"
+                                        style="width:14px;height:14px;accent-color:var(--blue);">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div
+                                            style="width:28px;height:28px;border-radius:50%;background:#d97706;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0;">
+                                            {{ strtoupper(substr($p['chair'], 0, 2)) }}
+                                        </div>
+                                        <div>
+                                            <div style="font-size:13px;font-weight:600;color:var(--text);">
+                                                {{ $p['chair'] }}
                                             </div>
-                                        </label>
-                                    @endforeach
+                                            <div style="font-size:11px;color:var(--text3);">Chair ·
+                                                {{ $p['code'] }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                                @endforeach
                                 @endforeach
                             </div>
                         </div>
@@ -510,14 +745,44 @@
             function closeModal(id) {
                 document.getElementById(id).classList.remove('open');
             }
+
             function showUtilityModal(id) {
                 const modal = document.getElementById(id);
-                if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                }
             }
+
             function hideUtilityModal(id) {
                 const modal = document.getElementById(id);
                 if (modal) modal.classList.add('hidden');
             }
+            document.querySelectorAll('form[data-department-form]').forEach(form => {
+                const alert = form.querySelector('[data-department-validation-alert]');
+                const fields = form.querySelectorAll('[name="dept_name"], [name="dept_code"]');
+                const updateAlert = () => {
+                    const hasAngleBracket = Array.from(fields).some(field => /[<>]/.test(field.value));
+                    alert.textContent = hasAngleBracket ? 'Angle brackets (< and >) are not allowed.' : '';
+                    alert.classList.toggle('hidden', !hasAngleBracket);
+                };
+
+                fields.forEach(field => field.addEventListener('input', updateAlert));
+                form.addEventListener('submit', event => {
+                    const invalidField = Array.from(fields).find(field => /[<>]/.test(field.value));
+                    if (!invalidField) return;
+                    event.preventDefault();
+                    updateAlert();
+                    invalidField.focus();
+                });
+            });
+            @if($departmentValidationMessage)
+            showUtilityModal('{{ old('
+                _department_form ') === '
+                edit ' ? '
+                edit - department - modal ' : '
+                add - department - modal ' }}');
+            @endif
             document.addEventListener('DOMContentLoaded', function() {
                 document.querySelectorAll('.modal-overlay').forEach(m => {
                     m.addEventListener('click', e => {
@@ -567,7 +832,7 @@
                 // Chairs are per-program now, so flatten every department's
                 // programs into one list of "Chair Name (PROG_CODE)" strings —
                 // this must line up 1:1 with the recipient rows rendered above.
-                const names = @json(collect($deptData)->flatMap(fn($d) => collect($d['programs'])->map(fn($p) => $p['chair'] . ' (' . $p['code'] . ')'))->values());
+                const names = @json(collect($deptData)->flatMap(fn($d) => collect($d['programs'])->map(fn($p) => $p['chair'].' ('.$p['code'].')'))->values());
                 checks.forEach((c, i) => {
                     if (c.checked) selected.push(names[i]);
                 });

@@ -41,9 +41,12 @@ class DeanDepartmentController extends Controller
     {
         $college = $this->assignedCollege();
         $data = $request->validate([
-            'dept_name' => ['required', 'string', 'max:255'],
-            'dept_code' => ['required', 'string', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $college->college_id)],
+            'dept_name' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'dept_code' => ['required', 'string', 'max:50', 'not_regex:/[<>]/', Rule::unique('department', 'dept_code')->where('dept_college_id', $college->college_id)],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
+
         $college->programs()->create($data);
 
         return back()->with('success', 'Department added to ' . $college->college_name . '.');
@@ -54,9 +57,12 @@ class DeanDepartmentController extends Controller
         $college = $this->assignedCollege();
         $department = Departments::where('dept_college_id', $college->college_id)->findOrFail($id);
         $data = $request->validate([
-            'dept_name' => ['required', 'string', 'max:255'],
-            'dept_code' => ['required', 'string', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $college->college_id)->ignore($department->dept_id, 'dept_id')],
+            'dept_name' => ['required', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'dept_code' => ['required', 'string', 'max:50', 'not_regex:/[<>]/', Rule::unique('department', 'dept_code')->where('dept_college_id', $college->college_id)->ignore($department->dept_id, 'dept_id')],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
+
         $department->update($data);
 
         return back()->with('success', 'Department updated.');
@@ -220,23 +226,26 @@ class DeanDepartmentController extends Controller
         $college = $this->assignedCollege();
         $department = Departments::where('dept_college_id', $college->college_id)->findOrFail($id);
         $data = $request->validate([
-            'usr_first_name' => ['required', 'string', 'max:150'],
-            'usr_middle_name' => ['nullable', 'string', 'max:150'],
-            'usr_last_name' => ['required', 'string', 'max:150'],
-            'usr_suffix' => ['nullable', 'string', 'max:20'],
-            'usr_email' => ['required', 'email', 'max:255'],
-            'password' => ['required', 'string', 'min:8'],
-            'usr_employee_id' => ['nullable', 'string', 'max:255'],
-            'usr_rank_title' => ['nullable', 'string', 'max:255'],
-            'role_phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
-            'role_address' => ['nullable', 'string', 'max:255'],
+            'usr_first_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_middle_name' => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_last_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_suffix' => ['nullable', 'string', 'max:20', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_email' => ['required', 'string', 'max:255', 'not_regex:/[<>]/', 'email'],
+            'password' => ['required', 'not_regex:/[<>]/', 'string', 'min:8'],
+            'usr_employee_id' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_rank_title' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'role_phone_number' => ['required', 'string', 'max:20', 'not_regex:/[<>]/', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
+            'role_address' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
             'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
             'special_position' => ['nullable', Rule::in(Designation::pluck('name')->toArray())],
-            'usr_gender' => ['nullable', 'string', 'max:255'],
-            'usr_civil_status' => ['nullable', 'string', 'max:255'],
+            'usr_gender' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_civil_status' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
             'usr_dob' => ['nullable', 'date'],
-            'usr_nationality' => ['nullable', 'string', 'max:255'],
+            'usr_nationality' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
+        
         $email = strtolower(trim($data['usr_email']));
         if (User::whereRaw('LOWER(usr_email) = ?', [$email])->exists()) {
             return back()->withErrors(['usr_email' => 'That email already has an account.'])->withInput();
@@ -298,19 +307,21 @@ class DeanDepartmentController extends Controller
         abort_unless($faculty->user, 422, 'This faculty profile has no linked user account.');
 
         $data = $request->validate([
-            'usr_first_name' => ['required', 'string', 'max:150'],
-            'usr_middle_name' => ['nullable', 'string', 'max:150'],
-            'usr_last_name' => ['required', 'string', 'max:150'],
-            'usr_suffix' => ['nullable', 'string', 'max:20'],
-            'usr_email' => ['required', 'email', 'max:255'],
-            'fac_employee_id' => ['nullable', 'string', 'max:255', Rule::unique('faculty', 'fac_employee_id')->ignore($faculty->fac_id, 'fac_id')],
-            'fac_rank' => ['nullable', 'string', 'max:255'],
+            'usr_first_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_middle_name' => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_last_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_suffix' => ['nullable', 'string', 'max:20', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'usr_email' => ['required', 'string', 'max:255', 'not_regex:/[<>]/', 'email'],
+            'fac_employee_id' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u', Rule::unique('faculty', 'fac_employee_id')->ignore($faculty->fac_id, 'fac_id')],
+            'fac_rank' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
             'fac_employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
             'fac_special_position' => ['nullable', Rule::in(Designation::pluck('name')->toArray())],
-            'fac_phone_number' => ['nullable', 'string', 'max:20', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
-            'fac_address' => ['nullable', 'string', 'max:255'],
+            'fac_phone_number' => ['nullable', 'string', 'max:20', 'not_regex:/[<>]/', 'regex:/^\\+[1-9]\\d{1,3}\\d{7,10}$/'],
+            'fac_address' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
             'dept_id' => ['required', 'string', Rule::exists('department', 'dept_id')->where('dept_college_id', $college->college_id)],
             'usr_is_active' => ['required', 'boolean'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $email = strtolower(trim($data['usr_email']));
