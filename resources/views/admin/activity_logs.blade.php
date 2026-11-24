@@ -109,19 +109,20 @@
                 @else
                     <div class="overflow-x-auto">
                         <table class="data-table">
-                            <thead><tr><th>Date &amp; Time</th><th>Database user</th><th>Action</th><th>Table</th><th>Changed fields</th><th>Row key</th></tr></thead>
+                            <thead><tr><th>Date &amp; Time</th><th>Database user</th><th>IP address</th><th>Action</th><th>Table</th><th>Changed fields</th><th>Row key</th></tr></thead>
                             <tbody>
                             @forelse($databaseActivityLogs as $databaseLog)
                                 <tr>
                                     <td class="whitespace-nowrap font-mono text-[11px] text-slate-500">{{ \Illuminate\Support\Carbon::parse($databaseLog->dal_created_at)->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</td>
                                     <td class="font-semibold">{{ $databaseLog->dal_database_user ?: 'Unknown database user' }}</td>
+                                    <td class="font-mono text-xs text-slate-500">{{ $databaseLog->dal_ip_address ?: 'Unavailable' }}</td>
                                     <td>{{ ucfirst(strtolower($databaseLog->dal_operation)) }}</td>
                                     <td class="font-mono text-xs">{{ $databaseLog->dal_table_name }}</td>
                                     <td class="max-w-sm break-words text-xs text-slate-500">{{ $databaseLog->dal_changed_columns ?: '—' }}</td>
                                     <td class="max-w-sm break-all font-mono text-xs text-slate-500">{{ $databaseLog->dal_record_key ?: '—' }}</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="py-8 text-center text-slate-400">No direct database changes have been recorded.</td></tr>
+                                <tr><td colspan="7" class="py-8 text-center text-slate-400">No direct database changes have been recorded.</td></tr>
                             @endforelse
                             </tbody>
                         </table>
