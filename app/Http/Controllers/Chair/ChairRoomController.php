@@ -135,10 +135,9 @@ class ChairRoomController extends Controller
             $duplicate = Room::query()
                 ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
                 ->where('room_college_id', $chair->dc_college_id)
-                ->where('room_building', $validated['room_building'] ?? null)
                 ->exists();
             if ($duplicate) {
-                return back()->withInput()->withErrors(['room_name' => 'A room with this name and building already exists for your college.']);
+                return back()->withInput()->with('error', 'This room name is already in use in your college, even if the building is different.');
             }
 
             Room::create($validated);
@@ -165,10 +164,9 @@ class ChairRoomController extends Controller
             ->where('room_id', '!=', $room->room_id)
             ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
             ->where('room_college_id', $chair->dc_college_id)
-            ->where('room_building', $validated['room_building'] ?? null)
             ->exists();
         if ($duplicate) {
-            return back()->withInput()->withErrors(['room_name' => 'A room with this name and building already exists for your college.']);
+            return back()->withInput()->with('error', 'This room name is already in use in your college, even if the building is different.');
         }
 
         $room->update($validated);

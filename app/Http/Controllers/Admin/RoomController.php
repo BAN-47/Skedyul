@@ -46,14 +46,13 @@ class RoomController extends Controller
         $validated['room_is_available'] = $validated['room_is_available'] ?? true;
 
         try {
-            $duplicate = Room::where('room_name', $validated['room_name'])
+            $duplicate = Room::whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
                 ->where('room_college_id', $validated['room_college_id'])
-                ->where('room_building', $validated['room_building'] ?? null)
                 ->exists();
             if ($duplicate) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'A room with this name and building already exists for this college.',
+                    'message' => 'This room name is already in use in this college, even if the building is different.',
                 ], 409);
             }
 
@@ -110,6 +109,17 @@ class RoomController extends Controller
         ]);
 
         try {
+            $duplicate = Room::where('room_id', '!=', $room->room_id)
+                ->whereRaw('LOWER(TRIM(room_name)) = ?', [mb_strtolower(trim($validated['room_name']))])
+                ->where('room_college_id', $validated['room_college_id'])
+                ->exists();
+            if ($duplicate) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This room name is already in use in this college, even if the building is different.',
+                ], 409);
+            }
+
             $room->update($validated);
         } catch (\Illuminate\Database\QueryException $e) {
             if ($e->getCode() === '23505') {
