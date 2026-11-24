@@ -75,7 +75,7 @@ class ChairFacultyLoadController extends Controller
         // The program assignment is authoritative. Requiring both the college
         // and program IDs excluded faculty whose college link was left stale.
         // Also retain faculty assigned to one of this program's active sections.
-        $faculty = Faculty::where('fac_is_placeholder', false)
+        $faculty = Faculty::with('user')->where('fac_is_placeholder', false)
             ->where(function ($q) use ($deptChair, $assignedFacultyIds) {
                 if ($deptChair->dc_dept_id) {
                     $q->where('fac_dept_id', $deptChair->dc_dept_id);
@@ -178,9 +178,24 @@ class ChairFacultyLoadController extends Controller
                 $totalStatusBadge = 'badge-blue';
             }
 
+            $overLimit = in_array('Over Limit', [$day['status_label'], $evening['status_label']], true);
+            $nearLimit = $overLimit || in_array('Near Max', [$day['status_label'], $evening['status_label']], true)
+                || in_array('Full', [$day['status_label'], $evening['status_label']], true);
+            $status = $overLimit ? 'Over Limit' : ($nearLimit ? 'Near Limit' : ($totalHours > 0 ? 'Within Limit' : 'No Load'));
+            $progress = $isPartTime
+                ? ($totalMaxHours > 0 ? min(100, (int) round($totalHours / $totalMaxHours * 100)) : 0)
+                : (int) round(max(
+                    $day['max_hours'] > 0 ? $day['total_hours'] / $day['max_hours'] : 0,
+                    $evening['max_hours'] > 0 ? $evening['total_hours'] / $evening['max_hours'] : 0
+                ) * 100);
+
             return [
                 'id' => $f->fac_id,
-                'name' => trim("{$f->fac_first_name} {$f->fac_last_name}"),
+                'name' => $f->full_name,
+                'email' => $f->user?->usr_email,
+                'profile_image' => $f->fac_profile_image,
+                'rank' => $f->fac_rank,
+                'is_active' => (bool) ($f->user?->usr_is_active ?? false),
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
                 'special_position_max_hours' => $f->fac_special_position
@@ -191,10 +206,20 @@ class ChairFacultyLoadController extends Controller
                 'total_max_hours' => $totalMaxHours,
                 'total_status_label' => $totalStatusLabel,
                 'total_status_badge' => $totalStatusBadge,
+                'status' => $status,
+                'status_color' => $overLimit ? 'rose' : ($nearLimit ? 'amber' : ($totalHours > 0 ? 'emerald' : 'slate')),
+                'progress' => min(100, $progress),
                 'day' => $day,
                 'evening' => $evening,
             ];
         })->values();
+
+        $facultyStats = [
+            'total' => $facultyLoad->count(),
+            'scheduled_hours' => $facultyLoad->sum('total_hours'),
+            'attention' => $facultyLoad->whereIn('status', ['Near Limit', 'Over Limit'])->count(),
+            'over_limit' => $facultyLoad->where('status', 'Over Limit')->count(),
+        ];
 
         // Sections for this chair's program only (no AY/sem filter — names carry year)
         $sections = Section::where('sec_dept_id', $deptChair->dc_dept_id)
@@ -209,6 +234,7 @@ class ChairFacultyLoadController extends Controller
             'semester',
             'semesters',
             'facultyLoad',
+            'facultyStats',
             'faculty',
             'subjects',
             'sections'
@@ -328,9 +354,15 @@ class ChairFacultyLoadController extends Controller
     public function updateSpecialPosition(Request $request, string $facultyId)
     {
         $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        // Keep this action inside the chair's own department. Some valid
+        // faculty records have a stale college ID, so the department is the
+        // reliable scope when this chair has a department assignment.
         $faculty = Faculty::whereKey($facultyId)
-            ->where('fac_college_id', $chair->dc_college_id)
-            ->when($chair->dc_dept_id, fn ($query) => $query->where('fac_dept_id', $chair->dc_dept_id))
+            ->when(
+                $chair->dc_dept_id,
+                fn ($query) => $query->where('fac_dept_id', $chair->dc_dept_id),
+                fn ($query) => $query->where('fac_college_id', $chair->dc_college_id)
+            )
             ->firstOrFail();
 
         $data = $request->validate([
