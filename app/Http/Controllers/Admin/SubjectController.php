@@ -109,15 +109,17 @@ class SubjectController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'subj_dept_id'       => 'required|exists:college,college_id',
-            'subj_prog_id'       => 'required|exists:department,dept_id',
-            'subj_code'          => 'required|string|unique:course,course_code',
-            'subj_name'          => 'required|string',
+            'subj_dept_id'       => 'required|string|not_regex:/[<>]/|exists:college,college_id',
+            'subj_prog_id'       => 'required|string|not_regex:/[<>]/|exists:department,dept_id',
+            'subj_code'          => 'required|string|not_regex:/[<>]/|regex:/^[\p{L}\p{N}-]+$/u|unique:course,course_code',
+            'subj_name'          => 'required|string|not_regex:/[<>]/|regex:/^[\p{L}\p{N}-]+$/u',
             'subj_units'         => 'required|numeric|min:0',
             'subj_lecture_units' => 'required|numeric|min:0|max:12',
             'subj_lab_units'     => 'required|numeric|min:0|max:4',
             'subj_year_level'    => 'nullable|integer|min:1|max:4',
             'subj_semester'      => 'nullable|integer|in:1,2',
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         try {
@@ -149,19 +151,23 @@ class SubjectController extends Controller
         $subject = Course::findOrFail($id);
 
         $validated = $request->validate([
-            'subj_dept_id'       => 'required|exists:college,college_id',
-            'subj_prog_id'       => 'required|exists:department,dept_id',
+            'subj_dept_id'       => 'required|string|not_regex:/[<>]/|exists:college,college_id',
+            'subj_prog_id'       => 'required|string|not_regex:/[<>]/|exists:department,dept_id',
             'subj_code'          => [
                 'required',
                 'string',
+                'not_regex:/[<>]/',
+                'regex:/^[\p{L}\p{N}-]+$/u',
                 Rule::unique('course', 'course_code')->ignore($subject->course_id, 'course_id'),
             ],
-            'subj_name'          => 'required|string',
+            'subj_name'          => 'required|string|not_regex:/[<>]/|regex:/^[\p{L}\p{N}-]+$/u',
             'subj_units'         => 'required|numeric|min:0',
             'subj_lecture_units' => 'required|numeric|min:0|max:12',
             'subj_lab_units'     => 'required|numeric|min:0|max:4',
             'subj_year_level'    => 'nullable|integer|min:1|max:4',
             'subj_semester'      => 'nullable|integer|in:1,2',
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         try {

@@ -46,10 +46,10 @@
                     <td>{{ $d->max_faculty_count ?? 'Unlimited' }}</td>
                     <td class="text-right">
                       <button type="button" class="btn btn-secondary btn-sm p-1.5" onclick="editDesignation(@js($d))">
-                        ✏️ Edit
+                        Edit
                       </button>
                       <button type="button" class="btn btn-secondary btn-sm p-1.5 text-rose-600 hover:bg-rose-50" onclick="deleteDesignation('{{ $d->id }}', '{{ $d->name }}')">
-                        🗑️ Delete
+                        Delete
                       </button>
                     </td>
                   </tr>
@@ -69,6 +69,9 @@
       <h3 class="modal-title font-bold text-lg" id="designation-modal-title">Add Designation</h3>
       <button type="button" class="modal-close text-slate-400 hover:text-slate-600" onclick="closeDesignationModal()">✕</button>
     </div>
+    <div id="designation-validation-alert"
+      class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+      role="alert" aria-live="assertive" hidden></div>
     <div class="modal-body space-y-4">
       <input type="hidden" id="designation-id">
       <div>
@@ -106,11 +109,14 @@ function csrfToken() {
   return m ? m.content : '';
 }
 
-function showToast(msg) {
-  alert(msg);
+function showDesignationValidationAlert(message) {
+  const alert = document.getElementById('designation-validation-alert');
+  alert.textContent = message;
+  alert.hidden = !message;
 }
 
 function openDesignationModal(designation = null) {
+  showDesignationValidationAlert('');
   document.getElementById('designation-id').value = designation ? designation.id : '';
   document.getElementById('designation-modal-title').textContent = designation ? 'Edit Designation' : 'Add Designation';
   document.getElementById('designation-name').value = designation ? designation.name : '';
@@ -128,10 +134,24 @@ function editDesignation(designation) {
   openDesignationModal(designation);
 }
 
+document.getElementById('designation-name').addEventListener('input', function() {
+  showDesignationValidationAlert(/[<>]/.test(this.value)
+    ? 'Angle brackets (< and >) are not allowed.'
+    : '');
+});
+
 async function saveDesignation() {
   const id = document.getElementById('designation-id').value;
+  const nameInput = document.getElementById('designation-name');
+  if (/[<>]/.test(nameInput.value)) {
+    showDesignationValidationAlert('Angle brackets (< and >) are not allowed.');
+    nameInput.focus();
+    return;
+  }
+  showDesignationValidationAlert('');
+
   const payload = {
-    name: document.getElementById('designation-name').value.trim(),
+    name: nameInput.value.trim(),
     day_cap: parseInt(document.getElementById('designation-day-cap').value || 30),
     evening_cap: parseInt(document.getElementById('designation-evening-cap').value || 30),
     max_faculty_count: document.getElementById('designation-max-count').value ? parseInt(document.getElementById('designation-max-count').value) : null,
@@ -152,12 +172,13 @@ async function saveDesignation() {
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-      showToast(data.message || 'Failed to save designation');
+      const validationMessage = Object.values(data.errors || {}).flat()[0];
+      showDesignationValidationAlert(validationMessage || data.message || 'Failed to save designation.');
       return;
     }
     window.location.reload();
   } catch (err) {
-    showToast('Network error saving designation');
+    showDesignationValidationAlert('Network error saving designation.');
   }
 }
 

@@ -22,10 +22,12 @@ class DesignationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255|unique:designations,name',
-            'day_cap' => 'required|integer|min:0|max:100',
-            'evening_cap' => 'required|integer|min:0|max:100',
-            'max_faculty_count' => 'nullable|integer|min:1',
+            'name' => ['required', 'string', 'max:255', 'not_regex:/[<>]/', Rule::unique('designations', 'name')],
+            'day_cap' => ['required', 'integer', 'min:0', 'max:100'],
+            'evening_cap' => ['required', 'integer', 'min:0', 'max:100'],
+            'max_faculty_count' => ['nullable', 'integer', 'min:1'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $designation = Designation::create($data);
@@ -40,10 +42,12 @@ class DesignationController extends Controller
     public function update(Request $request, Designation $designation)
     {
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('designations', 'name')->ignore($designation->id)],
-            'day_cap' => 'required|integer|min:0|max:100',
-            'evening_cap' => 'required|integer|min:0|max:100',
-            'max_faculty_count' => 'nullable|integer|min:1',
+            'name' => ['required', 'string', 'max:255', 'not_regex:/[<>]/', Rule::unique('designations', 'name')->ignore($designation->id)],
+            'day_cap' => ['required', 'integer', 'min:0', 'max:100'],
+            'evening_cap' => ['required', 'integer', 'min:0', 'max:100'],
+            'max_faculty_count' => ['nullable', 'integer', 'min:1'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $designation->update($data);

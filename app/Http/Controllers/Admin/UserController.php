@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Controller;
 use App\Models\Designation;
 use App\Models\User;
 use App\Models\Faculty;
@@ -123,9 +124,9 @@ class UserController extends Controller
     {        $rules = [];
 
         if (in_array($role, ['faculty', 'dean', 'department_chair'])) {
-            $rules['role_phone_number'] = ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'];
+            $rules['role_phone_number'] = ['required', 'string', 'max:20', 'not_regex:/[<>]/', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'];
             // Email is only USER.usr_email — no fac_gmail / dean_gmail / dc_gmail
-            $rules['role_address'] = 'nullable|string|max:255';
+            $rules['role_address'] = 'nullable|string|max:255|not_regex:/[<>]/';
             $rules['dept_id'] = 'required|uuid|exists:department,dept_id';
         }
 
@@ -324,28 +325,30 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate(array_merge([
-            'usr_first_name' => 'required|string|max:150',
-            'usr_middle_name' => 'nullable|string|max:150',
-            'usr_last_name' => 'required|string|max:150',
-            'usr_suffix' => 'nullable|string|max:20',
-            'usr_email' => 'required|email|max:255',
-            'password' => 'required|string|min:8',
+            'usr_first_name' => 'required|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_middle_name' => 'nullable|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_last_name' => 'required|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_suffix' => 'nullable|string|max:20|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_email' => 'required|string|max:255|not_regex:/[<>]/|email',
+            'password' => 'required|string|min:8|not_regex:/[<>]/',
             'usr_role' => ['required', Rule::in([
                 'faculty',
                 'department_chair',
                 'dean',
                 'system_admin'
             ])],
-            'usr_bio' => 'nullable|string|max:1000',
-            'usr_employee_id' => 'nullable|string|max:255',
-            'usr_rank_title' => 'nullable|string|max:255',
-            'usr_gender' => 'nullable|string|max:255',
-            'usr_civil_status' => 'nullable|string|max:255',
+            'usr_bio' => 'nullable|string|max:1000|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_employee_id' => 'nullable|string|max:255|not_regex:/[<>]/|regex:/^[\p{L}\p{N}-]+$/u',
+            'usr_rank_title' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'usr_gender' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'usr_civil_status' => 'nullable|string|max:255|not_regex:/[<>]/',
             'usr_dob' => 'nullable|date',
-            'usr_nationality' => 'nullable|string|max:255',
+            'usr_nationality' => 'nullable|string|max:255|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
         ], $this->roleSpecificRules(
             $request->input('usr_role', '')
-        )));
+        )), [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
+        ]);
 
         $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
 
@@ -578,12 +581,12 @@ class UserController extends Controller
         $oldRole = $user->usr_role;
 
         $data = $request->validate(array_merge([
-            'usr_first_name' => 'required|string|max:150',
-            'usr_middle_name' => 'nullable|string|max:150',
-            'usr_last_name' => 'required|string|max:150',
-            'usr_suffix' => 'nullable|string|max:20',
-            'usr_email' => 'required|email|max:255',
-            'password' => 'nullable|string|min:8|confirmed',
+            'usr_first_name' => 'required|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_middle_name' => 'nullable|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_last_name' => 'required|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_suffix' => 'nullable|string|max:20|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_email' => 'required|string|max:255|not_regex:/[<>]/|email',
+            'password' => 'nullable|string|min:8|confirmed|not_regex:/[<>]/',
             'usr_role' => ['required', Rule::in([
                 'faculty',
                 'department_chair',
@@ -591,17 +594,19 @@ class UserController extends Controller
                 'system_admin'
             ])],
             'usr_is_active' => 'required|boolean',
-            'usr_bio' => 'nullable|string|max:1000',
-            'usr_employee_id' => 'nullable|string|max:255',
-            'usr_rank_title' => 'nullable|string|max:255',
-            'usr_gender' => 'nullable|string|max:255',
-            'usr_civil_status' => 'nullable|string|max:255',
+            'usr_bio' => 'nullable|string|max:1000|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
+            'usr_employee_id' => 'nullable|string|max:255|not_regex:/[<>]/|regex:/^[\p{L}\p{N}-]+$/u',
+            'usr_rank_title' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'usr_gender' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'usr_civil_status' => 'nullable|string|max:255|not_regex:/[<>]/',
             'usr_dob' => 'nullable|date',
-            'usr_nationality' => 'nullable|string|max:255',
+            'usr_nationality' => 'nullable|string|max:255|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
         ], $this->roleSpecificRules(
             $request->input('usr_role', ''),
             true
-        )));
+        )), [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
+        ]);
 
         $data['usr_middle_name'] = MiddleInitialFormatter::format($data['usr_middle_name'] ?? null);
 

@@ -35,12 +35,14 @@ class RoomController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'room_name'         => 'required|string|max:100',
-            'room_college_id'   => 'required|uuid|exists:college,college_id',
-            'room_type'         => 'required|string|max:100',
+            'room_name'         => ['required', 'string', 'max:100', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'room_college_id'   => ['required', 'not_regex:/[<>]/', 'uuid', 'exists:college,college_id'],
+            'room_type'         => ['required', 'string', 'max:100', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s\/-]+$/u'],
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',
-            'room_building'     => 'nullable|string|max:150',
+            'room_building'     => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $validated['room_is_available'] = $validated['room_is_available'] ?? true;
@@ -100,12 +102,14 @@ class RoomController extends Controller
         $room = Room::findOrFail($id);
 
         $validated = $request->validate([
-            'room_name'         => 'required|string|max:100',
-            'room_college_id'   => 'required|uuid|exists:college,college_id',
-            'room_type'         => 'required|string|max:100',
+            'room_name'         => ['required', 'string', 'max:100', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s-]+$/u'],
+            'room_college_id'   => ['required', 'not_regex:/[<>]/', 'uuid', 'exists:college,college_id'],
+            'room_type'         => ['required', 'string', 'max:100', 'not_regex:/[<>]/', 'regex:/^[\p{L}\p{N}\s\/-]+$/u'],
             'room_capacity'     => 'required|integer|min:1',
             'room_is_available' => 'boolean',
-            'room_building'     => 'nullable|string|max:150',
+            'room_building'     => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         try {

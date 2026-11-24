@@ -86,9 +86,11 @@ class DepartmentController extends Controller
     public function storeDepartment(Request $request)
     {
         $data = $request->validate([
-            'dept_college_id' => ['required', 'string', 'exists:college,college_id'],
-            'dept_name' => ['required', 'string', 'max:255'],
-            'dept_code' => ['required', 'string', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $request->input('dept_college_id'))],
+            'dept_college_id' => ['required', 'string', 'not_regex:/[<>]/', 'exists:college,college_id', 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'dept_name' => ['required', 'string', 'not_regex:/[<>]/', 'max:255', 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'dept_code' => ['required', 'string', 'not_regex:/[<>]/', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $request->input('dept_college_id')), 'regex:/^[\p{L}\p{N}-]+$/u'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed. Use letters, numbers, and hyphens only.',
         ]);
         $department = Departments::create($data);
         AuditActivityLogger::record($request->user(), 'Created department', 'department', 'Created ' . $department->dept_code . ' in ' . College::find($department->dept_college_id)?->college_code . '.', $request->ip(), $department->dept_id);
@@ -99,10 +101,13 @@ class DepartmentController extends Controller
     {
         $department = Departments::findOrFail($id);
         $data = $request->validate([
-            'dept_college_id' => ['required', 'string', 'exists:college,college_id'],
-            'dept_name' => ['required', 'string', 'max:255'],
-            'dept_code' => ['required', 'string', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $request->input('dept_college_id'))->ignore($department->dept_id, 'dept_id')],
+            'dept_college_id' => ['required', 'string', 'not_regex:/[<>]/', 'exists:college,college_id', 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'dept_name' => ['required', 'string', 'not_regex:/[<>]/', 'max:255', 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'dept_code' => ['required', 'string', 'not_regex:/[<>]/', 'max:50', Rule::unique('department', 'dept_code')->where('dept_college_id', $request->input('dept_college_id'))->ignore($department->dept_id, 'dept_id'), 'regex:/^[\p{L}\p{N}-]+$/u'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed. Use letters, numbers, and hyphens only.',
         ]);
+
         $before = $department->only(['dept_name', 'dept_code', 'dept_college_id']);
         $department->update($data);
         AuditActivityLogger::record($request->user(), 'Updated department', 'department', 'Updated ' . $before['dept_code'] . ' to ' . $department->dept_code . '.', $request->ip(), $department->dept_id);
@@ -131,8 +136,10 @@ class DepartmentController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'college_name' => ['required', 'string', 'max:255', Rule::unique('college', 'college_name')],
-            'college_code' => ['required', 'string', 'max:50', Rule::unique('college', 'college_code')],
+            'college_name' => ['required', 'string', 'not_regex:/[<>]/', 'max:255', 'regex:/^[\p{L}\p{N}-]+$/u', Rule::unique('college', 'college_name')],
+            'college_code' => ['required', 'string', 'not_regex:/[<>]/', 'max:50', 'regex:/^[\p{L}\p{N}-]+$/u', Rule::unique('college', 'college_code')],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed. Use letters, numbers, and hyphens only.',
         ]);
 
         College::create($data);
@@ -144,9 +151,12 @@ class DepartmentController extends Controller
     {
         $college = College::findOrFail($id);
         $data = $request->validate([
-            'college_name' => ['required', 'string', 'max:255', Rule::unique('college', 'college_name')->ignore($college->college_id, 'college_id')],
-            'college_code' => ['required', 'string', 'max:50', Rule::unique('college', 'college_code')->ignore($college->college_id, 'college_id')],
+            'college_name' => ['required', 'string', 'not_regex:/[<>]/', 'max:255', 'regex:/^[\p{L}\p{N}-]+$/u', Rule::unique('college', 'college_name')->ignore($college->college_id, 'college_id')],
+            'college_code' => ['required', 'string', 'not_regex:/[<>]/', 'max:50', 'regex:/^[\p{L}\p{N}-]+$/u', Rule::unique('college', 'college_code')->ignore($college->college_id, 'college_id')],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed. Use letters, numbers, and hyphens only.',
         ]);
+
         $college->update($data);
 
         return back()->with('success', 'College updated.');

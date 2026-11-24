@@ -111,6 +111,9 @@
       <div class="modal-title">Add New Room</div>
       <button onclick="closeModal('modal-add-room')" class="modal-close">✕</button>
     </div>
+    <div id="add-room-validation-alert"
+      class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+      role="alert" aria-live="assertive" hidden></div>
     <div class="grid grid-cols-2 gap-3 mb-3">
       <div>
         <label class="field-label">Room Name / Number</label>
@@ -195,6 +198,9 @@
       <div class="modal-title">Edit Room</div>
       <button onclick="closeModal('modal-edit-room')" class="modal-close">✕</button>
     </div>
+    <div id="edit-room-validation-alert"
+      class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+      role="alert" aria-live="assertive" hidden></div>
     <div class="flex items-center gap-4 p-4 rounded-xl mb-5" style="background:linear-gradient(135deg,#0f172a,#1e3a8a);">
       <div class="w-[50px] h-[50px] rounded-xl bg-blue-600 flex items-center justify-center text-[22px] flex-shrink-0">🚪</div>
       <div id="edit-room-header" class="text-[17px] font-extrabold text-white"></div>
@@ -292,10 +298,45 @@ const ROOMS_DATA = {
 };
 
 // ── MODALS ─────────────────────────────────────────────────────────────────
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id) {
+  if (id === 'modal-add-room') showRoomValidationAlert('add', '');
+  document.getElementById(id).classList.add('open');
+}
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+
+function roomValidationFields(which) {
+  const prefix = which === 'add' ? 'add' : 'edit';
+  return ['name', 'type', 'capacity', 'building', 'college']
+    .map(field => document.getElementById(`${prefix}-room-${field}`))
+    .filter(Boolean);
+}
+
+function showRoomValidationAlert(which, message) {
+  const alert = document.getElementById(`${which}-room-validation-alert`);
+  alert.textContent = message;
+  alert.hidden = !message;
+}
+
+function validateRoomAngleBrackets(which) {
+  const invalidField = roomValidationFields(which).find(field => /[<>]/.test(field.value));
+  if (!invalidField) {
+    showRoomValidationAlert(which, '');
+    return true;
+  }
+
+  showRoomValidationAlert(which, 'Angle brackets (< and >) are not allowed.');
+  invalidField.focus();
+  return false;
+}
+
+['add', 'edit'].forEach(which => {
+  roomValidationFields(which).forEach(field => {
+    field.addEventListener('input', () => validateRoomAngleBrackets(which));
+    field.addEventListener('change', () => validateRoomAngleBrackets(which));
+  });
 });
 
 // ── TOAST ──────────────────────────────────────────────────────────────────
@@ -405,6 +446,7 @@ renderRooms();
 // ── ROOMS: ADD ─────────────────────────────────────────────────────────────────
 async function saveAddRoom() {
   const name = document.getElementById('add-room-name').value.trim();
+  if (!validateRoomAngleBrackets('add')) return;
   if (!name) { showErrorModal('Please enter a room name.'); return; }
   const type       = document.getElementById('add-room-type').value;
   const capacity   = document.getElementById('add-room-capacity').value;
@@ -435,6 +477,11 @@ async function saveAddRoom() {
     const data = await res.json();
 
     if (!res.ok) {
+      const validationMessage = Object.values(data.errors || {}).flat()[0];
+      if (res.status === 422 && validationMessage) {
+        showRoomValidationAlert('add', validationMessage);
+        return;
+      }
       showErrorModal(data.message || 'Failed to add room. Please try again.');
       return;
     }
@@ -462,6 +509,7 @@ async function saveAddRoom() {
     renderRooms();
     refreshStats();
     closeModal('modal-add-room');
+    showRoomValidationAlert('add', '');
     ['add-room-name','add-room-capacity','add-room-building','add-room-college'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -503,11 +551,13 @@ function openEditRoom(roomId) {
   document.getElementById('edit-room-college').value    = room.collegeId || '';
   setSelectValue('edit-room-type', room.type);
   setSelectValue('edit-room-status', room.available ? '1' : '0');
+  validateRoomAngleBrackets('edit');
   openModal('modal-edit-room');
 }
 
 async function saveEditRoom() {
   const name     = document.getElementById('edit-room-name').value.trim();
+  if (!validateRoomAngleBrackets('edit')) return;
   const type     = document.getElementById('edit-room-type').value;
   const capacity = document.getElementById('edit-room-capacity').value;
   const available = document.getElementById('edit-room-status').value === '1';
@@ -538,6 +588,11 @@ async function saveEditRoom() {
     const data = await res.json();
 
     if (!res.ok) {
+      const validationMessage = Object.values(data.errors || {}).flat()[0];
+      if (res.status === 422 && validationMessage) {
+        showRoomValidationAlert('edit', validationMessage);
+        return;
+      }
       showErrorModal(data.message || 'Failed to update room. Please try again.');
       return;
     }

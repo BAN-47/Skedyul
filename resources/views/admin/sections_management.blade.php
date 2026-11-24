@@ -217,6 +217,12 @@
                     <button type="button" class="modal-close" onclick="closeModal('section-modal')">✕</button>
                 </div>
 
+                <div id="section-validation-alert"
+                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert" aria-live="assertive" @if (!$errors->any()) hidden @endif>
+                    {{ $errors->first() }}
+                </div>
+
                 <div class="grid grid-cols-2 gap-3">
                     <div class="col-span-2">
                         <label class="field-label">Program</label>
@@ -322,8 +328,40 @@
 
     <script>
         const sectionForm = document.getElementById('section-form');
+        const sectionValidationAlert = document.getElementById('section-validation-alert');
         const sectionUpdateUrl = @json(route($routePrefix . '.update', '__SECTION_ID__'));
         const sectionStoreUrl = @json(route($routePrefix . '.store'));
+
+        function sectionFieldWithAngleBrackets() {
+            return Array.from(sectionForm.elements).find((field) => {
+                if (field.disabled || ['hidden', 'submit', 'button', 'checkbox'].includes(field.type)) return false;
+                return typeof field.value === 'string' && /[<>]/.test(field.value);
+            });
+        }
+
+        function updateSectionValidationAlert() {
+            const invalidField = sectionFieldWithAngleBrackets();
+            sectionValidationAlert.textContent = invalidField
+                ? 'Angle brackets (< and >) are not allowed.'
+                : '';
+            sectionValidationAlert.hidden = !invalidField;
+        }
+
+        sectionForm.addEventListener('input', updateSectionValidationAlert);
+        sectionForm.addEventListener('change', updateSectionValidationAlert);
+        sectionForm.addEventListener('invalid', (event) => {
+            if (typeof event.target.value === 'string' && /[<>]/.test(event.target.value)) {
+                updateSectionValidationAlert();
+            }
+        }, true);
+        sectionForm.addEventListener('submit', (event) => {
+            const invalidField = sectionFieldWithAngleBrackets();
+            if (invalidField) {
+                event.preventDefault();
+                updateSectionValidationAlert();
+                invalidField.focus();
+            }
+        });
 
         function openModal(id) {
             document.getElementById(id)?.classList.add('open');
@@ -425,6 +463,7 @@
 
         function openNewSection() {
             sectionForm.reset();
+            updateSectionValidationAlert();
             sectionForm.action = sectionStoreUrl;
             document.getElementById('section-method').value = 'POST';
             document.getElementById('section-id').value = '';
@@ -453,6 +492,7 @@
                 document.getElementById('section-capacity').value = data.capacity;
                 document.getElementById('section-status').value = data.status;
                 document.getElementById('section-evening').checked = data.evening === '1';
+                updateSectionValidationAlert();
                 openModal('section-modal');
             });
         });

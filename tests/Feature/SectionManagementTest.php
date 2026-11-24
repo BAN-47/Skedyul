@@ -164,6 +164,24 @@ class SectionManagementTest extends TestCase
         $this->assertDatabaseMissing('section', ['sec_id' => $sectionId]);
     }
 
+    public function test_admin_section_creation_rejects_angle_brackets_and_shows_modal_alert(): void
+    {
+        $admin = $this->user('admin', 'system_admin');
+
+        $this->actingAs($admin)
+            ->from(route('admin.sections'))
+            ->post(route('admin.sections.store'), $this->validSectionData([
+                'sec_name' => 'BSIT<>1A',
+            ]))
+            ->assertRedirect(route('admin.sections'))
+            ->assertSessionHasErrors('sec_name');
+
+        $this->get(route('admin.sections'))
+            ->assertOk()
+            ->assertSee('section-validation-alert', false)
+            ->assertSee('Angle brackets', false);
+    }
+
     public function test_dean_only_sees_and_manages_sections_in_their_college(): void
     {
         $dean = $this->user('dean', 'dean');

@@ -144,10 +144,15 @@
         <div class="modal-box w-[520px]">
             <form id="add-subj-form" action="{{ route('subject.store') }}" method="POST">
                 @csrf
+                <input type="hidden" name="_subject_form" value="add">
                 <div class="modal-header">
                     <div class="modal-title">Add New Subject</div>
                     <button class="modal-close" type="button" onclick="closeModal('modal-add-subject')">✕</button>
                 </div>
+
+                <div id="add-subj-validation-alert"
+                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert" aria-live="assertive" hidden></div>
 
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
@@ -259,11 +264,17 @@
             <form id="edit-subj-form" action="" method="POST">
                 @csrf
                 @method('PUT')
+                <input type="hidden" name="_subject_form" value="edit">
+                <input type="hidden" name="_subject_id" id="edit-subj-id">
 
                 <div class="modal-header">
                     <div class="modal-title">Edit Subject</div>
                     <button class="modal-close" type="button" onclick="closeModal('modal-edit-subject')">✕</button>
                 </div>
+
+                <div id="edit-subj-validation-alert"
+                    class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert" aria-live="assertive" hidden></div>
 
                 <div class="grid grid-cols-2 gap-3 mb-3">
                     <div>
@@ -371,6 +382,46 @@
         const addSubjectCode = document.getElementById('add-subj-code');
         const addSubjectCodeError = document.getElementById('add-subj-code-error');
         const addSubjectSubmit = document.getElementById('add-subj-submit');
+        const editSubjectForm = document.getElementById('edit-subj-form');
+
+        function guardSubjectForm(form, alertElement) {
+            const findInvalidField = () => Array.from(form.elements).find(field => {
+                if (field.disabled || ['hidden', 'submit', 'button', 'checkbox'].includes(field.type)) return false;
+                return typeof field.value === 'string' && /[<>]/.test(field.value);
+            });
+            const updateAlert = () => {
+                const invalidField = findInvalidField();
+                alertElement.textContent = invalidField ? 'Angle brackets (< and >) are not allowed.' : '';
+                alertElement.hidden = !invalidField;
+            };
+
+            form.addEventListener('input', updateAlert);
+            form.addEventListener('change', updateAlert);
+            form.addEventListener('invalid', event => {
+                if (typeof event.target.value === 'string' && /[<>]/.test(event.target.value)) {
+                    updateAlert();
+                }
+            }, true);
+            form.addEventListener('submit', event => {
+                const invalidField = findInvalidField();
+                if (!invalidField) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                updateAlert();
+                invalidField.focus();
+            }, true);
+
+            return updateAlert;
+        }
+
+        const updateAddSubjectAlert = guardSubjectForm(
+            addSubjectForm,
+            document.getElementById('add-subj-validation-alert')
+        );
+        const updateEditSubjectAlert = guardSubjectForm(
+            editSubjectForm,
+            document.getElementById('edit-subj-validation-alert')
+        );
 
         function validateAddSubjectCode() {
             const code = String(addSubjectCode?.value || '').trim().toLocaleUpperCase();
@@ -537,6 +588,7 @@
             const form = document.getElementById('edit-subj-form');
             form.action = btn.dataset.action;
 
+            document.getElementById('edit-subj-id').value = btn.dataset.id || '';
             document.getElementById('edit-subj-code').value = btn.dataset.code || '';
             document.getElementById('edit-subj-name').value = btn.dataset.name || '';
             document.getElementById('edit-subj-lec').value = btn.dataset.lec || 0;
@@ -547,9 +599,47 @@
             document.getElementById('edit-subj-sem').value = btn.dataset.sem || '';
             document.getElementById('edit-subj-units').value = btn.dataset.units || 0;
             updateSubjectTotalHours('edit');
+            updateEditSubjectAlert();
 
             openModal('modal-edit-subject');
         }
+
+        @if ($errors->any())
+            const failedSubjectForm = @json(old('_subject_form'));
+            const subjectValidationMessage = @json($errors->first());
+            if (failedSubjectForm === 'edit') {
+                const failedSubjectId = @json(old('_subject_id'));
+                const oldSubjectValues = @json(old());
+                const editForm = document.getElementById('edit-subj-form');
+                editForm.action = `${UPDATE_URL}/${encodeURIComponent(failedSubjectId)}`;
+                document.getElementById('edit-subj-id').value = failedSubjectId || '';
+                [
+                    'subj_code',
+                    'subj_dept_id',
+                    'subj_prog_id',
+                    'subj_name',
+                    'subj_units',
+                    'subj_lecture_units',
+                    'subj_lab_units',
+                    'subj_year_level',
+                    'subj_semester',
+                ].forEach(name => {
+                    if (oldSubjectValues[name] !== undefined) {
+                        editForm.elements.namedItem(name).value = oldSubjectValues[name];
+                    }
+                });
+                updateSubjectTotalHours('edit');
+                const alert = document.getElementById('edit-subj-validation-alert');
+                alert.textContent = subjectValidationMessage;
+                alert.hidden = false;
+                openModal('modal-edit-subject');
+            } else if (failedSubjectForm === 'add') {
+                const alert = document.getElementById('add-subj-validation-alert');
+                alert.textContent = subjectValidationMessage;
+                alert.hidden = false;
+                openModal('modal-add-subject');
+            }
+        @endif
 
         // Pre-select program on Add modal from page filter
         document.querySelector('[onclick="openModal(\'modal-add-subject\')"]')?.addEventListener('click', () => {
