@@ -17,15 +17,30 @@ use Illuminate\Support\Facades\DB;
 
 class ScheduleSubmissionController extends Controller
 {
+    private function departmentIdsForChair(Dept_Chair $chair)
+    {
+        $collegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+
+        if (!$collegeId) {
+            return collect([$chair->dc_dept_id])->filter()->values();
+        }
+
+        return \App\Models\Departments::query()
+            ->where('dept_college_id', $collegeId)
+            ->pluck('dept_id');
+    }
+
     public function index(Request $request)
     {
-        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        $chair = Dept_Chair::with('program')->where('dc_usr_id', Auth::id())->first();
 
         abort_if(
             !$chair || !$chair->dc_dept_id,
             403,
             'Your account is not assigned to a program department.'
         );
+
+        $departmentIds = $this->departmentIdsForChair($chair);
 
         $semester = Semester::with('academicYear')
             ->where('sem_is_active', true)
@@ -38,7 +53,7 @@ class ScheduleSubmissionController extends Controller
             'submittedBy',
             'reviewedBy',
         ])
-            ->where('schsub_dept_id', $chair->dc_dept_id)
+            ->whereIn('schsub_dept_id', $departmentIds)
             ->whereIn('schsub_type', ['pbs', 'pbt'])
             ->when(
                 $semester,
@@ -62,7 +77,7 @@ class ScheduleSubmissionController extends Controller
     }
     public function store(Request $request, DeanApprovalNotifier $approvalNotifier)
     {
-        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        $chair = Dept_Chair::with('program')->where('dc_usr_id', Auth::id())->first();
 
         abort_if(
             !$chair || !$chair->dc_dept_id,
@@ -74,11 +89,26 @@ class ScheduleSubmissionController extends Controller
             'faculty_id' => ['required', 'uuid'],
         ]);
 
-        $departmentId = $chair->dc_dept_id;
+        $chairCollegeId = $chair->program?->dept_college_id ?? $chair->dc_college_id;
+        abort_if(!$chairCollegeId, 403, 'Your account is not assigned to a college.');
+
         $faculty = Faculty::with('user')
             ->where('fac_id', $validated['faculty_id'])
-            ->where('fac_dept_id', $departmentId)
             ->firstOrFail();
+
+        // A Chair may submit a PBT for any department in their own college.
+        // Store it under the faculty member's department so Dean review scoping
+        // and the submitted schedule query use the same department.
+        $facultyDepartment = \App\Models\Departments::query()
+            ->where('dept_id', $faculty->fac_dept_id)
+            ->where('dept_college_id', $chairCollegeId)
+            ->first();
+        abort_unless(
+            $facultyDepartment,
+            403,
+            'You can only submit PBTs for faculty in your college.'
+        );
+        $departmentId = $facultyDepartment->dept_id;
 
         $semester = Semester::where('sem_is_active', true)->first();
 
@@ -123,25 +153,6 @@ class ScheduleSubmissionController extends Controller
             ->where('schsub_fac_id', $faculty->fac_id)
             ->first();
 
-        if ($submission && $submission->schsub_status !== 'returned') {
-            $message = 'This PBT has already been submitted and is ' . $submission->schsub_status . '.';
-
-            if ($request->boolean('return_to_pbt')) {
-                $shift = $request->input('shift') === 'night' ? 'night' : 'day';
-
-                return redirect()
-                    ->route('chair.pbt', [
-                        'faculty' => $faculty->fac_id,
-                        'shift' => $shift,
-                    ])
-                    ->with('error', $message);
-            }
-
-            return redirect()
-                ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
-                ->with('error', $message);
-        }
-
         $facultyName = $faculty->user->usr_name
             ?? trim(implode(' ', array_filter([
                 $faculty->fac_first_name,
@@ -161,6 +172,31 @@ class ScheduleSubmissionController extends Controller
             'start_time' => $schedule->sch_start_time,
             'end_time' => $schedule->sch_end_time,
         ])->values()->all();
+
+        // Only block a duplicate when the submitted timetable is unchanged.
+        // A changed timetable is a revision and must return to Pending review.
+        if (
+            $submission
+            && $submission->schsub_status !== 'returned'
+            && $this->scheduleSnapshotsMatch($submission->schsub_schedule_snapshot, $snapshot)
+        ) {
+            $message = 'This PBT has already been submitted and is ' . $submission->schsub_status . '.';
+
+            if ($request->boolean('return_to_pbt')) {
+                $shift = $request->input('shift') === 'night' ? 'night' : 'day';
+
+                return redirect()
+                    ->route('chair.pbt', [
+                        'faculty' => $faculty->fac_id,
+                        'shift' => $shift,
+                    ])
+                    ->with('error', $message);
+            }
+
+            return redirect()
+                ->route('chair.submit_dean')
+                ->with('error', $message);
+        }
 
         DB::transaction(function () use (
             $submission,
@@ -193,26 +229,16 @@ class ScheduleSubmissionController extends Controller
 
         $approvalNotifier->submitted($departmentId, 'pbt', $semester->sem_name ?? 'the selected semester');
 
-        if ($request->boolean('return_to_pbt')) {
-            $shift = $request->input('shift') === 'night' ? 'night' : 'day';
-
-            return redirect()
-                ->route('chair.pbt', [
-                    'faculty' => $faculty->fac_id,
-                    'shift' => $shift,
-                ])
-                ->with('success', 'This faculty PBT was submitted to the dean for review.');
-        }
-
         return redirect()
-            ->route('chair.submit_dean', ['faculty' => $faculty->fac_id])
+            ->route('chair.submit_dean')
             ->with('success', 'This faculty PBT was submitted to the dean for review.');
     }
 
     public function show(string $id)
     {
-        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        $chair = Dept_Chair::with('program')->where('dc_usr_id', Auth::id())->first();
         abort_if(!$chair || !$chair->dc_dept_id, 403, 'Your account is not assigned to a program department.');
+        $departmentIds = $this->departmentIdsForChair($chair);
 
         $submission = Schedule_Submission::with([
             'department',
@@ -224,9 +250,9 @@ class ScheduleSubmissionController extends Controller
         ])->findOrFail($id);
 
         abort_unless(
-            (string) $submission->schsub_dept_id === (string) $chair->dc_dept_id,
+            $departmentIds->contains(fn($departmentId) => (string) $departmentId === (string) $submission->schsub_dept_id),
             403,
-            'You cannot view submissions outside your department.'
+            'You cannot view submissions outside your college.'
         );
 
         $snapshot = collect($submission->schsub_schedule_snapshot ?? []);
@@ -261,11 +287,12 @@ class ScheduleSubmissionController extends Controller
 
     public function edit(string $id)
     {
-        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->first();
+        $chair = Dept_Chair::with('program')->where('dc_usr_id', Auth::id())->first();
         abort_if(!$chair || !$chair->dc_dept_id, 403, 'Your account is not assigned to a program department.');
+        $departmentIds = $this->departmentIdsForChair($chair);
 
         $submission = Schedule_Submission::with('section')
-            ->where('schsub_dept_id', $chair->dc_dept_id)
+            ->whereIn('schsub_dept_id', $departmentIds)
             ->findOrFail($id);
 
         if ($submission->schsub_status !== 'returned') {
@@ -278,7 +305,7 @@ class ScheduleSubmissionController extends Controller
             $shift = $submission->section?->sec_is_evening ? 'night' : 'day';
 
             return redirect()->route('chair.pbs', [
-                'department' => $chair->dc_dept_id,
+                'department' => $submission->schsub_dept_id,
                 'section' => $submission->schsub_sec_id,
                 'semester' => $submission->schsub_sem_id,
                 'shift' => $shift,
@@ -316,5 +343,35 @@ class ScheduleSubmissionController extends Controller
                 'faculty',
                 fn($query) => $query->where('fac_dept_id', $departmentId)
             );
+    }
+
+    private function scheduleSnapshotsMatch(mixed $submittedSnapshot, array $currentSnapshot): bool
+    {
+        $normalize = static function ($rows): array {
+            return collect(is_array($rows) ? $rows : [])
+                ->map(static function ($row): array {
+                    $row = (array) $row;
+
+                    return [
+                        'schedule_id' => trim((string) ($row['schedule_id'] ?? '')),
+                        'faculty' => trim((string) ($row['faculty'] ?? '')),
+                        'subject_code' => trim((string) ($row['subject_code'] ?? '')),
+                        'subject_name' => trim((string) ($row['subject_name'] ?? '')),
+                        'section' => trim((string) ($row['section'] ?? '')),
+                        'room' => trim((string) ($row['room'] ?? '')),
+                        'day' => trim((string) ($row['day'] ?? '')),
+                        'start_time' => substr(trim((string) ($row['start_time'] ?? '')), 0, 5),
+                        'end_time' => substr(trim((string) ($row['end_time'] ?? '')), 0, 5),
+                    ];
+                })
+                ->sortBy(static fn(array $row): string => json_encode(
+                    $row,
+                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                ) ?: '')
+                ->values()
+                ->all();
+        };
+
+        return $normalize($submittedSnapshot) === $normalize($currentSnapshot);
     }
 }

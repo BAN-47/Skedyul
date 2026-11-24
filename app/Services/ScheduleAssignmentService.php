@@ -35,41 +35,24 @@ class ScheduleAssignmentService
     public const PART_TIME_MAX_HOURS = 30;
     private const FULL_TIME_MAX_HOURS = 30;
 
-    /** Day-hour caps for staff with special positions; other full-time faculty use 30 hours. */
-    public const SPECIAL_POSITION_MAX_HOURS = [
-        'Vice-President' => 3,
-        'University Director' => 6,
-        'Campus Director' => 6,
-        'UD Data Protection Officer' => 6,
-        'Assistant Campus Director' => 9,
-        'Dean of Instruction' => 9,
-        'College Dean' => 9,
-        'Associate College Dean' => 12,
-        'Department Chairperson' => 16,
-        'PERG Chair' => 16,
-        'Campus Secretary' => 16,
-        'College Secretary' => 16,
-        'Research Chair' => 16,
-        'MIS Officer' => 30,
-    ];
-
     public static function facultyMaxHours(Faculty $faculty, string $shift = 'day'): float
     {
-        // Evening workload has a fixed 30-hour cap for all designations.
-        if ($shift === 'evening') {
-            return (float) self::EVENING_MAX_HOURS;
-        }
-
         // Part-time staff share one 30-hour cap between Day and Evening.
         if ($faculty->fac_employment_type === 'part_time') {
             return (float) self::PART_TIME_MAX_HOURS;
         }
 
-        if (
-            $faculty->fac_special_position
-            && isset(self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position])
-        ) {
-            return (float) self::SPECIAL_POSITION_MAX_HOURS[$faculty->fac_special_position];
+        $designation = null;
+        if ($faculty->fac_special_position) {
+            $designation = \App\Models\Designation::where('name', $faculty->fac_special_position)->first();
+        }
+
+        if ($shift === 'evening') {
+            return (float) ($designation ? $designation->evening_cap : self::EVENING_MAX_HOURS);
+        }
+
+        if ($designation) {
+            return (float) $designation->day_cap;
         }
 
         return (float) self::FULL_TIME_MAX_HOURS;

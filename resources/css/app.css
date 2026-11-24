@@ -913,6 +913,42 @@
         @apply px-5 py-4 border-t border-white/[.08];
     }
 
+    .sidebar-mobile-card {
+        @apply relative mb-3 overflow-hidden rounded-2xl border border-white/10 px-3.5 py-3.5 text-center;
+        background: radial-gradient(circle at 50% 0%, rgba(59,130,246,.28), transparent 58%), linear-gradient(160deg, #10244b, #0b1733);
+    }
+    .sidebar-mobile-brand { @apply relative z-[1] text-[15px] font-black tracking-tight text-white; }
+    .sidebar-mobile-brand-accent { @apply text-blue-400; }
+    .sidebar-mobile-phone-wrap { @apply flex h-[116px] items-center justify-center; perspective: 500px; }
+    .sidebar-mobile-phone {
+        @apply relative h-[106px] w-[68px] rounded-[16px] border-2 border-slate-400/70 bg-slate-950 p-1 shadow-lg shadow-blue-500/20;
+        animation: sidebar-phone-float 3.5s ease-in-out infinite;
+    }
+    .sidebar-mobile-speaker { @apply absolute left-1/2 top-[3px] z-[2] h-1 w-3 -translate-x-1/2 rounded-full bg-slate-700; }
+    .sidebar-mobile-screen { @apply h-full overflow-hidden rounded-[9px] bg-[#071329] px-1.5 pt-2.5 text-left text-white; }
+    .sidebar-mobile-status { @apply flex items-center justify-between text-[5px] font-bold text-blue-100/80; }
+    .sidebar-mobile-signal { @apply h-1 w-2 rounded-sm bg-emerald-400; }
+    .sidebar-mobile-now { @apply mt-1.5 rounded-md border border-blue-400/30 bg-blue-500/20 px-1 py-1; }
+    .sidebar-mobile-now span { @apply block text-[4px] font-bold tracking-wide text-cyan-300; }
+    .sidebar-mobile-now strong { @apply block truncate text-[6px] leading-tight; }
+    .sidebar-mobile-now small { @apply block truncate text-[4px] text-blue-100/60; }
+    .sidebar-mobile-next { @apply mt-1 rounded bg-white/10 px-1 py-1; }
+    .sidebar-mobile-next span { @apply block text-[4px] text-blue-100/50; }
+    .sidebar-mobile-next strong { @apply block truncate text-[5px] leading-tight; }
+    .sidebar-mobile-sync { @apply mt-1 flex items-center gap-1 text-[4px] text-emerald-300; }
+    .sidebar-mobile-sync i { @apply h-1 w-1 rounded-full bg-emerald-400; }
+    .sidebar-mobile-copy { @apply mt-1 text-[11px] leading-snug text-blue-100/75; }
+    .sidebar-mobile-download { @apply mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 px-2 py-2.5 text-[11px] font-bold text-white no-underline shadow-md transition hover:brightness-110; }
+    .sidebar-mobile-download-disabled { @apply cursor-not-allowed bg-white/10 text-white/60 shadow-none; }
+
+    @keyframes sidebar-phone-float {
+        0%, 100% { transform: translateY(2px) rotateY(-7deg) rotateZ(-2deg); }
+        50% { transform: translateY(-3px) rotateY(7deg) rotateZ(2deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .sidebar-mobile-phone { animation: none; }
+    }
+
     .btn-logout {
         @apply w-full py-2.5 border border-white/[.12] rounded-lg bg-transparent
                text-white/50 text-[12px] font-semibold cursor-pointer transition-all

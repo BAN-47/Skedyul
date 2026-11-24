@@ -371,6 +371,9 @@
             </div>
           </div>
 
+            </div>
+          </div>
+
           {{-- SECURITY --}}
           <div id="settings-security" style="display:none;">
             <div class="card mb-4">

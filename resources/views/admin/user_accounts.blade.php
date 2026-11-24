@@ -399,8 +399,8 @@
             <label class="field-label">Special Position (Optional)</label>
             <select id="add-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('add')">
               <option value="">None</option>
-              @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-              <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              @foreach (\App\Models\Designation::orderBy('name')->get() as $d)
+              <option value="{{ $d->name }}" data-max-hours="{{ $d->day_cap }}">{{ $d->name }}</option>
               @endforeach
             </select>
             <p id="add-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>
@@ -689,8 +689,8 @@
             <label class="field-label">Special Position (Optional)</label>
             <select id="edit-special-position" name="special_position" class="field-input" onchange="updateAdminSpecialPositionCap('edit')">
               <option value="">None</option>
-              @foreach (\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)
-              <option value="{{ $position }}" data-max-hours="{{ $maxHours }}">{{ $position }}</option>
+              @foreach (\App\Models\Designation::orderBy('name')->get() as $d)
+              <option value="{{ $d->name }}" data-max-hours="{{ $d->day_cap }}">{{ $d->name }}</option>
               @endforeach
             </select>
             <p id="edit-special-position-cap" class="mt-1 text-[11px] text-slate-500">No special-position limit.</p>

@@ -34,6 +34,8 @@
                 ['subject.index', route('subject.index'), '▱', 'Courses'],
 
                 ['admin.rooms', route('admin.rooms'), '⌂', 'Rooms'],
+
+                ['admin.designations.index', route('admin.designations.index'), '🎖', 'Designations'],
             ];
 
             $navSystem = [

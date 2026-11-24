@@ -22,9 +22,11 @@
     $visibleSchedules = $schedules
         ->filter(function ($schedule) use ($shift) {
             $storedShift = strtolower((string) ($schedule->sch_shift ?? 'day'));
-            return $shift === 'night'
-                ? in_array($storedShift, ['evening', 'night'], true)
-                : !in_array($storedShift, ['evening', 'night'], true);
+            $isEvening =
+                (bool) ($schedule->section?->sec_is_evening ?? false) ||
+                in_array($storedShift, ['evening', 'night'], true);
+
+            return $shift === 'night' ? $isEvening : !$isEvening;
         })
         ->values();
     $programOrder = ['BSIT' => 1, 'IT' => 1, 'BSIS' => 2, 'IS' => 2, 'BITCT' => 3];
@@ -422,7 +424,7 @@
                 });
                 list.querySelectorAll('[data-dean-faculty-group]').forEach((group) => {
                     const visible = group.querySelectorAll('[data-dean-faculty-option]:not(.hidden)')
-                    .length;
+                        .length;
                     group.classList.toggle('hidden', visible === 0);
                 });
                 document.getElementById('dean-pbt-teacher-empty')?.classList.toggle('hidden', visibleCount > 0);
