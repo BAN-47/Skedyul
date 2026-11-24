@@ -1,166 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  @include('partials.favicon')
+    @include('partials.favicon')
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SKEDYUL — Faculty Workload</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-
 <body class="font-sans bg-slate-50 text-slate-900 overflow-hidden h-screen">
-
-    <div class="app-shell">
-
-        <div class="app-main">
-
-            @include('partials.dean_header', ['title' => 'Dean Faculty Workload Overview'])
-
-            <div class="page-content">
-                <div class="flex items-center justify-between mb-5">
+    @include('partials.dean_header', ['title' => 'Faculty Workload'])
+            <main class="page-content">
+                @if(session('success'))<div role="status" class="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif
+                @if($errors->any())<div role="alert" class="mb-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
+                <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <div class="text-[20px] font-extrabold">Faculty Workload Overview</div>
-                        <div class="text-[13px] text-slate-400 mt-0.5">AY 2025–26 · 1st Semester</div>
+                        <h1 class="text-xl font-bold">Faculty workload</h1>
+                        <p class="mt-1 text-sm text-slate-500">Teaching hours for faculty in {{ $dean->department?->college_name ?? 'your college' }}.</p>
                     </div>
-                    <button class="btn btn-primary" onclick="openModal('modal-export')">Export PDF</button>
+                    <span class="badge badge-blue">{{ $semester?->sem_name ?? 'No semester' }}{{ $semester?->academicYear?->ay_academic_year ? ' · AY '.$semester->academicYear->ay_academic_year : '' }}</span>
                 </div>
 
-                <div class="card">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Faculty</th>
-                                <th>Department</th>
-                                <th>Employment</th>
-                                <th>Subjects</th>
-                                <th>Total Load</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- BSIS -->
-                            <tr>
-                                <td><b>Jerome Bautista</b></td>
-                                <td>BSIS</td>
-                                <td>Full-time</td>
-                                <td>CC 313, CC 401, IT 302</td>
-                                <td class="font-mono font-bold text-green-600">24h</td>
-                                <td><span class="badge badge-green">OK</span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Maria Santos</b></td>
-                                <td>BSIS</td>
-                                <td>Full-time</td>
-                                <td>GE 102, IT 101</td>
-                                <td class="font-mono font-bold text-blue-600">18h</td>
-                                <td><span class="badge badge-blue">Available</span></td>
-                            </tr>
-                            <!-- BSIT -->
-                            <tr>
-                                <td><b>Ana Reyes</b></td>
-                                <td>BSIT</td>
-                                <td>Part-time</td>
-                                <td>IT 401, CC 201, GE 101</td>
-                                <td class="font-mono font-bold text-amber-600">27h</td>
-                                <td><span class="badge badge-amber">Near Max</span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Carlo Mendoza</b></td>
-                                <td>BSIT</td>
-                                <td>Full-time</td>
-                                <td>CC 101, CC 102, IT 201, CC 311</td>
-                                <td class="font-mono font-bold text-red-600">31h</td>
-                                <td><span class="badge badge-red">Overload</span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Liza Cruz</b></td>
-                                <td>BSIT</td>
-                                <td>Part-time</td>
-                                <td>GE 103</td>
-                                <td class="font-mono font-bold text-blue-600">9h</td>
-                                <td><span class="badge badge-teal">Part-time</span></td>
-                            </tr>
-                            <!-- BIT-CT -->
-                            <tr>
-                                <td><b>Noel Garcia</b></td>
-                                <td>BIT-CT</td>
-                                <td>Full-time</td>
-                                <td>GE 201, CT 101, CT 201</td>
-                                <td class="font-mono font-bold text-green-600">21h</td>
-                                <td><span class="badge badge-green">OK</span></td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty</p><p class="mt-1 text-2xl font-bold">{{ $stats['faculty'] }}</p><p class="mt-1 text-xs text-slate-500">Across your college</p></article>
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Scheduled hours</p><p class="mt-1 text-2xl font-bold text-blue-700">{{ number_format($stats['total_hours'], 1) }}h</p><p class="mt-1 text-xs text-slate-500">This semester’s college sections</p></article>
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Needs attention</p><p class="mt-1 text-2xl font-bold {{ $stats['attention'] ? 'text-amber-600' : 'text-emerald-700' }}">{{ $stats['attention'] }}</p><p class="mt-1 text-xs text-slate-500">Near or over a workload limit</p></article>
+                    <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Over limit</p><p class="mt-1 text-2xl font-bold {{ $stats['over_limit'] ? 'text-rose-600' : 'text-emerald-700' }}">{{ $stats['over_limit'] }}</p><p class="mt-1 text-xs text-slate-500">Day, Evening, or shared Part-time cap</p></article>
                 </div>
-            </div>
 
-        </div><!-- end app-main -->
-    </div><!-- end app-shell -->
+                <form method="GET" action="{{ route('dean.faculty_workload') }}" class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <label class="text-xs font-semibold text-slate-500">Academic year / semester
+                            <select name="semester" class="field-input mt-1 w-full" onchange="this.form.submit()">
+                                @forelse($semesters as $option)
+                                    <option value="{{ $option->sem_id }}" @selected($semester?->sem_id === $option->sem_id)>{{ $option->academicYear?->ay_academic_year ?? 'Academic year' }} · {{ $option->sem_name }}{{ $option->sem_is_active ? ' (Current)' : '' }}</option>
+                                @empty<option value="">No semesters found</option>@endforelse
+                            </select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-500">Department
+                            <select name="department" class="field-input mt-1 w-full">
+                                <option value="all">All departments</option>
+                                @foreach($departments as $department)<option value="{{ $department->dept_id }}" @selected($selectedDepartment === $department->dept_id)>{{ $department->dept_code }} · {{ $department->dept_name }}</option>@endforeach
+                            </select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-500">Employment
+                            <select name="employment" class="field-input mt-1 w-full"><option value="all" @selected($employmentFilter === 'all')>All employment types</option><option value="full_time" @selected($employmentFilter === 'full_time')>Full-time</option><option value="part_time" @selected($employmentFilter === 'part_time')>Part-time</option></select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-500">Workload status
+                            <select name="status" class="field-input mt-1 w-full"><option value="all" @selected($statusFilter === 'all')>All statuses</option><option value="attention" @selected($statusFilter === 'attention')>Near / over limit</option><option value="available" @selected($statusFilter === 'available')>Within limit</option></select>
+                        </label>
+                        <label class="text-xs font-semibold text-slate-500">Search faculty
+                            <input name="search" value="{{ $search }}" class="field-input mt-1 w-full" placeholder="Name, email, subject...">
+                        </label>
+                    </div>
+                    <div class="mt-3 flex justify-end gap-2"><a href="{{ route('dean.faculty_workload') }}" class="topbar-btn btn-secondary">Clear</a><button class="topbar-btn btn-primary" type="submit">Apply filters</button></div>
+                </form>
 
-    <!-- MODAL: EXPORT -->
-    <div class="modal-overlay" id="modal-export">
-        <div class="modal-box w-[440px]">
-            <div class="modal-header">
-                <div class="modal-title">Export Report</div>
-                <button class="modal-close" onclick="closeModal('modal-export')">✕</button>
-            </div>
-            <div>
-                <div class="mb-3.5">
-                    <label class="field-label">Report Type</label>
-                    <select class="field-input">
-                        <option>Master Schedule</option>
-                        <option selected>Faculty Workload Report</option>
-                        <option>Faculty Deployment Report</option>
-                        <option>Department Summary</option>
-                    </select>
-                </div>
-                <div class="mb-3.5">
-                    <label class="field-label">Department</label>
-                    <select class="field-input">
-                        <option value="">All Departments</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="field-label">Format</label>
-                    <select class="field-input">
-                        <option>PDF</option>
-                        <option>Excel (.xlsx)</option>
-                        <option>Word (.docx)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal('modal-export')">Cancel</button>
-                <button class="btn btn-primary"
-                    onclick="closeModal('modal-export');showToast('Report exported!')">Download</button>
-            </div>
-        </div>
+                <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[1100px] text-left text-sm">
+                            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Faculty</th><th class="p-3">Department / designation</th><th class="p-3">Employment</th><th class="p-3">Subjects</th><th class="p-3">Day</th><th class="p-3">Evening</th><th class="p-3">Total load</th><th class="p-3">Status</th><th class="p-3">Action</th></tr></thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($facultyRows as $row)
+                                    <tr>
+                                        <td class="p-3"><div class="flex min-w-[200px] items-center gap-3"><span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">@if($row['photo'])<img class="h-full w-full object-cover" src="{{ asset('storage/'.$row['photo']) }}" alt="">@else{{ strtoupper(mb_substr($row['name'], 0, 1)) }}@endif</span><span class="min-w-0"><span class="block truncate font-semibold">{{ $row['name'] }}</span><span class="block truncate text-xs text-slate-500">{{ $row['email'] ?? 'No linked account' }}</span></span></div></td>
+                                        <td class="p-3"><div>{{ $row['department'] }}{{ $row['rank'] ? ' · '.$row['rank'] : '' }}</div><div class="text-xs text-slate-500">{{ $row['position'] ?: 'No special designation' }}</div></td>
+                                        <td class="p-3">{{ $row['employment'] === 'part_time' ? 'Part-time' : 'Full-time' }}<div class="text-xs {{ $row['active'] ? 'text-emerald-700' : 'text-slate-400' }}">{{ $row['active'] ? 'Active account' : 'Inactive / no account' }}</div></td>
+                                        <td class="max-w-[220px] p-3 text-slate-600">{{ $row['subjects'] }}</td>
+                                        <td class="p-3"><strong class="text-emerald-700">{{ number_format($row['day_hours'], 1) }}h</strong><span class="text-xs text-slate-400"> / {{ $row['day_cap'] }}h</span>@if($row['employment'] === 'part_time')<div class="text-xs text-slate-400">Part of shared cap</div>@endif</td>
+                                        <td class="p-3"><strong class="text-indigo-700">{{ number_format($row['evening_hours'], 1) }}h</strong><span class="text-xs text-slate-400"> / {{ $row['evening_cap'] }}h</span>@if($row['employment'] === 'part_time')<div class="text-xs text-slate-400">Part of shared cap</div>@endif</td>
+                                        <td class="min-w-[170px] p-3"><div class="font-semibold">{{ number_format($row['total_hours'], 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $row['total_cap'] }}h{{ $row['employment'] === 'part_time' ? ' shared' : ' combined caps' }}</span></div><div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full {{ $row['status_color'] === 'rose' ? 'bg-rose-500' : ($row['status_color'] === 'amber' ? 'bg-amber-500' : ($row['status_color'] === 'emerald' ? 'bg-emerald-500' : 'bg-slate-300')) }}" style="width: {{ $row['progress'] }}%"></div></div></td>
+                                        <td class="p-3"><span class="badge {{ $row['status_color'] === 'rose' ? 'badge-red' : ($row['status_color'] === 'amber' ? 'badge-amber' : ($row['status_color'] === 'emerald' ? 'badge-green' : 'badge-grey')) }}">{{ $row['status'] }}</span></td>
+                                        <td class="p-3">@if($departments->contains('dept_id', $row['department_id']))<button type="button" class="topbar-btn btn-secondary" data-edit-designation data-id="{{ $row['id'] }}" data-name="{{ $row['name'] }}" data-position="{{ $row['position'] ?? '' }}" data-employment="{{ $row['employment'] }}">Edit designation</button>@else<span class="text-xs text-slate-400">View only</span>@endif</td>
+                                    </tr>
+                                @empty<tr><td colspan="9" class="p-8 text-center text-slate-500">No faculty match these filters for this semester.</td></tr>@endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                    @if($facultyRows->total())<div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4 text-sm text-slate-500"><span>Showing {{ $facultyRows->firstItem() }}–{{ $facultyRows->lastItem() }} of {{ $facultyRows->total() }} faculty</span>{{ $facultyRows->links() }}</div>@endif
+                </section>
+            </main>
+    <div id="workload-designation-modal" class="fixed inset-0 z-[120] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="workload-designation-title" onclick="if(event.target===this)closeWorkloadDesignation()">
+        <form id="workload-designation-form" method="POST" action="" class="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl" onclick="event.stopPropagation()">
+            @csrf @method('PUT')
+            <div class="flex items-start justify-between gap-3"><div><h2 id="workload-designation-title" class="text-lg font-bold">Edit faculty designation</h2><p id="workload-designation-name" class="mt-1 text-sm text-slate-500"></p></div><button type="button" class="topbar-btn btn-secondary" onclick="closeWorkloadDesignation()">Close</button></div>
+            <label for="workload-designation-select" class="mt-5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Special designation</label>
+            <select id="workload-designation-select" name="special_position" class="field-input mt-1 w-full"><option value="">No special designation</option>@foreach(\App\Services\ScheduleAssignmentService::SPECIAL_POSITION_MAX_HOURS as $position => $maxHours)<option value="{{ $position }}" data-cap="{{ $maxHours }}">{{ $position }} ({{ $maxHours }}h Day cap)</option>@endforeach</select>
+            <p id="workload-designation-note" class="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800"></p>
+            <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="closeWorkloadDesignation()">Cancel</button><button type="submit" class="topbar-btn btn-primary">Save designation</button></div>
+        </form>
     </div>
-
-    <div class="toast" id="toast"><span id="toast-msg"></span></div>
-
     <script>
-        function openModal(id) {
-            document.getElementById(id).classList.add('open');
+        const workloadDesignationModal = document.getElementById('workload-designation-modal');
+        const workloadDesignationForm = document.getElementById('workload-designation-form');
+        const workloadDesignationSelect = document.getElementById('workload-designation-select');
+        let workloadDesignationEmployment = 'full_time';
+        function syncWorkloadDesignationNote() {
+            const cap = workloadDesignationSelect.selectedOptions[0]?.dataset.cap || {{ \App\Services\ScheduleAssignmentService::TOTAL_MAX_HOURS }};
+            document.getElementById('workload-designation-note').textContent = workloadDesignationEmployment === 'part_time'
+                ? 'Part-time faculty have one shared {{ \App\Services\ScheduleAssignmentService::PART_TIME_MAX_HOURS }}-hour limit across Day and Evening. The designation does not change this shared limit.'
+                : `This designation sets the Day limit to ${cap} hours. Evening remains capped at {{ \App\Services\ScheduleAssignmentService::EVENING_MAX_HOURS }} hours.`;
         }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('open');
+        function openWorkloadDesignation(button) {
+            workloadDesignationForm.action = `{{ url('/dean/faculty-workload') }}/${button.dataset.id}/designation`;
+            document.getElementById('workload-designation-name').textContent = button.dataset.name;
+            workloadDesignationEmployment = button.dataset.employment;
+            workloadDesignationSelect.value = button.dataset.position || '';
+            syncWorkloadDesignationNote();
+            workloadDesignationModal.classList.remove('hidden');
+            workloadDesignationModal.classList.add('flex');
         }
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => {
-                if (e.target === m) m.classList.remove('open');
-            }));
-        });
-
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            document.getElementById('toast-msg').textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 3000);
-        }
+        function closeWorkloadDesignation() { workloadDesignationModal.classList.add('hidden'); workloadDesignationModal.classList.remove('flex'); }
+        document.querySelectorAll('[data-edit-designation]').forEach(button => button.addEventListener('click', () => openWorkloadDesignation(button)));
+        workloadDesignationSelect.addEventListener('change', syncWorkloadDesignationNote);
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') closeWorkloadDesignation(); });
     </script>
+    </div><!-- app-main opened by dean_header -->
+    </div><!-- app-shell opened by dean_header -->
 </body>
-
 </html>

@@ -63,7 +63,8 @@ class ActivityLogController extends Controller
                             ->orWhere('dal_table_name', $likeOperator, $like)
                             ->orWhere('dal_changed_columns', $likeOperator, $like)
                             ->orWhere('dal_record_key', $likeOperator, $like)
-                            ->orWhere('dal_database_user', $likeOperator, $like);
+                            ->orWhere('dal_database_user', $likeOperator, $like)
+                            ->orWhere('dal_ip_address', $likeOperator, $like);
                     });
                 })
                 ->when($filters['date'] ?? null, function ($query, string $date): void {

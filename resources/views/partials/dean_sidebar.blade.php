@@ -34,6 +34,10 @@
             class="nav-item {{ request()->routeIs('dean.departments') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-building-community" aria-hidden="true"></i></span> Departments
         </a>
+        <a href="{{ route('dean.faculty_workload') }}"
+            class="nav-item {{ request()->routeIs('dean.faculty_workload') ? 'active' : '' }}">
+            <span class="nav-icon"><i class="ti ti-chart-bar" aria-hidden="true"></i></span> Faculty Workload
+        </a>
         <a href="{{ route('dean.courses') }}"
             class="nav-item {{ request()->routeIs('dean.courses') ? 'active' : '' }}">
             <span class="nav-icon"><i class="ti ti-book-2" aria-hidden="true"></i></span> Courses

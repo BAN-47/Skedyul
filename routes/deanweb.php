@@ -67,6 +67,8 @@ Route::middleware(['auth', 'role:dean', 'audit.activity'])
 
         Route::get('/faculty-workload', [FacultyWorkloadController::class, 'facultyWorkload'])
             ->name('faculty_workload');
+        Route::put('/faculty-workload/{faculty}/designation', [FacultyWorkloadController::class, 'updateDesignation'])
+            ->name('faculty_workload.designation');
 
         Route::get('/pending-approvals', [PendingApprovalsController::class, 'index'])
             ->name('pending_approvals');
