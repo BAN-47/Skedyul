@@ -79,6 +79,9 @@
                         const payload = JSON.parse(html);
                         message = payload.message || message;
                     } catch (_) {}
+                    if (response.status === 422) {
+                        message = 'Plot or assign at least one class to your schedule for the selected semester. The preview will not appear until a schedule is plotted.';
+                    }
                     throw new Error(message);
                 }
                 if (/<html[\s>]/i.test(html)) {

@@ -45,6 +45,7 @@
     </div>
 
     <div class="sidebar-bottom">
+        @include('partials.sidebar_mobile_app')
         <form action="{{ route('logout') }}" method="POST">
             @csrf
             <button type="submit" class="btn-logout">⬅ Sign Out</button>
