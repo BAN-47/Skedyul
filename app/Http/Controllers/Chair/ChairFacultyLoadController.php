@@ -13,6 +13,7 @@ use App\Models\Section;
 use App\Models\Study_Load;
 use App\Models\Semester;
 use App\Models\Workload;
+use App\Models\WorkloadOverride;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -107,8 +108,18 @@ class ChairFacultyLoadController extends Controller
             ->get()
             ->groupBy('sl_fac_id');
 
-        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads) {
+        $workloadOverrides = $semester
+            ? WorkloadOverride::with('approvedBy')
+                ->where('wlo_semester_id', $semester->sem_id)
+                ->whereIn('wlo_fac_id', $facultyIds)
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('wlo_fac_id')
+            : collect();
+
+        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads, $workloadOverrides) {
             $allLoads = $studyLoads->get($f->fac_id, collect());
+            $facultyOverrides = $workloadOverrides->get($f->fac_id, collect());
 
             $shifts = collect(['day', 'evening'])->mapWithKeys(function (string $shift) use ($f, $allLoads) {
                 $loads = $allLoads->filter(fn ($load) =>
@@ -205,6 +216,15 @@ class ChairFacultyLoadController extends Controller
                 'total_max_hours' => $totalMaxHours,
                 'total_status_label' => $totalStatusLabel,
                 'total_status_badge' => $totalStatusBadge,
+                'workload_override_count' => $facultyOverrides->count(),
+                'workload_overrides' => $facultyOverrides->map(fn (WorkloadOverride $override) => [
+                    'designation' => $override->wlo_designation,
+                    'hours_after' => $override->wlo_hours_after,
+                    'cap_hours' => $override->wlo_cap_hours,
+                    'reason' => $override->wlo_reason,
+                    'approved_by' => $override->approvedBy?->usr_name ?? 'Unknown',
+                    'created_at' => $override->created_at,
+                ])->values(),
                 'status' => $status,
                 'status_color' => $overLimit ? 'rose' : ($nearLimit ? 'amber' : ($totalHours > 0 ? 'emerald' : 'slate')),
                 'progress' => min(100, $progress),
@@ -218,6 +238,7 @@ class ChairFacultyLoadController extends Controller
             'scheduled_hours' => $facultyLoad->sum('total_hours'),
             'attention' => $facultyLoad->whereIn('status', ['Near Limit', 'Over Limit'])->count(),
             'over_limit' => $facultyLoad->where('status', 'Over Limit')->count(),
+            'workload_overrides' => $facultyLoad->sum('workload_override_count'),
         ];
 
         // Sections for this chair's program only (no AY/sem filter — names carry year)

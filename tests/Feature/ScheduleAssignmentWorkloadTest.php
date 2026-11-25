@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Faculty;
+use App\Models\Course;
 use App\Models\Schedule;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -29,6 +31,12 @@ class ScheduleAssignmentWorkloadTest extends TestCase
             $table->uuid('sl_course_id');
             $table->string('sl_shift');
             $table->uuid('sl_sem_id');
+        });
+        Schema::create('designations', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('name')->unique();
+            $table->unsignedInteger('day_cap');
+            $table->unsignedInteger('evening_cap');
         });
     }
 
@@ -82,6 +90,12 @@ class ScheduleAssignmentWorkloadTest extends TestCase
 
     public function test_perg_chair_day_workload_limit_is_16_hours(): void
     {
+        DB::table('designations')->insert([
+            'id' => (string) Str::uuid(),
+            'name' => 'PERG Chair',
+            'day_cap' => 16,
+            'evening_cap' => 30,
+        ]);
         $faculty = new Faculty([
             'fac_employment_type' => 'full_time',
             'fac_special_position' => 'PERG Chair',
@@ -89,6 +103,99 @@ class ScheduleAssignmentWorkloadTest extends TestCase
 
         $this->assertSame(16.0, ScheduleAssignmentService::facultyMaxHours($faculty, 'day'));
         $this->assertSame(30.0, ScheduleAssignmentService::facultyMaxHours($faculty, 'evening'));
+    }
+
+    public function test_over_cap_assignment_requires_a_reason_and_returns_20_of_16_analytics(): void
+    {
+        $faculty = (new Faculty())->forceFill([
+            'fac_first_name' => 'Taylor',
+            'fac_last_name' => 'Faculty',
+            'fac_special_position' => 'PERG Chair',
+        ]);
+        $course = (new Course())->forceFill(['course_code' => 'COMP-101']);
+
+        try {
+            $this->checkWorkloadLimit([], $faculty, $course, 16, 4, 20, 16, 'day');
+            $this->fail('The first over-cap attempt should require an explicit override.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringStartsWith('WORKLOAD_OVERRIDE_REQUIRED:', $exception->getMessage());
+            $details = json_decode(substr($exception->getMessage(), strlen('WORKLOAD_OVERRIDE_REQUIRED:')), true);
+            $this->assertSame(20.0, (float) $details['hours_after']);
+            $this->assertSame(16.0, (float) $details['cap_hours']);
+            $this->assertSame(4.0, (float) $details['over_by']);
+        }
+
+        try {
+            $this->checkWorkloadLimit(['workload_override' => true], $faculty, $course, 16, 4, 20, 16, 'day');
+            $this->fail('An override without a reason should be rejected.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame(
+                'LOAD_LIMIT:A reason is required to override the faculty workload cap.',
+                $exception->getMessage()
+            );
+        }
+
+        $override = $this->checkWorkloadLimit([
+            'workload_override' => true,
+            'workload_override_reason' => 'Department coverage approved.',
+        ], $faculty, $course, 16, 4, 20, 16, 'day');
+
+        $this->assertSame(20.0, $override['hours_after']);
+        $this->assertSame(16.0, $override['cap_hours']);
+        $this->assertSame('Department coverage approved.', $override['reason']);
+    }
+
+    public function test_workload_override_is_persisted_once_per_study_load(): void
+    {
+        Schema::create('workload_overrides', function (Blueprint $table) {
+            $table->uuid('wlo_id')->primary();
+            $table->uuid('wlo_load_id')->unique();
+            $table->uuid('wlo_fac_id');
+            $table->uuid('wlo_course_id');
+            $table->uuid('wlo_section_id')->nullable();
+            $table->uuid('wlo_semester_id');
+            $table->uuid('wlo_approved_by');
+            $table->string('wlo_shift');
+            $table->string('wlo_designation')->nullable();
+            $table->decimal('wlo_hours_before', 8, 2);
+            $table->decimal('wlo_hours_added', 8, 2);
+            $table->decimal('wlo_hours_after', 8, 2);
+            $table->decimal('wlo_cap_hours', 8, 2);
+            $table->text('wlo_reason');
+            $table->timestamps();
+        });
+
+        $facultyId = (string) Str::uuid();
+        $courseId = (string) Str::uuid();
+        $loadId = (string) Str::uuid();
+        $sectionId = (string) Str::uuid();
+        $semesterId = (string) Str::uuid();
+        $approverId = (string) Str::uuid();
+        $faculty = (new Faculty())->forceFill(['fac_id' => $facultyId]);
+        $course = (new Course())->forceFill(['course_id' => $courseId]);
+        $load = (new \App\Models\Study_Load())->forceFill(['sl_id' => $loadId]);
+        $data = ['sec_id' => $sectionId, 'sem_id' => $semesterId];
+        $details = [
+            'shift' => 'day',
+            'designation' => 'PERG Chair',
+            'hours_before' => 16.0,
+            'hours_added' => 4.0,
+            'hours_after' => 20.0,
+            'cap_hours' => 16.0,
+            'reason' => 'Department coverage approved.',
+        ];
+        Auth::shouldReceive('id')->once()->andReturn($approverId);
+        $method = new \ReflectionMethod(ScheduleAssignmentService::class, 'recordWorkloadOverride');
+        $method->setAccessible(true);
+        $scheduler = app(ScheduleAssignmentService::class);
+
+        $method->invoke($scheduler, $data, $faculty, $course, $load, $details);
+        $method->invoke($scheduler, $data, $faculty, $course, $load, $details);
+
+        $this->assertSame(1, DB::table('workload_overrides')->count());
+        $this->assertSame(20.0, (float) DB::table('workload_overrides')->value('wlo_hours_after'));
+        $this->assertSame(16.0, (float) DB::table('workload_overrides')->value('wlo_cap_hours'));
+        $this->assertSame('Department coverage approved.', DB::table('workload_overrides')->value('wlo_reason'));
     }
 
     public function test_evening_section_meetings_use_evening_load_even_in_day_time_slots(): void
@@ -247,5 +354,31 @@ class ScheduleAssignmentWorkloadTest extends TestCase
             'sl_shift' => $shift,
             'sl_sem_id' => $semesterId,
         ]);
+    }
+
+    private function checkWorkloadLimit(
+        array $data,
+        Faculty $faculty,
+        Course $course,
+        float $hoursBefore,
+        float $hoursAdded,
+        float $hoursAfter,
+        float $capHours,
+        string $shift
+    ): ?array {
+        $method = new \ReflectionMethod(ScheduleAssignmentService::class, 'checkWorkloadLimit');
+        $method->setAccessible(true);
+
+        return $method->invoke(
+            app(ScheduleAssignmentService::class),
+            $data,
+            $faculty,
+            $course,
+            $hoursBefore,
+            $hoursAdded,
+            $hoursAfter,
+            $capHours,
+            $shift
+        );
     }
 }

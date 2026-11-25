@@ -10,6 +10,8 @@ use App\Models\SystemSetting;
 use App\Services\AuditActivityLogger;
 use App\Services\CaptchaChallenge;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
@@ -32,8 +34,22 @@ class LoginController extends Controller
             'password' => 'required'
         ]);
 
-        $user = User::whereRaw('LOWER(usr_email) = ?', [strtolower(trim($request->email))])
-            ->first();                                                      
+        try {
+            $user = User::whereRaw('LOWER(usr_email) = ?', [strtolower(trim($request->email))])
+                ->first();
+        } catch (QueryException $exception) {
+            $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+            $isConnectionFailure = str_starts_with($sqlState, '08')
+                || ($sqlState === 'HY000' && str_contains(strtolower($exception->getMessage()), 'timeout'));
+
+            if (!$isConnectionFailure) {
+                throw $exception;
+            }
+
+            Log::warning('Sign-in could not reach the database.', ['sqlstate' => $sqlState]);
+
+            return back()->with('error', 'Sign-in is temporarily unavailable. Please try again shortly.');
+        }
 
         if (!$user) {
             return back()->with('error', 'Account not found.');

@@ -438,11 +438,16 @@ class PbtController extends Controller
             'fac_id'     => 'required|uuid|exists:faculty,fac_id',
             'sem_id'     => 'required|uuid|exists:semester,sem_id',
             'sec_id'     => 'nullable|uuid|exists:section,sec_id',
+            'sec_ids'    => 'sometimes|array|min:1',
+            'sec_ids.*'  => 'required|uuid|exists:section,sec_id',
+            'ojt_is_evening' => 'sometimes|boolean',
             'room_id'    => 'nullable|uuid|exists:room,room_id',
             'day'        => $multipleDays ? 'prohibited' : 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
             'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
             'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            'workload_override' => 'sometimes|boolean',
+            'workload_override_reason' => 'required_if:workload_override,true,1|nullable|string|max:1000',
             'start_time' => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after_or_equal:07:00', 'before:22:00'],
             'end_time'   => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after:start_time', 'before_or_equal:22:00'],
         ]);
@@ -458,6 +463,24 @@ class PbtController extends Controller
         }
         $course = Course::findOrFail($data['subj_id']);
         $data['sec_id'] = $data['sec_id'] ?? null;
+        if (!empty($data['sec_ids'])) {
+            if (!ScheduleAssignmentService::isOjt($course)) {
+                throw ValidationException::withMessages([
+                    'sec_ids' => 'Multiple sections can only be selected for an OJT course.',
+                ]);
+            }
+
+            $validSectionCount = Section::whereIn('sec_id', $data['sec_ids'])
+                ->where('sec_year_level', 4)
+                ->whereHas('program', fn ($query) => $query->where('dept_college_id', $collegeId))
+                ->count();
+            if ($validSectionCount !== count(array_unique($data['sec_ids']))) {
+                abort(403, 'Shared OJT sections must be Year 4 sections within your college.');
+            }
+
+            return $data;
+        }
+
         if (empty($data['sec_id'])) {
             if ($course->course_code !== 'REC') {
                 throw ValidationException::withMessages([
@@ -490,7 +513,9 @@ class PbtController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request, true);
-        $result = $this->scheduler->assignMultiple($data);
+        $result = !empty($data['sec_ids'])
+            ? $this->scheduler->assignMultipleSections($data)
+            : $this->scheduler->assignMultiple($data);
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 

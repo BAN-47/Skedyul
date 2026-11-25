@@ -961,23 +961,12 @@ function submitAdd(keepOpen = false) {
 
     setAddButtonsLoading(true, keepOpen);
 
-    fetch("/chair/pbt", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-TOKEN": csrfToken(),
-            Accept: "application/json",
-        },
-        body: JSON.stringify(payload),
-    })
-        .then(async (res) => {
-            const data = await res
-                .json()
-                .catch(() => ({
-                    message: `The server returned an unreadable response (${res.status}).`,
-                }));
-            if (!res.ok && !data.message && !data.errors)
-                data.message = `Schedule could not be saved (HTTP ${res.status}).`;
+    window.submitScheduleWithWorkloadOverride("/chair/pbt", payload)
+        .then(({ data, cancelled }) => {
+            if (cancelled) {
+                setAddButtonsLoading(false);
+                return;
+            }
             if (data.success) {
                 showToast(data.message || "Schedule added.");
                 if (keepOpen) {

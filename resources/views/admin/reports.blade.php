@@ -110,7 +110,7 @@
                     </div>
                 @else
                 <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
-                    <span>All active faculty records, including faculty with no plotted classes.</span>
+                    <span>All active faculty records, including faculty with no plotted classes. {{ $workloadOverrideCount }} recorded workload override{{ $workloadOverrideCount === 1 ? '' : 's' }} in this result.</span>
                     <span>{{ $byTeacher->count() }} faculty</span>
                 </div>
                 <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -155,6 +155,30 @@
                                 Part-time shared cap: <strong>{{ $load['total_hours'] }} / {{ $load['part_time_cap'] }} hrs</strong>
                                 <div class="mt-2 h-2 overflow-hidden rounded-full bg-white"><div class="h-full rounded-full {{ $load['total_hours'] > $load['part_time_cap'] ? 'bg-rose-500' : 'bg-cyan-500' }}" style="width:{{ $combinedPct }}%"></div></div>
                             </div>
+                        @endif
+                        @if($facultyReport->workload_overrides->isNotEmpty())
+                            <details class="mt-3 rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+                                <summary class="cursor-pointer text-xs font-bold text-rose-800">
+                                    {{ $facultyReport->workload_overrides->count() }} recorded workload override{{ $facultyReport->workload_overrides->count() === 1 ? '' : 's' }} · View analytics
+                                </summary>
+                                <div class="mt-3 space-y-2">
+                                    @foreach($facultyReport->workload_overrides->take(5) as $override)
+                                        <div class="rounded-lg border border-rose-100 bg-white p-2.5 text-xs">
+                                            <div class="font-bold text-rose-800">
+                                                {{ $override->wlo_hours_after + 0 }} / {{ $override->wlo_cap_hours + 0 }} hours · {{ $override->wlo_designation ?: ucfirst($override->wlo_shift) }}
+                                            </div>
+                                            <div class="mt-1 text-slate-500">
+                                                {{ $override->course?->course_code ?? 'Course' }} · {{ $override->section?->sec_name ?? 'Section not set' }} · {{ $override->created_at?->format('M j, Y') }}
+                                            </div>
+                                            <p class="mt-1 text-slate-700">{{ $override->wlo_reason }}</p>
+                                            <div class="mt-1 text-slate-500">Approved by {{ $override->approvedBy?->usr_name ?? 'Unknown' }}</div>
+                                        </div>
+                                    @endforeach
+                                    @if($facultyReport->workload_overrides->count() > 5)
+                                        <div class="text-[11px] text-slate-500">Showing the latest 5 of {{ $facultyReport->workload_overrides->count() }} records.</div>
+                                    @endif
+                                </div>
+                            </details>
                         @endif
 
                         <button type="button" data-faculty-schedule-url="{{ route('admin.reports.faculty-schedule', $facultyReport->fac_id) }}" data-faculty-name="{{ $facultyReport->name }}" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100">

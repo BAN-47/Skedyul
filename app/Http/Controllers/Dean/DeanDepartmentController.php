@@ -95,7 +95,6 @@ class DeanDepartmentController extends Controller
         $department = Departments::where('dept_college_id', $college->college_id)->findOrFail($id);
         $data = $request->validate([
             'faculty_id' => ['required', 'string', 'exists:faculty,fac_id'],
-            'confirm_replace' => ['nullable', 'accepted'],
         ]);
 
         $faculty = Faculty::where('fac_college_id', $college->college_id)
@@ -110,9 +109,6 @@ class DeanDepartmentController extends Controller
         $current = Dept_Chair::where('dc_dept_id', $department->dept_id)->first();
         if ($current?->dc_usr_id === $user->usr_id) {
             return back()->with('success', 'This faculty member is already the department chair.');
-        }
-        if ($current && !$request->boolean('confirm_replace')) {
-            return back()->withErrors(['faculty_id' => 'A chair is already assigned. Confirm replacement to continue.']);
         }
         $otherChair = Dept_Chair::where('dc_usr_id', $user->usr_id)
             ->where('dc_dept_id', '!=', $department->dept_id)

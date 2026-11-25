@@ -152,7 +152,10 @@ class PbtExportController extends Controller
             $schedules
         );
 
-        $spreadsheet->setActiveSheetIndex(0);
+        $hasDayContent = $schedules->contains(fn(Schedule $schedule) => $this->isDaySchedule($schedule));
+        $hasEveningContent = $schedules->contains(fn(Schedule $schedule) => $this->isEveningSchedule($schedule));
+
+        $spreadsheet->setActiveSheetIndex(!$hasDayContent && $hasEveningContent ? 1 : 0);
 
         $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '_', $facultyName ?: 'Faculty');
         $filename = 'PBT_' . trim($safeName, '_') . '_' . now()->format('Ymd') . '.xlsx';
@@ -618,6 +621,10 @@ class PbtExportController extends Controller
 
     private function isDaySchedule(Schedule $schedule): bool
     {
+        if ($schedule->section) {
+            return !(bool) $schedule->section->sec_is_evening;
+        }
+
         $shift = strtolower(trim((string) $schedule->sch_shift));
         if ($shift !== '') {
             return in_array($shift, ['day', 'morning'], true);
@@ -635,6 +642,10 @@ class PbtExportController extends Controller
 
     private function isEveningSchedule(Schedule $schedule): bool
     {
+        if ($schedule->section) {
+            return (bool) $schedule->section->sec_is_evening;
+        }
+
         $shift = strtolower(trim((string) $schedule->sch_shift));
         if ($shift !== '') {
             return in_array($shift, ['evening', 'night'], true);
