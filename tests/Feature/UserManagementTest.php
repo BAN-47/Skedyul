@@ -47,6 +47,37 @@ class UserManagementTest extends TestCase
         $this->assertTrue(Hash::check('secret1234', $user->usr_password_hash));
     }
 
+    public function test_admin_cannot_create_a_user_with_angle_brackets_in_name_or_password(): void
+    {
+        $this->actingAs($this->admin())
+            ->from(route('admin.users'))
+            ->post(route('admin.users.store'), [
+                ...$this->newSystemAdminPayload(),
+                'usr_first_name' => '<Juan>',
+                'password' => 'secret<123>',
+            ])
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionHasErrors(['usr_first_name', 'password']);
+    }
+
+    public function test_admin_cannot_update_a_user_with_angle_brackets_in_name_or_password(): void
+    {
+        $user = $this->admin();
+
+        $this->actingAs($user)
+            ->from(route('admin.users'))
+            ->put(route('admin.users.update', $user->usr_id), [
+                ...$this->newSystemAdminPayload(),
+                'usr_first_name' => '<Test>',
+                'usr_email' => 'updated@example.com',
+                'password' => 'secret<123>',
+                'password_confirmation' => 'secret<123>',
+                'usr_is_active' => true,
+            ])
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionHasErrors(['usr_first_name', 'password']);
+    }
+
     public function test_admin_sees_a_clean_error_when_duplicate_user_email_is_submitted(): void
     {
         User::create([

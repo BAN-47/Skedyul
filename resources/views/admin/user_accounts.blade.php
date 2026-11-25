@@ -260,6 +260,10 @@
       <form method="POST" action="{{ route('admin.users.store') }}" id="form-add-user">
         @csrf
 
+        <div id="add-user-validation-alert"
+          class="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          role="alert" aria-live="assertive" hidden></div>
+
         <div class="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label class="field-label">Email</label>
@@ -1136,8 +1140,41 @@ function togglePasswordVisibility(inputId, btn) {
     // Keep hidden full number in sync before submit
     document.addEventListener('DOMContentLoaded', function() {
       const addForm = document.getElementById('form-add-user');
+      const addValidationAlert = document.getElementById('add-user-validation-alert');
+
+      function addUserFieldWithAngleBrackets() {
+        return Array.from(addForm?.elements || []).find(field => {
+          if (field.disabled || ['hidden', 'submit', 'button', 'file'].includes(field.type)) return false;
+          return typeof field.value === 'string' && /[<>]/.test(field.value);
+        });
+      }
+
+      function updateAddUserValidationAlert() {
+        if (!addValidationAlert) return;
+        const invalidField = addUserFieldWithAngleBrackets();
+        addValidationAlert.textContent = invalidField
+          ? 'Angle brackets (< and >) are not allowed.'
+          : '';
+        addValidationAlert.hidden = !invalidField;
+      }
+
       if (addForm) {
-        addForm.addEventListener('submit', function() {
+        addForm.addEventListener('input', updateAddUserValidationAlert);
+        addForm.addEventListener('change', updateAddUserValidationAlert);
+        addForm.addEventListener('invalid', function(event) {
+          if (typeof event.target.value === 'string' && /[<>]/.test(event.target.value)) {
+            updateAddUserValidationAlert();
+          }
+        }, true);
+        addForm.addEventListener('submit', function(event) {
+          const invalidField = addUserFieldWithAngleBrackets();
+          if (invalidField) {
+            event.preventDefault();
+            updateAddUserValidationAlert();
+            invalidField.focus();
+            return;
+          }
+          updateAddUserValidationAlert();
           syncPhoneField('add');
         });
       }

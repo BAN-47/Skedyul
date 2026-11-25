@@ -88,21 +88,23 @@ class DeanSettingsController extends Controller
     public function updatePersonalInfo(Request $request)
     {
         $data = $request->validate([
-            'dean_first_name' => 'required|string|max:100',
-            'dean_last_name' => 'required|string|max:100',
-            'dean_middle_name' => 'nullable|string|max:100',
-            'dean_suffix' => 'nullable|string|max:20',
-            'dean_employee_id' => 'nullable|string|max:50',
-            'dean_gender' => 'nullable|string|max:30',
-            'dean_civil_status' => 'nullable|string|max:30',
+            'dean_first_name' => 'required|string|max:100|not_regex:/[<>]/',
+            'dean_last_name' => 'required|string|max:100|not_regex:/[<>]/',
+            'dean_middle_name' => 'nullable|string|max:100|not_regex:/[<>]/',
+            'dean_suffix' => 'nullable|string|max:20|not_regex:/[<>]/',
+            'dean_employee_id' => 'nullable|string|max:50|not_regex:/[<>]/',
+            'dean_gender' => 'nullable|string|max:30|not_regex:/[<>]/',
+            'dean_civil_status' => 'nullable|string|max:30|not_regex:/[<>]/',
             'dean_dob' => 'nullable|date',
-            'dean_nationality' => 'nullable|string|max:100',
-            'fac_bachelors_degree' => 'nullable|string|max:255',
-            'fac_masters_degree' => 'nullable|string|max:255',
-            'fac_doctorate_degree' => 'nullable|string|max:255',
-            'fac_bachelors_abbr' => [$request->filled('fac_bachelors_degree') ? 'required' : 'nullable', 'string', 'max:40'],
-            'fac_masters_abbr' => [$request->filled('fac_masters_degree') ? 'required' : 'nullable', 'string', 'max:40'],
-            'fac_doctorate_abbr' => [$request->filled('fac_doctorate_degree') ? 'required' : 'nullable', 'string', 'max:60'],
+            'dean_nationality' => 'nullable|string|max:100|not_regex:/[<>]/',
+            'fac_bachelors_degree' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'fac_masters_degree' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'fac_doctorate_degree' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'fac_bachelors_abbr' => [$request->filled('fac_bachelors_degree') ? 'required' : 'nullable', 'string', 'max:40', 'not_regex:/[<>]/'],
+            'fac_masters_abbr' => [$request->filled('fac_masters_degree') ? 'required' : 'nullable', 'string', 'max:40', 'not_regex:/[<>]/'],
+            'fac_doctorate_abbr' => [$request->filled('fac_doctorate_degree') ? 'required' : 'nullable', 'string', 'max:60', 'not_regex:/[<>]/'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $dean = $this->currentDean();
@@ -126,12 +128,14 @@ class DeanSettingsController extends Controller
     {
         $data = $request->validate([
             'usr_email' => [
-                'required', 'email', 'max:255',
+                'required', 'string', 'max:255', 'not_regex:/[<>]/', 'email',
                 Rule::unique('USER', 'usr_email')->ignore(Auth::id(), 'usr_id'),
             ],
-            'dean_phone_number' => 'nullable|string|max:30',
-            'dean_office_address' => 'nullable|string|max:255',
-            'dean_bio' => 'nullable|string|max:1000',
+            'dean_phone_number' => 'nullable|string|max:30|not_regex:/[<>]/',
+            'dean_office_address' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'dean_bio' => 'nullable|string|max:1000|not_regex:/[<>]/',
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $dean = $this->currentDean();
@@ -150,12 +154,14 @@ class DeanSettingsController extends Controller
     public function updateInstitution(Request $request)
     {
         $data = $request->validate([
-            'inst_name' => 'required|string|max:255',
-            'inst_branch_campus' => 'nullable|string|max:255',
-            'inst_college' => 'nullable|string|max:255',
-            'inst_abbreviation' => 'nullable|string|max:50',
-            'inst_contact_email' => 'nullable|email|max:150',
-            'inst_phone' => 'nullable|string|max:30',
+            'inst_name' => 'required|string|max:255|not_regex:/[<>]/',
+            'inst_branch_campus' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'inst_college' => 'nullable|string|max:255|not_regex:/[<>]/',
+            'inst_abbreviation' => 'nullable|string|max:50|not_regex:/[<>]/',
+            'inst_contact_email' => 'nullable|string|max:150|not_regex:/[<>]/|email',
+            'inst_phone' => 'nullable|string|max:30|not_regex:/[<>]/',
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $institution = \App\Models\Institution::first();
@@ -191,8 +197,10 @@ class DeanSettingsController extends Controller
     public function updatePassword(Request $request)
     {
         $request->validate([
-            'current_password' => 'required|string',
-            'new_password' => ['required', 'string', 'confirmed', Password::min(8)],
+            'current_password' => 'required|string|not_regex:/[<>]/',
+            'new_password' => ['required', 'string', 'not_regex:/[<>]/', 'confirmed', Password::min(8)],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
 
         $user = auth()->user();

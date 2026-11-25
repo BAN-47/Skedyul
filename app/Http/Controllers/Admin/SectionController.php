@@ -183,18 +183,21 @@ class SectionController extends Controller
         $studentCount = (int) ($section?->sec_no_of_student ?? 0);
 
         return $request->validate([
-            'sec_dept_id' => ['required', 'uuid', $programRule],
-            'sec_ay_id' => ['required', 'uuid', 'exists:academic_year,ay_id'],
+            'sec_dept_id' => ['required', 'not_regex:/[<>]/', 'uuid', $programRule, 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'sec_ay_id' => ['required', 'not_regex:/[<>]/', 'uuid', 'exists:academic_year,ay_id', 'regex:/^[\p{L}\p{N}-]+$/u'],
             'sec_sem_id' => [
                 'required',
+                'not_regex:/[<>]/',
                 'uuid',
                 Rule::exists('semester', 'sem_id')->where('sem_ay_id', $request->input('sec_ay_id')),
             ],
-            'sec_name' => ['required', 'string', 'max:50', $uniqueNameRule],
-            'sec_year_level' => ['required', 'integer', 'min:1', 'max:5'],
-            'sec_max_capacity' => ['required', 'integer', 'min:'.max(1, $studentCount)],
-            'sec_status' => ['required', Rule::in(['active', 'inactive'])],
+            'sec_name' => ['required', 'string', 'not_regex:/[<>]/', 'max:50', $uniqueNameRule, 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'sec_year_level' => ['required', 'not_regex:/[<>]/', 'integer', 'min:1', 'max:5', 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'sec_max_capacity' => ['required', 'not_regex:/[<>]/', 'integer', 'min:'.max(1, $studentCount), 'regex:/^[\p{L}\p{N}-]+$/u'],
+            'sec_status' => ['required', 'not_regex:/[<>]/', Rule::in(['active', 'inactive']), 'regex:/^[\p{L}\p{N}-]+$/u'],
             'sec_is_evening' => ['nullable', 'boolean'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed. Only use valid alphabetical (A-Z) letters.',
         ]);
     }
 

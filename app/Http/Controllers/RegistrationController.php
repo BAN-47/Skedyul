@@ -54,7 +54,7 @@ class RegistrationController extends Controller
             'usr_dob' => ['required', 'date', 'after_or_equal:1950-01-01', 'before_or_equal:' . now()->subDay()->toDateString()],
             'usr_nationality' => ['required', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
             'role_phone_number' => ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{1,3}\d{7,10}$/'],
-            'role_address' => ['required', 'string', 'max:255', 'regex:/^[\p{L}\p{N}\s#.,\'\/-]+$/u'],
+            'role_address' => ['nullable', 'string', 'max:255', 'regex:/^[\p{L}\p{N}\s#.,\'\/-]+$/u'],
             'college_id' => ['required', 'uuid', 'exists:college,college_id'],
             'dept_id' => ['required', 'uuid', 'exists:department,dept_id'],
             'usr_rank_title' => ['required', 'string', 'max:255', 'regex:/^[\p{L}\s\-\'\.]+$/u'],

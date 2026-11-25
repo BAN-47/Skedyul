@@ -75,6 +75,7 @@
                     <div class="card-sub">Update your personal details</div>
                   </div>
                 </div>
+                <div id="personal-info-validation-alert" class="hidden mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" aria-live="assertive"></div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
                   <div><label class="field-label">First Name</label><input class="field-input" id="pi-first" value="{{ $dean->dean_first_name }}"></div>
                   <div><label class="field-label">Last Name</label><input class="field-input" id="pi-last" value="{{ $dean->dean_last_name }}"></div>
@@ -135,6 +136,7 @@
                     <div class="card-sub">How others can reach you</div>
                   </div>
                 </div>
+                <div id="contact-info-validation-alert" class="hidden mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" aria-live="assertive"></div>
                 <div class="grid grid-cols-2 gap-3 mb-3">
                   <div><label class="field-label">Email Address</label><input class="field-input" type="email" id="pi-gmail" value="{{ auth()->user()->usr_email }}"></div>
                   <div><label class="field-label">Phone Number</label><input class="field-input" id="pi-phone" value="{{ $dean->dean_phone_number }}"></div>
@@ -232,6 +234,7 @@
                     <div class="card-sub">Update your Dean portal account password</div>
                   </div>
                 </div>
+                <div id="password-validation-alert" class="hidden mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert" aria-live="assertive"></div>
                 <div class="mb-3.5">
                   <label class="field-label">Current Password</label>
                   <div class="relative">
@@ -408,7 +411,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast"><span id="toast-msg"></span></div>
+  <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
   <script>
     function goToPage(id) {
@@ -570,6 +573,42 @@
       setTimeout(() => t.classList.remove('show'), 3000);
     }
 
+    function showAngleBracketAlert(payload, alertId, notify = true) {
+      const containsAngleBracket = Object.values(payload).some(value =>
+        typeof value === 'string' && /[<>]/.test(value)
+      );
+      const message = containsAngleBracket ? 'Angle brackets (< and >) are not allowed.' : '';
+      const alert = document.getElementById(alertId);
+      if (alert) {
+        alert.textContent = message;
+        alert.classList.toggle('hidden', !message);
+      }
+      if (message && notify) showToast(message);
+      return Boolean(message);
+    }
+
+    function watchAngleBracketFields(fieldIds, alertId) {
+      const fields = fieldIds.map(id => document.getElementById(id)).filter(Boolean);
+      const updateAlert = () => showAngleBracketAlert(
+        Object.fromEntries(fields.map(field => [field.id, field.value])),
+        alertId,
+        false
+      );
+      fields.forEach(field => {
+        field.addEventListener('input', updateAlert);
+        field.addEventListener('change', updateAlert);
+      });
+      updateAlert();
+    }
+
+    watchAngleBracketFields([
+      'pi-first', 'pi-last', 'pi-middle', 'pi-suffix', 'pi-empid', 'pi-gender',
+      'pi-civil', 'pi-nat', 'pi-bachelors', 'pi-bachelors-abbr', 'pi-masters',
+      'pi-masters-abbr', 'pi-doctorate', 'pi-doctorate-abbr', 'pi-dob',
+    ], 'personal-info-validation-alert');
+    watchAngleBracketFields(['pi-gmail', 'pi-phone', 'pi-address', 'pi-bio'], 'contact-info-validation-alert');
+    watchAngleBracketFields(['pw-current', 'pw-new', 'pw-confirm'], 'password-validation-alert');
+
     function uploadAvatar(input) {
       const file = input.files[0];
       if (!file) return;
@@ -650,6 +689,8 @@ function savePersonalInfo() {
         fac_doctorate_abbr: document.getElementById('pi-doctorate-abbr').value,
       };
 
+      if (showAngleBracketAlert(payload, 'personal-info-validation-alert')) return;
+
       fetch("{{ route('dean.profile.personal-info.update') }}", {
           method: 'PUT',
           headers: {
@@ -685,6 +726,8 @@ function savePersonalInfo() {
         dean_bio: document.getElementById('pi-bio').value,
       };
 
+      if (showAngleBracketAlert(payload, 'contact-info-validation-alert')) return;
+
       fetch("{{ route('dean.profile.contact.update') }}", {
           method: 'PUT',
           headers: {
@@ -714,13 +757,15 @@ function savePersonalInfo() {
 
     function saveInstitutionInfo() {
       const payload = {
-        institution_name: document.getElementById('inst-name').value,
-        institution_campus: document.getElementById('inst-campus').value,
-        institution_college: document.getElementById('inst-college').value,
-        institution_abbr: document.getElementById('inst-abbr').value,
-        institution_email: document.getElementById('inst-email').value,
-        institution_phone: document.getElementById('inst-phone').value,
+        inst_name: document.getElementById('inst-name').value,
+        inst_branch_campus: document.getElementById('inst-campus').value,
+        inst_college: document.getElementById('inst-college').value,
+        inst_abbreviation: document.getElementById('inst-abbr').value,
+        inst_contact_email: document.getElementById('inst-email').value,
+        inst_phone: document.getElementById('inst-phone').value,
       };
+
+      if (showAngleBracketAlert(payload, 'contact-info-validation-alert')) return;
 
       fetch("{{ route('dean.institution.update') }}", {
           method: 'PUT',
@@ -753,6 +798,12 @@ function savePersonalInfo() {
       const current = document.getElementById('pw-current').value;
       const newPw = document.getElementById('pw-new').value;
       const confirm = document.getElementById('pw-confirm').value;
+
+      if (showAngleBracketAlert({
+        current_password: current,
+        new_password: newPw,
+        new_password_confirmation: confirm,
+      }, 'password-validation-alert')) return;
 
       if (!current) {
         showToast('Please enter your current password.');
@@ -795,7 +846,8 @@ function savePersonalInfo() {
             document.getElementById('pw-bar').style.width = '0';
             showToast('Password updated successfully!');
           } else {
-            showToast(data.message || 'Update failed. Please check your inputs.');
+            const firstError = data.errors ? Object.values(data.errors)[0][0] : data.message;
+            showToast(firstError || 'Update failed. Please check your inputs.');
           }
         })
         .catch(() => showToast('Update failed. Please try again.'));
