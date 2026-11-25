@@ -11,6 +11,7 @@ use App\Models\Workload;
 use App\Models\Course;
 use App\Models\Room;
 use App\Models\Section;
+use App\Models\WorkloadOverride;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,7 @@ class ScheduleAssignmentService
         try {
             return DB::transaction(function () use ($data, $days) {
                 $created = [];
+                $workloadOverride = null;
                 foreach ($days as $day) {
                     $dayData = $data;
                     unset($dayData['days']);
@@ -133,6 +135,7 @@ class ScheduleAssignmentService
                         throw new RuntimeException('__MULTI_DAY_FAIL__' . json_encode($result));
                     }
                     $created[] = $result['schedule'];
+                    $workloadOverride ??= $result['workload_override'] ?? null;
                 }
 
                 if (!app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'])) {
@@ -143,6 +146,7 @@ class ScheduleAssignmentService
                     'success' => true,
                     'message' => 'Schedule added for ' . implode(', ', $days) . '.',
                     'schedules' => $created,
+                    'workload_override' => $workloadOverride,
                 ];
             });
         } catch (RuntimeException $e) {
@@ -166,6 +170,7 @@ class ScheduleAssignmentService
         try {
             return DB::transaction(function () use ($data, $sectionIds, $days) {
                 $created = [];
+                $workloadOverride = null;
                 $course = Course::findOrFail($data['subj_id']);
                 if (self::isOjt($course)) {
                     Study_Load::where('sl_fac_id', $data['fac_id'])
@@ -184,13 +189,19 @@ class ScheduleAssignmentService
                             throw new RuntimeException('__MULTI_SECTION_FAIL__' . json_encode($result));
                         }
                         $created[] = $result['schedule'];
+                        $workloadOverride ??= $result['workload_override'] ?? null;
                     }
                 }
 
                 if (!app(UnassignedFacultyService::class)->isPlaceholder($data['fac_id'])) {
                     $this->syncWorkload($data['fac_id'], $data['sem_id']);
                 }
-                return ['success' => true, 'message' => 'Shared OJT schedule added for the selected Year 4 sections.', 'schedules' => $created];
+                return [
+                    'success' => true,
+                    'message' => 'Shared OJT schedule added for the selected Year 4 sections.',
+                    'schedules' => $created,
+                    'workload_override' => $workloadOverride,
+                ];
             });
         } catch (RuntimeException $e) {
             if (str_starts_with($e->getMessage(), '__MULTI_SECTION_FAIL__')) {
@@ -231,6 +242,7 @@ class ScheduleAssignmentService
                 $isRec = $course->course_code === 'REC';
                 $isOjt = self::isOjt($course);
                 $faculty = $this->lockConflictResources($data, $isRec);
+                $workloadOverrideDetails = null;
 
                 if ($conflict = $this->findConflict($data, $isRec)) {
                     throw new RuntimeException('SCHEDULE_CONFLICT:' . $conflict);
@@ -242,71 +254,78 @@ class ScheduleAssignmentService
                     $this->assertCourseHoursAvailable($data, $course);
                 }
                 if (!$placeholder) {
-                $loadQuery = Study_Load::where([
-                    'sl_fac_id' => $data['fac_id'],
-                    'sl_course_id' => $data['subj_id'],
-                    'sl_sem_id' => $data['sem_id'],
-                ]);
-                if (!$isRec) {
-                    $loadQuery->where('sl_sec_id', $data['sec_id']);
-                }
-                $studyLoad = $loadQuery->withExists('schedules')->first();
-                $courseHours = self::courseHours($course);
-                $sectionIsEvening = !empty($data['sec_id'])
-                    && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
-                $workloadShift = self::workloadShiftForAssignment(
-                    $sectionIsEvening,
-                    $scheduleShift,
-                    $studyLoad?->sl_shift,
-                    (bool) ($studyLoad?->schedules_exists ?? false)
-                );
-                $currentHours = $this->facultyHoursForLimit(
-                    $faculty,
-                    $data['fac_id'],
-                    $data['sem_id'],
-                    $workloadShift
-                );
-                $hasExistingSharedOjt = self::isOjt($course) && Study_Load::where('sl_fac_id', $data['fac_id'])
-                    ->where('sl_course_id', $course->course_id)
-                    ->where('sl_sem_id', $data['sem_id'])
-                    ->exists();
-                $additionalHours = (!$studyLoad || (
-                    $studyLoad->sl_shift !== $workloadShift
-                    && $faculty->fac_employment_type !== 'part_time'
-                )) && !$hasExistingSharedOjt ? $courseHours : 0;
-                $hoursAfterAssignment = $currentHours + $additionalHours;
-                $maxHours = self::facultyMaxHours($faculty, $workloadShift);
-                if ($hoursAfterAssignment > $maxHours) {
-                    $workloadName = $faculty->fac_employment_type === 'part_time'
-                        ? 'combined Day and Evening'
-                        : $workloadShift;
-                    throw new RuntimeException("LOAD_LIMIT:Cannot add {$course->course_code}. {$faculty->fac_first_name} {$faculty->fac_last_name} has {$currentHours} teaching hours in the {$workloadName} workload; this course adds {$additionalHours} hours, totaling {$hoursAfterAssignment} against the {$maxHours}-hour limit.");
-                }
-
-                if (!$studyLoad) {
-                    $studyLoad = Study_Load::create([
+                    $loadQuery = Study_Load::where([
                         'sl_fac_id' => $data['fac_id'],
                         'sl_course_id' => $data['subj_id'],
-                        'sl_shift' => $workloadShift,
-                        'sl_ojt_is_evening' => $isOjt ? (bool) ($data['ojt_is_evening'] ?? false) : false,
-                        'sl_sec_id' => $data['sec_id'] ?? null,
                         'sl_sem_id' => $data['sem_id'],
-                        'sl_assigned_by' => Auth::id(),
-                        'sl_status'      => 'approved',
-                        'sl_assigned_at' => now(),
                     ]);
-                } else {
-                    $needsSave = false;
-                    if ($studyLoad->sl_shift !== $workloadShift) {
-                        $studyLoad->sl_shift = $workloadShift;
-                        $needsSave = true;
+                    if (!$isRec) {
+                        $loadQuery->where('sl_sec_id', $data['sec_id']);
                     }
-                    if ($isOjt && (bool) $studyLoad->sl_ojt_is_evening !== (bool) ($data['ojt_is_evening'] ?? false)) {
-                        $studyLoad->sl_ojt_is_evening = (bool) ($data['ojt_is_evening'] ?? false);
-                        $needsSave = true;
+                    $studyLoad = $loadQuery->withExists('schedules')->first();
+                    $courseHours = self::courseHours($course);
+                    $sectionIsEvening = !empty($data['sec_id'])
+                        && (bool) Section::whereKey($data['sec_id'])->value('sec_is_evening');
+                    $workloadShift = self::workloadShiftForAssignment(
+                        $sectionIsEvening,
+                        $scheduleShift,
+                        $studyLoad?->sl_shift,
+                        (bool) ($studyLoad?->schedules_exists ?? false)
+                    );
+                    $currentHours = $this->facultyHoursForLimit(
+                        $faculty,
+                        $data['fac_id'],
+                        $data['sem_id'],
+                        $workloadShift
+                    );
+                    $hasExistingSharedOjt = self::isOjt($course) && Study_Load::where('sl_fac_id', $data['fac_id'])
+                        ->where('sl_course_id', $course->course_id)
+                        ->where('sl_sem_id', $data['sem_id'])
+                        ->exists();
+                    $additionalHours = (!$studyLoad || (
+                        $studyLoad->sl_shift !== $workloadShift
+                        && $faculty->fac_employment_type !== 'part_time'
+                    )) && !$hasExistingSharedOjt ? $courseHours : 0;
+                    $hoursAfterAssignment = $currentHours + $additionalHours;
+                    $maxHours = self::facultyMaxHours($faculty, $workloadShift);
+                    $workloadOverrideDetails = $this->checkWorkloadLimit(
+                        $data,
+                        $faculty,
+                        $course,
+                        $currentHours,
+                        $additionalHours,
+                        $hoursAfterAssignment,
+                        $maxHours,
+                        $workloadShift
+                    );
+
+                    if (!$studyLoad) {
+                        $studyLoad = Study_Load::create([
+                            'sl_fac_id' => $data['fac_id'],
+                            'sl_course_id' => $data['subj_id'],
+                            'sl_shift' => $workloadShift,
+                            'sl_ojt_is_evening' => $isOjt ? (bool) ($data['ojt_is_evening'] ?? false) : false,
+                            'sl_sec_id' => $data['sec_id'] ?? null,
+                            'sl_sem_id' => $data['sem_id'],
+                            'sl_assigned_by' => Auth::id(),
+                            'sl_status'      => 'approved',
+                            'sl_assigned_at' => now(),
+                        ]);
+                    } else {
+                        $needsSave = false;
+                        if ($studyLoad->sl_shift !== $workloadShift) {
+                            $studyLoad->sl_shift = $workloadShift;
+                            $needsSave = true;
+                        }
+                        if ($isOjt && (bool) $studyLoad->sl_ojt_is_evening !== (bool) ($data['ojt_is_evening'] ?? false)) {
+                            $studyLoad->sl_ojt_is_evening = (bool) ($data['ojt_is_evening'] ?? false);
+                            $needsSave = true;
+                        }
+                        if ($needsSave) $studyLoad->save();
                     }
-                    if ($needsSave) $studyLoad->save();
-                }
+                    if ($workloadOverrideDetails) {
+                        $this->recordWorkloadOverride($data, $faculty, $course, $studyLoad, $workloadOverrideDetails);
+                    }
                 } else {
                     $studyLoad = null;
                     $courseHours = 0;
@@ -345,6 +364,7 @@ class ScheduleAssignmentService
                     'max_hours' => $maxHours,
                     'hours_after' => $hoursAfterAssignment,
                     'workload_shift' => $workloadShift,
+                    'workload_override' => $workloadOverrideDetails,
                 ];
             });
             $schedule = $result['schedule'];
@@ -361,8 +381,12 @@ class ScheduleAssignmentService
                 $max = $result['max_hours'];
                 $shift = $result['workload_shift'];
                 $notice = $hours >= $max
-                    ? " Faculty load is now {$hours} of {$max} teaching hours in the {$shift} workload; further course assignments in this shift are blocked."
+                    ? " Faculty load is now {$hours} of {$max} teaching hours in the {$shift} workload; any additional assignment exceeding this cap requires a documented override."
                     : '';
+            }
+            if ($result['workload_override']) {
+                $override = $result['workload_override'];
+                $notice .= " Workload override recorded: {$override['hours_after']}/{$override['cap_hours']} hours.";
             }
             if ($refreshResponse) {
                 $schedule->load(['subject', 'faculty', 'section', 'room']);
@@ -372,6 +396,7 @@ class ScheduleAssignmentService
                 'message' => 'Schedule added.' . $notice,
                 'schedule' => $schedule,
                 'hours_after' => $result['hours_after'],
+                'workload_override' => $result['workload_override'],
             ];
         } catch (RuntimeException $e) {
             if (str_starts_with($e->getMessage(), 'SCHEDULE_CONFLICT:')) {
@@ -379,6 +404,16 @@ class ScheduleAssignmentService
             }
             if (str_starts_with($e->getMessage(), 'LOAD_LIMIT:')) {
                 return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 11)];
+            }
+            if (str_starts_with($e->getMessage(), 'WORKLOAD_OVERRIDE_REQUIRED:')) {
+                $details = json_decode(substr($e->getMessage(), strlen('WORKLOAD_OVERRIDE_REQUIRED:')), true);
+                return [
+                    'success' => false,
+                    'conflict' => false,
+                    'requires_workload_override' => true,
+                    'message' => 'Faculty workload exceeds the applicable teaching-hour cap.',
+                    'workload' => $details,
+                ];
             }
             if (str_starts_with($e->getMessage(), 'COURSE_HOURS:')) {
                 return ['success' => false, 'conflict' => false, 'message' => substr($e->getMessage(), 13)];
@@ -751,6 +786,78 @@ class ScheduleAssignmentService
         return $faculty->fac_employment_type === 'part_time'
             ? $this->facultyHours($facultyId, $semesterId)
             : $this->facultyHoursForShift($facultyId, $semesterId, $shift);
+    }
+
+    private function checkWorkloadLimit(
+        array $data,
+        Faculty $faculty,
+        Course $course,
+        float $hoursBefore,
+        float $hoursAdded,
+        float $hoursAfter,
+        float $capHours,
+        string $shift
+    ): ?array {
+        if ($hoursAdded <= 0 || $hoursAfter <= $capHours) {
+            return null;
+        }
+
+        $workload = [
+            'faculty_name' => trim($faculty->fac_first_name . ' ' . $faculty->fac_last_name),
+            'designation' => $faculty->fac_special_position ?: $faculty->fac_rank ?: 'Faculty',
+            'course_code' => $course->course_code,
+            'shift' => $shift,
+            'workload_label' => $faculty->fac_employment_type === 'part_time'
+                ? 'Day + Evening (shared)'
+                : ucfirst($shift),
+            'hours_before' => round($hoursBefore, 2),
+            'hours_added' => round($hoursAdded, 2),
+            'hours_after' => round($hoursAfter, 2),
+            'cap_hours' => round($capHours, 2),
+            'over_by' => round($hoursAfter - $capHours, 2),
+        ];
+
+        if (empty($data['workload_override'])) {
+            throw new RuntimeException(
+                'WORKLOAD_OVERRIDE_REQUIRED:' . json_encode($workload, JSON_THROW_ON_ERROR)
+            );
+        }
+
+        $reason = trim((string) ($data['workload_override_reason'] ?? ''));
+        if ($reason === '') {
+            throw new RuntimeException('LOAD_LIMIT:A reason is required to override the faculty workload cap.');
+        }
+
+        return $workload + ['reason' => $reason];
+    }
+
+    private function recordWorkloadOverride(
+        array $data,
+        Faculty $faculty,
+        Course $course,
+        Study_Load $studyLoad,
+        array $details
+    ): void {
+        if (WorkloadOverride::where('wlo_load_id', $studyLoad->sl_id)->exists()) {
+            return;
+        }
+
+        WorkloadOverride::create([
+            'wlo_id' => (string) \Illuminate\Support\Str::uuid(),
+            'wlo_load_id' => $studyLoad->sl_id,
+            'wlo_fac_id' => $faculty->fac_id,
+            'wlo_course_id' => $course->course_id,
+            'wlo_section_id' => $data['sec_id'] ?? null,
+            'wlo_semester_id' => $data['sem_id'],
+            'wlo_approved_by' => Auth::id(),
+            'wlo_shift' => $details['shift'],
+            'wlo_designation' => $details['designation'],
+            'wlo_hours_before' => $details['hours_before'],
+            'wlo_hours_added' => $details['hours_added'],
+            'wlo_hours_after' => $details['hours_after'],
+            'wlo_cap_hours' => $details['cap_hours'],
+            'wlo_reason' => $details['reason'],
+        ]);
     }
 
     public static function courseHours(?Course $course): float

@@ -71,11 +71,12 @@
                     </form>
                 </div>
 
-                <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Faculty</p><p class="mt-1 text-2xl font-bold text-slate-900">{{ $facultyStats['total'] }}</p><p class="mt-1 text-xs text-slate-500">In your department</p></article>
                     <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Scheduled hours</p><p class="mt-1 text-2xl font-bold text-blue-700">{{ number_format($facultyStats['scheduled_hours'], 1) }}h</p><p class="mt-1 text-xs text-slate-500">This semester’s department schedules</p></article>
                     <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Needs attention</p><p class="mt-1 text-2xl font-bold {{ $facultyStats['attention'] ? 'text-amber-600' : 'text-emerald-700' }}">{{ $facultyStats['attention'] }}</p><p class="mt-1 text-xs text-slate-500">Near or over a workload limit</p></article>
                     <article class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Over limit</p><p class="mt-1 text-2xl font-bold {{ $facultyStats['over_limit'] ? 'text-rose-600' : 'text-emerald-700' }}">{{ $facultyStats['over_limit'] }}</p><p class="mt-1 text-xs text-slate-500">Day, Evening, or shared Part-time cap</p></article>
+                    <article class="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-rose-700">Recorded overrides</p><p class="mt-1 text-2xl font-bold text-rose-800">{{ $facultyStats['workload_overrides'] }}</p><p class="mt-1 text-xs text-rose-700">Includes required reason and approving chair</p></article>
                 </div>
 
                 <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -96,10 +97,10 @@
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full min-w-[1100px] text-left text-sm" id="faculty-load-table">
-                            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Faculty</th><th class="p-3">Rank / designation</th><th class="p-3">Employment</th><th class="p-3">Subjects</th><th class="p-3">Day</th><th class="p-3">Evening</th><th class="p-3">Total load</th><th class="p-3">Status</th></tr></thead>
+                            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Faculty</th><th class="p-3">Rank / designation</th><th class="p-3">Employment</th><th class="p-3">Subjects</th><th class="p-3">Day</th><th class="p-3">Evening</th><th class="p-3">Total load</th><th class="p-3">Status</th><th class="p-3">Override analytics</th></tr></thead>
                             <tbody class="divide-y divide-slate-100">
                                 @forelse($facultyLoad as $fl)
-                                    <tr data-load-row data-employment="{{ $fl['employment'] }}" data-designated="{{ $fl['special_position'] ? '1' : '0' }}" data-load-status="{{ $fl['status_color'] === 'rose' ? 'attention' : ($fl['status_color'] === 'amber' ? 'attention' : ($fl['status'] === 'Within Limit' ? 'available' : 'no_load')) }}" data-search="{{ strtolower($fl['name'].' '.$fl['email'].' '.$fl['rank'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['status']) }}">
+                                    <tr data-load-row data-employment="{{ $fl['employment'] }}" data-designated="{{ $fl['special_position'] ? '1' : '0' }}" data-load-status="{{ $fl['status_color'] === 'rose' ? 'attention' : ($fl['status_color'] === 'amber' ? 'attention' : ($fl['status'] === 'Within Limit' ? 'available' : 'no_load')) }}" data-search="{{ strtolower($fl['name'].' '.$fl['email'].' '.$fl['rank'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['status'].' '.collect($fl['workload_overrides'])->pluck('reason')->implode(' ')) }}">
                                         <td>
                                             <div class="flex min-w-[200px] items-center gap-3">
                                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold text-blue-700">@if($fl['profile_image'])<img src="{{ asset('storage/'.$fl['profile_image']) }}" alt="" class="h-full w-full object-cover">@else{{ strtoupper(mb_substr($fl['name'], 0, 1)) }}@endif</span>
@@ -115,14 +116,32 @@
                                         <td class="p-3"><strong class="text-indigo-700">{{ number_format($fl['evening']['total_hours'], 1) }}h</strong><span class="text-xs text-slate-400"> / {{ $fl['evening']['max_hours'] }}h</span>@if($fl['employment'] === 'part_time')<div class="text-xs text-slate-400">Part of shared cap</div>@endif</td>
                                         <td class="min-w-[175px] p-3"><div class="font-semibold">{{ number_format($fl['total_hours'], 1) }}h <span class="text-xs font-normal text-slate-400">/ {{ $fl['total_max_hours'] }}h{{ $fl['employment'] === 'part_time' ? ' shared' : ' combined caps' }}</span></div><div class="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full {{ $fl['status_color'] === 'rose' ? 'bg-rose-500' : ($fl['status_color'] === 'amber' ? 'bg-amber-500' : ($fl['status_color'] === 'emerald' ? 'bg-emerald-500' : 'bg-slate-300')) }}" style="width: {{ $fl['progress'] }}%"></div></div></td>
                                         <td class="p-3"><span class="badge {{ $fl['status_color'] === 'rose' ? 'badge-red' : ($fl['status_color'] === 'amber' ? 'badge-amber' : ($fl['status_color'] === 'emerald' ? 'badge-green' : 'badge-grey')) }}">{{ $fl['status'] }}</span></td>
+                                        <td class="min-w-[220px] p-3">
+                                            @if ($fl['workload_override_count'] > 0)
+                                                <details>
+                                                    <summary class="cursor-pointer font-semibold text-rose-700">{{ $fl['workload_override_count'] }} recorded · View reasons</summary>
+                                                    <div class="mt-2 space-y-2">
+                                                        @foreach ($fl['workload_overrides']->take(3) as $override)
+                                                            <div class="rounded-lg border border-rose-100 bg-rose-50 p-2 text-xs">
+                                                                <div class="font-semibold">{{ $override['hours_after'] }} / {{ $override['cap_hours'] }}h · {{ $override['designation'] }}</div>
+                                                                <p class="mt-1 text-slate-700">{{ $override['reason'] }}</p>
+                                                                <div class="mt-1 text-slate-500">By {{ $override['approved_by'] }} · {{ $override['created_at']?->format('M j, Y') }}</div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </details>
+                                            @else
+                                                <span class="text-xs text-slate-400">None</span>
+                                            @endif
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="p-8 text-center text-slate-500">No faculty in this
+                                        <td colspan="9" class="p-8 text-center text-slate-500">No faculty in this
                                             department yet.</td>
                                     </tr>
                                 @endforelse
-                                <tr id="faculty-load-no-results" class="hidden"><td colspan="8" class="p-8 text-center text-slate-500">No faculty match these filters.</td></tr>
+                                <tr id="faculty-load-no-results" class="hidden"><td colspan="9" class="p-8 text-center text-slate-500">No faculty match these filters.</td></tr>
                             </tbody>
                         </table>
                     </div>

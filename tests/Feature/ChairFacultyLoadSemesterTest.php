@@ -111,6 +111,19 @@ class ChairFacultyLoadSemesterTest extends TestCase
             $table->time('sch_start_time');
             $table->time('sch_end_time');
         });
+        Schema::create('workload_overrides', function (Blueprint $table) {
+            $table->uuid('wlo_id')->primary();
+            $table->uuid('wlo_semester_id');
+            $table->uuid('wlo_fac_id');
+            $table->timestamps();
+        });
+        Schema::create('designations', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->string('name')->unique();
+            $table->unsignedInteger('day_cap');
+            $table->unsignedInteger('evening_cap');
+            $table->unsignedInteger('max_faculty_count')->nullable();
+        });
 
         $this->collegeId = (string) Str::uuid();
         $this->departmentId = (string) Str::uuid();

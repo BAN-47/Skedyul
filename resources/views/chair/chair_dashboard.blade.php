@@ -152,6 +152,13 @@
           <div class="stat-sub">{{ $facultyAtMaxLoadCount === 1 ? 'faculty member' : 'faculty members' }} at their weekly teaching-hour cap</div>
         </div>
         <div class="stat-card">
+          <div class="stat-card-bar bg-rose-600"></div>
+          <div class="stat-icon icon-red" aria-hidden="true"><i class="ti ti-file-alert"></i></div>
+          <div class="stat-label">Workload Overrides</div>
+          <div class="stat-value">{{ $workloadOverrideCount }}</div>
+          <div class="stat-sub">Recorded this semester with required reasons</div>
+        </div>
+        <div class="stat-card">
           <div class="stat-card-bar bg-cyan-600"></div>
           <div class="stat-icon icon-cyan" aria-hidden="true"><i class="ti ti-building-community"></i></div>
           <div class="stat-label">Sections</div>
@@ -383,7 +390,7 @@
             </div>
           </div>
           @forelse($facultyLoad as $fl)
-            <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['day']['status'].' '.$fl['evening']['status']) }}">
+            <div class="workload-item" data-dashboard-faculty data-person-key="{{ $fl['fac_id'] }}" data-search="{{ strtolower($fl['name'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['day']['status'].' '.$fl['evening']['status'].' '.($fl['latest_workload_override']['reason'] ?? '')) }}">
               <div class="workload-name mb-2">{{ $fl['name'] }}{{ $fl['employment'] === 'part_time' ? ' (Part-time)' : '' }}{{ $fl['special_position'] ? ' · '.$fl['special_position'] : '' }}</div>
               @if ($fl['employment'] === 'part_time')
                 @php
@@ -415,6 +422,13 @@
                   <div class="text-[11px] {{ $textColor }} mt-1">{{ $fl[$shift]['remaining'] }} teaching hours remaining</div>
                   @if ($shift === 'day')<hr class="my-2 border-slate-100">@endif
                 @endforeach
+              @endif
+              @if ($fl['latest_workload_override'])
+                <div class="mt-2 rounded-lg border border-rose-100 bg-rose-50 p-2 text-[11px] text-rose-800">
+                  <div class="font-bold">Override recorded: {{ $fl['latest_workload_override']['hours_after'] }}/{{ $fl['latest_workload_override']['cap_hours'] }}h</div>
+                  <div class="mt-1">{{ $fl['latest_workload_override']['reason'] }}</div>
+                  <div class="mt-1 text-rose-600">Approved by {{ $fl['latest_workload_override']['approved_by'] }} · {{ $fl['workload_override_count'] }} total</div>
+                </div>
               @endif
             </div>
           @empty

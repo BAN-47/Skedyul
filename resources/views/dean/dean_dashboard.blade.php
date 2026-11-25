@@ -112,6 +112,39 @@
                     </div>
                 </div>
 
+                <div class="card mt-4 border border-rose-100">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Recorded Workload Overrides</div>
+                            <div class="card-sub">{{ $workloadOverrideCount ?? 0 }} approved exception{{ ($workloadOverrideCount ?? 0) === 1 ? '' : 's' }} this semester · showing the latest 10 across your college</div>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        @forelse($workloadOverrides ?? [] as $override)
+                            <article class="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <div class="font-semibold text-slate-800">
+                                            {{ trim(($override->faculty?->fac_first_name ?? '') . ' ' . ($override->faculty?->fac_last_name ?? '')) ?: 'Faculty member' }}
+                                            <span class="font-normal text-slate-500">· {{ $override->course?->course_code ?? 'Course' }} · {{ $override->section?->sec_name ?? 'Section not set' }}</span>
+                                        </div>
+                                        <div class="mt-1 text-xs font-semibold text-rose-800">
+                                            {{ $override->wlo_hours_after + 0 }} / {{ $override->wlo_cap_hours + 0 }} teaching hours · {{ $override->wlo_designation ?: ucfirst($override->wlo_shift) }}
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-slate-500">{{ $override->created_at?->format('M j, Y') }}</span>
+                                </div>
+                                <p class="mt-2 text-sm text-slate-700">{{ $override->wlo_reason }}</p>
+                                <div class="mt-1 text-xs text-slate-500">Approved by {{ $override->approvedBy?->usr_name ?? 'Unknown' }}</div>
+                            </article>
+                        @empty
+                            <div class="rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+                                No workload overrides have been recorded for this semester.
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
                 <div class="card mt-4 overflow-hidden border border-blue-100">
                     <div class="card-header">
                         <div>

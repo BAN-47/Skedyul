@@ -1158,6 +1158,7 @@
                 ? 2
                 : 1);
     </script>
+    <script src="{{ asset('js/workload-override.js') }}?v={{ filemtime(public_path('js/workload-override.js')) }}" defer></script>
     <script src="{{ asset('js/pbs.js') }}?v={{ filemtime(public_path('js/pbs.js')) }}" defer></script>
     <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 

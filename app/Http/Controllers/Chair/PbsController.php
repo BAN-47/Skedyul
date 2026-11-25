@@ -379,6 +379,8 @@ class PbsController extends Controller
             'shift'      => 'required|string|in:day,evening',
             'days'       => $multipleDays ? 'required|array|min:1' : 'prohibited',
             'days.*'     => 'required|string|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            'workload_override' => 'sometimes|boolean',
+            'workload_override_reason' => 'required_if:workload_override,true,1|nullable|string|max:1000',
             'start_time' => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after_or_equal:07:00', 'before:22:00'],
             'end_time'   => ['required', 'date_format:H:i', 'regex:/^\d{2}:[03]0$/', 'after:start_time', 'before_or_equal:22:00'],
         ]);

@@ -14,6 +14,7 @@ use App\Models\Section;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Models\User;
+use App\Models\WorkloadOverride;
 use App\Services\FacultyNameFormatter;
 use Illuminate\Support\Facades\Auth;
 
@@ -91,6 +92,18 @@ class DeanDashboardController extends Controller
 
         $overloadFaculty = $facultyLoads->where('status', 'Overload')->values();
         $overloadCount = $overloadFaculty->count();
+
+        $facultyIdsForOverrides = $faculty->pluck('fac_id')
+            ->merge($collegeStudyLoads->keys())
+            ->unique()
+            ->values();
+        $workloadOverrideQuery = WorkloadOverride::with(['faculty', 'course', 'section', 'approvedBy'])
+            ->where('wlo_semester_id', $semester?->sem_id)
+            ->whereIn('wlo_fac_id', $facultyIdsForOverrides);
+        $workloadOverrideCount = $semester ? (clone $workloadOverrideQuery)->count() : 0;
+        $workloadOverrides = $semester
+            ? $workloadOverrideQuery->orderByDesc('created_at')->limit(10)->get()
+            : collect();
 
         $deptSummary = $programs->map(function ($program) use ($facultyLoads) {
             $programFacultyLoads = $facultyLoads->filter(
@@ -337,6 +350,8 @@ class DeanDashboardController extends Controller
             'totalFaculty',
             'totalSections',
             'overloadCount',
+            'workloadOverrideCount',
+            'workloadOverrides',
             'deptSummary',
             'subjectsTotal',
             'subjectsPlotted',
