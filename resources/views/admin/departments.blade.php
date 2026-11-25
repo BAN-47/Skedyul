@@ -112,7 +112,7 @@
                             <input class="field-input min-w-0 px-2 py-2 text-sm" name="college_code" value="{{ $selectedCollege->college_code }}" required maxlength="50" aria-label="College code">
                             <button class="btn btn-secondary shrink-0 px-3 py-2 text-sm" type="submit">Save college</button>
                         </form>
-                        <form method="POST" action="{{ route('admin.colleges.destroy', $selectedCollege->college_id) }}" onsubmit="return confirm('Permanently delete {{ addslashes($selectedCollege->college_name) }} and all {{ $selectedCollege->programs_count }} department(s) inside it? Departments linked to faculty, courses, sections, Chairs, Deans, or submissions must be cleared first.');">@csrf @method('DELETE')<button class="btn btn-danger" type="submit">Delete college</button></form>
+                        <button class="btn btn-danger" type="button" id="open-college-delete-warning">Delete college</button>
                     </div>
                     <form method="GET" action="{{ route('admin.departments') }}" class="mt-4 grid gap-3">
                         <input type="hidden" name="college_id" value="{{ $selectedCollege->college_id }}">
@@ -135,6 +135,48 @@
         </main>
     </div>
 </div>
+
+@if($selectedCollege && !$selectedDepartment)
+    <div id="college-delete-warning" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="college-delete-title" aria-describedby="college-delete-description">
+        <section class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div class="flex items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xl text-amber-700" aria-hidden="true">!</span>
+                <div>
+                    <h2 id="college-delete-title" class="text-lg font-bold text-slate-900">Delete {{ $selectedCollege->college_name }}?</h2>
+                    <p id="college-delete-description" class="mt-2 text-sm leading-6 text-slate-600">This action cannot be undone. It will permanently delete this college, all {{ $selectedCollege->programs_count }} {{ \Illuminate\Support\Str::plural('department', $selectedCollege->programs_count) }}, and the records linked to them, including faculty assignments, courses, sections, rooms, Chair and Dean assignments, and schedule records.</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-2">
+                <button class="btn btn-secondary" type="button" id="cancel-college-delete">Cancel</button>
+                <form method="POST" action="{{ route('admin.colleges.destroy', $selectedCollege->college_id) }}">@csrf @method('DELETE')<button class="btn btn-danger" type="submit">Delete college and departments</button></form>
+            </div>
+        </section>
+    </div>
+    <script>
+        (() => {
+            const modal = document.getElementById('college-delete-warning');
+            const openButton = document.getElementById('open-college-delete-warning');
+            const cancelButton = document.getElementById('cancel-college-delete');
+            const closeModal = () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                openButton.focus();
+            };
+            openButton.addEventListener('click', () => {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                cancelButton.focus();
+            });
+            cancelButton.addEventListener('click', closeModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+            });
+        })();
+    </script>
+@endif
 
 @if(request('modal') === 'add-college')
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="college-add-title">

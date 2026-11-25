@@ -169,38 +169,13 @@ class DepartmentController extends Controller
     public function destroy(string $id)
     {
         $college = College::findOrFail($id);
-        $departments = Departments::where('dept_college_id', $college->college_id)->get();
-        $departmentDependencies = [
-            'faculty' => 'fac_dept_id', 'course' => 'course_dept_id', 'section' => 'sec_dept_id',
-            'department_chair' => 'dc_dept_id', 'schedule_submission' => 'schsub_dept_id',
-            'dean' => 'dean_dept_id',
-        ];
-        foreach ($departments as $department) {
-            foreach ($departmentDependencies as $table => $column) {
-                if (Schema::hasTable($table) && Schema::hasColumn($table, $column)
-                    && DB::table($table)->where($column, $department->dept_id)->exists()) {
-                    return back()->with('error', 'This college has departments linked to faculty, courses, sections, Chairs, Deans, or submissions. Move or remove those records before deleting the college.');
-                }
+        DB::transaction(function () use ($college): void {
+            if (Schema::hasTable('room') && Schema::hasColumn('room', 'room_college_id')) {
+                DB::table('room')->where('room_college_id', $college->college_id)->delete();
             }
-        }
+            $college->delete();
+        });
 
-        $dependencies = [
-            'department' => 'dept_college_id', 'faculty' => 'fac_college_id',
-            'room' => 'room_college_id', 'course' => 'course_college_id',
-            'department_chair' => 'dc_college_id', 'dean' => 'dean_college_id',
-        ];
-        foreach ($dependencies as $table => $column) {
-            if (Schema::hasTable($table) && Schema::hasColumn($table, $column)
-                && DB::table($table)->where($column, $college->college_id)->exists()) {
-                return back()->with('error', 'This college still has departments, users, rooms, or courses. Move or remove those records first.');
-            }
-        }
-
-        foreach ($departments as $department) {
-            $department->delete();
-        }
-        $college->delete();
-
-        return redirect()->route('admin.departments')->with('success', 'College permanently deleted.');
+        return redirect()->route('admin.departments')->with('success', 'College and its related departments and records were permanently deleted.');
     }
 }
