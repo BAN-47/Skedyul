@@ -13,6 +13,7 @@ use App\Services\FacultyNameFormatter;
 use App\Services\ScheduleAssignmentService;
 use App\Models\Semester;
 use App\Models\Study_Load;
+use App\Models\WorkloadOverride;
 
 class ReportsController extends Controller
 {
@@ -26,12 +27,14 @@ class ReportsController extends Controller
         $bySection = $this->getSectionData($semester, $sectionSearch);
         $byTeacher = $this->getTeacherData($semester, $teacherSearch);
         $byRoom    = $this->getRoomData($semester, $roomSearch);
+        $workloadOverrideCount = $byTeacher->sum(fn ($facultyReport) => $facultyReport->workload_overrides->count());
 
         return view('admin.reports', compact(
             'semester',
             'bySection',
             'byTeacher',
-            'byRoom'
+            'byRoom',
+            'workloadOverrideCount'
         ));
     }
 
@@ -236,8 +239,18 @@ class ReportsController extends Controller
                 ->groupBy('sl_fac_id');
         }
 
-        return $faculty->map(function (Faculty $member) use ($semester, $loadsByFaculty) {
+        $overridesByFaculty = $semester && $faculty->isNotEmpty()
+            ? WorkloadOverride::with(['approvedBy', 'course', 'section'])
+                ->where('wlo_semester_id', $semester->sem_id)
+                ->whereIn('wlo_fac_id', $faculty->pluck('fac_id'))
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('wlo_fac_id')
+            : collect();
+
+        return $faculty->map(function (Faculty $member) use ($semester, $loadsByFaculty, $overridesByFaculty) {
             $loads = $loadsByFaculty->get($member->fac_id, collect());
+            $workloadOverrides = $overridesByFaculty->get($member->fac_id, collect());
             $summary = $semester ? $this->facultyLoadSummary($member, $semester, $loads) : [
                 'day_hours' => 0,
                 'evening_hours' => 0,
@@ -257,6 +270,7 @@ class ReportsController extends Controller
                 'employment' => $member->fac_employment_type ?: '—',
                 'designation' => $member->fac_special_position ?: $member->fac_rank ?: 'Faculty',
                 'load' => $summary,
+                'workload_overrides' => $workloadOverrides,
             ];
         });
     }

@@ -12,6 +12,7 @@ use App\Models\Course;
 use App\Models\AcademicYear;
 use App\Models\Semester;
 use App\Models\Study_Load;
+use App\Models\WorkloadOverride;
 use App\Models\Notification;
 use App\Models\Audit_Log;
 use Illuminate\Support\Facades\Auth;
@@ -79,9 +80,19 @@ class ChairController extends Controller
             ->get()
             ->groupBy('sl_fac_id');
 
+        $workloadOverridesByFaculty = $semester
+            ? WorkloadOverride::with('approvedBy')
+                ->where('wlo_semester_id', $semester->sem_id)
+                ->whereIn('wlo_fac_id', $faculty->pluck('fac_id'))
+                ->orderByDesc('created_at')
+                ->get()
+                ->groupBy('wlo_fac_id')
+            : collect();
+
         // ---------- LEADERS & LOAD ANALYTICS ----------
-        $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty) {
+        $facultyLoad = $faculty->map(function ($f) use ($studyLoadsByFaculty, $workloadOverridesByFaculty) {
             $allLoads = $studyLoadsByFaculty->get($f->fac_id, collect());
+            $facultyOverrides = $workloadOverridesByFaculty->get($f->fac_id, collect());
 
             $shifts = collect(['day', 'evening'])->mapWithKeys(function ($shift) use ($f, $allLoads) {
                 $loads = $allLoads->filter(fn ($load) =>
@@ -120,6 +131,16 @@ class ChairController extends Controller
                 'rank' => $f->fac_rank,
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
+                'workload_override_count' => $facultyOverrides->count(),
+                'latest_workload_override' => $facultyOverrides->first()
+                    ? [
+                        'hours_after' => $facultyOverrides->first()->wlo_hours_after,
+                        'cap_hours' => $facultyOverrides->first()->wlo_cap_hours,
+                        'designation' => $facultyOverrides->first()->wlo_designation,
+                        'reason' => $facultyOverrides->first()->wlo_reason,
+                        'approved_by' => $facultyOverrides->first()->approvedBy?->usr_name ?? 'Unknown',
+                    ]
+                    : null,
                 'day' => $shifts['day'],
                 'evening' => $shifts['evening'],
                 'classes' => $allLoads->unique(fn ($load) => (string) $load->sl_course_id . '|' . (string) $load->sl_sec_id)->count(),
@@ -283,6 +304,7 @@ class ChairController extends Controller
                 )
             )
             ->count();
+        $workloadOverrideCount = $facultyLoad->sum('workload_override_count');
 
         $recentActivity = Audit_Log::where('al_usr_id', $user->usr_id)
             ->orderByDesc('al_created_at')
@@ -307,6 +329,7 @@ class ChairController extends Controller
             'notifications',
             'unreadCount',
             'facultyAtMaxLoadCount',
+            'workloadOverrideCount',
             'recentActivity'
         ));
     }

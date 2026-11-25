@@ -1,20 +1,33 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     @include('partials.favicon')
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SKEDYUL — Colleges & Departments</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
+
 <body class="h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
-<div class="app-shell">
-    @include('partials.admin_sidebar')
-    <div class="app-main">
-        @include('partials.admin_header', ['title' => 'Colleges & Departments'])
-        <main class="page-content space-y-4">
-            @if(session('success'))<div role="status" class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{{ session('success') }}</div>@endif
-            @if(session('error'))<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ session('error') }}</div>@endif
-            @if($errors->any())<div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{{ $errors->first() }}</div>@endif
+    <div class="app-shell">
+        @include('partials.admin_sidebar')
+        <div class="app-main">
+            @include('partials.admin_header', ['title' => 'Colleges & Departments'])
+            <main class="page-content space-y-4">
+                @if (session('success'))
+                    <div role="status"
+                        class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                        {{ session('success') }}</div>
+                @endif
+                @if (session('error'))
+                    <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                        {{ session('error') }}</div>
+                @endif
+                @if ($errors->any())
+                    <div role="alert" class="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                        {{ $errors->first() }}</div>
+                @endif
 
             @if(!$selectedCollege)
                 <section class="card">
@@ -158,38 +171,123 @@
                 <p class="py-4 text-sm text-slate-500">No department or role activity recorded yet.</p>
             @endforelse
         </div>
-        <div class="mt-4">{{ $departmentHistory->links() }}</div>
-    </section>
-</div>
-@endif
-<script>
-    document.querySelectorAll('form[data-angle-bracket-guard]').forEach((form) => {
-        const alert = form.querySelector('[data-angle-bracket-alert]');
-        const findInvalidField = () => Array.from(form.elements).find((field) => {
-            if (field.disabled || ['hidden', 'submit', 'button', 'checkbox'].includes(field.type)) return false;
-            return typeof field.value === 'string' && /[<>]/.test(field.value);
-        });
-        const updateAlert = () => {
-            const invalidField = findInvalidField();
-            alert.textContent = invalidField ? 'Angle brackets (< and >) are not allowed.' : '';
-            alert.hidden = !invalidField;
-        };
+    </div>
 
-        form.addEventListener('input', updateAlert);
-        form.addEventListener('change', updateAlert);
-        form.addEventListener('invalid', (event) => {
-            if (typeof event.target.value === 'string' && /[<>]/.test(event.target.value)) {
+    @if (request('modal') === 'add-college')
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog"
+            aria-modal="true" aria-labelledby="college-add-title">
+            <form method="POST" action="{{ route('admin.colleges.store') }}"
+                class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" data-angle-bracket-guard>@csrf
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="college-add-title" class="text-lg font-bold">Add college</h2>
+                        <p class="text-sm text-slate-500">Create a college for departments and faculty.</p>
+                    </div><a class="btn btn-secondary" href="{{ route('admin.departments') }}">Close</a>
+                </div>
+                @php($collegeValidationError = $errors->first('college_name') ?: $errors->first('college_code'))
+                <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    data-angle-bracket-alert role="alert" aria-live="assertive"
+                    @if (!$collegeValidationError) hidden @endif>{{ $collegeValidationError }}</div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input class="field-input" name="college_name"
+                        value="{{ old('college_name') }}" required maxlength="255" placeholder="College name"><input
+                        class="field-input" name="college_code" value="{{ old('college_code') }}" required
+                        maxlength="50" placeholder="Code (e.g. CCICT)"></div>
+                <div class="mt-5 flex justify-end gap-2"><a class="btn btn-secondary"
+                        href="{{ route('admin.departments') }}">Cancel</a><button class="btn btn-primary"
+                        type="submit">Add college</button></div>
+            </form>
+        </div>
+    @endif
+
+    @if (request('modal') === 'add-department' && $selectedCollege)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog"
+            aria-modal="true" aria-labelledby="department-add-title">
+            <form method="POST" action="{{ route('admin.departments.store') }}"
+                class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" data-angle-bracket-guard>@csrf
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="department-add-title" class="text-lg font-bold">Add department</h2>
+                        <p class="text-sm text-slate-500">Adding to {{ $selectedCollege->college_code }} ·
+                            {{ $selectedCollege->college_name }}</p>
+                    </div><a class="btn btn-secondary"
+                        href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Close</a>
+                </div>
+                @php($departmentValidationError = $errors->first('dept_college_id') ?: ($errors->first('dept_name') ?: $errors->first('dept_code')))
+                <div class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    data-angle-bracket-alert role="alert" aria-live="assertive"
+                    @if (!$departmentValidationError) hidden @endif>{{ $departmentValidationError }}</div>
+                <input type="hidden" name="dept_college_id"
+                    value="{{ old('dept_college_id', $selectedCollege->college_id) }}">
+                <div class="mt-4 grid gap-3 sm:grid-cols-[1fr_180px]"><input name="dept_name"
+                        value="{{ old('dept_name') }}" class="field-input" required maxlength="255"
+                        placeholder="Department name"><input name="dept_code" value="{{ old('dept_code') }}"
+                        class="field-input" required maxlength="50" placeholder="Code (e.g. BSIS)"></div>
+                <div class="mt-5 flex justify-end gap-2"><a class="btn btn-secondary"
+                        href="{{ route('admin.departments', ['college_id' => $selectedCollege->college_id]) }}">Cancel</a><button
+                        class="btn btn-primary" type="submit">Add department</button></div>
+            </form>
+        </div>
+    @endif
+
+    @if (request('modal') === 'activity' || request()->has('history_page'))
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog"
+            aria-modal="true" aria-labelledby="department-activity-title">
+            <section class="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="department-activity-title" class="text-lg font-bold">Department and role activity</h2>
+                        <p class="text-sm text-slate-500">Recent actions by Admins, Deans, Chairs, and Faculty.</p>
+                    </div><a class="btn btn-secondary"
+                        href="{{ $selectedCollege ? route('admin.departments', ['college_id' => $selectedCollege->college_id]) : route('admin.departments') }}">Close</a>
+                </div>
+                <div class="mt-3 divide-y divide-slate-100">
+                    @forelse($departmentHistory as $activity)
+                        <article class="py-3">
+                            <div class="font-semibold">{{ $activity->user?->usr_name ?? 'System' }} <span
+                                    class="font-normal text-slate-500">·
+                                    {{ $activity->user?->usr_role ?? 'system' }}</span></div>
+                            <div class="text-sm">{{ $activity->al_action }} · {{ $activity->al_description }}</div>
+                            <div class="text-xs text-slate-500">{{ $activity->al_target_table }} ·
+                                {{ $activity->al_created_at }}</div>
+                        </article>
+                    @empty
+                        <p class="py-4 text-sm text-slate-500">No department or role activity recorded yet.</p>
+                    @endforelse
+                </div>
+                <div class="mt-4">{{ $departmentHistory->links() }}</div>
+            </section>
+        </div>
+    @endif
+    <script>
+        document.querySelectorAll('form[data-angle-bracket-guard]').forEach((form) => {
+            const alert = form.querySelector('[data-angle-bracket-alert]');
+            const findInvalidField = () => Array.from(form.elements).find((field) => {
+                if (field.disabled || ['hidden', 'submit', 'button', 'checkbox'].includes(field.type))
+                    return false;
+                return typeof field.value === 'string' && /[<>]/.test(field.value);
+            });
+            const updateAlert = () => {
+                const invalidField = findInvalidField();
+                alert.textContent = invalidField ? 'Angle brackets (< and >) are not allowed.' : '';
+                alert.hidden = !invalidField;
+            };
+
+            form.addEventListener('input', updateAlert);
+            form.addEventListener('change', updateAlert);
+            form.addEventListener('invalid', (event) => {
+                if (typeof event.target.value === 'string' && /[<>]/.test(event.target.value)) {
+                    updateAlert();
+                }
+            }, true);
+            form.addEventListener('submit', (event) => {
+                const invalidField = findInvalidField();
+                if (!invalidField) return;
+                event.preventDefault();
                 updateAlert();
-            }
-        }, true);
-        form.addEventListener('submit', (event) => {
-            const invalidField = findInvalidField();
-            if (!invalidField) return;
-            event.preventDefault();
-            updateAlert();
-            invalidField.focus();
+                invalidField.focus();
+            });
         });
-    });
-</script>
+    </script>
 </body>
+
 </html>

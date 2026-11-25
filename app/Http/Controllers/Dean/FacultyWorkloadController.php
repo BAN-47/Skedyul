@@ -14,6 +14,7 @@ use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class FacultyWorkloadController extends Controller
@@ -29,11 +30,16 @@ class FacultyWorkloadController extends Controller
             ->firstOrFail();
 
         $data = $request->validate([
-            'special_position' => ['nullable', 'string', Rule::in(Designation::pluck('name')->toArray())],
+            'special_position' => ['nullable', 'string', 'not_regex:/[<>]/', Rule::in(Designation::pluck('name')->toArray())],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
+
         $position = $data['special_position'] ?? null;
         if ($position && Designation::isLimitReached($position, $faculty->fac_id)) {
-            return back()->withErrors(['special_position' => "The designation '{$position}' has reached its maximum faculty limit."]);
+            return back()
+                ->withErrors(['special_position' => "The designation '{$position}' has reached its maximum faculty limit."])
+                ->withInput();
         }
         $cap = $position ? Designation::where('name', $position)->value('day_cap') : null;
         $faculty->update([
@@ -60,13 +66,21 @@ class FacultyWorkloadController extends Controller
         $dean = Dean::where('dean_usr_id', Auth::id())->firstOrFail();
         abort_unless($dean->dean_college_id, 403, 'Your account is not assigned to a college.');
 
-        $data = $request->validate([
-            'semester' => ['nullable', 'uuid', 'exists:semester,sem_id'],
-            'department' => ['nullable', 'string', 'max:80'],
-            'employment' => ['nullable', 'in:all,full_time,part_time'],
-            'status' => ['nullable', 'in:all,attention,available'],
-            'search' => ['nullable', 'string', 'max:100'],
+        $validator = Validator::make($request->query(), [
+            'semester' => ['nullable', 'not_regex:/[<>]/', 'uuid', 'exists:semester,sem_id'],
+            'department' => ['nullable', 'string', 'max:80', 'not_regex:/[<>]/'],
+            'employment' => ['nullable', 'not_regex:/[<>]/', 'in:all,full_time,part_time'],
+            'status' => ['nullable', 'not_regex:/[<>]/', 'in:all,attention,available'],
+            'search' => ['nullable', 'string', 'max:100', 'not_regex:/[<>]/'],
+        ], [
+            'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
+        if ($validator->fails()) {
+            return redirect()->route('dean.faculty_workload')
+                ->withErrors($validator)
+                ->withInput($request->query());
+        }
+        $data = $validator->validated();
 
         $departments = Departments::where('dept_college_id', $dean->dean_college_id)
             ->orderBy('dept_code')->get();
