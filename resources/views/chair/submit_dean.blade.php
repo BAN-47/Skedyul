@@ -15,13 +15,12 @@
 
         <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
             @include('partials.chair_header', [
-                'title' => '',
+                'title' => 'Schedule Submissions',
                 'badgeText' => 'Department Chair',
             ])
 
             <div class="flex-1 overflow-y-auto p-5 md:p-7">
                 <div class="mb-5">
-                    <h1 class="text-xl font-bold">Schedule Submissions</h1>
                     <p class="mt-1 text-sm text-slate-500">
                         Track Program by Section and Program by Teacher submissions sent to the Dean.
                     </p>
