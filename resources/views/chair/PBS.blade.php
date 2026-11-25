@@ -123,6 +123,21 @@
                                 default => 'Submit PBS to Dean',
                             };
                         @endphp
+                        @if (!empty($reuseSourceSemesterId) && $selectedSection)
+                            <button type="button" id="schedule-reuse-open" class="btn btn-secondary"
+                                data-reuse-scope="pbs"
+                                data-source-section-id="{{ $selectedSection->sec_id }}"
+                                data-target-id="{{ $selectedSection->sec_id }}"
+                                data-target-label="{{ $selectedSection->sec_name }}"
+                                data-source-semester-id="{{ $reuseSourceSemesterId }}"
+                                data-source-label="{{ trim(($activeSemester->ay_academic_year ?? $activeSemester->ay_year_label ?? 'Archived year') . ', ' . ($activeSemester->sem_name ?? 'Semester')) }}"
+                                data-destination-semester-id="{{ $reuseDestinationSemester->sem_id ?? '' }}"
+                                data-destination-label="{{ trim(($reuseDestinationSemester->ay_academic_year ?? $reuseDestinationSemester->ay_year_label ?? 'Current year') . ', ' . ($reuseDestinationSemester->sem_name ?? 'Semester')) }}"
+                                data-preview-url="{{ route('chair.pbs.reuse.preview') }}"
+                                data-apply-url="{{ route('chair.pbs.reuse.apply') }}">
+                                Reuse Schedule
+                            </button>
+                        @endif
                         <form method="POST" action="{{ route('chair.pbs.submit-dean') }}" class="inline-flex">
                             @csrf
                             <input type="hidden" name="section" value="{{ $selectedSection?->sec_id }}">
@@ -1090,6 +1105,7 @@
     {{-- TOAST --}}
     <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
+    @include('chair.partials.schedule_reuse_modals')
 
     <script>
         window.PBS_SELECTED_DATE = @json($selectedDate->toDateString());
@@ -1160,6 +1176,7 @@
     </script>
     <script src="{{ asset('js/workload-override.js') }}?v={{ filemtime(public_path('js/workload-override.js')) }}" defer></script>
     <script src="{{ asset('js/pbs.js') }}?v={{ filemtime(public_path('js/pbs.js')) }}" defer></script>
+    <script src="{{ asset('js/schedule-reuse.js') }}?v={{ filemtime(public_path('js/schedule-reuse.js')) }}" defer></script>
     <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
     @if (session('error') || session('success'))

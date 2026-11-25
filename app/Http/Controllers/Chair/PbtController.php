@@ -226,6 +226,11 @@ class PbtController extends Controller
         })->values();
 
         $officialSemesterName = DB::table('semester')->where('sem_is_active', true)->value('sem_name');
+        $reuseSourceSemesterId = $activeSem && !(bool) ($activeSem->ay_is_active ?? true)
+            ? (string) $activeSem->sem_id
+            : null;
+        $reuseDestinationSemester = app(\App\Services\ScheduleReuseService::class)
+            ->destinationSemesterForSource($reuseSourceSemesterId);
 
         return response()->view('chair.PBT', [
             'schedules'        => $schedules,
@@ -275,6 +280,9 @@ class PbtController extends Controller
             'chairDepartment'  => $chairDepartment,
             'academicYears'    => DB::table('academic_year')->orderByDesc('ay_academic_year')->get(),
             'selectedAcademicYearId' => $selectedAcademicYearId,
+            'reuseSourceSemesterId' => $reuseSourceSemesterId,
+            'reuseDestinationSemester' => $reuseDestinationSemester,
+            'canReuseSchedules' => (bool) ($reuseDestinationSemester && $selectedFaculty),
             'semesters'        => DB::table('semester as s')
                 ->leftJoin('academic_year as ay', 'ay.ay_id', '=', 's.sem_ay_id')
                 ->when($selectedAcademicYearId, fn($query) => $query->where('s.sem_ay_id', $selectedAcademicYearId))

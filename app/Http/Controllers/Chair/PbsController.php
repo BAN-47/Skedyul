@@ -122,6 +122,9 @@ class PbsController extends Controller
                 'chairProgram'     => null,
                 'chairDepartment'  => null,
                 'activeSemester'   => $this->activeSemester(),
+                'reuseSourceSemesterId' => null,
+                'reuseDestinationSemester' => null,
+                'canReuseSchedules' => false,
                 'canPlotSelectedSemester' => false,
                 'selectedSection'  => null,
                 'pbsSubmission'    => null,
@@ -192,6 +195,11 @@ class PbsController extends Controller
         if (!empty($filters['section'])) {
             $selectedSection = $sections->firstWhere('sec_id', $filters['section']);
         }
+        $reuseSourceSemesterId = $activeSem && !(bool) ($activeSem->ay_is_active ?? true)
+            ? (string) $activeSem->sem_id
+            : null;
+        $reuseDestinationSemester = app(\App\Services\ScheduleReuseService::class)
+            ->destinationSemesterForSource($reuseSourceSemesterId);
 
         $canSubmitPbs = $selectedSection
             && (string) $selectedSection->sec_dept_id === (string) $progId;
@@ -291,6 +299,9 @@ class PbsController extends Controller
             'categories'       => $categories,
             'selectedCategory' => $selectedCategory,
             'academicYears' => AcademicYear::query()->orderByDesc('ay_academic_year')->get(),
+            'reuseSourceSemesterId' => $reuseSourceSemesterId,
+            'reuseDestinationSemester' => $reuseDestinationSemester,
+            'canReuseSchedules' => (bool) $reuseDestinationSemester,
             'selectedAcademicYearId' => $selectedAcademicYearId,
             // Labels like "2026-2027 1st Sem"
             'semesters'     => DB::table('semester as s')

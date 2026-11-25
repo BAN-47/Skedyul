@@ -10,6 +10,7 @@ use App\Http\Controllers\Chair\PbsController;
 use App\Http\Controllers\Chair\PbsSubmissionController;
 use App\Http\Controllers\Chair\PbtController;
 use App\Http\Controllers\Chair\PbtExportController;
+use App\Http\Controllers\Chair\ScheduleReuseController;
 use App\Http\Controllers\Chair\MisController;
 use App\Http\Controllers\Chair\ScheduleSubmissionController;
 use App\Http\Controllers\Chair\PbsExportController;
@@ -40,6 +41,8 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     Route::put('/pbs/section/students', [PbsController::class, 'updateStudents'])->name('chair.pbs.section.students');
     Route::post('/pbs/fetch-schedules', [PbsController::class, 'fetchSchedules'])->name('chair.pbs.fetch-schedules');
     Route::post('/pbs/submit-dean', [PbsSubmissionController::class, 'store'])->name('chair.pbs.submit-dean');
+    Route::post('/pbs/reuse/preview', [ScheduleReuseController::class, 'previewPbs'])->name('chair.pbs.reuse.preview');
+    Route::post('/pbs/reuse/apply', [ScheduleReuseController::class, 'applyPbs'])->name('chair.pbs.reuse.apply');
 
     // Classes awaiting a real faculty member from the course's department.
     Route::get('/faculty-assignment', [UnassignedFacultyController::class, 'index'])->name('chair.unassigned_faculty.index');
@@ -52,6 +55,8 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
     Route::put('/pbt/{id}', [PbtController::class, 'update'])->name('chair.pbt.update');
     Route::delete('/pbt/{id}', [PbtController::class, 'destroy'])->name('chair.pbt.destroy');
     Route::post('/pbt/clear', [PbtController::class, 'clear'])->name('chair.pbt.clear');
+    Route::post('/pbt/reuse/preview', [ScheduleReuseController::class, 'previewPbt'])->name('chair.pbt.reuse.preview');
+    Route::post('/pbt/reuse/apply', [ScheduleReuseController::class, 'applyPbt'])->name('chair.pbt.reuse.apply');
 
     // Weekly room timetable for the selected academic term.
     Route::get('/room-utilization', [RoomUtilizationController::class, 'index'])->name('chair.room_utilization');

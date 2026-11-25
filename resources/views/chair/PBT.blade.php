@@ -120,6 +120,20 @@
                     <span class="text-xs text-slate-500">Schedules save as drafts when confirmed</span>
                     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
                         @if ($selectedFaculty)
+                            @if (!empty($reuseSourceSemesterId))
+                                <button type="button" id="schedule-reuse-open" class="btn btn-secondary"
+                                    data-reuse-scope="pbt"
+                                    data-target-id="{{ $selectedFaculty->fac_id }}"
+                                    data-target-label="{{ \App\Services\FacultyNameFormatter::format($selectedFaculty) }}"
+                                    data-source-semester-id="{{ $reuseSourceSemesterId }}"
+                                    data-source-label="{{ trim(($activeSemester->ay_academic_year ?? $activeSemester->ay_year_label ?? 'Archived year') . ', ' . ($activeSemester->sem_name ?? 'Semester')) }}"
+                                    data-destination-semester-id="{{ $reuseDestinationSemester->sem_id ?? '' }}"
+                                    data-destination-label="{{ trim(($reuseDestinationSemester->ay_academic_year ?? $reuseDestinationSemester->ay_year_label ?? 'Current year') . ', ' . ($reuseDestinationSemester->sem_name ?? 'Semester')) }}"
+                                    data-preview-url="{{ route('chair.pbt.reuse.preview') }}"
+                                    data-apply-url="{{ route('chair.pbt.reuse.apply') }}">
+                                    Reuse Schedule
+                                </button>
+                            @endif
                             @if ($activeSemester)
                                 <form method="POST" action="{{ route('chair.submit_dean.store') }}">
                                     @csrf
@@ -1223,6 +1237,8 @@
         {{-- TOAST --}}
         <div class="toast" id="toast" role="alert" aria-live="assertive"><span id="toast-msg"></span></div>
 
+        @include('chair.partials.schedule_reuse_modals')
+
         <script>
             window.PBT_SELECTED_DATE = @json($selectedDate->toDateString());
             window.PBT_SELECTED_TEACHER = @json($selectedFaculty->fac_id ?? null);
@@ -1287,6 +1303,7 @@
         </script>
         <script src="{{ asset('js/workload-override.js') }}?v={{ filemtime(public_path('js/workload-override.js')) }}" defer></script>
         <script src="{{ asset('js/pbt.js') }}?v={{ filemtime(public_path('js/pbt.js')) }}" defer></script>
+        <script src="{{ asset('js/schedule-reuse.js') }}?v={{ filemtime(public_path('js/schedule-reuse.js')) }}" defer></script>
         <script src="{{ asset('js/schedule-signoff.js') }}" defer></script>
 
         @if (session('error') || session('success'))
