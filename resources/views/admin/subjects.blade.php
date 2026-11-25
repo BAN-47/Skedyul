@@ -146,7 +146,7 @@
                 @csrf
                 <input type="hidden" name="_subject_form" value="add">
                 <div class="modal-header">
-                    <div class="modal-title">Add New Subject</div>
+                    <div class="modal-title">Add New Course</div>
                     <button class="modal-close" type="button" onclick="closeModal('modal-add-subject')">✕</button>
                 </div>
 
