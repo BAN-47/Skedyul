@@ -15,7 +15,7 @@ class DesignationController extends Controller
             return response()->json(Designation::orderBy('name')->get());
         }
 
-        $designations = Designation::orderBy('name')->get();
+        $designations = Designation::orderBy('name')->paginate(10)->withQueryString();
         return view('admin.designations', compact('designations'));
     }
 

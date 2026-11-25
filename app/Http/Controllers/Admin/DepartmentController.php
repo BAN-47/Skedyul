@@ -26,11 +26,11 @@ class DepartmentController extends Controller
         $departmentQuery = Departments::query()
             ->with([
                 'department',
-                'faculty' => fn ($query) => $query->where('fac_is_placeholder', false)->with('user'),
+                'faculty' => fn($query) => $query->where('fac_is_placeholder', false)->with('user'),
                 'chairs.user',
             ])
             ->withCount([
-                'faculty' => fn ($query) => $query->where('fac_is_placeholder', false),
+                'faculty' => fn($query) => $query->where('fac_is_placeholder', false),
                 'subjects',
             ]);
         $likeOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ILIKE' : 'LIKE';
@@ -42,30 +42,30 @@ class DepartmentController extends Controller
             : null;
         $selectedDepartment = $selectedCollege && $request->filled('department_id')
             ? Departments::where('dept_college_id', $selectedCollege->college_id)
-                ->with(['department', 'chairs.user'])
-                ->withCount(['faculty' => fn ($query) => $query->where('fac_is_placeholder', false)])
-                ->find($request->input('department_id'))
+            ->with(['department', 'chairs.user'])
+            ->withCount(['faculty' => fn($query) => $query->where('fac_is_placeholder', false)])
+            ->find($request->input('department_id'))
             : null;
         $departmentFaculty = $selectedDepartment
             ? $selectedDepartment->faculty()
-                ->where('fac_is_placeholder', false)
-                ->with('user')
-                ->orderBy('fac_last_name')
-                ->orderBy('fac_first_name')
-                ->paginate(15, ['*'], 'faculty_page')
-                ->withQueryString()
+            ->where('fac_is_placeholder', false)
+            ->with(['user.dean', 'user.deptChair'])
+            ->orderBy('fac_last_name')
+            ->orderBy('fac_first_name')
+            ->paginate(15, ['*'], 'faculty_page')
+            ->withQueryString()
             : null;
         $editingCollege = request()->filled('edit_college')
             ? $colleges->firstWhere('college_id', request('edit_college'))
             : null;
         if ($filters['search'] ?? null) {
             $term = '%' . addcslashes($filters['search'], '%_\\') . '%';
-            $departmentQuery->where(fn ($query) => $query->where('dept_name', $likeOperator, $term)
+            $departmentQuery->where(fn($query) => $query->where('dept_name', $likeOperator, $term)
                 ->orWhere('dept_code', $likeOperator, $term)
-                ->orWhereHas('department', fn ($collegeQuery) => $collegeQuery->where('college_name', $likeOperator, $term)->orWhere('college_code', $likeOperator, $term)));
+                ->orWhereHas('department', fn($collegeQuery) => $collegeQuery->where('college_name', $likeOperator, $term)->orWhere('college_code', $likeOperator, $term)));
         }
         if ($filters['designation'] ?? null) {
-            $departmentQuery->whereHas('faculty', fn ($facultyQuery) => $facultyQuery->where('fac_special_position', $filters['designation']));
+            $departmentQuery->whereHas('faculty', fn($facultyQuery) => $facultyQuery->where('fac_special_position', $filters['designation']));
         }
         $departmentRows = $departmentQuery->orderBy('dept_name')->paginate(12, ['*'], 'department_page')->withQueryString();
         $editingDepartment = ($selectedCollege && request()->filled('edit_department'))
@@ -76,7 +76,7 @@ class DepartmentController extends Controller
         $departmentHistory = Audit_Log::with('user')
             ->where(function ($query): void {
                 $query->whereIn('al_target_table', ['department', 'faculty', 'department_chair', 'dean', 'USER'])
-                    ->orWhereHas('user', fn ($userQuery) => $userQuery->whereIn('usr_role', ['dean', 'department_chair', 'faculty']));
+                    ->orWhereHas('user', fn($userQuery) => $userQuery->whereIn('usr_role', ['dean', 'department_chair', 'faculty']));
             })
             ->orderByDesc('al_created_at')->paginate(10, ['*'], 'history_page')->withQueryString();
 
@@ -117,13 +117,20 @@ class DepartmentController extends Controller
     public function destroyDepartment(string $id)
     {
         $department = Departments::findOrFail($id);
-        foreach ([
-            'faculty' => 'fac_dept_id', 'course' => 'course_dept_id', 'section' => 'sec_dept_id',
-            'department_chair' => 'dc_dept_id', 'schedule_submission' => 'schsub_dept_id',
-            'dean' => 'dean_dept_id',
-        ] as $table => $column) {
-            if (Schema::hasTable($table) && Schema::hasColumn($table, $column)
-                && DB::table($table)->where($column, $department->dept_id)->exists()) {
+        foreach (
+            [
+                'faculty' => 'fac_dept_id',
+                'course' => 'course_dept_id',
+                'section' => 'sec_dept_id',
+                'department_chair' => 'dc_dept_id',
+                'schedule_submission' => 'schsub_dept_id',
+                'dean' => 'dean_dept_id',
+            ] as $table => $column
+        ) {
+            if (
+                Schema::hasTable($table) && Schema::hasColumn($table, $column)
+                && DB::table($table)->where($column, $department->dept_id)->exists()
+            ) {
                 return back()->with('error', 'This department is still linked to faculty, courses, sections, a Chair, or submissions. Move those records first.');
             }
         }
@@ -166,13 +173,18 @@ class DepartmentController extends Controller
     {
         $college = College::findOrFail($id);
         $dependencies = [
-            'department' => 'dept_college_id', 'faculty' => 'fac_college_id',
-            'room' => 'room_college_id', 'course' => 'course_college_id',
-            'department_chair' => 'dc_college_id', 'dean' => 'dean_college_id',
+            'department' => 'dept_college_id',
+            'faculty' => 'fac_college_id',
+            'room' => 'room_college_id',
+            'course' => 'course_college_id',
+            'department_chair' => 'dc_college_id',
+            'dean' => 'dean_college_id',
         ];
         foreach ($dependencies as $table => $column) {
-            if (Schema::hasTable($table) && Schema::hasColumn($table, $column)
-                && DB::table($table)->where($column, $college->college_id)->exists()) {
+            if (
+                Schema::hasTable($table) && Schema::hasColumn($table, $column)
+                && DB::table($table)->where($column, $college->college_id)->exists()
+            ) {
                 return back()->with('error', 'This college still has departments, users, rooms, or courses. Move or remove those records first.');
             }
         }
