@@ -163,7 +163,7 @@
                         </div>
                     </div>
                     <div id="replace-chair-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="replace-chair-title" onclick="if(event.target===this)this.classList.add('hidden')">
-                        <form method="POST" action="{{ route('dean.departments.chair.assign', $selectedDepartment->dept_id) }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()" onsubmit="return confirmChairAssignment(this, {{ $currentChair ? 'true' : 'false' }})">@csrf
+                        <form method="POST" action="{{ route('dean.departments.chair.assign', $selectedDepartment->dept_id) }}" class="w-full max-w-xl rounded-2xl bg-white p-5 shadow-xl" onclick="event.stopPropagation()">@csrf
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <h2 id="replace-chair-title" class="text-lg font-bold">{{ $currentChair ? 'Designate Department Chairperson' : 'Assign Department Chairperson' }}</h2>
@@ -174,7 +174,6 @@
                             <select id="chair-faculty-id" name="faculty_id" required class="field-input mt-1 w-full">
                                 <option value="">Choose faculty</option>@foreach($collegeFaculty->where('fac_dept_id', $selectedDepartment->dept_id) as $member)<option value="{{ $member->fac_id }}">{{ $member->full_name }}{{ $member->fac_rank ? ' · '.$member->fac_rank : '' }}</option>@endforeach
                             </select>
-                            <input type="hidden" name="confirm_replace" value="0">
                             <div class="mt-5 flex justify-end gap-2"><button type="button" class="topbar-btn btn-secondary" onclick="hideUtilityModal('replace-chair-modal')">Cancel</button><button type="submit" class="topbar-btn btn-primary">{{ $currentChair ? 'Replace chair' : 'Assign chair' }}</button></div>
                         </form>
                     </div>
@@ -330,12 +329,6 @@
                         </div>
                     </div>
                     <script>
-                        function confirmChairAssignment(form, replacing) {
-                            if (replacing && !window.confirm('This department already has a chair. Replace the current chair with the selected faculty member? The former chair will return to a faculty account and be saved in chair history.')) return false;
-                            form.querySelector('[name="confirm_replace"]').value = replacing ? '1' : '0';
-                            return true;
-                        }
-
                         document.getElementById('faculty-roster-search')?.addEventListener('input', event => {
                             const term = event.target.value.trim().toLowerCase();
                             document.querySelectorAll('.faculty-roster-row').forEach(row => row.classList.toggle('hidden', !row.dataset.facultySearch.includes(term)));
