@@ -636,6 +636,33 @@ class ScheduleReuseServiceTest extends TestCase
         $this->assertSame(1, DB::table('section')->where('sec_sem_id', $this->destinationSecondSemesterId)->count());
     }
 
+    public function test_pbt_apply_copies_only_the_selected_schedule_rows(): void
+    {
+        $secondScheduleId = DB::table('schedule')
+            ->where('sch_sem_id', $this->sourceSemesterId)
+            ->where('sch_day', 'Tuesday')
+            ->value('sch_id');
+        $scheduler = Mockery::mock(ScheduleAssignmentService::class);
+        $scheduler->shouldReceive('assign')->times(3)->andReturnUsing(function (array $assignment) {
+            $this->assertSame('Monday', $assignment['day']);
+            $this->insertSimulatedSchedule($assignment);
+            return ['success' => true, 'workload_override' => null];
+        });
+
+        $result = (new ScheduleReuseService($scheduler))->apply(
+            'pbt',
+            $this->facultyId,
+            $this->destinationSemesterId,
+            $this->sourceSemesterId,
+            [],
+            ['schedule:' . $secondScheduleId]
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['copied_count']);
+        $this->assertSame(1, DB::table('schedule')->where('sch_sem_id', $this->destinationSemesterId)->count());
+    }
+
     public function test_pbt_reuse_is_limited_to_the_chair_of_the_source_department(): void
     {
         $otherDepartmentId = (string) Str::uuid();

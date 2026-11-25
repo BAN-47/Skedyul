@@ -19,13 +19,19 @@
             </div>
             <div id="schedule-reuse-global-message" class="hidden mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"></div>
             <div id="schedule-reuse-summary" class="mb-4 grid grid-cols-3 gap-3"></div>
-            <h3 class="mb-1 border-b border-slate-200 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-700">Assignment checking</h3>
+            <div id="schedule-reuse-selection-controls" class="mb-1 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-700">Assignment checking</h3>
+                <label class="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-600">
+                    <input id="schedule-reuse-select-all" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    Select all schedules
+                </label>
+            </div>
             <div id="schedule-reuse-rows" class="divide-y divide-slate-200"></div>
             <div id="schedule-reuse-blocked" class="hidden mt-4 gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 <span aria-hidden="true" class="text-amber-600">⚠</span>
                 <div>
                     <div class="font-semibold">Copying is paused because one or more assignments need attention.</div>
-                    <div class="mt-1 text-amber-800">Review the issue shown on the affected assignment. Close this preview, make the correction, then click Reuse Schedule again for a fresh check.</div>
+                    <div class="mt-1 text-amber-800">Unselect assignments you do not want to reuse, or close this preview, make corrections, then click Reuse Schedule again for a fresh check.</div>
                 </div>
             </div>
             <div id="schedule-reuse-workload-reason-wrap" class="hidden mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">

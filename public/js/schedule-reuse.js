@@ -11,6 +11,8 @@
     const previewSuccess = document.getElementById("schedule-reuse-preview-success");
     const rowsContainer = document.getElementById("schedule-reuse-rows");
     const summaryContainer = document.getElementById("schedule-reuse-summary");
+    const selectionControls = document.getElementById("schedule-reuse-selection-controls");
+    const selectAllCheckbox = document.getElementById("schedule-reuse-select-all");
     const reasonWrap = document.getElementById("schedule-reuse-workload-reason-wrap");
     const reasonInput = document.getElementById("schedule-reuse-workload-reason");
 
@@ -20,6 +22,8 @@
         config: null,
         preview: null,
         applying: false,
+        canCopy: false,
+        selectedSummary: null,
     };
 
     if (modal.parentElement !== document.body) document.body.appendChild(modal);
@@ -55,6 +59,7 @@
                 state.config.scope === "pbs" ? state.config.sourceSectionId : state.config.targetId,
             destination_semester_id: state.config.destinationSemesterId,
             source_semester_id: state.config.sourceSemesterId,
+            excluded: state.config.excluded || [],
         };
     }
 
@@ -96,7 +101,13 @@
         confirmButton.textContent = "Confirm Reuse";
         refreshButton.classList.add("hidden");
         confirmButton.disabled = true;
+        selectionControls.classList.add("hidden");
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+        selectAllCheckbox.disabled = false;
         state.preview = null;
+        state.canCopy = false;
+        state.selectedSummary = null;
     }
 
     function renderSummary(summary) {
@@ -134,29 +145,119 @@
             valid: "Valid",
             conflict: "Conflict",
             error: "Error",
-            excluded: "Not available",
+            excluded: "Not selected",
         }[status] || status;
     }
 
     function renderRow(row) {
         const card = makeElement("article", "py-3 text-slate-900");
+        const layout = makeElement("div", "flex items-start gap-3");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500";
+        checkbox.checked = row.included !== false;
+        checkbox.disabled = row.user_excludable === false;
+        checkbox.dataset.sourceKey = row.source_key;
+        checkbox.setAttribute(
+            "aria-label",
+            `Include ${row.course_code || "course"}${row.section_name ? ` for ${row.section_name}` : ""}`,
+        );
+        layout.appendChild(checkbox);
+
+        const content = makeElement("div", "min-w-0 flex-1");
         const heading = makeElement("div", "flex flex-wrap items-center justify-between gap-2");
         heading.append(
             makeElement("h4", "text-xs font-bold text-slate-900", `${row.course_code || "Course"}${row.course_name ? ` — ${row.course_name}` : ""} · ${row.section_name || "Section unavailable"}`),
             makeElement("span", `rounded-full px-2 py-1 text-[11px] font-bold ${statusStyle(row.status)}`, statusLabel(row.status)),
         );
-        card.appendChild(heading);
-        card.appendChild(makeElement(
+        content.appendChild(heading);
+        content.appendChild(makeElement(
             "p",
             "mt-1 text-[10px] text-slate-600",
             `Faculty: ${row.faculty_name || "—"} · ${row.room_name || "—"} · ${row.day || "—"} ${row.start_time || ""}–${row.end_time || ""}`,
         ));
         if (row.message) {
             const color = ["conflict", "error"].includes(row.status) ? "text-red-700" : "text-slate-600";
-            card.appendChild(makeElement("p", `mt-1 text-[10px] ${color}`, row.message));
+            content.appendChild(makeElement("p", `mt-1 text-[10px] ${color}`, row.message));
         }
 
+        layout.appendChild(content);
+        card.appendChild(layout);
         return card;
+    }
+
+    function renderSelection(focusSourceKey = null) {
+        const sourceRows = state.preview?.rows || [];
+        const excluded = new Set(state.config?.excluded || []);
+        const rows = sourceRows.map((row) => {
+            const userExcludable = row.user_excludable !== false;
+            const included = userExcludable && row.included !== false && !excluded.has(row.source_key);
+            return included
+                ? { ...row, included: true }
+                : {
+                    ...row,
+                    included: false,
+                    status: "excluded",
+                    message: userExcludable ? "You chose not to include this assignment." : row.message,
+                };
+        });
+        const includedRows = rows.filter((row) => row.included);
+        const count = (status) => includedRows.filter((row) => row.status === status).length;
+        const summary = {
+            valid: count("valid"),
+            conflicts: count("conflict"),
+            needs_review: count("needs_review"),
+            errors: count("error"),
+            workload_overrides: count("workload_override"),
+            excluded: rows.filter((row) => row.status === "excluded").length,
+            selected: includedRows.length,
+            total: rows.length,
+        };
+        summary.blocked = summary.conflicts + summary.needs_review + summary.errors;
+        state.selectedSummary = summary;
+        state.canCopy = summary.blocked === 0 && summary.valid + summary.workload_overrides > 0;
+
+        selectionControls.classList.toggle("hidden", rows.length === 0);
+        rowsContainer.replaceChildren(...rows.map(renderRow));
+        if (!rows.length) {
+            rowsContainer.appendChild(makeElement("p", "py-5 text-sm text-slate-500", "No schedules are available in this archived section or faculty record."));
+        }
+        renderSummary(summary);
+
+        const selectableRows = rows.filter((row) => row.user_excludable !== false);
+        const selectedCount = selectableRows.filter((row) => row.included).length;
+        selectAllCheckbox.disabled = selectableRows.length === 0;
+        selectAllCheckbox.checked = selectableRows.length > 0 && selectedCount === selectableRows.length;
+        selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < selectableRows.length;
+
+        const hasOverrides = summary.workload_overrides > 0;
+        reasonWrap.classList.toggle("hidden", !hasOverrides);
+        blockedNotice.classList.toggle("hidden", summary.blocked === 0);
+        blockedNotice.classList.toggle("flex", summary.blocked > 0);
+
+        const notices = [];
+        if (!rows.length) {
+            notices.push(state.preview?.message || "");
+        } else if (summary.selected === 0) {
+            notices.push("Select at least one schedule to reuse.");
+        } else if (summary.blocked > 0) {
+            notices.push("Some selected assignments need attention. Unselect them or close the preview to make corrections.");
+        }
+        setMessage(globalMessage, notices.filter(Boolean).join(" "));
+
+        confirmButton.disabled = !state.canCopy || state.applying || (hasOverrides && !reasonInput.value.trim());
+        confirmButton.textContent = `Confirm Reuse${summary.selected ? ` (${summary.selected})` : ""}`;
+        overallStatus.textContent = state.canCopy ? "Ready to reuse" : "Needs attention";
+        overallStatus.className = state.canCopy
+            ? "rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800"
+            : "rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800";
+        overallStatus.classList.remove("hidden");
+
+        if (focusSourceKey) {
+            const focusedCheckbox = [...rowsContainer.querySelectorAll("input[data-source-key]")]
+                .find((checkbox) => checkbox.dataset.sourceKey === focusSourceKey);
+            focusedCheckbox?.focus();
+        }
     }
 
     function renderPreview(data) {
@@ -169,29 +270,30 @@
             return;
         }
 
+        const previousRows = new Map((state.preview?.rows || []).map((row) => [row.source_key, row]));
+        data.rows = data.rows.map((row) => {
+            const previousRow = previousRows.get(row.source_key);
+            if (
+                row.status === "excluded"
+                && row.included === false
+                && row.user_excludable !== false
+                && (state.config.excluded || []).includes(row.source_key)
+                && previousRow
+                && previousRow.status !== "excluded"
+            ) {
+                return {
+                    ...row,
+                    status: previousRow.status,
+                    message: previousRow.message,
+                    workload: previousRow.workload,
+                    included: true,
+                };
+            }
+            return row;
+        });
         state.preview = data;
         setMessage(previewError, "");
-        renderSummary(data.summary);
-        rowsContainer.replaceChildren(...data.rows.map(renderRow));
-        if (!data.rows.length) {
-            rowsContainer.appendChild(makeElement("p", "py-5 text-sm text-slate-500", "No schedules are available in this archived section or faculty record."));
-        }
-
-        const blocked = (data.summary.blocked || 0) > 0;
-        blockedNotice.classList.toggle("hidden", !blocked);
-        blockedNotice.classList.toggle("flex", blocked);
-        const notices = [];
-        if (!data.can_copy && !blocked) notices.push(data.message || "");
-        setMessage(globalMessage, notices.filter(Boolean).join(" "));
-
-        const hasOverrides = (data.summary.workload_overrides || 0) > 0;
-        reasonWrap.classList.toggle("hidden", !hasOverrides);
-        confirmButton.disabled = !data.can_copy || state.applying || (hasOverrides && !reasonInput.value.trim());
-        overallStatus.textContent = data.can_copy ? "Ready to reuse" : "Needs attention";
-        overallStatus.className = data.can_copy
-            ? "rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800"
-            : "rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800";
-        overallStatus.classList.remove("hidden");
+        renderSelection();
         document.getElementById("schedule-reuse-terms").textContent =
             `${data.source_label || state.config.sourceLabel} → ${data.destination_label || state.config.destinationLabel} · ${state.config.targetLabel}`;
     }
@@ -235,8 +337,8 @@
     }
 
     async function applyReuse() {
-        if (!state.preview?.can_copy || state.applying) return;
-        const hasOverrides = (state.preview.summary?.workload_overrides || 0) > 0;
+        if (!state.canCopy || state.applying) return;
+        const hasOverrides = (state.selectedSummary?.workload_overrides || 0) > 0;
         if (hasOverrides && !reasonInput.value.trim()) {
             reasonInput.focus();
             setMessage(previewError, "Enter a reason for the workload exception before continuing.");
@@ -273,9 +375,9 @@
             state.applying = false;
             confirmButton.removeAttribute("aria-busy");
             if (!confirmButton.classList.contains("hidden")) {
-                confirmButton.textContent = "Confirm Reuse";
-                confirmButton.disabled = !state.preview?.can_copy
-                    || ((state.preview?.summary?.workload_overrides || 0) > 0 && !reasonInput.value.trim());
+                confirmButton.textContent = `Confirm Reuse${state.selectedSummary?.selected ? ` (${state.selectedSummary.selected})` : ""}`;
+                confirmButton.disabled = !state.canCopy
+                    || ((state.selectedSummary?.workload_overrides || 0) > 0 && !reasonInput.value.trim());
             }
             closeButtons.forEach((button) => { button.disabled = false; });
         }
@@ -296,6 +398,7 @@
             destinationLabel: button.dataset.destinationLabel || "Current semester",
             previewUrl: button.dataset.previewUrl,
             applyUrl: button.dataset.applyUrl,
+            excluded: [],
         };
         if (state.config.scope === "pbs" && !state.config.sourceSectionId) {
             showUnavailable("Select a section from the archived semester before reusing its schedules.");
@@ -305,10 +408,34 @@
     });
 
     confirmButton.addEventListener("click", applyReuse);
+    rowsContainer.addEventListener("change", (event) => {
+        const checkbox = event.target instanceof HTMLInputElement
+            ? event.target
+            : null;
+        if (!checkbox?.dataset.sourceKey || checkbox.disabled || !state.config || !state.preview) return;
+
+        const excluded = new Set(state.config.excluded || []);
+        if (checkbox.checked) {
+            excluded.delete(checkbox.dataset.sourceKey);
+        } else {
+            excluded.add(checkbox.dataset.sourceKey);
+        }
+        state.config.excluded = [...excluded];
+        renderSelection(checkbox.dataset.sourceKey);
+    });
+    selectAllCheckbox.addEventListener("change", () => {
+        if (!state.config || !state.preview) return;
+        state.config.excluded = selectAllCheckbox.checked
+            ? []
+            : state.preview.rows
+                .filter((row) => row.user_excludable !== false)
+                .map((row) => row.source_key);
+        renderSelection();
+    });
     reasonInput.addEventListener("input", () => {
         setMessage(previewError, "");
-        const hasOverrides = (state.preview?.summary?.workload_overrides || 0) > 0;
-        confirmButton.disabled = !state.preview?.can_copy || (hasOverrides && !reasonInput.value.trim());
+        const hasOverrides = (state.selectedSummary?.workload_overrides || 0) > 0;
+        confirmButton.disabled = !state.canCopy || (hasOverrides && !reasonInput.value.trim());
     });
     refreshButton.addEventListener("click", () => window.location.reload());
     closeButtons.forEach((button) => button.addEventListener("click", hideModal));
