@@ -160,19 +160,6 @@
 </div>
 @endif
 
-@if(request('modal') === 'activity' || request()->has('history_page'))
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="department-activity-title">
-    <section class="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-        <div class="flex items-center justify-between"><div><h2 id="department-activity-title" class="text-lg font-bold">Department and role activity</h2><p class="text-sm text-slate-500">Recent actions by Admins, Deans, Chairs, and Faculty.</p></div><a class="btn btn-secondary" href="{{ $selectedCollege ? route('admin.departments', ['college_id' => $selectedCollege->college_id]) : route('admin.departments') }}">Close</a></div>
-        <div class="mt-3 divide-y divide-slate-100">
-            @forelse($departmentHistory as $activity)
-                <article class="py-3"><div class="font-semibold">{{ $activity->user?->usr_name ?? 'System' }} <span class="font-normal text-slate-500">· {{ $activity->user?->usr_role ?? 'system' }}</span></div><div class="text-sm">{{ $activity->al_action }} · {{ $activity->al_description }}</div><div class="text-xs text-slate-500">{{ $activity->al_target_table }} · {{ $activity->al_created_at }}</div></article>
-            @empty
-                <p class="py-4 text-sm text-slate-500">No department or role activity recorded yet.</p>
-            @endforelse
-        </div>
-    </div>
-
     @if (request('modal') === 'add-college')
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4" role="dialog"
             aria-modal="true" aria-labelledby="college-add-title">
