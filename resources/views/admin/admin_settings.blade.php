@@ -31,7 +31,7 @@
     @include('partials.admin_header', ['title' => 'Technical Admin settings'])
 
     <div class="page-content">
-      <div class="grid grid-cols-[220px_1fr] gap-6 items-start">
+      <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
 
         {{-- Left nav --}}
         <div class="card py-3 px-0">
@@ -368,9 +368,6 @@
                   </label>
                 </div>
               </div>
-            </div>
-          </div>
-
             </div>
           </div>
 
