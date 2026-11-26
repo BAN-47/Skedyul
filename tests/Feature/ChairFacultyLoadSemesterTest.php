@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\AuditActivityMiddleware;
 use App\Models\User;
+use App\Services\ProfileImageStorage;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -77,12 +78,14 @@ class ChairFacultyLoadSemesterTest extends TestCase
         });
         Schema::create('faculty', function (Blueprint $table) {
             $table->uuid('fac_id')->primary();
+            $table->string('fac_usr_id')->nullable();
             $table->uuid('fac_college_id')->nullable();
             $table->uuid('fac_dept_id')->nullable();
             $table->string('fac_first_name');
             $table->string('fac_last_name');
             $table->string('fac_employment_type')->nullable();
             $table->string('fac_special_position')->nullable();
+            $table->string('fac_profile_image')->nullable();
             $table->boolean('fac_is_placeholder')->default(false);
         });
         Schema::create('course', function (Blueprint $table) {
@@ -183,6 +186,7 @@ class ChairFacultyLoadSemesterTest extends TestCase
             'fac_first_name' => 'Ada',
             'fac_last_name' => 'Lovelace',
             'fac_employment_type' => 'full_time',
+            'fac_profile_image' => 'ada-lovelace.png',
         ]);
         $firstCourseId = (string) Str::uuid();
         $secondCourseId = (string) Str::uuid();
@@ -259,8 +263,21 @@ class ChairFacultyLoadSemesterTest extends TestCase
             ->assertOk()
             ->assertSee('2nd Semester')
             ->assertSee('2024-2025')
-            ->assertSee('CS202')
-            ->assertDontSee('CS101');
+            ->assertSee('2.0h')
+            ->assertDontSee('5.0h')
+            ->assertDontSee('Total load')
+            ->assertDontSee('Subjects</th>', false)
+            ->assertSee('Manage faculty accounts, employment types, and teaching loads for your department.')
+            ->assertSee('aria-label="Assign designation"', false)
+            ->assertSee('aria-label="Edit faculty"', false)
+            ->assertSee('aria-label="Delete faculty account"', false)
+            ->assertSee('Add User Account')
+            ->assertSee('Edit faculty details')
+            ->assertSee('Temporary Password')
+            ->assertSee('New Password')
+            ->assertSee('Confirm New Password')
+            ->assertSee('Show password')
+            ->assertSee(ProfileImageStorage::url('ada-lovelace.png', 'faculty_profile'), false);
     }
 
     public function test_faculty_load_defaults_to_official_semester(): void
@@ -276,7 +293,7 @@ class ChairFacultyLoadSemesterTest extends TestCase
         $this->actingAs($chair)
             ->get(route('chair.faculty_load'))
             ->assertOk()
-            ->assertSee('CS101')
-            ->assertDontSee('CS202');
+            ->assertSee('5.0h')
+            ->assertDontSee('2.0h');
     }
 }

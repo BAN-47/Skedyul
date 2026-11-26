@@ -62,7 +62,7 @@
 
         <a href="{{ route('chair.faculty_load') }}"
             class="nav-item {{ request()->routeIs('chair.faculty_load') ? 'active' : '' }}">
-            <span class="nav-icon"><i class="ti ti-chart-bar" aria-hidden="true"></i></span> Faculty Load
+            <span class="nav-icon"><i class="ti ti-users" aria-hidden="true"></i></span> Faculty Management
         </a>
 
         <a href="{{ route('chair.subjects') }}"

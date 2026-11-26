@@ -14,10 +14,16 @@ use App\Models\Study_Load;
 use App\Models\Semester;
 use App\Models\Workload;
 use App\Models\WorkloadOverride;
+use App\Models\User;
+use App\Services\AuditActivityLogger;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use App\Services\ScheduleAssignmentService;
 
 /**
@@ -117,7 +123,7 @@ class ChairFacultyLoadController extends Controller
                 ->groupBy('wlo_fac_id')
             : collect();
 
-        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads, $workloadOverrides) {
+        $facultyLoad = $faculty->map(function (Faculty $f) use ($studyLoads, $workloadOverrides, $deptChair) {
             $allLoads = $studyLoads->get($f->fac_id, collect());
             $facultyOverrides = $workloadOverrides->get($f->fac_id, collect());
 
@@ -202,10 +208,20 @@ class ChairFacultyLoadController extends Controller
             return [
                 'id' => $f->fac_id,
                 'name' => $f->full_name,
+                'first_name' => $f->fac_first_name,
+                'middle_name' => $f->fac_middle_name,
+                'last_name' => $f->fac_last_name,
+                'suffix' => $f->fac_suffix,
+                'employee_id' => $f->fac_employee_id,
+                'phone_number' => $f->fac_phone_number,
+                'address' => $f->fac_address,
                 'email' => $f->user?->usr_email,
                 'profile_image' => $f->fac_profile_image,
                 'rank' => $f->fac_rank,
                 'is_active' => (bool) ($f->user?->usr_is_active ?? false),
+                'can_manage' => $deptChair->dc_dept_id
+                    ? $f->fac_dept_id === $deptChair->dc_dept_id
+                    : $f->fac_college_id === $deptChair->dc_college_id,
                 'employment' => $f->fac_employment_type,
                 'special_position' => $f->fac_special_position,
                 'special_position_max_hours' => $f->fac_special_position
@@ -241,6 +257,18 @@ class ChairFacultyLoadController extends Controller
             'workload_overrides' => $facultyLoad->sum('workload_override_count'),
         ];
 
+        $managedFacultyQuery = $this->facultyForChair($deptChair);
+        $accountStats = [
+            'total' => (clone $managedFacultyQuery)->count(),
+            'active' => (clone $managedFacultyQuery)
+                ->whereHas('user', fn (Builder $query) => $query->where('usr_is_active', true))
+                ->count(),
+            'inactive' => (clone $managedFacultyQuery)->where(function (Builder $query) {
+                $query->whereHas('user', fn (Builder $users) => $users->where('usr_is_active', false))
+                    ->orWhereDoesntHave('user');
+            })->count(),
+        ];
+
         // Sections for this chair's program only (no AY/sem filter — names carry year)
         $sections = Section::where('sec_dept_id', $deptChair->dc_dept_id)
             ->orderBy('sec_name')
@@ -257,11 +285,243 @@ class ChairFacultyLoadController extends Controller
             'semesters',
             'facultyLoad',
             'facultyStats',
+            'accountStats',
             'faculty',
             'subjects',
             'sections',
             'designations'
         ));
+    }
+
+    public function storeFaculty(Request $request)
+    {
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'middle_name' => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'last_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'suffix' => ['nullable', 'string', 'max:20', 'not_regex:/[<>]/'],
+            'email' => ['required', 'email', 'max:255', 'not_regex:/[<>]/'],
+            'employee_id' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/', Rule::unique('faculty', 'fac_employee_id')],
+            'phone_number' => ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{7,14}$/'],
+            'rank' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
+            'special_position' => ['nullable', 'string', 'exists:designations,name'],
+            'address' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'password' => ['required', 'string', 'min:8', 'confirmed', 'not_regex:/[<>]/'],
+        ]);
+
+        $data['email'] = mb_strtolower(trim($data['email']));
+        if (User::query()->whereRaw('LOWER(usr_email) = ?', [$data['email']])->exists()) {
+            return back()->withInput()->withErrors([
+                'email' => 'This email is already registered. Use a different email address.',
+            ]);
+        }
+
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $position = $data['special_position'] ?? null;
+        if ($position && Designation::isLimitReached($position)) {
+            return back()->withInput()->withErrors([
+                'special_position' => "The designation '{$position}' has reached its maximum faculty limit.",
+            ]);
+        }
+        $designation = $position ? Designation::where('name', $position)->firstOrFail() : null;
+
+        $user = DB::transaction(function () use ($data, $chair, $position, $designation): User {
+            $name = trim(implode(' ', array_filter([
+                $data['first_name'],
+                $data['middle_name'] ?? null,
+                $data['last_name'],
+                $data['suffix'] ?? null,
+            ])));
+            $user = User::create([
+                'usr_name' => $name,
+                'usr_first_name' => $data['first_name'],
+                'usr_middle_name' => $data['middle_name'] ?? null,
+                'usr_last_name' => $data['last_name'],
+                'usr_suffix' => $data['suffix'] ?? null,
+                'usr_email' => $data['email'],
+                'usr_password_hash' => Hash::make($data['password']),
+                'usr_role' => 'faculty',
+                'usr_is_active' => true,
+            ]);
+
+            Faculty::create([
+                'fac_usr_id' => $user->usr_id,
+                'fac_college_id' => $chair->dc_college_id,
+                'fac_dept_id' => $chair->dc_dept_id,
+                'fac_first_name' => $data['first_name'],
+                'fac_middle_name' => $data['middle_name'] ?? null,
+                'fac_last_name' => $data['last_name'],
+                'fac_suffix' => $data['suffix'] ?? null,
+                'fac_employee_id' => $data['employee_id'] ?? null,
+                'fac_phone_number' => $data['phone_number'],
+                'fac_address' => $data['address'] ?? null,
+                'fac_rank' => $data['rank'] ?? null,
+                'fac_employment_type' => $data['employment_type'],
+                'fac_special_position' => $position,
+                'fac_special_position_max_hours' => $designation?->day_cap,
+            ]);
+
+            return $user;
+        });
+
+        AuditActivityLogger::record(
+            $request->user(),
+            'Created faculty account',
+            'faculty',
+            'Created faculty account for ' . $user->usr_name . '.',
+            $request->ip(),
+            $user->usr_id
+        );
+
+        return redirect()->route('chair.faculty_load', array_filter([
+            'semester' => $request->input('semester'),
+        ]))->with('success', 'Faculty account created successfully.');
+    }
+
+    public function updateFaculty(Request $request, string $facultyId)
+    {
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $faculty = $this->facultyForChair($chair)->with('user')->whereKey($facultyId)->firstOrFail();
+        $user = $faculty->user;
+        abort_if(!$user, 404, 'The faculty account is not linked to a user.');
+
+        $data = $request->validate([
+            'first_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'middle_name' => ['nullable', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'last_name' => ['required', 'string', 'max:150', 'not_regex:/[<>]/', 'regex:/^[\p{L}\s\-\'\.]+$/u'],
+            'suffix' => ['nullable', 'string', 'max:20', 'not_regex:/[<>]/'],
+            'email' => ['required', 'email', 'max:255', 'not_regex:/[<>]/'],
+            'employee_id' => [
+                'nullable',
+                'string',
+                'max:255',
+                'not_regex:/[<>]/',
+                Rule::unique('faculty', 'fac_employee_id')->ignore($faculty->fac_id, 'fac_id'),
+            ],
+            'phone_number' => ['required', 'string', 'max:20', 'regex:/^\+[1-9]\d{7,14}$/'],
+            'rank' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'employment_type' => ['required', Rule::in(['full_time', 'part_time'])],
+            'special_position' => ['nullable', 'string', 'exists:designations,name'],
+            'address' => ['nullable', 'string', 'max:255', 'not_regex:/[<>]/'],
+            'usr_is_active' => ['required', 'boolean'],
+            'password' => ['nullable', 'string', 'min:8', 'confirmed', 'not_regex:/[<>]/'],
+        ]);
+
+        $data['email'] = mb_strtolower(trim($data['email']));
+        if (User::query()
+            ->whereRaw('LOWER(usr_email) = ?', [$data['email']])
+            ->where('usr_id', '!=', $user->usr_id)
+            ->exists()) {
+            return back()->withInput()->withErrors([
+                'email' => 'This email is already registered. Use a different email address.',
+            ]);
+        }
+
+        $position = $data['special_position'] ?? null;
+        if ($position && Designation::isLimitReached($position, $faculty->fac_id)) {
+            return back()->withInput()->withErrors([
+                'special_position' => "The designation '{$position}' has reached its maximum faculty limit.",
+            ]);
+        }
+        $designation = $position ? Designation::where('name', $position)->firstOrFail() : null;
+
+        DB::transaction(function () use ($data, $faculty, $user, $position, $designation): void {
+            $name = trim(implode(' ', array_filter([
+                $data['first_name'],
+                $data['middle_name'] ?? null,
+                $data['last_name'],
+                $data['suffix'] ?? null,
+            ])));
+            $user->fill([
+                'usr_name' => $name,
+                'usr_first_name' => $data['first_name'],
+                'usr_middle_name' => $data['middle_name'] ?? null,
+                'usr_last_name' => $data['last_name'],
+                'usr_suffix' => $data['suffix'] ?? null,
+                'usr_email' => $data['email'],
+                'usr_is_active' => (bool) $data['usr_is_active'],
+            ]);
+            if (!empty($data['password'])) {
+                $user->usr_password_hash = Hash::make($data['password']);
+            }
+            $user->save();
+
+            $faculty->update([
+                'fac_first_name' => $data['first_name'],
+                'fac_middle_name' => $data['middle_name'] ?? null,
+                'fac_last_name' => $data['last_name'],
+                'fac_suffix' => $data['suffix'] ?? null,
+                'fac_employee_id' => $data['employee_id'] ?? null,
+                'fac_phone_number' => $data['phone_number'],
+                'fac_address' => $data['address'] ?? null,
+                'fac_rank' => $data['rank'] ?? null,
+                'fac_employment_type' => $data['employment_type'],
+                'fac_special_position' => $position,
+                'fac_special_position_max_hours' => $designation?->day_cap,
+            ]);
+        });
+
+        AuditActivityLogger::record(
+            $request->user(),
+            'Updated faculty account',
+            'faculty',
+            'Updated faculty account for ' . $user->usr_name . '.',
+            $request->ip(),
+            $faculty->fac_id
+        );
+
+        return redirect()->route('chair.faculty_load', array_filter([
+            'semester' => $request->input('semester'),
+        ]))->with('success', 'Faculty account updated successfully.');
+    }
+
+    public function destroyFaculty(Request $request, string $facultyId)
+    {
+        $chair = Dept_Chair::where('dc_usr_id', Auth::id())->firstOrFail();
+        $faculty = $this->facultyForChair($chair)->with('user')->whereKey($facultyId)->firstOrFail();
+
+        if ($faculty->studyLoads()->exists() || $faculty->schedules()->exists()) {
+            return back()->with('error', 'Remove this faculty member’s study loads and schedules before deleting the account.');
+        }
+
+        try {
+            DB::transaction(function () use ($faculty): void {
+                $faculty->delete();
+                $faculty->user?->delete();
+            });
+        } catch (QueryException $exception) {
+            $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+            if ($sqlState === '23503' || str_contains(strtolower($exception->getMessage()), 'foreign key')) {
+                return back()->with('error', 'Cannot delete this faculty account because related records still depend on it.');
+            }
+
+            throw $exception;
+        }
+
+        AuditActivityLogger::record(
+            $request->user(),
+            'Deleted faculty account',
+            'faculty',
+            'Deleted faculty account ' . $faculty->full_name . '.',
+            $request->ip(),
+            $faculty->fac_id
+        );
+
+        return redirect()->route('chair.faculty_load', array_filter([
+            'semester' => $request->input('semester'),
+        ]))->with('success', 'Faculty account deleted successfully.');
+    }
+
+    private function facultyForChair(Dept_Chair $chair): Builder
+    {
+        return Faculty::query()
+            ->where('fac_is_placeholder', false)
+            ->when(
+                $chair->dc_dept_id,
+                fn (Builder $query) => $query->where('fac_dept_id', $chair->dc_dept_id),
+                fn (Builder $query) => $query->where('fac_college_id', $chair->dc_college_id)
+            );
     }
 
     /**

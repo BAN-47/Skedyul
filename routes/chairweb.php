@@ -29,6 +29,9 @@ Route::middleware(['auth', 'role:department_chair', 'audit.activity'])->prefix('
 
     // Chair faculty load
     Route::get('/faculty-load', [ChairFacultyLoadController::class, 'index'])->name('chair.faculty_load');
+    Route::post('/faculty-load/faculty', [ChairFacultyLoadController::class, 'storeFaculty'])->name('chair.faculty_load.faculty.store');
+    Route::put('/faculty-load/faculty/{faculty}', [ChairFacultyLoadController::class, 'updateFaculty'])->name('chair.faculty_load.faculty.update');
+    Route::delete('/faculty-load/faculty/{faculty}', [ChairFacultyLoadController::class, 'destroyFaculty'])->name('chair.faculty_load.faculty.destroy');
     Route::post('/faculty-load/assign', [ChairFacultyLoadController::class, 'assign'])->name('chair.faculty_load.assign');
     Route::put('/faculty-load/{faculty}/special-position', [ChairFacultyLoadController::class, 'updateSpecialPosition'])->name('chair.faculty_load.special-position');
 
