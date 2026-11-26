@@ -330,7 +330,7 @@ class UserController extends Controller
             'usr_last_name' => 'required|string|max:150|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
             'usr_suffix' => 'nullable|string|max:20|not_regex:/[<>]/|regex:/^[\p{L}\s\-\'\.]+$/u',
             'usr_email' => 'required|string|max:255|not_regex:/[<>]/|email',
-            'password' => 'required|string|min:8|not_regex:/[<>]/',
+            'password' => 'required|string|min:8|confirmed|not_regex:/[<>]/',
             'usr_role' => ['required', Rule::in([
                 'faculty',
                 'department_chair',

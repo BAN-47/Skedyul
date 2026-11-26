@@ -20,7 +20,7 @@
             <div class="page-content" id="page-user-accounts">
 
                 {{-- STAT CARDS --}}
-                <div class="grid grid-cols-4 gap-3 mb-4">
+                <div class="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-2 xl:grid-cols-5">
                     <div class="stat-card">
                         <div class="stat-card-bar bg-blue-600"></div>
                         <div class="stat-icon">👥</div>
@@ -52,6 +52,14 @@
                         <div class="stat-value">{{ $stats['active'] ?? 0 }}</div>
                         <div class="stat-sub">{{ $stats['inactive'] ?? 0 }} inactive</div>
                     </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-bar bg-rose-500"></div>
+                        <div class="stat-icon">⏸️</div>
+                        <div class="stat-label">Inactive Accounts</div>
+                        <div class="stat-value">{{ $stats['inactive'] ?? 0 }}</div>
+                        <div class="stat-sub">Accounts currently disabled</div>
+                    </div>
                 </div>
 
                 {{-- USER TABLE --}}
@@ -62,7 +70,13 @@
                             <div class="card-sub">Click a name to view full profile</div>
                         </div>
 
-                        <div class="flex gap-2 items-center">
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <div class="flex gap-2" role="group" aria-label="Filter users by account status">
+                                <button type="button" data-user-status-filter="1" onclick="filterUsersByStatus('1')"
+                                    class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white">Active</button>
+                                <button type="button" data-user-status-filter="0" onclick="filterUsersByStatus('0')"
+                                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">Inactive</button>
+                            </div>
                             <input id="user-search" value="{{ $search }}" placeholder="Search users..."
                                 oninput="filterUsers(this.value)" class="field-input w-[200px]">
 
@@ -309,7 +323,7 @@
                         <label class="field-label">Password</label>
                         <div class="relative">
                             <input name="password" id="add-password" type="password"
-                                placeholder="Temporary password" required minlength="8" class="field-input pr-10">
+                                placeholder="Temporary password" required minlength="8" oninput="validateAddPasswordConfirmation()" class="field-input pr-10">
                             <button type="button"
                                 class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
                                 onclick="togglePasswordVisibility('add-password', this)">
@@ -318,6 +332,21 @@
                         </div>
                     </div>
 
+                    <div>
+                        <label class="field-label">Confirm Password</label>
+                        <div class="relative">
+                            <input name="password_confirmation" id="add-password-confirmation" type="password"
+                                placeholder="Re-enter password" required minlength="8" oninput="validateAddPasswordConfirmation()" class="field-input pr-10">
+                            <button type="button"
+                                class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                                onclick="togglePasswordVisibility('add-password-confirmation', this)">
+                                👁
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-3">
                     <div class="role-field" data-roles="faculty,dean,department_chair" style="display:none;">
                         <label class="field-label">Employee ID</label>
                         <input name="usr_employee_id" placeholder="e.g. 2026-00123" class="field-input">
@@ -955,6 +984,14 @@
             }
         }
 
+        function validateAddPasswordConfirmation() {
+            const password = document.getElementById('add-password');
+            const confirmation = document.getElementById('add-password-confirmation');
+            if (!password || !confirmation) return;
+            confirmation.setCustomValidity(confirmation.value && confirmation.value !== password.value ?
+                'Passwords do not match.' : '');
+        }
+
         function openModal(id) {
             document.getElementById(id)?.classList.add('active');
         }
@@ -1546,10 +1583,11 @@
             if (count) count.style.display = 'none';
         }
 
-        // ── Client-side pagination (10 per page) ──
-        const USERS_PER_PAGE = 10;
+        // ── Client-side pagination (6 per page) ──
+        const USERS_PER_PAGE = 6;
         let currentPage = 1;
         let filterQuery = @json(mb_strtolower($search));
+        let statusFilter = '1';
 
         function getUserRows() {
             return Array.from(document.querySelectorAll('#users-table tbody tr.user-row'));
@@ -1568,7 +1606,22 @@
         }
 
         function getFilteredRows() {
-            return getUserRows().filter(row => rowMatchesFilter(row, filterQuery));
+            return getUserRows().filter(row => row.dataset.active === statusFilter && rowMatchesFilter(row, filterQuery));
+        }
+
+        function filterUsersByStatus(status) {
+            statusFilter = status;
+            currentPage = 1;
+            document.querySelectorAll('[data-user-status-filter]').forEach(button => {
+                const selected = button.dataset.userStatusFilter === status;
+                button.classList.toggle('bg-blue-600', selected);
+                button.classList.toggle('text-white', selected);
+                button.classList.toggle('border', !selected);
+                button.classList.toggle('border-slate-200', !selected);
+                button.classList.toggle('bg-white', !selected);
+                button.classList.toggle('text-slate-600', !selected);
+            });
+            renderUserPage();
         }
 
         function renderUserPage() {

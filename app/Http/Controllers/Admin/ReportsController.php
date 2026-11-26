@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Faculty;
+use App\Models\College;
+use App\Models\Departments;
 use App\Models\Room;
 use App\Models\Schedule;
 use App\Models\Section;
@@ -23,8 +25,14 @@ class ReportsController extends Controller
         $sectionSearch = trim((string) request('section_search', ''));
         $teacherSearch = trim((string) request('teacher_search', ''));
         $roomSearch = trim((string) request('room_search', ''));
+        $sectionCollege = trim((string) request('section_college', ''));
+        $sectionDepartment = trim((string) request('section_department', ''));
 
-        $bySection = $this->getSectionData($semester, $sectionSearch);
+        $colleges = College::query()->orderBy('college_name')->get();
+        $departments = Departments::query()
+            ->when($sectionCollege !== '', fn ($query) => $query->where('dept_college_id', $sectionCollege))
+            ->orderBy('dept_name')->get();
+        $bySection = $this->getSectionData($semester, $sectionSearch, $sectionCollege, $sectionDepartment);
         $byTeacher = $this->getTeacherData($semester, $teacherSearch);
         $byRoom    = $this->getRoomData($semester, $roomSearch);
         $workloadOverrideCount = $byTeacher->sum(fn ($facultyReport) => $facultyReport->workload_overrides->count());
@@ -32,6 +40,10 @@ class ReportsController extends Controller
         return view('admin.reports', compact(
             'semester',
             'bySection',
+            'colleges',
+            'departments',
+            'sectionCollege',
+            'sectionDepartment',
             'byTeacher',
             'byRoom',
             'workloadOverrideCount'
@@ -170,9 +182,15 @@ class ReportsController extends Controller
     }
 
     // ── BY SECTION ───────────────────────────────────────────────────────
-    private function getSectionData($semester, string $search = '')
+    private function getSectionData($semester, string $search = '', string $collegeId = '', string $departmentId = '')
     {
         $sectionsQuery = Section::with('program');
+        if ($collegeId !== '') {
+            $sectionsQuery->whereHas('program', fn ($department) => $department->where('dept_college_id', $collegeId));
+        }
+        if ($departmentId !== '') {
+            $sectionsQuery->where('sec_dept_id', $departmentId);
+        }
         if ($search !== '') {
             $pattern = '%' . mb_strtolower($search) . '%';
             $sectionsQuery->where(function ($query) use ($pattern) {
