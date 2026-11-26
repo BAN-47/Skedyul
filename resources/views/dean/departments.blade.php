@@ -224,6 +224,30 @@
                                                                 class="block font-semibold text-slate-900">{{ $member->full_name }}</span><span
                                                                 class="block text-xs text-slate-500">{{ $member->user?->usr_email ?? 'No email' }}</span></span></button>
                                                 </td>
+                                                <td class="p-3"><button type="button"
+                                                        class="flex items-center gap-3 text-left"
+                                                        onclick="showFacultyDetails(this)"
+                                                        data-name="{{ $member->full_name }}"
+                                                        data-rank="{{ $member->fac_rank ?? '—' }}"
+                                                        data-employment="{{ ucfirst(str_replace('_', '-', $member->fac_employment_type ?? '—')) }}"
+                                                        data-email="{{ $member->user?->usr_email ?? '—' }}"
+                                                        data-employee="{{ $member->fac_employee_id ?? '—' }}"
+                                                        data-phone="{{ $member->fac_phone_number ?? '—' }}"
+                                                        data-position="{{ $member->fac_special_position ?? '—' }}"
+                                                        data-day="{{ number_format($member->day_load_hours, 1) }}h / {{ $member->day_load_cap }}h"
+                                                        data-evening="{{ number_format($member->evening_load_hours, 1) }}h / {{ $member->evening_load_cap }}h"
+                                                        data-load="{{ number_format($member->current_load_hours, 1) }}h"><span
+                                                            class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">
+                                                            @if ($member->fac_profile_image)
+                                                                <img class="h-full w-full object-cover"
+                                                                    src="{{ \App\Services\ProfileImageStorage::url($member->fac_profile_image, 'faculty_profile') }}"
+                                                                    alt="">@else{{ strtoupper(mb_substr($member->full_name, 0, 1)) }}
+                                                            @endif
+                                                        </span>
+                                                        <span><span
+                                                                class="block font-semibold text-slate-900">{{ $member->full_name }}</span><span
+                                                                class="block text-xs text-slate-500">{{ $member->user?->usr_email ?? 'No email' }}</span></span></button>
+                                                </td>
                                                 <td class="p-3">
                                                     <div>{{ $member->fac_rank ?? 'Faculty' }}</div>
                                                     <div class="text-xs text-slate-400">
