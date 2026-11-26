@@ -21,6 +21,8 @@ class DepartmentController extends Controller
         $filters = request()->validate([
             'search' => ['nullable', 'string', 'max:120'],
             'college_id' => ['nullable', 'string', 'exists:college,college_id'],
+            'employment_type' => ['nullable', Rule::in(['full_time', 'part_time'])],
+            'account_status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
         $departmentQuery = Departments::query()
             ->with([
@@ -48,10 +50,14 @@ class DepartmentController extends Controller
         $departmentFaculty = $selectedDepartment
             ? $selectedDepartment->faculty()
             ->where('fac_is_placeholder', false)
+            ->when($filters['employment_type'] ?? null, fn($query, $employment) => $query->where('fac_employment_type', $employment))
+            ->when($filters['account_status'] ?? null, function ($query, $status): void {
+                $query->whereHas('user', fn($userQuery) => $userQuery->where('usr_is_active', $status === 'active'));
+            })
             ->with(['user.dean', 'user.deptChair'])
             ->orderBy('fac_last_name')
             ->orderBy('fac_first_name')
-            ->paginate(15, ['*'], 'faculty_page')
+            ->paginate(10, ['*'], 'faculty_page')
             ->withQueryString()
             : null;
         $editingCollege = request()->filled('edit_college')
@@ -64,7 +70,7 @@ class DepartmentController extends Controller
                 ->orWhereHas('department', fn($collegeQuery) => $collegeQuery->where('college_name', $likeOperator, $term)->orWhere('college_code', $likeOperator, $term)));
         }
         if ($filters['designation'] ?? null) {
-            $departmentQuery->whereHas('faculty', fn ($facultyQuery) => $facultyQuery->where('fac_special_position', $filters['designation']));
+            $departmentQuery->whereHas('faculty', fn($facultyQuery) => $facultyQuery->where('fac_special_position', $filters['designation']));
         }
         $departmentRows = $departmentQuery->orderBy('dept_name')->paginate(12, ['*'], 'department_page')->withQueryString();
         $editingDepartment = ($selectedCollege && request()->filled('edit_department'))
