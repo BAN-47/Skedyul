@@ -87,6 +87,7 @@ class LoginController extends Controller
         }
 
         // Replace the pre-login session ID to prevent session fixation.
+        $user->recordLogin();
         Auth::login($user);
         $request->session()->regenerate();
         AuditActivityLogger::record(

@@ -67,6 +67,7 @@ class FacultyMobileController extends Controller
             $data['device_name'],
             ['faculty:read']
         )->plainTextToken;
+        $user->recordLogin();
 
         return response()->json([
             'token' => $token,

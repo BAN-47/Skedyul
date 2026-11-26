@@ -55,7 +55,13 @@ class User extends Authenticatable
 
     protected $casts = [
         'usr_is_active' => 'boolean',
+        'usr_last_login_at' => 'datetime',
     ];
+
+    public function recordLogin(): void
+    {
+        $this->forceFill(['usr_last_login_at' => now()])->save();
+    }
 
     public function getAuthPassword()
     {

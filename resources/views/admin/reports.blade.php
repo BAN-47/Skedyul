@@ -58,14 +58,28 @@
             <div id="panel-section" class="tab-panel">
                 <form method="GET" action="{{ route('admin.reports') }}" class="mb-4 flex flex-wrap items-center gap-2">
                     <input type="hidden" name="reports_tab" value="section">
+                    <label class="sr-only" for="section-report-college">Filter by college</label>
+                    <select id="section-report-college" name="section_college" class="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onchange="document.getElementById('section-report-department').value=''; this.form.submit()">
+                        <option value="">All colleges</option>
+                        @foreach($colleges as $college)
+                            <option value="{{ $college->college_id }}" @selected($sectionCollege === $college->college_id)>{{ $college->college_name }}</option>
+                        @endforeach
+                    </select>
+                    <label class="sr-only" for="section-report-department">Filter by department</label>
+                    <select id="section-report-department" name="section_department" class="w-full sm:w-48 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" onchange="this.form.submit()" @disabled($departments->isEmpty())>
+                        <option value="">All departments</option>
+                        @foreach($departments as $department)
+                            <option value="{{ $department->dept_id }}" @selected($sectionDepartment === $department->dept_id)>{{ $department->dept_name }}</option>
+                        @endforeach
+                    </select>
                     <label class="sr-only" for="section-report-search">Search sections</label>
-                    <input id="section-report-search" name="section_search" value="{{ request('section_search') }}" type="search" placeholder="Search section, department, or year…" class="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                    <button class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
-                    @if(request('section_search'))<a class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'section']) }}">Clear</a>@endif
+                    <input id="section-report-search" name="section_search" value="{{ request('section_search') }}" type="search" placeholder="Search section, department, or year…" class="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                    <button class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
+                    @if(request('section_search') || $sectionCollege || $sectionDepartment)<a class="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'section']) }}">Clear</a>@endif
                 </form>
                 @if($bySection->isEmpty())
                     <div class="card text-center py-12 text-slate-400">
-                        {{ request('section_search') ? 'No sections match your search.' : 'No sections found.' }}
+                        {{ (request('section_search') || $sectionCollege || $sectionDepartment) ? 'No sections match these filters.' : 'No sections found.' }}
                     </div>
                 @else
                 <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
@@ -97,12 +111,28 @@
                  TAB: BY TEACHER
             ═════════════════════════════════════════════ --}}
             <div id="panel-teacher" class="tab-panel hidden">
+                @php
+                    $teacherGroups = collect([
+                        ['title' => 'Full-time faculty', 'key' => 'full_time', 'faculty' => $byTeacher->filter(fn ($faculty) => $faculty->employment === 'full_time')],
+                        ['title' => 'Part-time faculty', 'key' => 'part_time', 'faculty' => $byTeacher->filter(fn ($faculty) => $faculty->employment === 'part_time')],
+                        ['title' => 'Other / unspecified employment', 'key' => 'other', 'faculty' => $byTeacher->filter(fn ($faculty) => !in_array($faculty->employment, ['full_time', 'part_time'], true))],
+                    ])->filter(fn ($group) => $group['faculty']->isNotEmpty());
+                @endphp
                 <form method="GET" action="{{ route('admin.reports') }}" class="mb-4 flex flex-wrap items-center gap-2">
                     <input type="hidden" name="reports_tab" value="teacher">
+                    @if(!$byTeacher->isEmpty())
+                    <div class="flex flex-wrap gap-2 sm:mr-2" role="group" aria-label="Filter faculty by employment type">
+                        <button type="button" data-teacher-filter="full_time" @disabled(!$teacherGroups->contains(fn ($group) => $group['key'] === 'full_time')) class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Full-time</button>
+                        <button type="button" data-teacher-filter="part_time" @disabled(!$teacherGroups->contains(fn ($group) => $group['key'] === 'part_time')) class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 disabled:opacity-50">Part-time</button>
+                        @if($teacherGroups->contains(fn ($group) => $group['key'] === 'other'))
+                        <button type="button" data-teacher-filter="other" class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600">Other</button>
+                        @endif
+                    </div>
+                    @endif
                     <label class="sr-only" for="teacher-report-search">Search faculty</label>
-                    <input id="teacher-report-search" name="teacher_search" value="{{ request('teacher_search') }}" type="search" placeholder="Search faculty, employee ID, college, or department…" class="min-w-[240px] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
-                    <button class="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
-                    @if(request('teacher_search'))<a class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'teacher']) }}">Clear</a>@endif
+                    <input id="teacher-report-search" name="teacher_search" value="{{ request('teacher_search') }}" type="search" placeholder="Search faculty, employee ID, college, or department…" class="w-full sm:w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100">
+                    <button class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700" type="submit">Search</button>
+                    @if(request('teacher_search'))<a class="rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50" href="{{ route('admin.reports', ['reports_tab' => 'teacher']) }}">Clear</a>@endif
                 </form>
                 @if($byTeacher->isEmpty())
                     <div class="card text-center py-12 text-slate-400">
@@ -113,8 +143,14 @@
                     <span>All active faculty records, including faculty with no plotted classes. {{ $workloadOverrideCount }} recorded workload override{{ $workloadOverrideCount === 1 ? '' : 's' }} in this result.</span>
                     <span>{{ $byTeacher->count() }} faculty</span>
                 </div>
-                <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                @foreach($byTeacher as $facultyReport)
+                @foreach($teacherGroups as $teacherGroup)
+                <section class="mb-6" data-teacher-group="{{ $teacherGroup['key'] }}" aria-labelledby="teacher-group-{{ $teacherGroup['key'] }}">
+                    <div class="mb-3 flex items-center gap-2">
+                        <h3 id="teacher-group-{{ $teacherGroup['key'] }}" class="text-sm font-bold text-slate-800">{{ $teacherGroup['title'] }}</h3>
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{{ $teacherGroup['faculty']->count() }}</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                @foreach($teacherGroup['faculty'] as $facultyReport)
                     @php
                         $load = $facultyReport->load;
                         $over = $load['status'] === 'Over limit';
@@ -123,7 +159,7 @@
                         $eveningPct = $load['evening_cap'] > 0 ? min(100, round($load['evening_hours'] / $load['evening_cap'] * 100)) : 0;
                         $combinedPct = ($load['part_time_cap'] ?? 0) > 0 ? min(100, round($load['total_hours'] / $load['part_time_cap'] * 100)) : 0;
                     @endphp
-                    <article class="card border border-slate-200 shadow-sm">
+                    <article data-teacher-card class="card border border-slate-200 shadow-sm">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="flex min-w-0 items-center gap-3">
                                 <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 font-bold text-blue-700">
@@ -186,7 +222,16 @@
                         </button>
                     </article>
                 @endforeach
-                </div>
+                    </div>
+                    <div data-teacher-pagination class="mt-4 flex items-center justify-between text-sm text-slate-600">
+                        <span data-teacher-page-label></span>
+                        <div class="flex gap-2">
+                            <button type="button" data-teacher-prev class="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">Previous</button>
+                            <button type="button" data-teacher-next class="rounded-lg border border-slate-200 px-3 py-1.5 hover:bg-slate-50">Next</button>
+                        </div>
+                    </div>
+                </section>
+                @endforeach
                 @endif
             </div>
 
@@ -289,6 +334,57 @@ function switchTab(active) {
 const requestedTab = document.body.dataset.activeTab;
 const savedTab = localStorage.getItem('reports_tab') || 'section';
 switchTab(TABS.includes(requestedTab) ? requestedTab : savedTab);
+
+// ── FACULTY EMPLOYMENT FILTER AND PAGINATION ─────────────────────────────
+const teacherFilterButtons = [...document.querySelectorAll('[data-teacher-filter]')];
+const teacherGroups = [...document.querySelectorAll('[data-teacher-group]')];
+let activeTeacherFilter = teacherFilterButtons.find(button => button.dataset.teacherFilter === 'full_time' && !button.disabled)?.dataset.teacherFilter
+    || teacherFilterButtons.find(button => !button.disabled)?.dataset.teacherFilter;
+
+function renderTeacherGroups() {
+    teacherGroups.forEach(group => {
+        const visible = group.dataset.teacherGroup === activeTeacherFilter;
+        group.classList.toggle('hidden', !visible);
+        if (!visible) return;
+
+        const cards = [...group.querySelectorAll('[data-teacher-card]')];
+        const pageSize = 6;
+        const pageCount = Math.max(1, Math.ceil(cards.length / pageSize));
+        group.dataset.page = Math.min(Number(group.dataset.page || 1), pageCount);
+        const page = Number(group.dataset.page);
+        cards.forEach((card, index) => card.classList.toggle('hidden', index < (page - 1) * pageSize || index >= page * pageSize));
+        group.querySelector('[data-teacher-page-label]').textContent = `Page ${page} of ${pageCount} · ${cards.length} faculty`;
+        group.querySelector('[data-teacher-prev]').disabled = page <= 1;
+        group.querySelector('[data-teacher-next]').disabled = page >= pageCount;
+        group.querySelector('[data-teacher-pagination]').classList.toggle('hidden', cards.length <= pageSize);
+    });
+
+    teacherFilterButtons.forEach(button => {
+        const selected = button.dataset.teacherFilter === activeTeacherFilter;
+        button.classList.toggle('bg-blue-600', selected);
+        button.classList.toggle('text-white', selected);
+        button.classList.toggle('border', !selected);
+        button.classList.toggle('border-slate-200', !selected);
+        button.classList.toggle('bg-white', !selected);
+        button.classList.toggle('text-slate-600', !selected);
+    });
+}
+
+teacherFilterButtons.forEach(button => button.addEventListener('click', () => {
+    activeTeacherFilter = button.dataset.teacherFilter;
+    renderTeacherGroups();
+}));
+teacherGroups.forEach(group => {
+    group.querySelector('[data-teacher-prev]').addEventListener('click', () => {
+        group.dataset.page = Math.max(1, Number(group.dataset.page || 1) - 1);
+        renderTeacherGroups();
+    });
+    group.querySelector('[data-teacher-next]').addEventListener('click', () => {
+        group.dataset.page = Number(group.dataset.page || 1) + 1;
+        renderTeacherGroups();
+    });
+});
+if (teacherGroups.length) renderTeacherGroups();
 
 // ── TOAST ──────────────────────────────────────────────────────────────────
 function showToast(msg) {
