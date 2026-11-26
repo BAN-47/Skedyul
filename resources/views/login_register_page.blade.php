@@ -111,13 +111,16 @@
         </div>
 
         {{-- Department badge --}}
-        <div id="auth-campus-badge" class="mt-12 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-5 py-3.5 text-center">
-          <div class="text-[12px] font-extrabold leading-snug text-white">
-            College of Computing, Information and<br>Communications Technology
+        <div id="auth-campus-badge" class="mt-10 w-full max-w-sm rounded-2xl border border-white/10 bg-white/[.06] px-6 py-4 text-center shadow-lg shadow-black/10 backdrop-blur-sm">
+          <div class="text-[10px] font-bold leading-snug tracking-[0.22em] text-blue-200/80">
+            DEVELOPED AT
           </div>
-          <div class="mt-1 text-[10px] text-white/30">
-            Cebu Technological University · Main Campus
-          </div>
+          <p class="mt-2 text-[11px] font-semibold leading-relaxed text-white/90">
+            College of Computer, Information and Communications Technology
+          </p>
+          <p class="mt-1 text-[10px] tracking-wide text-white/55">
+            Cebu Technological University - Main Campus
+          </p>
         </div>
 
       </div>
@@ -238,10 +241,6 @@
         <div class="mt-4 text-center text-sm text-slate-500">
           Don’t have an account?
           <a href="{{ route('register') }}" data-auth-view="register" class="font-bold text-blue-600 hover:text-blue-700">Create Account</a>
-        </div>
-
-        <div class="mt-6 text-center text-xs text-slate-400">
-          CCICT · Cebu Technological University — Main Campus
         </div>
 
       </div>
