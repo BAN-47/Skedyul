@@ -9,6 +9,7 @@ use App\Models\Faculty;
 use App\Models\Semester;
 use App\Models\Study_Load;
 use App\Services\AuditActivityLogger;
+use App\Services\ProfileImageStorage;
 use App\Models\Designation;
 use App\Services\ScheduleAssignmentService;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class FacultyWorkloadController extends Controller
             $request->user(),
             'Updated faculty designation',
             'faculty',
-            ($position ? 'Set ' . $faculty->full_name . ' as ' . $position . ' (' . $cap . '-hour Day cap).' : 'Removed the special designation from ' . $faculty->full_name . '.') ,
+            ($position ? 'Set ' . $faculty->full_name . ' as ' . $position . ' (' . $cap . '-hour Day cap).' : 'Removed the special designation from ' . $faculty->full_name . '.'),
             $request->ip(),
             $faculty->fac_id
         );
@@ -97,9 +98,9 @@ class FacultyWorkloadController extends Controller
         $sectionIds = \App\Models\Section::whereIn('sec_dept_id', $departmentIds)->pluck('sec_id');
         $loadsByFaculty = $semester
             ? Study_Load::with(['subject', 'section', 'schedules'])
-                ->where('sl_sem_id', $semester->sem_id)
-                ->whereIn('sl_sec_id', $sectionIds)
-                ->get()->groupBy('sl_fac_id')
+            ->where('sl_sem_id', $semester->sem_id)
+            ->whereIn('sl_sec_id', $sectionIds)
+            ->get()->groupBy('sl_fac_id')
             : collect();
 
         // Include home faculty in this college and any outside faculty teaching
@@ -117,9 +118,9 @@ class FacultyWorkloadController extends Controller
 
         $rows = $faculty->map(function (Faculty $member) use ($loadsByFaculty) {
             $loads = $loadsByFaculty->get($member->fac_id, collect());
-            $isEvening = fn ($load) => (bool) $load->section?->sec_is_evening
+            $isEvening = fn($load) => (bool) $load->section?->sec_is_evening
                 || strtolower((string) ($load->sl_shift ?? 'day')) === 'evening';
-            $dayLoads = $loads->filter(fn ($load) => !$isEvening($load));
+            $dayLoads = $loads->filter(fn($load) => !$isEvening($load));
             $eveningLoads = $loads->filter($isEvening);
             $dayHours = ScheduleAssignmentService::scheduledHoursForLoads($dayLoads);
             $eveningHours = ScheduleAssignmentService::scheduledHoursForLoads($eveningLoads);
@@ -144,13 +145,15 @@ class FacultyWorkloadController extends Controller
                     $dayCap > 0 ? $dayHours / $dayCap : 0,
                     $eveningCap > 0 ? $eveningHours / $eveningCap : 0
                 ) * 100);
-            $codes = $loads->map(fn ($load) => $load->subject?->course_code)->filter()->unique()->implode(', ');
+            $codes = $loads->map(fn($load) => $load->subject?->course_code)->filter()->unique()->implode(', ');
 
             return [
                 'id' => $member->fac_id,
                 'name' => $member->full_name,
                 'email' => $member->user?->usr_email,
-                'photo' => $member->fac_profile_image,
+                'photo' => $member->fac_profile_image
+                    ? ProfileImageStorage::url($member->fac_profile_image, 'faculty_profile')
+                    : null,
                 'rank' => $member->fac_rank,
                 'position' => $member->fac_special_position,
                 'department' => $member->program?->dept_code ?? 'Other department',
@@ -168,8 +171,12 @@ class FacultyWorkloadController extends Controller
                 'status_color' => $overLimit ? 'rose' : ($attention ? 'amber' : ($totalHours > 0 ? 'emerald' : 'slate')),
                 'progress' => min(100, $progress),
                 'search' => strtolower(implode(' ', array_filter([
-                    $member->full_name, $member->user?->usr_email, $member->fac_rank,
-                    $member->fac_special_position, $member->program?->dept_code, $codes,
+                    $member->full_name,
+                    $member->user?->usr_email,
+                    $member->fac_rank,
+                    $member->fac_special_position,
+                    $member->program?->dept_code,
+                    $codes,
                 ]))),
             ];
         });
@@ -193,13 +200,24 @@ class FacultyWorkloadController extends Controller
         ];
         $page = LengthAwarePaginator::resolveCurrentPage();
         $facultyRows = new LengthAwarePaginator(
-            $filtered->forPage($page, 15)->values(), $filtered->count(), 15, $page,
+            $filtered->forPage($page, 15)->values(),
+            $filtered->count(),
+            15,
+            $page,
             ['path' => LengthAwarePaginator::resolveCurrentPath(), 'query' => $request->query()]
         );
 
         return view('dean.faculty_workload', compact(
-            'dean', 'departments', 'selectedDepartment', 'semesters', 'semester',
-            'facultyRows', 'stats', 'search', 'employmentFilter', 'statusFilter'
+            'dean',
+            'departments',
+            'selectedDepartment',
+            'semesters',
+            'semester',
+            'facultyRows',
+            'stats',
+            'search',
+            'employmentFilter',
+            'statusFilter'
         ));
     }
 }
