@@ -114,8 +114,8 @@
 
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                     <div class="overflow-x-auto">
-                        <table class="w-full min-w-[1100px] text-left text-sm" id="faculty-load-table">
-                            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-3">Faculty</th><th class="p-3">Rank / designation</th><th class="p-3">Employment</th><th class="p-3">Day</th><th class="p-3">Evening</th><th class="p-3">Workload</th><th class="p-3">Override analytics</th><th class="p-3 text-right">Actions</th></tr></thead>
+                        <table class="w-full min-w-[1100px] table-fixed text-left text-sm" id="faculty-load-table">
+                            <thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="w-[20%] p-3">Faculty</th><th class="w-[18%] p-3">Rank / designation</th><th class="w-[12%] p-3">Employment</th><th class="w-[9%] p-3">Day</th><th class="w-[9%] p-3">Evening</th><th class="w-[11%] p-3">Workload</th><th class="w-[10%] whitespace-normal p-3">Override analytics</th><th class="w-[11%] p-3 text-right">Actions</th></tr></thead>
                             <tbody class="divide-y divide-slate-100">
                                 @forelse($facultyLoad as $fl)
                                     <tr class="bg-white" data-load-row data-employment="{{ $fl['employment'] ?? 'full_time' }}" data-account-status="{{ $fl['is_active'] ? 'active' : 'inactive' }}" data-designated="{{ $fl['special_position'] ? '1' : '0' }}" data-load-status="{{ $fl['status_color'] === 'rose' ? 'attention' : ($fl['status_color'] === 'amber' ? 'attention' : ($fl['status'] === 'Within Limit' ? 'available' : 'no_load')) }}" data-search="{{ strtolower($fl['name'].' '.$fl['email'].' '.$fl['employee_id'].' '.$fl['rank'].' '.$fl['employment'].' '.($fl['special_position'] ?? '').' '.$fl['subjects'].' '.$fl['status'].' '.collect($fl['workload_overrides'])->pluck('reason')->implode(' ')) }}">
@@ -131,7 +131,7 @@
                                         <td class="p-3"><strong class="text-emerald-700">{{ number_format($fl['day']['total_hours'], 1) }}h</strong><span class="text-xs text-slate-400"> / {{ $fl['day']['max_hours'] }}h</span>@if($fl['employment'] === 'part_time')<div class="text-xs text-slate-400">Part of shared cap</div>@endif</td>
                                         <td class="p-3"><strong class="text-indigo-700">{{ number_format($fl['evening']['total_hours'], 1) }}h</strong><span class="text-xs text-slate-400"> / {{ $fl['evening']['max_hours'] }}h</span>@if($fl['employment'] === 'part_time')<div class="text-xs text-slate-400">Part of shared cap</div>@endif</td>
                                         <td class="p-3"><span class="badge {{ $fl['status_color'] === 'rose' ? 'badge-red' : ($fl['status_color'] === 'amber' ? 'badge-amber' : ($fl['status_color'] === 'emerald' ? 'badge-green' : 'badge-grey')) }}">{{ $fl['status'] }}</span></td>
-                                        <td class="min-w-[220px] p-3">
+                                        <td class="w-[10%] p-3 break-words">
                                             @if ($fl['workload_override_count'] > 0)
                                                 <details>
                                                     <summary class="cursor-pointer font-semibold text-rose-700">{{ $fl['workload_override_count'] }} recorded · View reasons</summary>
@@ -149,7 +149,7 @@
                                                 <span class="text-xs text-slate-400">None</span>
                                             @endif
                                         </td>
-                                        <td class="min-w-[155px] p-3">
+                                        <td class="w-[11%] min-w-[145px] p-3">
                                             @if ($fl['can_manage'])
                                                 <div class="flex justify-end gap-1.5">
                                                     @php($designationAction = $fl['special_position'] ? 'Edit designation' : 'Assign designation')
