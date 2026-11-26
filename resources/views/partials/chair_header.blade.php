@@ -112,7 +112,7 @@
         'index' => route('chair.notifications.index'),
         'unreadCount' => route('chair.notifications.unread-count'),
         'read' => route('chair.notifications.read', ['notification' => '__notification_id__']),
-        'readAll' => route('chair.notifications.read-all'),
+        'readAll' => route('notifications.read-all'),
         'delete' => route('notifications.destroy', ['id' => '__notification_id__']),
         'reportAdmin' => route('chair.notifications.report-admin'),
     ];
@@ -360,7 +360,7 @@
     async function chairHeaderMarkAllRead() {
         try {
             await chairHeaderRequest(CHAIR_HEADER_NOTIFICATION_ENDPOINTS.readAll, {
-                method: 'POST',
+                method: 'PUT',
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 },
