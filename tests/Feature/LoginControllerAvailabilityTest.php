@@ -26,6 +26,7 @@ class LoginControllerAvailabilityTest extends TestCase
             $table->boolean('usr_is_active')->default(true);
             $table->unsignedInteger('usr_failed_login_attempts')->default(0);
             $table->timestamp('usr_locked_until')->nullable();
+            $table->timestamp('usr_last_login_at')->nullable();
         });
     }
 
@@ -53,5 +54,6 @@ class LoginControllerAvailabilityTest extends TestCase
             ->assertRedirect(route('admin.dashboard'));
 
         $this->assertAuthenticatedAs(User::findOrFail($userId));
+        $this->assertNotNull(User::findOrFail($userId)->usr_last_login_at);
     }
 }

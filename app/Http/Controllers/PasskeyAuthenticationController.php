@@ -195,6 +195,7 @@ class PasskeyAuthenticationController extends Controller
                 return response()->json(['message' => 'This account role cannot sign in.'], 403);
             }
 
+            $user->recordLogin();
             Auth::login($user);
             $request->session()->regenerate();
             AuditActivityLogger::record(
