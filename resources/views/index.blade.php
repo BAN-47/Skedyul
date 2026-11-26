@@ -77,10 +77,10 @@
                     </p>
 
                     <div class="mt-8 flex flex-wrap gap-3">
-                        <a href="#" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
+                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
                             Get Started with Us
                         </a>
-                        <a href="#" class="inline-flex items-center justify-center rounded-lg bg-gray-400 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
+                        <a href="#features" class="inline-flex items-center justify-center rounded-lg bg-gray-400 px-5 py-3 text-base font-semibold text-white shadow-lg shadow-blue-600/30 transition hover:-translate-y-px hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 sm:px-6 sm:text-lg">
                             See how it works
                         </a>
                     </div>
