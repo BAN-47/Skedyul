@@ -72,13 +72,20 @@ class DeanDepartmentController extends Controller
     {
         $college = $this->assignedCollege();
         $department = Departments::where('dept_college_id', $college->college_id)->findOrFail($id);
-        foreach ([
-            'faculty' => 'fac_dept_id', 'course' => 'course_dept_id', 'section' => 'sec_dept_id',
-            'department_chair' => 'dc_dept_id', 'schedule_submission' => 'schsub_dept_id',
-            'dean' => 'dean_dept_id',
-        ] as $table => $column) {
-            if (Schema::hasTable($table) && Schema::hasColumn($table, $column)
-                && DB::table($table)->where($column, $department->dept_id)->exists()) {
+        foreach (
+            [
+                'faculty' => 'fac_dept_id',
+                'course' => 'course_dept_id',
+                'section' => 'sec_dept_id',
+                'department_chair' => 'dc_dept_id',
+                'schedule_submission' => 'schsub_dept_id',
+                'dean' => 'dean_dept_id',
+            ] as $table => $column
+        ) {
+            if (
+                Schema::hasTable($table) && Schema::hasColumn($table, $column)
+                && DB::table($table)->where($column, $department->dept_id)->exists()
+            ) {
                 return back()->with('error', 'This department is still linked to faculty, courses, sections, a Chair, or submissions. Remove or move those records first.');
             }
         }
@@ -241,7 +248,7 @@ class DeanDepartmentController extends Controller
         ], [
             'not_regex' => 'Angle brackets (< and >) are not allowed.',
         ]);
-        
+
         $email = strtolower(trim($data['usr_email']));
         if (User::whereRaw('LOWER(usr_email) = ?', [$email])->exists()) {
             return back()->withErrors(['usr_email' => 'That email already has an account.'])->withInput();
@@ -279,8 +286,8 @@ class DeanDepartmentController extends Controller
                 'fac_employment_type' => $data['employment_type'],
                 'fac_rank' => $data['usr_rank_title'] ?? null,
                 'fac_special_position' => $data['special_position'] ?? null,
-                'fac_special_position_max_hours' => $data['special_position'] 
-                    ? Designation::where('name', $data['special_position'])->value('day_cap') 
+                'fac_special_position_max_hours' => $data['special_position']
+                    ? Designation::where('name', $data['special_position'])->value('day_cap')
                     : null,
             ]);
             return $user;
@@ -336,8 +343,8 @@ class DeanDepartmentController extends Controller
                 'fac_rank' => $data['fac_rank'] ?? null,
                 'fac_employment_type' => $data['fac_employment_type'],
                 'fac_special_position' => $data['fac_special_position'] ?? null,
-                'fac_special_position_max_hours' => $data['fac_special_position'] 
-                    ? Designation::where('name', $data['fac_special_position'])->value('day_cap') 
+                'fac_special_position_max_hours' => $data['fac_special_position']
+                    ? Designation::where('name', $data['fac_special_position'])->value('day_cap')
                     : null,
                 'fac_phone_number' => $data['fac_phone_number'] ?? null,
                 'fac_address' => $data['fac_address'] ?? null,
@@ -347,8 +354,10 @@ class DeanDepartmentController extends Controller
             // Keep the linked login name, email, and account status in sync with the edit form.
             $faculty->user->update([
                 'usr_name' => trim(implode(' ', array_filter([
-                    $data['usr_first_name'], $data['usr_middle_name'] ?? null,
-                    $data['usr_last_name'], $data['usr_suffix'] ?? null,
+                    $data['usr_first_name'],
+                    $data['usr_middle_name'] ?? null,
+                    $data['usr_last_name'],
+                    $data['usr_suffix'] ?? null,
                 ]))),
                 'usr_first_name' => $data['usr_first_name'],
                 'usr_middle_name' => $data['usr_middle_name'] ?? null,
@@ -394,8 +403,12 @@ class DeanDepartmentController extends Controller
     // Cycles through brand colors per department card, in department order.
     const DEPT_COLORS = ['blue', 'purple', 'teal', 'amber', 'red', 'green'];
 
-    public function index()
+    public function index(Request $request)
     {
+        $filters = $request->validate([
+            'employment_type' => ['nullable', Rule::in(['full_time', 'part_time'])],
+            'account_status' => ['nullable', Rule::in(['active', 'inactive'])],
+        ]);
         $academicYear = AcademicYear::where('ay_is_active', true)->first();
         $semester     = Semester::where('sem_is_active', true)->first();
 
@@ -417,8 +430,8 @@ class DeanDepartmentController extends Controller
             ->when($semester, fn($q) => $q->where('sl_sem_id', $semester->sem_id))
             ->get()
             ->groupBy('sl_fac_id');
-        $hoursByFaculty = $loadsByFaculty->map(fn ($loads) => $loads->sum(
-            fn ($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
+        $hoursByFaculty = $loadsByFaculty->map(fn($loads) => $loads->sum(
+            fn($load) => \App\Services\ScheduleAssignmentService::courseHours($load->subject)
         ));
 
         $deptData = [];
@@ -485,9 +498,9 @@ class DeanDepartmentController extends Controller
 
                 // Section ownership is tied to the department; count all years and semesters for the overview.
                 $progSectionCount = Section::where('sec_dept_id', $prog->dept_id)->count();
-                $activeFacultyCount = Faculty::whereIn('fac_id', $facultyIds)->whereHas('user', fn ($query) => $query->where('usr_is_active', true))->count();
-                $plottedCourseCount = Study_Load::whereHas('subject', fn ($query) => $query->where('course_dept_id', $prog->dept_id))
-                    ->when($semester, fn ($query) => $query->where('sl_sem_id', $semester->sem_id))
+                $activeFacultyCount = Faculty::whereIn('fac_id', $facultyIds)->whereHas('user', fn($query) => $query->where('usr_is_active', true))->count();
+                $plottedCourseCount = Study_Load::whereHas('subject', fn($query) => $query->where('course_dept_id', $prog->dept_id))
+                    ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id))
                     ->distinct('sl_course_id')->count('sl_course_id');
 
                 $programsData[$prog->prog_id] = [
@@ -537,6 +550,7 @@ class DeanDepartmentController extends Controller
             ? $managedDepartments->firstWhere('dept_id', request('department_id'))
             : null;
         $facultyMembers = collect();
+        $facultyRosterTotal = 0;
         $currentChair = null;
         $chairHistory = collect();
         $departmentActivity = collect();
@@ -561,12 +575,12 @@ class DeanDepartmentController extends Controller
                 ->orderBy('fac_last_name')->orderBy('fac_first_name')->get()
                 ->map(function (Faculty $member) use ($semester) {
                     $loads = Study_Load::with(['subject', 'section', 'schedules'])->where('sl_fac_id', $member->fac_id)
-                        ->when($semester, fn ($query) => $query->where('sl_sem_id', $semester->sem_id))->get();
-                    $shiftForLoad = fn ($load) => $load->section?->sec_is_evening
+                        ->when($semester, fn($query) => $query->where('sl_sem_id', $semester->sem_id))->get();
+                    $shiftForLoad = fn($load) => $load->section?->sec_is_evening
                         ? 'evening'
                         : strtolower((string) ($load->sl_shift ?: 'day'));
-                    $dayLoads = $loads->filter(fn ($load) => $shiftForLoad($load) !== 'evening');
-                    $eveningLoads = $loads->filter(fn ($load) => $shiftForLoad($load) === 'evening');
+                    $dayLoads = $loads->filter(fn($load) => $shiftForLoad($load) !== 'evening');
+                    $eveningLoads = $loads->filter(fn($load) => $shiftForLoad($load) === 'evening');
                     $member->day_load_hours = ScheduleAssignmentService::scheduledHoursForLoads($dayLoads);
                     $member->evening_load_hours = ScheduleAssignmentService::scheduledHoursForLoads($eveningLoads);
                     $member->current_load_hours = $member->day_load_hours + $member->evening_load_hours;
@@ -576,25 +590,41 @@ class DeanDepartmentController extends Controller
                     return $member;
                 });
             $facultyTotal = $facultyMembers->count();
-            $activeFacultyCount = $facultyMembers->filter(fn ($member) => (bool) $member->user?->usr_is_active)->count();
+            $activeFacultyCount = $facultyMembers->filter(fn($member) => (bool) $member->user?->usr_is_active)->count();
             $dayLoadTotal = $facultyMembers->sum('day_load_hours');
             $eveningLoadTotal = $facultyMembers->sum('evening_load_hours');
-            $workloadAttentionCount = $facultyMembers->filter(fn ($member) => in_array($member->load_status, ['Near Max', 'Overload'], true))->count();
+            $workloadAttentionCount = $facultyMembers->filter(fn($member) => in_array($member->load_status, ['Near Max', 'Overload'], true))->count();
             $pendingReviewCount = $semester
                 ? Schedule_Submission::where('schsub_dept_id', $selectedDepartment->dept_id)
-                    ->where('schsub_sem_id', $semester->sem_id)
-                    ->where('schsub_status', 'pending')
-                    ->whereIn('schsub_type', ['pbs', 'pbt'])
-                    ->count()
+                ->where('schsub_sem_id', $semester->sem_id)
+                ->where('schsub_status', 'pending')
+                ->whereIn('schsub_type', ['pbs', 'pbt'])
+                ->count()
                 : 0;
-            $facultyPage = max(1, LengthAwarePaginator::resolveCurrentPage('faculty_page'));
+            $facultyRoster = $facultyMembers;
+            if ($filters['employment_type'] ?? null) {
+                $facultyRoster = $facultyRoster->filter(
+                    fn($member) => $member->fac_employment_type === $filters['employment_type']
+                );
+            }
+            if ($filters['account_status'] ?? null) {
+                $isActive = $filters['account_status'] === 'active';
+                $facultyRoster = $facultyRoster->filter(
+                    fn($member) => $member->user !== null
+                        && (bool) $member->user->usr_is_active === $isActive
+                );
+            }
+            $facultyRosterTotal = $facultyRoster->count();
+            $lastFacultyPage = max(1, (int) ceil($facultyRosterTotal / 10));
+            $facultyPage = min(max(1, LengthAwarePaginator::resolveCurrentPage('faculty_page')), $lastFacultyPage);
             $facultyMembers = new LengthAwarePaginator(
-                $facultyMembers->forPage($facultyPage, 10)->values(),
-                $facultyTotal,
+                $facultyRoster->forPage($facultyPage, 10)->values(),
+                $facultyRosterTotal,
                 10,
                 $facultyPage,
                 ['path' => LengthAwarePaginator::resolveCurrentPath(), 'pageName' => 'faculty_page', 'query' => request()->query()]
             );
+            $facultyMembers->fragment('program-detail-view');
             $currentChair = Dept_Chair::with('user')->where('dc_dept_id', $selectedDepartment->dept_id)->first();
             $currentDean = Dean::with('user')->where('dean_college_id', $assignedCollege->college_id)->first();
             $deanHistory = Audit_Log::with('user')
@@ -629,7 +659,7 @@ class DeanDepartmentController extends Controller
                 ->orderByDesc('al_created_at')->paginate(10, ['*'], 'activity_page')->withQueryString();
             $collegeFaculty = Faculty::where('fac_college_id', $assignedCollege->college_id)
                 ->where('fac_is_placeholder', false)->with('user')
-                ->whereHas('user', fn ($query) => $query->where('usr_role', 'faculty')->where('usr_is_active', true))
+                ->whereHas('user', fn($query) => $query->where('usr_role', 'faculty')->where('usr_is_active', true))
                 ->orderBy('fac_last_name')->orderBy('fac_first_name')->get();
         }
 
@@ -638,7 +668,7 @@ class DeanDepartmentController extends Controller
         $activeFacultyCount = $activeFacultyCount ?? 0;
         $dayLoadTotal = $dayLoadTotal ?? 0;
         $eveningLoadTotal = $eveningLoadTotal ?? 0;
-        return view('dean.departments', compact('deptData', 'academicYear', 'semester', 'assignedCollege', 'managedDepartments', 'selectedDepartment', 'facultyMembers', 'facultyTotal', 'sectionCount', 'activeFacultyCount', 'dayLoadTotal', 'eveningLoadTotal', 'pendingReviewCount', 'workloadAttentionCount', 'collegeFaculty', 'currentChair', 'currentDean', 'chairHistory', 'chairHistoryAvailable', 'deanHistory', 'departmentActivity'));
+        return view('dean.departments', compact('deptData', 'academicYear', 'semester', 'assignedCollege', 'managedDepartments', 'selectedDepartment', 'facultyMembers', 'facultyTotal', 'facultyRosterTotal', 'filters', 'sectionCount', 'activeFacultyCount', 'dayLoadTotal', 'eveningLoadTotal', 'pendingReviewCount', 'workloadAttentionCount', 'collegeFaculty', 'currentChair', 'currentDean', 'chairHistory', 'chairHistoryAvailable', 'deanHistory', 'departmentActivity'));
     }
 
     /**
