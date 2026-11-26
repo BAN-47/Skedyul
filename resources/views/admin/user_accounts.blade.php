@@ -611,9 +611,14 @@
                     </div>
                     <div>
                         <label class="field-label" for="edit-password-confirmation">Confirm New Password</label>
-                        <input id="edit-password-confirmation" name="password_confirmation" type="password"
-                            minlength="8" autocomplete="new-password" placeholder="Re-enter the new password"
-                            class="field-input">
+                        <div class="relative">
+                            <input id="edit-password-confirmation" name="password_confirmation" type="password"
+                                minlength="8" autocomplete="new-password" placeholder="Re-enter the new password"
+                                class="field-input pr-11">
+                            <button type="button" aria-label="Show password"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                                onclick="togglePasswordVisibility('edit-password-confirmation', this)">👁</button>
+                        </div>
                     </div>
                 </div>
 
